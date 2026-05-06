@@ -14,6 +14,7 @@ import {
   CheckSquare,
   Award,
   BookOpen,
+  ClipboardList,
   TrendingUp,
   TrendingDown,
   Receipt,
@@ -49,6 +50,7 @@ const SECTIONS: MenuSection[] = [
       { to: '/attendance',  label: '출석체크', Icon: CheckSquare },
       { to: '/certificates', label: '수료증',  Icon: Award },
       { to: '/activity-logs', label: '일지',   Icon: BookOpen },
+      { to: '/forms',         label: '폼 관리', Icon: ClipboardList },
     ],
   },
   {

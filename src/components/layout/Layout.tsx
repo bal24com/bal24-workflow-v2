@@ -19,6 +19,7 @@ const TITLES: Record<string, string> = {
   '/attendance':  '출석체크',
   '/certificates':'수료증',
   '/activity-logs':'일지',
+  '/forms':       '폼 관리',
   '/income':      '수입',
   '/expense':     '지출',
   '/receipts':    '증빙',
