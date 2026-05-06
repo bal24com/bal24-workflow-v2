@@ -40,7 +40,7 @@ const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
 ];
 
 const SELECT_COLUMNS =
-  '*, lead_client:clients!consortiums_lead_client_id_fkey(id,name), project:projects(id,name)';
+  '*, lead_client:clients!consortiums_lead_client_id_fkey(id,name), project:projects!consortiums_project_id_fkey(id,name)';
 
 const MEMBER_SELECT =
   '*, client:clients(id,name)';

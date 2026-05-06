@@ -12,6 +12,9 @@ import ClientsPage from './pages/clients/ClientsPage';
 import ExpertsPage from './pages/experts/ExpertsPage';
 import ConsortiumPage from './pages/consortium/ConsortiumPage';
 import ConsortiumDetailPage from './pages/consortium/ConsortiumDetailPage';
+import IncomePage from './pages/income/IncomePage';
+import ExpensesPage from './pages/expenses/ExpensesPage';
+import ReceiptsPage from './pages/receipts/ReceiptsPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -71,9 +74,9 @@ export default function App() {
           <Route path="/shares" element={<PlaceholderPage title="공유" description="외부 공유 링크 관리가 여기에 들어와요." />} />
 
           {/* 재무 */}
-          <Route path="/income" element={<PlaceholderPage title="수입" description="수입 관리가 여기에 들어와요." />} />
-          <Route path="/expense" element={<PlaceholderPage title="지출" description="지출 관리가 여기에 들어와요." />} />
-          <Route path="/vouchers" element={<PlaceholderPage title="증빙" description="증빙·영수증 관리가 여기에 들어와요." />} />
+          <Route path="/income" element={<IncomePage />} />
+          <Route path="/expense" element={<ExpensesPage />} />
+          <Route path="/vouchers" element={<ReceiptsPage />} />
           <Route path="/reports" element={<PlaceholderPage title="리포트" description="재무·실적 리포트가 여기에 들어와요." />} />
 
           {/* 기타 */}

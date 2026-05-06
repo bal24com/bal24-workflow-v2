@@ -15,6 +15,11 @@ export type ProgramType = '교육' | '캠프' | '행사' | '기타';
 export type ProgramStatus = '준비' | '진행' | '완료' | '취소';
 export type ConsortiumStatus = '구성중' | '진행' | '완료' | '해산';
 export type ConsortiumRole = '주관' | '공동' | '위탁';
+export type LedgerType = 'own' | 'consortium';
+export type IncomeStatus = '대기' | '입금완료' | '반려';
+export type ExpenseStatus = '대기' | '출금완료' | '반려';
+export type WithholdingType = 'none' | 'business_3_3' | 'other_8_8';
+export type ReceiptType = '영수증' | '세금계산서' | '간이영수증' | '계좌이체' | '카드전표' | '기타';
 
 // ─── 사용자 ───────────────────────────────────────────
 export interface Profile {
@@ -294,6 +299,74 @@ export interface Assignment {
   file_url?: string | null;
   submitted_at: string;
   feedback?: string | null;
+}
+
+// ─── 수입 / 지출 / 영수증 (STEP 12) ─────────────────────
+export interface Income {
+  id: string;
+  ledger_type: LedgerType;
+  project_id?: string | null;
+  consortium_id?: string | null;
+  client_id?: string | null;
+  account_code: string;
+  description: string;
+  amount: number;
+  income_date: string;
+  invoice_number?: string | null;
+  status: IncomeStatus;
+  received_at?: string | null;
+  received_by?: string | null;
+  memo?: string | null;
+  deleted_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Expense {
+  id: string;
+  ledger_type: LedgerType;
+  project_id?: string | null;
+  consortium_id?: string | null;
+  payee_id?: string | null;
+  staff_id?: string | null;
+  account_code: string;
+  description: string;
+  gross_amount: number;
+  withholding_type: WithholdingType;
+  /** GENERATED — 앱에서 INSERT 금지 */
+  withholding_rate: number;
+  /** GENERATED — 앱에서 INSERT 금지 */
+  withholding_amount: number;
+  /** GENERATED — 앱에서 INSERT 금지 */
+  net_amount: number;
+  expense_date: string;
+  paid_at?: string | null;
+  paid_by?: string | null;
+  status: ExpenseStatus;
+  memo?: string | null;
+  deleted_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Receipt {
+  id: string;
+  expense_id?: string | null;
+  income_id?: string | null;
+  project_id?: string | null;
+  consortium_id?: string | null;
+  file_url: string;
+  file_name: string;
+  file_size?: number | null;
+  receipt_type: ReceiptType;
+  description?: string | null;
+  memo?: string | null;
+  amount?: number | null;
+  deleted_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
 }
 
 // ─── 정산 ─────────────────────────────────────────────
