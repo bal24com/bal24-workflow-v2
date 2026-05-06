@@ -27,8 +27,9 @@ type ProjectRow = Project & {
   pm?: { id: string; name: string } | null;
 };
 
+// projects → profiles FK가 두 개(pm_id, created_by) 있어 명시적 별칭 필요 (PGRST201 방지)
 const SELECT_COLUMNS =
-  '*, client:clients(id,name), pm:profiles(id,name)';
+  '*, client:clients(id,name), pm:profiles!projects_pm_id_fkey(id,name)';
 
 function StatusFilterTabs({
   value,
