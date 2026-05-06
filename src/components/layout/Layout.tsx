@@ -11,7 +11,7 @@ const TITLES: Record<string, string> = {
   '/home':        '홈',
   '/schedule':    '일정',
   '/projects':    '프로젝트',
-  '/consortiums': '컨소시엄',
+  '/consortium':  '컨소시엄',
   '/programs':    '프로그램',
   '/clients':     '고객사',
   '/experts':     '전문가',

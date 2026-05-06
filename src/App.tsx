@@ -10,6 +10,8 @@ import ProjectDetailPage from './pages/projects/ProjectDetailPage';
 import ProgramsPage from './pages/programs/ProgramsPage';
 import ClientsPage from './pages/clients/ClientsPage';
 import ExpertsPage from './pages/experts/ExpertsPage';
+import ConsortiumPage from './pages/consortium/ConsortiumPage';
+import ConsortiumDetailPage from './pages/consortium/ConsortiumDetailPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -60,7 +62,9 @@ export default function App() {
           <Route path="/schedule" element={<PlaceholderPage title="일정" description="캘린더와 일정 등록이 여기에 들어와요." />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
-          <Route path="/consortiums" element={<PlaceholderPage title="컨소시엄" description="컨소시엄 관리가 여기에 들어와요." />} />
+          <Route path="/consortium" element={<ConsortiumPage />} />
+          <Route path="/consortium/:id" element={<ConsortiumDetailPage />} />
+          <Route path="/consortiums" element={<Navigate to="/consortium" replace />} />
           <Route path="/programs" element={<ProgramsPage />} />
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/experts" element={<ExpertsPage />} />

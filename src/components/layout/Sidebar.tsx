@@ -38,7 +38,7 @@ const SECTIONS: MenuSection[] = [
       { to: '/home',        label: '홈',       Icon: Home },
       { to: '/schedule',    label: '일정',     Icon: CalendarDays },
       { to: '/projects',    label: '프로젝트', Icon: Briefcase },
-      { to: '/consortiums', label: '컨소시엄', Icon: Users2 },
+      { to: '/consortium',  label: '컨소시엄', Icon: Users2 },
       { to: '/programs',    label: '프로그램', Icon: GraduationCap },
       { to: '/clients',     label: '고객사',   Icon: Building2 },
       { to: '/experts',     label: '전문가',   Icon: UserStar },

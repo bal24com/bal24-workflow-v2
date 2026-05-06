@@ -13,6 +13,8 @@ export type Priority = '낮음' | '보통' | '높음' | '긴급';
 export type SurveyType = '사전' | '사후';
 export type ProgramType = '교육' | '캠프' | '행사' | '기타';
 export type ProgramStatus = '준비' | '진행' | '완료' | '취소';
+export type ConsortiumStatus = '구성중' | '진행' | '완료' | '해산';
+export type ConsortiumRole = '주관' | '공동' | '위탁';
 
 // ─── 사용자 ───────────────────────────────────────────
 export interface Profile {
@@ -95,10 +97,12 @@ export interface Consortium {
   name: string;
   description?: string | null;
   lead_org?: string | null;
+  lead_client_id?: string | null;
+  project_id?: string | null;
   start_date?: string | null;
   end_date?: string | null;
   total_budget?: number | null;
-  status: ProjectStatus;
+  status: ConsortiumStatus;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -108,8 +112,10 @@ export interface ConsortiumMember {
   id: string;
   consortium_id: string;
   org_name: string;
-  role?: string | null;
-  budget_ratio?: number | null;
+  client_id?: string | null;
+  role?: ConsortiumRole | null;
+  responsibilities?: string | null;
+  budget_ratio?: number | null;     // 지분율 (%)
   budget_amount?: number | null;
   contact_name?: string | null;
   contact_phone?: string | null;
