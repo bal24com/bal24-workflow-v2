@@ -37,9 +37,6 @@ export interface Client {
   representative?: string | null;
   business_type?: string | null;
   business_item?: string | null;
-  manager_name?: string | null;
-  manager_phone?: string | null;
-  manager_email?: string | null;
   address?: string | null;
   phone?: string | null;
   email?: string | null;
@@ -53,11 +50,27 @@ export interface Client {
   updated_at: string;
 }
 
+export interface ClientContact {
+  id: string;
+  client_id: string;
+  name: string;
+  position?: string | null;
+  main_duties?: string | null;
+  phone_mobile?: string | null;
+  phone_office?: string | null;
+  email?: string | null;
+  linked_profile_id?: string | null;
+  created_at: string;
+}
+
 // ─── 인력풀 ───────────────────────────────────────────
 export interface StaffPool {
   id: string;
   name: string;
   phone?: string | null;
+  phone_mobile?: string | null;
+  phone_office?: string | null;
+  main_duties?: string | null;
   email?: string | null;
   specialty?: string[] | null;
   career_summary?: string | null;
