@@ -458,5 +458,99 @@ URL 구조: /consortium/:id/portal
 5. 문자/카카오 발송 — 현재는 URL 복사로 대체
 
 
-최종 업데이트: 2026-05-06
+최종 업데이트: 2026-05-07
 프로젝트: BalanceDot WorkFlow v2 by 박경수
+
+---
+
+## 📌 현재 진행 상황 (2026-05-07 기준)
+
+> ⚠️ STEP 번호는 git commit 메시지 기준. 실제 구현 순서가 1~17 선형이 아니고, sub-step(11-B/C/D/E)이 본 STEP 12 이후에 진행되었음.
+
+### ✅ 완료된 STEP (commit 기준)
+
+| STEP | 내용 | commit |
+|------|------|------|
+| 1 | 프로젝트 초기 설정 (Vite + React + TS + Tailwind) | `87dce5d` |
+| 2 | Supabase 14 테이블 + RLS | `5d0bf65` / `ad5bba2` |
+| Phase 1 | 로그인 + 사이드바 + UI 컴포넌트 | `820d2c0` / `2914022` |
+| 8 | 프로젝트 상세 4탭 + 파일업로드 + 태스크 (start_date·모달·FK 모호성 fix) | `2fc9bc5` / `0bdb645` / `19175f7` / `95b907f` |
+| 9 | 프로그램 페이지 + Supabase join FK 가이드 | `978d65b` |
+| 10-A | 고객사 + client_contacts 정규화 + 재사용 FileDropZone | `e29c33c` / `24339ab` |
+| 10-B | 전문가 + Claude API 명함 인식 | `645a679` |
+| 11 | 컨소시엄 페이지 + 동적 참여사 + 상세 (FK 명시 fix) | `a1fbaa6` / `4819095` |
+| 12 | 수입/지출/증빙 + 원천징수 GENERATED 컬럼 + /vouchers→/receipts 정렬 | `6f81b0d` / `9493474` |
+| 11-B | 출석체크 시스템 (attendance_sessions + attendance_records + 외부 /checkin/:token) | `58e743a` |
+| 11-C | 수료증·강의확인서 PDF 발급 (certificate_templates + issued_certificates) | `c727863` |
+| 11-D | 통합 일지 시스템 (activity_logs) | `4c8d1e1` |
+| 11-E | 외부 공개 폼 시스템 (public_forms + form_applications + 외부 /form/:token) | `a0aa040` |
+| 13 | 결과보고서 자동 생성 + 정산 5단계 워크플로우 (project_reports + project_settlements) | `47b4e5e` |
+| 14 | 정산 워크플로우 UI (SettlementPage + SettlementActionModal) | `92f99b4` |
+| 15 | 고객 문서 포털 (project_portals + portal_items + portal_responses + portal_templates + portal_template_items + 외부 /portal/:token) | `fcca93a` |
+| 16 | 강사 초대 수락 링크 (instructor_invitations.portal_token + 외부 /invitation/:token) | `640444a` |
+
+---
+
+### 🚧 미구현 영역 (사이드바에는 있지만 PlaceholderPage 만 표시)
+
+App.tsx 라우트는 등록되어 있고 사이드바 메뉴도 보이지만 컴포넌트는 PlaceholderPage 임:
+
+| 메뉴 그룹 | 라우트 | 사이드바 라벨 | 메모 |
+|---|---|---|---|
+| 운영 (홈 다음 2번째) | `/schedule` | 일정 | 캘린더 (프로젝트 기간·프로그램 일자·태스크 D-day·출석세션 통합 가능) |
+| 운영 (전문가 다음) | `/shares` | 공유 | 외부링크 통합 대시보드 (현재 /checkin·/form·/portal·/invitation 4종이 분산) |
+| 재무 (마지막) | `/reports` | 리포트 | 재무·실적 통합 리포트 (STEP 13 ProjectReportPage 와 별개) |
+| 기타 | `/team` | 팀원 | profiles 관리 + 권한(roles) UI ([결정 1] 5종 역할 시스템 명세 있음) |
+| 기타 | `/ai` | AI | AI 어시스턴트 ([결정 8.A] AI 태스크 자동 생성 명세 있음 — Claude API 이미 STEP 10-B에서 사용 중) |
+
+---
+
+### 📋 실제 사용 중 Supabase 테이블 (코드 grep 기준)
+
+| 테이블 | 도입 STEP |
+|---|---|
+| `profiles` | STEP 2 |
+| `clients` / `client_contacts` | STEP 2 / STEP 10-A |
+| `staff_pool` | STEP 2 |
+| `projects` / `tasks` | STEP 2 / STEP 8 |
+| `consortiums` / `consortium_members` | STEP 2 / STEP 11 |
+| `programs` / `program_curriculum` / `program_applicants` | STEP 9 |
+| `income` | STEP 12 |
+| `expenses` (withholding GENERATED 컬럼) | STEP 12 |
+| `receipts` | STEP 12 |
+| `files` (공통 첨부) | 공통 |
+| `attendance_sessions` / `attendance_records` | STEP 11-B |
+| `certificate_templates` / `issued_certificates` | STEP 11-C |
+| `activity_logs` | STEP 11-D |
+| `public_forms` / `form_applications` | STEP 11-E |
+| `project_reports` / `project_settlements` | STEP 13 / 14 |
+| `project_portals` / `portal_items` / `portal_responses` / `portal_templates` / `portal_template_items` | STEP 15 |
+| `instructor_invitations` (portal_token 컬럼 포함) | STEP 16 |
+
+> ⚠️ supabase/migrations/ 폴더에는 STEP 11-B 이후의 마이그레이션 파일이 보존되지 않음. 박경수님이 Supabase Dashboard에서 직접 SQL 실행. 최신 보존 파일은 `20260509_consortium_extend.sql`.
+> 사후 보존이 필요하면 별도 작업으로 STEP 11-B/C/D/E·13·14·15·16 의 DDL 을 마이그레이션 파일로 추출.
+
+---
+
+### 🚩 외부 공개 라우트 (인증 불필요 — token 기반)
+
+| 라우트 | 컴포넌트 | 용도 |
+|---|---|---|
+| `/checkin/:token` | CheckInPage | 출석 체크인 (STEP 11-B) |
+| `/form/:token` | PublicFormPage | 외부 공개 폼 응답 (STEP 11-E) |
+| `/portal/:token` | ClientPortalPage | 고객 문서 포털 응답 (STEP 15) |
+| `/invitation/:token` | InstructorInvitePage | 강사 초대 수락 (STEP 16) |
+
+---
+
+### 🚩 프로젝트 정보
+
+| 항목 | 값 |
+|------|-----|
+| 로컬 경로 | `C:\workflow\bal24-workflow-v2` |
+| GitHub | `https://github.com/bal24com/bal24-workflow-v2` |
+| 배포 | `https://bal24-workflow-v2.netlify.app` / `https://bal24.kr` |
+| Supabase | `https://clsljkxvgmqwenettkrz.supabase.co` |
+| 최근 커밋 | `640444a` (STEP 16 강사 초대 수락 링크) |
+| 이전 프로젝트 | `C:\workflow\workflow_v7_full` → **폐기, 사용 안 함** |
+
