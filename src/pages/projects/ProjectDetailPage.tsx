@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, FileText, Info, Loader2, Users, FileBarChart } from 'lucide-react';
+import { ArrowLeft, ClipboardList, FileText, Info, Loader2, Users, FileBarChart, Link2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Badge, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
@@ -14,19 +14,21 @@ import OverviewTab from './detail/OverviewTab';
 import TasksTab from './detail/TasksTab';
 import MembersTab from './detail/MembersTab';
 import FilesTab from './detail/FilesTab';
+import PortalTab from './detail/PortalTab';
 
 type DetailProject = Project & {
   client?: { id: string; name: string } | null;
   pm?: { id: string; name: string } | null;
 };
 
-type TabKey = 'overview' | 'tasks' | 'members' | 'files';
+type TabKey = 'overview' | 'tasks' | 'members' | 'files' | 'portal';
 
 const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'overview', label: '개요',     Icon: Info },
   { key: 'tasks',    label: '태스크',   Icon: ClipboardList },
   { key: 'members',  label: '참여인력', Icon: Users },
   { key: 'files',    label: '파일',     Icon: FileText },
+  { key: 'portal',   label: '포털',     Icon: Link2 },
 ];
 
 // projects → profiles FK가 두 개(pm_id, created_by) 있어 명시적 별칭 필요 (PGRST201 방지)
@@ -175,6 +177,7 @@ export default function ProjectDetailPage() {
         {tab === 'tasks' && <TasksTab projectId={projectId} />}
         {tab === 'members' && <MembersTab projectId={projectId} />}
         {tab === 'files' && <FilesTab projectId={projectId} uploaderId={user?.id} />}
+        {tab === 'portal' && <PortalTab projectId={projectId} clientId={project.client_id ?? null} />}
       </div>
     </div>
   );

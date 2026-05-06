@@ -32,6 +32,10 @@ export type ReportType = 'interim' | 'final';
 export type ReportStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
 export type SettlementStep = 1 | 2 | 3 | 4 | 5;
 export type ClientType = 'client' | 'vendor' | 'both';
+export type PortalItemType = 'file_download' | 'file_upload' | 'feedback' | 'approval' | 'auto_data' | 'tax_invoice';
+export type PortalAutoDataKey = 'applications' | 'attendance' | 'curriculum' | 'report';
+export type PortalStageTag = 'proposal' | 'contract' | 'operation' | 'closing';
+export type PortalResponseType = 'feedback' | 'file' | 'approval';
 
 // ─── 사용자 ───────────────────────────────────────────
 export interface Profile {
@@ -526,6 +530,75 @@ export interface IssuedCertificate {
   pdf_url?: string | null;
   issued_by?: string | null;
   created_at: string;
+}
+
+// ─── 고객 문서 포털 (STEP 15) ──────────────────────
+export interface PortalTemplate {
+  id: string;
+  name: string;
+  description?: string | null;
+  stage_hint?: PortalStageTag | null;
+  is_shared: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortalTemplateItem {
+  id: string;
+  template_id: string;
+  item_type: PortalItemType;
+  label: string;
+  description?: string | null;
+  auto_data_key?: PortalAutoDataKey | null;
+  approval_text?: string | null;
+  required: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface ProjectPortal {
+  id: string;
+  project_id: string;
+  template_id?: string | null;
+  portal_token: string;
+  title: string;
+  message?: string | null;
+  stage_tag?: PortalStageTag | null;
+  is_active: boolean;
+  expires_at?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortalItem {
+  id: string;
+  portal_id: string;
+  item_type: PortalItemType;
+  label: string;
+  description?: string | null;
+  auto_data_key?: PortalAutoDataKey | null;
+  file_url?: string | null;
+  file_name?: string | null;
+  approval_text?: string | null;
+  required: boolean;
+  sort_order: number;
+  completed: boolean;
+  completed_at?: string | null;
+  created_at: string;
+}
+
+export interface PortalResponse {
+  id: string;
+  item_id: string;
+  response_type: PortalResponseType;
+  content?: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
+  file_size?: number | null;
+  submitted_at: string;
+  submitter_ip?: string | null;
 }
 
 // ─── 결과보고서 (STEP 13) ────────────────────────────

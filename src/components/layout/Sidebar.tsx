@@ -15,6 +15,7 @@ import {
   Award,
   BookOpen,
   ClipboardList,
+  Link as LinkIcon,
   TrendingUp,
   TrendingDown,
   Receipt,
@@ -52,6 +53,7 @@ const SECTIONS: MenuSection[] = [
       { to: '/certificates', label: '수료증',  Icon: Award },
       { to: '/activity-logs', label: '일지',   Icon: BookOpen },
       { to: '/forms',         label: '폼 관리', Icon: ClipboardList },
+      { to: '/portals',       label: '포털',    Icon: LinkIcon },
     ],
   },
   {

@@ -20,6 +20,8 @@ const TITLES: Record<string, string> = {
   '/certificates':'수료증',
   '/activity-logs':'일지',
   '/forms':       '폼 관리',
+  '/portals':     '포털',
+  '/portal/templates': '포털 템플릿',
   '/income':      '수입',
   '/expense':     '지출',
   '/receipts':    '증빙',

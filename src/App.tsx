@@ -24,6 +24,9 @@ import FormManagePage from './pages/forms/FormManagePage';
 import PublicFormPage from './pages/public-form/PublicFormPage';
 import ProjectReportPage from './pages/reports/ProjectReportPage';
 import SettlementPage from './pages/settlements/SettlementPage';
+import PortalManagePage from './pages/portal/PortalManagePage';
+import PortalTemplatePage from './pages/portal/templates/PortalTemplatePage';
+import ClientPortalPage from './pages/client-portal/ClientPortalPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -56,6 +59,7 @@ export default function App() {
         {/* 인증 불필요 — 외부 공개 라우트 (token 기반) */}
         <Route path="/checkin/:token" element={<CheckInPage />} />
         <Route path="/form/:token" element={<PublicFormPage />} />
+        <Route path="/portal/:token" element={<ClientPortalPage />} />
 
         <Route
           path="/login"
@@ -106,6 +110,10 @@ export default function App() {
 
           {/* 외부 공개 폼 관리 (STEP 11-E) */}
           <Route path="/forms" element={<FormManagePage />} />
+
+          {/* 고객 문서 포털 (STEP 15) */}
+          <Route path="/portals" element={<PortalManagePage />} />
+          <Route path="/portal/templates" element={<PortalTemplatePage />} />
           <Route path="/reports" element={<PlaceholderPage title="리포트" description="재무·실적 리포트가 여기에 들어와요." />} />
 
           {/* 기타 */}
