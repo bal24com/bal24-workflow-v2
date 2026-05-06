@@ -31,6 +31,7 @@ export type CertificateRecipientType = 'student' | 'instructor';
 export type ReportType = 'interim' | 'final';
 export type ReportStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
 export type SettlementStep = 1 | 2 | 3 | 4 | 5;
+export type ClientType = 'client' | 'vendor' | 'both';
 
 // ─── 사용자 ───────────────────────────────────────────
 export interface Profile {
@@ -52,6 +53,9 @@ export interface Client {
   id: string;
   name: string;
   business_number?: string | null;
+  business_name?: string | null;
+  ceo_name?: string | null;
+  client_type?: ClientType | null;
   representative?: string | null;
   business_type?: string | null;
   business_item?: string | null;

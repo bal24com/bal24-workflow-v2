@@ -23,6 +23,7 @@ import ActivityLogsPage from './pages/activity-logs/ActivityLogsPage';
 import FormManagePage from './pages/forms/FormManagePage';
 import PublicFormPage from './pages/public-form/PublicFormPage';
 import ProjectReportPage from './pages/reports/ProjectReportPage';
+import SettlementPage from './pages/settlements/SettlementPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -89,6 +90,7 @@ export default function App() {
           {/* 재무 */}
           <Route path="/income" element={<IncomePage />} />
           <Route path="/expense" element={<ExpensesPage />} />
+          <Route path="/settlements" element={<SettlementPage />} />
           <Route path="/receipts" element={<ReceiptsPage />} />
           <Route path="/vouchers" element={<Navigate to="/receipts" replace />} />
 

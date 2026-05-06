@@ -1,19 +1,19 @@
-// bal24 v2 — 결과보고서 하단 정산 진행 바
+// bal24 v2 — 결과보고서 하단 정산 진행 바 (STEP 14: SettlementActionModal 연동)
 // 5단계: 결과보고서 제출 → 고객사 승인 → 세금계산서 → 입금 → 출금
 
 import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { Button } from '../../components/ui';
-import { supabase } from '../../lib/supabase';
 import { formatKoreanDate } from './reportUtils';
 import type { ProjectSettlementRow, SettlementStep } from '../../types/database';
+import SettlementActionModal from '../settlements/SettlementActionModal';
 
-const STEPS: { step: SettlementStep; label: string; field: keyof ProjectSettlementRow | null }[] = [
-  { step: 1, label: '결과보고서 제출', field: null }, // step 1 진입은 보고서 submit 시
-  { step: 2, label: '고객사 승인',   field: 'approved_at' },
-  { step: 3, label: '세금계산서',     field: 'invoice_at' },
-  { step: 4, label: '입금',           field: 'received_at' },
-  { step: 5, label: '출금',           field: 'paid_out_at' },
+const STEPS: { step: SettlementStep; label: string }[] = [
+  { step: 1, label: '결과보고서 제출' },
+  { step: 2, label: '고객사 승인' },
+  { step: 3, label: '세금계산서' },
+  { step: 4, label: '입금' },
+  { step: 5, label: '출금' },
 ];
 
 const NEXT_LABELS: Record<SettlementStep, string> = {
@@ -28,18 +28,16 @@ type Props = {
   settlement: ProjectSettlementRow | null;
   /** 보고서가 제출된 상태일 때만 step 1 이상으로 진입 가능 */
   reportSubmitted: boolean;
+  /** SettlementActionModal에 전달용 */
+  projectId: string;
+  projectName: string;
   onChanged: () => void;
 };
 
-function translateError(raw: string): string {
-  const m = raw.toLowerCase();
-  if (m.includes('row-level security')) return '단계 변경 권한이 없어요.';
-  return '단계 변경에 실패했어요. 잠시 후 다시 시도해 주세요.';
-}
-
-export default function ReportSettlementBar({ settlement, reportSubmitted, onChanged }: Props) {
-  const [pending, setPending] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+export default function ReportSettlementBar({
+  settlement, reportSubmitted, projectId, projectName, onChanged,
+}: Props) {
+  const [actionOpen, setActionOpen] = useState(false);
 
   if (!reportSubmitted && !settlement) {
     return (
@@ -50,37 +48,6 @@ export default function ReportSettlementBar({ settlement, reportSubmitted, onCha
   }
 
   const currentStep: SettlementStep = settlement?.current_step ?? 1;
-
-  const handleNext = async () => {
-    if (!settlement) return;
-    if (currentStep >= 5) return;
-    const nextStep = (currentStep + 1) as SettlementStep;
-    const nowIso = new Date().toISOString();
-
-    const fieldUpdates: Partial<ProjectSettlementRow> = { current_step: nextStep };
-    // 단계 진입 시 해당 timestamp 기록
-    if (nextStep === 2) fieldUpdates.approved_at = nowIso;
-    if (nextStep === 3) fieldUpdates.invoice_at = nowIso;
-    if (nextStep === 4) fieldUpdates.received_at = nowIso;
-    if (nextStep === 5) fieldUpdates.paid_out_at = nowIso;
-
-    setPending(true);
-    setErrorMsg(null);
-    try {
-      const { error } = await supabase
-        .from('project_settlements')
-        .update(fieldUpdates)
-        .eq('id', settlement.id);
-      if (error) throw error;
-      onChanged();
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[settlement] 단계 변경 실패:', raw);
-      setErrorMsg(translateError(raw));
-    } finally {
-      setPending(false);
-    }
-  };
 
   const stamps: Record<SettlementStep, string | null> = {
     1: settlement?.created_at ?? null,
@@ -124,7 +91,7 @@ export default function ReportSettlementBar({ settlement, reportSubmitted, onCha
             })}
           </div>
           {settlement && currentStep < 5 && (
-            <Button variant="primary" size="sm" loading={pending} onClick={() => void handleNext()}>
+            <Button variant="primary" size="sm" onClick={() => setActionOpen(true)}>
               {NEXT_LABELS[currentStep]}
             </Button>
           )}
@@ -134,12 +101,18 @@ export default function ReportSettlementBar({ settlement, reportSubmitted, onCha
             </span>
           )}
         </div>
-        {errorMsg && (
-          <div role="alert" className="mt-3 rounded-lg bg-danger/10 border border-danger/20 px-3 py-2 text-xs text-danger">
-            {errorMsg}
-          </div>
-        )}
       </div>
+
+      {settlement && (
+        <SettlementActionModal
+          open={actionOpen}
+          settlement={settlement}
+          projectId={projectId}
+          projectName={projectName}
+          onClose={() => setActionOpen(false)}
+          onSaved={onChanged}
+        />
+      )}
     </div>
   );
 }

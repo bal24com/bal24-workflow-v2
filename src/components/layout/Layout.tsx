@@ -23,6 +23,7 @@ const TITLES: Record<string, string> = {
   '/income':      '수입',
   '/expense':     '지출',
   '/receipts':    '증빙',
+  '/settlements': '정산',
   '/reports':     '리포트',
   '/team':        '팀원',
   '/ai':          'AI',

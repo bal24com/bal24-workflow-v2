@@ -287,6 +287,8 @@ export default function ProjectReportPage() {
       <ReportSettlementBar
         settlement={settlement}
         reportSubmitted={status === 'submitted' || status === 'approved'}
+        projectId={project.id}
+        projectName={project.name}
         onChanged={() => void fetchData()}
       />
 

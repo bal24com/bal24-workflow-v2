@@ -18,6 +18,7 @@ import {
   TrendingUp,
   TrendingDown,
   Receipt,
+  CreditCard,
   FileBarChart,
   Users,
   Sparkles,
@@ -56,10 +57,11 @@ const SECTIONS: MenuSection[] = [
   {
     heading: '재무',
     items: [
-      { to: '/income',   label: '수입',   Icon: TrendingUp },
-      { to: '/expense',  label: '지출',   Icon: TrendingDown },
-      { to: '/receipts', label: '증빙',   Icon: Receipt },
-      { to: '/reports',  label: '리포트', Icon: FileBarChart },
+      { to: '/income',      label: '수입',   Icon: TrendingUp },
+      { to: '/expense',     label: '지출',   Icon: TrendingDown },
+      { to: '/receipts',    label: '증빙',   Icon: Receipt },
+      { to: '/settlements', label: '정산',   Icon: CreditCard },
+      { to: '/reports',     label: '리포트', Icon: FileBarChart },
     ],
   },
   {

@@ -3,11 +3,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { Plus, Trash2, ScanLine, Loader2 } from 'lucide-react';
+import { Plus, ScanLine, Loader2 } from 'lucide-react';
 import { Modal, Button, Input, FileDropZone } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { extractBusinessCardInfo, ClaudeApiKeyMissingError, ClaudeApiError } from '../../lib/claude';
-import type { Profile } from '../../types/database';
+import type { ClientType, Profile } from '../../types/database';
+import ContactRow, { makeContact, type ContactDraft } from './ContactRow';
 
 const STORAGE_BUCKET = 'client-files';
 
@@ -19,6 +20,9 @@ type Props = {
 
 type ClientForm = {
   name: string;
+  businessName: string;
+  ceoName: string;
+  clientType: ClientType;
   representative: string;
   businessNumber: string;
   businessType: string;
@@ -29,33 +33,15 @@ type ClientForm = {
   note: string;
 };
 
-type ContactDraft = {
-  uid: string;
-  name: string;
-  position: string;
-  mainDuties: string;
-  phoneMobile: string;
-  phoneOffice: string;
-  email: string;
-  linkedProfileId: string;
-};
-
 type ProfileOption = Pick<Profile, 'id' | 'name'>;
 
 const EMPTY_CLIENT: ClientForm = {
-  name: '', representative: '', businessNumber: '',
+  name: '', businessName: '', ceoName: '', clientType: 'client',
+  representative: '', businessNumber: '',
   businessType: '', businessItem: '',
   bankName: '', bankAccount: '',
   address: '', note: '',
 };
-
-function makeContact(): ContactDraft {
-  return {
-    uid: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`,
-    name: '', position: '', mainDuties: '',
-    phoneMobile: '', phoneOffice: '', email: '', linkedProfileId: '',
-  };
-}
 
 function formatBusinessNumber(raw: string): string {
   const d = raw.replace(/\D/g, '').slice(0, 10);
@@ -230,6 +216,9 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
       const businessNumberDigits = form.businessNumber.replace(/\D/g, '');
       const { data: clientData, error: insertError } = await supabase.from('clients').insert({
         name: form.name.trim(),
+        business_name: form.businessName.trim() || null,
+        ceo_name: form.ceoName.trim() || null,
+        client_type: form.clientType,
         representative: form.representative.trim() || null,
         business_number: businessNumberDigits || null,
         business_type: form.businessType.trim() || null,
@@ -292,19 +281,36 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
       <form id="client-form" onSubmit={handleSubmit} className="space-y-5" noValidate>
         <section className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">기본 정보</h3>
-          <Input label="상호명" required value={form.name} onChange={(e) => update('name', e.target.value)} disabled={submitting} error={errors.name} placeholder="예) (주)밸런스닷" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="대표자명" value={form.representative} onChange={(e) => update('representative', e.target.value)} disabled={submitting} />
-            <Input
-              label="사업자등록번호"
-              value={form.businessNumber}
-              onChange={(e) => update('businessNumber', formatBusinessNumber(e.target.value))}
-              disabled={submitting}
-              error={errors.businessNumber}
-              placeholder="000-00-00000"
-              inputMode="numeric"
-            />
+            <Input label="상호명 (통칭)" required value={form.name} onChange={(e) => update('name', e.target.value)} disabled={submitting} error={errors.name} placeholder="예) 밸런스닷" />
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700">고객 유형</label>
+              <select
+                value={form.clientType}
+                onChange={(e) => update('clientType', e.target.value as ClientType)}
+                disabled={submitting}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="client">고객사</option>
+                <option value="vendor">거래처</option>
+                <option value="both">고객사 + 거래처</option>
+              </select>
+            </div>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="법인명 (사업자등록증 상)" value={form.businessName} onChange={(e) => update('businessName', e.target.value)} disabled={submitting} placeholder="예) 주식회사 밸런스닷" />
+            <Input label="대표자명" value={form.ceoName} onChange={(e) => update('ceoName', e.target.value)} disabled={submitting} placeholder="예) 박경수" />
+          </div>
+          <Input
+            label="사업자등록번호"
+            value={form.businessNumber}
+            onChange={(e) => update('businessNumber', formatBusinessNumber(e.target.value))}
+            disabled={submitting}
+            error={errors.businessNumber}
+            placeholder="000-00-00000"
+            inputMode="numeric"
+            helperText="세금계산서 발행에 필요해요."
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="업태" value={form.businessType} onChange={(e) => update('businessType', e.target.value)} disabled={submitting} placeholder="예) 서비스업" />
             <Input label="종목" value={form.businessItem} onChange={(e) => update('businessItem', e.target.value)} disabled={submitting} placeholder="예) 교육서비스" />
@@ -365,44 +371,16 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
           </div>
           <div className="space-y-3">
             {contacts.map((c, idx) => (
-              <div key={c.uid} className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500">담당자 #{idx + 1}</span>
-                  {contacts.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeContact(c.uid)}
-                      disabled={submitting}
-                      className="p-1 rounded text-slate-400 hover:text-danger hover:bg-danger/5"
-                      aria-label={`담당자 #${idx + 1} 삭제`}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <Input label="이름" value={c.name} onChange={(e) => updateContact(c.uid, { name: e.target.value })} disabled={submitting} placeholder="예) 홍길동" />
-                  <Input label="직책" value={c.position} onChange={(e) => updateContact(c.uid, { position: e.target.value })} disabled={submitting} placeholder="예) 차장" />
-                  <Input label="주요업무" value={c.mainDuties} onChange={(e) => updateContact(c.uid, { mainDuties: e.target.value })} disabled={submitting} placeholder="예) 교육 운영" />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <Input label="휴대폰" value={c.phoneMobile} onChange={(e) => updateContact(c.uid, { phoneMobile: e.target.value })} disabled={submitting} placeholder="010-0000-0000" />
-                  <Input label="사무실" value={c.phoneOffice} onChange={(e) => updateContact(c.uid, { phoneOffice: e.target.value })} disabled={submitting} />
-                  <Input label="이메일" type="email" value={c.email} onChange={(e) => updateContact(c.uid, { email: e.target.value })} disabled={submitting} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-700">내부직원 매칭</label>
-                  <select
-                    value={c.linkedProfileId}
-                    onChange={(e) => updateContact(c.uid, { linkedProfileId: e.target.value })}
-                    disabled={submitting}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-                  >
-                    <option value="">선택 없음</option>
-                    {profiles.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                  </select>
-                </div>
-              </div>
+              <ContactRow
+                key={c.uid}
+                contact={c}
+                index={idx}
+                canRemove={contacts.length > 1}
+                profiles={profiles}
+                onUpdate={updateContact}
+                onRemove={removeContact}
+                disabled={submitting}
+              />
             ))}
           </div>
           <p className="text-xs text-muted">이름이 비어 있는 담당자 행은 저장되지 않아요.</p>

@@ -21,6 +21,7 @@ export type AccountCode = {
 
 export const INCOME_ACCOUNT_CODES: AccountCode[] = [
   { code: 'INCOME_SALES',    label: '용역매출', description: '교육·컨설팅·행사 운영비' },
+  { code: 'INCOME_CONTRACT', label: '계약수입', description: '프로젝트 계약 입금 (정산 자동 연동)' },
   { code: 'INCOME_GRANT',    label: '지원금',  description: '정부·재단 사업 지원금' },
   { code: 'INCOME_SUBSIDY',  label: '보조금',  description: '지자체 보조금' },
   { code: 'INCOME_DONATION', label: '후원금',  description: '기업·개인 후원' },
