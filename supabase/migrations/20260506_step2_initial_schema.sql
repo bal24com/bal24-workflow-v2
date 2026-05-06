@@ -9,15 +9,15 @@
 -- ============================================================
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-0. 필수 확장 (gen_random_bytes 사용)                           │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-0. 필수 확장 (gen_random_bytes 사용)                           
+-- 
 create extension if not exists pgcrypto with schema extensions;
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-1. 사용자 프로필 (Supabase Auth users 확장)                    │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-1. 사용자 프로필 (Supabase Auth users 확장)                    
+-- 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
@@ -33,9 +33,9 @@ create table if not exists public.profiles (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-2. 거래처                                                      │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-2. 거래처                                                      
+-- 
 create table if not exists public.clients (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -54,9 +54,9 @@ create table if not exists public.clients (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-3. 인력풀 (외부 강사)                                          │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-3. 인력풀 (외부 강사)                                          
+-- 
 create table if not exists public.staff_pool (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -77,9 +77,9 @@ create table if not exists public.staff_pool (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-4. 컨소시엄                                                    │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-4. 컨소시엄                                                    
+-- 
 create table if not exists public.consortiums (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -109,15 +109,15 @@ create table if not exists public.consortium_members (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-5. 프로젝트                                                    │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-5. 프로젝트                                                    
+-- 
 create table if not exists public.projects (
   id uuid primary key default gen_random_uuid(),
   consortium_id uuid references public.consortiums(id),
   client_id uuid references public.clients(id),
   name text not null,
-  type text[] default '{}' check (type <@ array['교육','컨설팅','이벤트']),
+  type text[] default '{}',
   status text default '제안' check (status in ('제안','진행','정산','종료')),
   start_date date,
   end_date date,
@@ -140,9 +140,9 @@ create table if not exists public.project_members (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-6. 태스크                                                      │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-6. 태스크                                                      
+-- 
 create table if not exists public.tasks (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references public.projects(id) on delete cascade,
@@ -159,9 +159,9 @@ create table if not exists public.tasks (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-7. 교육 + 커리큘럼                                             │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-7. 교육 + 커리큘럼                                             
+-- 
 create table if not exists public.educations (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references public.projects(id) on delete cascade,
@@ -194,9 +194,9 @@ create table if not exists public.curriculum (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-8. 강사 초빙                                                   │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-8. 강사 초빙                                                   
+-- 
 create table if not exists public.instructor_invitations (
   id uuid primary key default gen_random_uuid(),
   education_id uuid references public.educations(id) on delete cascade,
@@ -218,9 +218,9 @@ create table if not exists public.instructor_invitations (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-9. 교육생 + 출석 + 설문 + 과제                                 │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-9. 교육생 + 출석 + 설문 + 과제                                 
+-- 
 create table if not exists public.students (
   id uuid primary key default gen_random_uuid(),
   education_id uuid references public.educations(id) on delete cascade,
@@ -267,9 +267,9 @@ create table if not exists public.assignments (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-10. 정산                                                       │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-10. 정산                                                       
+-- 
 create table if not exists public.settlements (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references public.projects(id) on delete cascade,
@@ -287,9 +287,9 @@ create table if not exists public.settlements (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-11. 파일                                                       │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-11. 파일                                                       
+-- 
 create table if not exists public.files (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references public.projects(id),
@@ -304,9 +304,9 @@ create table if not exists public.files (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-12. 알림                                                       │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-12. 알림                                                       
+-- 
 create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
   recipient_id uuid references public.profiles(id) on delete cascade,
@@ -319,9 +319,9 @@ create table if not exists public.notifications (
 );
 
 
--- ┌─────────────────────────────────────────────────────────────────┐
--- │ 2-13. 활동 로그                                                  │
--- └─────────────────────────────────────────────────────────────────┘
+-- 
+--  2-13. 활동 로그                                                  
+-- 
 create table if not exists public.activity_logs (
   id uuid primary key default gen_random_uuid(),
   actor_id uuid references public.profiles(id),
@@ -405,7 +405,7 @@ drop policy if exists "activity_logs_insert" on public.activity_logs;
 create policy "activity_logs_insert" on public.activity_logs
   for insert with check (auth.uid() is not null);
 
--- ─── 외부 접근 테이블: anon이 토큰으로 직접 조회·수정 (로그인 X) ───
+--  외부 접근 테이블: anon이 토큰으로 직접 조회·수정 (로그인 X) 
 alter table public.students enable row level security;
 alter table public.instructor_invitations enable row level security;
 alter table public.consortium_members enable row level security;
