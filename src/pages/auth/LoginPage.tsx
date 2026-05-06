@@ -50,9 +50,9 @@ function BrandSide() {
       <div className="relative space-y-8">
         <div className="space-y-3">
           <h2 className="text-3xl xl:text-4xl font-bold leading-snug">
-            팀의 모든 업무를
+            당신의 성장을
             <br />
-            한 곳에서.
+            돕습니다.
           </h2>
           <p className="text-sm text-white/80 max-w-sm">
             프로젝트부터 정산까지, 흩어져 있던 일을 하나로 모아요.
@@ -220,10 +220,10 @@ export default function LoginPage() {
           <div className="w-full max-w-sm space-y-7">
             <header className="space-y-2">
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                다시 만나서 반가워요 <span aria-hidden="true">👋</span>
+                안녕하세요 <span aria-hidden="true">👋</span>
               </h1>
               <p className="text-sm text-slate-600">
-                계정 정보를 입력하고 업무를 이어가 볼까요?
+                WorkFlow로 오늘도 스마트하게 시작하세요.
               </p>
             </header>
 

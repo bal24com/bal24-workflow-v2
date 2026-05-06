@@ -1,5 +1,5 @@
 // bal24 WorkFlow v2 — 라우팅 + 인증 가드
-// 비로그인 → /login / 로그인 → Layout 안의 메뉴들
+// 비로그인 → /login / 로그인 → Layout 안의 메뉴들 (14개)
 
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
@@ -26,7 +26,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   if (loading) return <LoadingScreen />;
-  if (session) return <Navigate to="/dashboard" replace />;
+  if (session) return <Navigate to="/home" replace />;
   return <>{children}</>;
 }
 
@@ -50,38 +50,31 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route
-            path="/tasks"
-            element={<PlaceholderPage title="업무관리" description="태스크 보드와 칸반 뷰가 여기에 들어와요." />}
-          />
-          <Route
-            path="/schedule"
-            element={<PlaceholderPage title="일정관리" description="캘린더와 일정 등록이 여기에 들어와요." />}
-          />
-          <Route
-            path="/meetings"
-            element={<PlaceholderPage title="미팅" description="회의록과 미팅 일정 관리가 여기에 들어와요." />}
-          />
-          <Route
-            path="/clients"
-            element={<PlaceholderPage title="거래처" description="거래처 목록과 상세 관리가 여기에 들어와요." />}
-          />
-          <Route
-            path="/staff"
-            element={<PlaceholderPage title="인력" description="강사·인력풀 관리가 여기에 들어와요." />}
-          />
-          <Route
-            path="/billing"
-            element={<PlaceholderPage title="정산" description="정산 현황과 입출금이 여기에 들어와요." />}
-          />
-          <Route
-            path="/reports"
-            element={<PlaceholderPage title="사업보고" description="실적 리포트와 결과보고서가 여기에 들어와요." />}
-          />
+          {/* 운영 */}
+          <Route path="/home" element={<DashboardPage />} />
+          <Route path="/schedule" element={<PlaceholderPage title="일정" description="캘린더와 일정 등록이 여기에 들어와요." />} />
+          <Route path="/projects" element={<PlaceholderPage title="프로젝트" description="프로젝트 목록과 상세가 여기에 들어와요." />} />
+          <Route path="/consortiums" element={<PlaceholderPage title="컨소시엄" description="컨소시엄 관리가 여기에 들어와요." />} />
+          <Route path="/programs" element={<PlaceholderPage title="프로그램" description="교육·컨설팅 프로그램이 여기에 들어와요." />} />
+          <Route path="/clients" element={<PlaceholderPage title="고객사" description="고객사 목록과 상세 관리가 여기에 들어와요." />} />
+          <Route path="/experts" element={<PlaceholderPage title="전문가" description="외부 전문가·강사풀 관리가 여기에 들어와요." />} />
+          <Route path="/shares" element={<PlaceholderPage title="공유" description="외부 공유 링크 관리가 여기에 들어와요." />} />
+
+          {/* 재무 */}
+          <Route path="/income" element={<PlaceholderPage title="수입" description="수입 관리가 여기에 들어와요." />} />
+          <Route path="/expense" element={<PlaceholderPage title="지출" description="지출 관리가 여기에 들어와요." />} />
+          <Route path="/vouchers" element={<PlaceholderPage title="증빙" description="증빙·영수증 관리가 여기에 들어와요." />} />
+          <Route path="/reports" element={<PlaceholderPage title="리포트" description="재무·실적 리포트가 여기에 들어와요." />} />
+
+          {/* 기타 */}
+          <Route path="/team" element={<PlaceholderPage title="팀원" description="내부 팀원 관리가 여기에 들어와요." />} />
+          <Route path="/ai" element={<PlaceholderPage title="AI" description="AI 자동화 도구가 여기에 들어와요." />} />
+
+          {/* 구 경로 호환 */}
+          <Route path="/dashboard" element={<Navigate to="/home" replace />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </BrowserRouter>
   );

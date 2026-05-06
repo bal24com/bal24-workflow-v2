@@ -1,16 +1,22 @@
 // bal24 v2 — 좌측 사이드바
-// 다크 슬레이트(#0F172A) 배경, 8개 메뉴
+// 다크 슬레이트(#0F172A) 배경, 14개 메뉴 + 섹션 구분 (운영 / 재무 / 기타)
 
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  CheckSquare,
-  Calendar,
-  Video,
+  Home,
+  CalendarDays,
   Briefcase,
+  Users2,
+  GraduationCap,
+  Building2,
+  UserStar,
+  Share2,
+  TrendingUp,
+  TrendingDown,
+  Receipt,
+  FileBarChart,
   Users,
-  Wallet,
-  FileText,
+  Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -20,16 +26,61 @@ type MenuItem = {
   Icon: LucideIcon;
 };
 
-const MENU: MenuItem[] = [
-  { to: '/dashboard', label: '대시보드', Icon: LayoutDashboard },
-  { to: '/tasks',     label: '업무관리', Icon: CheckSquare },
-  { to: '/schedule',  label: '일정관리', Icon: Calendar },
-  { to: '/meetings',  label: '미팅',     Icon: Video },
-  { to: '/clients',   label: '거래처',   Icon: Briefcase },
-  { to: '/staff',     label: '인력',     Icon: Users },
-  { to: '/billing',   label: '정산',     Icon: Wallet },
-  { to: '/reports',   label: '사업보고', Icon: FileText },
+type MenuSection = {
+  heading: string;
+  items: MenuItem[];
+};
+
+const SECTIONS: MenuSection[] = [
+  {
+    heading: '운영',
+    items: [
+      { to: '/home',        label: '홈',       Icon: Home },
+      { to: '/schedule',    label: '일정',     Icon: CalendarDays },
+      { to: '/projects',    label: '프로젝트', Icon: Briefcase },
+      { to: '/consortiums', label: '컨소시엄', Icon: Users2 },
+      { to: '/programs',    label: '프로그램', Icon: GraduationCap },
+      { to: '/clients',     label: '고객사',   Icon: Building2 },
+      { to: '/experts',     label: '전문가',   Icon: UserStar },
+      { to: '/shares',      label: '공유',     Icon: Share2 },
+    ],
+  },
+  {
+    heading: '재무',
+    items: [
+      { to: '/income',   label: '수입',   Icon: TrendingUp },
+      { to: '/expense',  label: '지출',   Icon: TrendingDown },
+      { to: '/vouchers', label: '증빙',   Icon: Receipt },
+      { to: '/reports',  label: '리포트', Icon: FileBarChart },
+    ],
+  },
+  {
+    heading: '기타',
+    items: [
+      { to: '/team', label: '팀원', Icon: Users },
+      { to: '/ai',   label: 'AI',   Icon: Sparkles },
+    ],
+  },
 ];
+
+function MenuLink({ to, label, Icon }: MenuItem) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        [
+          'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+          isActive
+            ? 'bg-primary/20 text-white font-semibold'
+            : 'text-slate-300 hover:bg-white/5 hover:text-white',
+        ].join(' ')
+      }
+    >
+      <Icon size={18} aria-hidden="true" />
+      <span>{label}</span>
+    </NavLink>
+  );
+}
 
 export default function Sidebar() {
   return (
@@ -49,23 +100,21 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {MENU.map(({ to, label, Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              [
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-                isActive
-                  ? 'bg-primary/20 text-white font-semibold'
-                  : 'text-slate-300 hover:bg-white/5 hover:text-white',
-              ].join(' ')
-            }
+      <nav className="flex-1 px-3 py-4 overflow-y-auto" aria-label="섹션 메뉴">
+        {SECTIONS.map((section, idx) => (
+          <div
+            key={section.heading}
+            className={idx > 0 ? 'mt-4 pt-4 border-t border-white/10' : ''}
           >
-            <Icon size={18} aria-hidden="true" />
-            <span>{label}</span>
-          </NavLink>
+            <div className="px-3 mb-1.5 text-[10px] font-bold tracking-widest uppercase text-slate-500">
+              {section.heading}
+            </div>
+            <div className="space-y-1">
+              {section.items.map((item) => (
+                <MenuLink key={item.to} {...item} />
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 

@@ -8,14 +8,20 @@ import Sidebar from './Sidebar';
 import { useAuth } from '../../contexts/AuthContext';
 
 const TITLES: Record<string, string> = {
-  '/dashboard': '대시보드',
-  '/tasks':     '업무관리',
-  '/schedule':  '일정관리',
-  '/meetings':  '미팅',
-  '/clients':   '거래처',
-  '/staff':     '인력',
-  '/billing':   '정산',
-  '/reports':   '사업보고',
+  '/home':        '홈',
+  '/schedule':    '일정',
+  '/projects':    '프로젝트',
+  '/consortiums': '컨소시엄',
+  '/programs':    '프로그램',
+  '/clients':     '고객사',
+  '/experts':     '전문가',
+  '/shares':      '공유',
+  '/income':      '수입',
+  '/expense':     '지출',
+  '/vouchers':    '증빙',
+  '/reports':     '리포트',
+  '/team':        '팀원',
+  '/ai':          'AI',
 };
 
 export default function Layout() {
