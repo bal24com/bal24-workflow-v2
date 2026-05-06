@@ -2,6 +2,7 @@
 // 리스트/카드 뷰 토글 + 상태 필터 + 신규 등록 모달
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { LayoutGrid, List, Plus, Loader2 } from 'lucide-react';
 import {
   Badge,
@@ -103,42 +104,49 @@ function ProjectMeta({ p }: { p: ProjectRow }) {
 
 function ProjectListItem({ p }: { p: ProjectRow }) {
   return (
-    <li className="flex items-start gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition">
-      <div className="flex-1 min-w-0 space-y-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
-          <Badge variant={statusToBadgeVariant(p.status)}>{p.status}</Badge>
-          {p.type?.map((t) => (
-            <span key={t} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-              {t}
-            </span>
-          ))}
+    <li>
+      <Link
+        to={`/projects/${p.id}`}
+        className="flex items-start gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition"
+      >
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
+            <Badge variant={statusToBadgeVariant(p.status)}>{p.status}</Badge>
+            {p.type?.map((t) => (
+              <span key={t} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                {t}
+              </span>
+            ))}
+          </div>
+          <ProjectMeta p={p} />
         </div>
-        <ProjectMeta p={p} />
-      </div>
+      </Link>
     </li>
   );
 }
 
 function ProjectCard({ p }: { p: ProjectRow }) {
   return (
-    <Card className="hover:border-primary/30 hover:shadow-md transition">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="truncate">{p.name}</CardTitle>
-          <Badge variant={statusToBadgeVariant(p.status)}>{p.status}</Badge>
-        </div>
-        <CardDescription>
-          {p.type?.join(' · ') ?? '유형 미지정'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <ProjectMeta p={p} />
-        {p.description && (
-          <p className="text-xs text-muted line-clamp-2">{p.description}</p>
-        )}
-      </CardContent>
-    </Card>
+    <Link to={`/projects/${p.id}`} className="block">
+      <Card className="hover:border-primary/30 hover:shadow-md transition cursor-pointer h-full">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="truncate">{p.name}</CardTitle>
+            <Badge variant={statusToBadgeVariant(p.status)}>{p.status}</Badge>
+          </div>
+          <CardDescription>
+            {p.type?.join(' · ') ?? '유형 미지정'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <ProjectMeta p={p} />
+          {p.description && (
+            <p className="text-xs text-muted line-clamp-2">{p.description}</p>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
