@@ -36,6 +36,7 @@ export type PortalItemType = 'file_download' | 'file_upload' | 'feedback' | 'app
 export type PortalAutoDataKey = 'applications' | 'attendance' | 'curriculum' | 'report';
 export type PortalStageTag = 'proposal' | 'contract' | 'operation' | 'closing';
 export type PortalResponseType = 'feedback' | 'file' | 'approval';
+export type InvitationRole = 'instructor' | 'ta' | 'mentor' | 'facilitator';
 
 // ─── 사용자 ───────────────────────────────────────────
 export interface Profile {
@@ -248,19 +249,36 @@ export interface Curriculum {
 }
 
 // ─── 강사 초빙 ────────────────────────────────────────
+export interface InvitationFile {
+  url: string;
+  name: string;
+  size?: number;
+  type?: string;
+}
+
 export interface InstructorInvitation {
   id: string;
-  education_id: string;
+  education_id?: string | null;
+  program_id?: string | null;
   curriculum_id?: string | null;
   staff_pool_id?: string | null;
+  expert_id?: string | null;
   profile_id?: string | null;
   name: string;
   phone?: string | null;
   email?: string | null;
+  role?: InvitationRole | null;
   status: InvitationStatus;
-  access_token: string;
+  access_token?: string;
+  portal_token?: string | null;
   invited_at: string;
   responded_at?: string | null;
+  rejected_reason?: string | null;
+  replacement_for?: string | null;
+  invited_by?: string | null;
+  notes?: string | null;
+  materials?: InvitationFile[] | null;
+  profile_files?: InvitationFile[] | null;
   lecture_fee?: number | null;
   note?: string | null;
   created_by?: string | null;

@@ -27,6 +27,7 @@ import SettlementPage from './pages/settlements/SettlementPage';
 import PortalManagePage from './pages/portal/PortalManagePage';
 import PortalTemplatePage from './pages/portal/templates/PortalTemplatePage';
 import ClientPortalPage from './pages/client-portal/ClientPortalPage';
+import InstructorInvitePage from './pages/instructor-portal/InstructorInvitePage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/checkin/:token" element={<CheckInPage />} />
         <Route path="/form/:token" element={<PublicFormPage />} />
         <Route path="/portal/:token" element={<ClientPortalPage />} />
+        <Route path="/invitation/:token" element={<InstructorInvitePage />} />
 
         <Route
           path="/login"

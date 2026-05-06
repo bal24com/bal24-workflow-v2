@@ -2,7 +2,7 @@
 // 리스트/카드 뷰 + 상태 필터 + 유형 필터 + 신규 등록 모달
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutGrid, List, Plus, Loader2 } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, UserPlus } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -21,6 +21,7 @@ import {
   programStatusToBadgeVariant,
 } from './programStatus';
 import ProgramFormModal from './ProgramFormModal';
+import InvitationManagePanel from './InvitationManagePanel';
 
 type ViewMode = 'list' | 'card';
 type StatusFilter = ProgramStatus | '전체';
@@ -113,7 +114,24 @@ function ProgramMeta({ p }: { p: ProgramRow }) {
   );
 }
 
-function ProgramListItem({ p }: { p: ProgramRow }) {
+function InviteButton({ onClick, size = 'sm' }: { onClick: (e: React.MouseEvent) => void; size?: 'sm' | 'xs' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'inline-flex items-center gap-1 rounded-lg font-semibold text-primary hover:bg-primary/5 transition-colors',
+        size === 'xs' ? 'px-2 py-0.5 text-[10px]' : 'px-2 py-1 text-xs',
+      ].join(' ')}
+      aria-label="초대 관리"
+    >
+      <UserPlus size={size === 'xs' ? 10 : 12} />
+      초대 관리
+    </button>
+  );
+}
+
+function ProgramListItem({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow) => void }) {
   return (
     <li className="flex items-start gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition">
       <div className="flex-1 min-w-0 space-y-1.5">
@@ -126,11 +144,12 @@ function ProgramListItem({ p }: { p: ProgramRow }) {
         </div>
         <ProgramMeta p={p} />
       </div>
+      <InviteButton onClick={(e) => { e.stopPropagation(); onInvite(p); }} />
     </li>
   );
 }
 
-function ProgramCard({ p }: { p: ProgramRow }) {
+function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow) => void }) {
   return (
     <Card className="hover:border-primary/30 hover:shadow-md transition h-full">
       <CardHeader>
@@ -145,6 +164,9 @@ function ProgramCard({ p }: { p: ProgramRow }) {
         {p.description && (
           <p className="text-xs text-muted line-clamp-2">{p.description}</p>
         )}
+        <div className="pt-2 border-t border-slate-100 flex justify-end">
+          <InviteButton onClick={(e) => { e.stopPropagation(); onInvite(p); }} />
+        </div>
       </CardContent>
     </Card>
   );
@@ -158,6 +180,7 @@ export default function ProgramsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('전체');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('전체');
   const [modalOpen, setModalOpen] = useState(false);
+  const [invitePanel, setInvitePanel] = useState<ProgramRow | null>(null);
 
   const fetchPrograms = useCallback(async () => {
     setLoading(true);
@@ -312,13 +335,13 @@ export default function ProgramsPage() {
       ) : view === 'list' ? (
         <ul className="space-y-2">
           {visible.map((p) => (
-            <ProgramListItem key={p.id} p={p} />
+            <ProgramListItem key={p.id} p={p} onInvite={setInvitePanel} />
           ))}
         </ul>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((p) => (
-            <ProgramCard key={p.id} p={p} />
+            <ProgramCard key={p.id} p={p} onInvite={setInvitePanel} />
           ))}
         </div>
       )}
@@ -327,6 +350,13 @@ export default function ProgramsPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={() => void fetchPrograms()}
+      />
+
+      <InvitationManagePanel
+        open={Boolean(invitePanel)}
+        programId={invitePanel?.id ?? ''}
+        programName={invitePanel?.name ?? ''}
+        onClose={() => setInvitePanel(null)}
       />
     </div>
   );
