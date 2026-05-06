@@ -12,6 +12,7 @@ import {
   UserStar,
   Share2,
   CheckSquare,
+  Award,
   TrendingUp,
   TrendingDown,
   Receipt,
@@ -45,6 +46,7 @@ const SECTIONS: MenuSection[] = [
       { to: '/experts',     label: '전문가',   Icon: UserStar },
       { to: '/shares',      label: '공유',     Icon: Share2 },
       { to: '/attendance',  label: '출석체크', Icon: CheckSquare },
+      { to: '/certificates', label: '수료증',  Icon: Award },
     ],
   },
   {

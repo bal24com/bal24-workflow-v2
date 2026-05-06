@@ -17,6 +17,7 @@ const TITLES: Record<string, string> = {
   '/experts':     '전문가',
   '/shares':      '공유',
   '/attendance':  '출석체크',
+  '/certificates':'수료증',
   '/income':      '수입',
   '/expense':     '지출',
   '/receipts':    '증빙',
