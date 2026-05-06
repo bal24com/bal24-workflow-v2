@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import Layout from './components/layout/Layout';
 import DashboardPage from './pages/dashboard/DashboardPage';
+import ProjectsPage from './pages/projects/ProjectsPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -53,7 +54,7 @@ export default function App() {
           {/* 운영 */}
           <Route path="/home" element={<DashboardPage />} />
           <Route path="/schedule" element={<PlaceholderPage title="일정" description="캘린더와 일정 등록이 여기에 들어와요." />} />
-          <Route path="/projects" element={<PlaceholderPage title="프로젝트" description="프로젝트 목록과 상세가 여기에 들어와요." />} />
+          <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/consortiums" element={<PlaceholderPage title="컨소시엄" description="컨소시엄 관리가 여기에 들어와요." />} />
           <Route path="/programs" element={<PlaceholderPage title="프로그램" description="교육·컨설팅 프로그램이 여기에 들어와요." />} />
           <Route path="/clients" element={<PlaceholderPage title="고객사" description="고객사 목록과 상세 관리가 여기에 들어와요." />} />
