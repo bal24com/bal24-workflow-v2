@@ -35,12 +35,18 @@ export interface Client {
   name: string;
   business_number?: string | null;
   representative?: string | null;
+  business_type?: string | null;
+  business_item?: string | null;
+  manager_name?: string | null;
+  manager_phone?: string | null;
+  manager_email?: string | null;
   address?: string | null;
   phone?: string | null;
   email?: string | null;
   bank_name?: string | null;
   bank_account?: string | null;
   bank_holder?: string | null;
+  business_license_url?: string | null;
   note?: string | null;
   created_by?: string | null;
   created_at: string;
