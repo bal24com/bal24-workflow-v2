@@ -11,6 +11,8 @@ export type ProjectType = '교육' | '컨설팅' | '이벤트';
 export type Role = 'ADMIN' | 'PM' | 'MEMBER';
 export type Priority = '낮음' | '보통' | '높음' | '긴급';
 export type SurveyType = '사전' | '사후';
+export type ProgramType = '교육' | '캠프' | '행사' | '기타';
+export type ProgramStatus = '준비' | '진행' | '완료' | '취소';
 
 // ─── 사용자 ───────────────────────────────────────────
 export interface Profile {
@@ -119,6 +121,23 @@ export interface ProjectMember {
   profile_id: string;
   role?: string | null;
   created_at: string;
+}
+
+// ─── 프로그램 ─────────────────────────────────────────
+export interface Program {
+  id: string;
+  project_id?: string | null;
+  name: string;
+  type: ProgramType;
+  status: ProgramStatus;
+  start_date?: string | null;
+  end_date?: string | null;
+  venue?: string | null;
+  capacity?: number | null;
+  description?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ─── 태스크 ───────────────────────────────────────────

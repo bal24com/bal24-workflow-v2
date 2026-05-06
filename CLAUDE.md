@@ -35,6 +35,7 @@ Supabase
 ✅ React Hook 규칙 엄수 (Minified React error #310 방지)
 ✅ typecheck 수시 실행하여 새 오류 생성 방지
 ✅ 파일 업로드: 드래그앤드롭 + 클립보드 붙여넣기(Ctrl+V) 필수
+✅ Supabase join 시 FK 명시 필수: `profiles!{table}_{column}_fkey` 형태 사용. 단축형 `:profiles(...)`는 FK 2개 이상일 때 PGRST201 에러 발생.
 ✅ 작업 완료 시 이 문서에 ✅ 표시
 
 
