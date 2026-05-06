@@ -130,6 +130,7 @@ export interface Task {
   status: TaskStatus;
   priority: Priority;
   assignee_id?: string | null;
+  start_date?: string | null;
   due_date?: string | null;
   seq_num: number;
   created_by?: string | null;
