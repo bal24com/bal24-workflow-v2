@@ -10,10 +10,16 @@
 
 
 -- ┌─────────────────────────────────────────────────────────────────┐
+-- │ 2-0. 필수 확장 (gen_random_bytes 사용)                           │
+-- └─────────────────────────────────────────────────────────────────┘
+create extension if not exists pgcrypto with schema extensions;
+
+
+-- ┌─────────────────────────────────────────────────────────────────┐
 -- │ 2-1. 사용자 프로필 (Supabase Auth users 확장)                    │
 -- └─────────────────────────────────────────────────────────────────┘
 create table if not exists public.profiles (
-  id uuid references auth.users primary key,
+  id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
   name text not null,
   role text not null check (role in ('ADMIN','PM','MEMBER')),
