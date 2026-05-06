@@ -736,3 +736,23 @@ export interface AuditLog {
   detail?: Record<string, unknown> | null;
   created_at: string;
 }
+
+// ─── 일정·캘린더 (STEP 17) ─────────────────────────────
+export type ScheduleCategory = 'meeting' | 'deadline' | 'external' | 'personal' | 'etc';
+
+export interface ScheduleEvent {
+  id: string;
+  title: string;
+  event_date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  all_day: boolean;
+  category: ScheduleCategory;
+  color?: string | null;
+  project_id?: string | null;
+  program_id?: string | null;
+  description?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}

@@ -28,6 +28,7 @@ import PortalManagePage from './pages/portal/PortalManagePage';
 import PortalTemplatePage from './pages/portal/templates/PortalTemplatePage';
 import ClientPortalPage from './pages/client-portal/ClientPortalPage';
 import InstructorInvitePage from './pages/instructor-portal/InstructorInvitePage';
+import SchedulePage from './pages/schedule/SchedulePage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -81,7 +82,7 @@ export default function App() {
         >
           {/* 운영 */}
           <Route path="/home" element={<DashboardPage />} />
-          <Route path="/schedule" element={<PlaceholderPage title="일정" description="캘린더와 일정 등록이 여기에 들어와요." />} />
+          <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/projects/:projectId/report" element={<ProjectReportPage />} />
