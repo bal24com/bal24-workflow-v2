@@ -22,6 +22,7 @@ import CertificatePage from './pages/certificates/CertificatePage';
 import ActivityLogsPage from './pages/activity-logs/ActivityLogsPage';
 import FormManagePage from './pages/forms/FormManagePage';
 import PublicFormPage from './pages/public-form/PublicFormPage';
+import ProjectReportPage from './pages/reports/ProjectReportPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="/schedule" element={<PlaceholderPage title="일정" description="캘린더와 일정 등록이 여기에 들어와요." />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
+          <Route path="/projects/:projectId/report" element={<ProjectReportPage />} />
           <Route path="/consortium" element={<ConsortiumPage />} />
           <Route path="/consortium/:id" element={<ConsortiumDetailPage />} />
           <Route path="/consortiums" element={<Navigate to="/consortium" replace />} />

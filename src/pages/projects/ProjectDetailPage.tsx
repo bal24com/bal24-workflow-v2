@@ -3,9 +3,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, FileText, Info, Loader2, Users } from 'lucide-react';
+import { ArrowLeft, ClipboardList, FileText, Info, Loader2, Users, FileBarChart } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Badge } from '../../components/ui';
+import { Badge, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import type { Project } from '../../types/database';
 import { useAuth } from '../../contexts/AuthContext';
@@ -122,14 +122,23 @@ export default function ProjectDetailPage() {
           <ArrowLeft size={12} />
           프로젝트 목록
         </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold text-text">{project.name}</h1>
-          <Badge variant={statusToBadgeVariant(project.status)}>{project.status}</Badge>
-        </div>
-        <div className="text-xs text-muted">
-          {project.type?.length ? project.type.join(' · ') : '유형 미지정'}
-          {project.client?.name && ` · 고객사 ${project.client.name}`}
-          {project.pm?.name && ` · 담당자 ${project.pm.name}`}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-bold text-text">{project.name}</h1>
+              <Badge variant={statusToBadgeVariant(project.status)}>{project.status}</Badge>
+            </div>
+            <div className="text-xs text-muted">
+              {project.type?.length ? project.type.join(' · ') : '유형 미지정'}
+              {project.client?.name && ` · 고객사 ${project.client.name}`}
+              {project.pm?.name && ` · 담당자 ${project.pm.name}`}
+            </div>
+          </div>
+          <Link to={`/projects/${project.id}/report`} className="shrink-0">
+            <Button variant="primary" size="sm" leftIcon={<FileBarChart size={14} />}>
+              결과보고서 작성
+            </Button>
+          </Link>
         </div>
       </div>
 

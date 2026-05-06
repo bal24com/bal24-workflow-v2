@@ -28,6 +28,9 @@ export type FormFieldType = 'text' | 'number' | 'select' | 'textarea' | 'date';
 export type ActivityLogType = 'mentoring' | 'lecture' | 'business_trip' | 'ta' | 'operation';
 export type CertificateType = 'completion' | 'lecture';
 export type CertificateRecipientType = 'student' | 'instructor';
+export type ReportType = 'interim' | 'final';
+export type ReportStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+export type SettlementStep = 1 | 2 | 3 | 4 | 5;
 
 // ─── 사용자 ───────────────────────────────────────────
 export interface Profile {
@@ -521,7 +524,67 @@ export interface IssuedCertificate {
   created_at: string;
 }
 
-// ─── 정산 ─────────────────────────────────────────────
+// ─── 결과보고서 (STEP 13) ────────────────────────────
+export interface ReportContent {
+  overview?: {
+    period?: string;
+    clientName?: string;
+    totalBudget?: number | null;
+    description?: string;
+  };
+  performance?: {
+    programs?: { name: string; sessionCount?: number; completionCount?: number; attendanceRate?: number | null }[];
+    summary?: string;
+  };
+  staff?: {
+    experts?: { name: string; logHours: number; certCount?: number }[];
+    summary?: string;
+  };
+  budget?: {
+    plannedTotal?: number | null;
+    incomeTotal?: number;
+    expenseGross?: number;
+    expenseNet?: number;
+    balance?: number;
+    summary?: string;
+  };
+  notes?: string;
+}
+
+export interface ProjectReport {
+  id: string;
+  project_id: string;
+  title: string;
+  report_type: ReportType;
+  status: ReportStatus;
+  content: ReportContent;
+  settlement_id?: string | null;
+  submitted_at?: string | null;
+  submitted_by?: string | null;
+  approved_at?: string | null;
+  approved_by?: string | null;
+  reject_reason?: string | null;
+  pdf_url?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectSettlementRow {
+  id: string;
+  project_id: string;
+  current_step: SettlementStep;
+  report_id?: string | null;
+  approved_at?: string | null;
+  invoice_at?: string | null;
+  received_at?: string | null;
+  paid_out_at?: string | null;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── 정산 (기존 항목별 settlements) ─────────────────
 export interface Settlement {
   id: string;
   project_id: string;
