@@ -15,6 +15,9 @@ import ConsortiumDetailPage from './pages/consortium/ConsortiumDetailPage';
 import IncomePage from './pages/income/IncomePage';
 import ExpensesPage from './pages/expenses/ExpensesPage';
 import ReceiptsPage from './pages/receipts/ReceiptsPage';
+import AttendancePage from './pages/attendance/AttendancePage';
+import AttendanceDetailPage from './pages/attendance/AttendanceDetailPage';
+import CheckInPage from './pages/attendance-checkin/CheckInPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -44,6 +47,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* 인증 불필요 — 외부 공개 라우트 (token 기반) */}
+        <Route path="/checkin/:token" element={<CheckInPage />} />
+
         <Route
           path="/login"
           element={
@@ -78,6 +84,10 @@ export default function App() {
           <Route path="/expense" element={<ExpensesPage />} />
           <Route path="/receipts" element={<ReceiptsPage />} />
           <Route path="/vouchers" element={<Navigate to="/receipts" replace />} />
+
+          {/* 출석체크 (STEP 11-B) */}
+          <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/attendance/:sessionId" element={<AttendanceDetailPage />} />
           <Route path="/reports" element={<PlaceholderPage title="리포트" description="재무·실적 리포트가 여기에 들어와요." />} />
 
           {/* 기타 */}

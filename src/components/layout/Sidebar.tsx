@@ -11,6 +11,7 @@ import {
   Building2,
   UserStar,
   Share2,
+  CheckSquare,
   TrendingUp,
   TrendingDown,
   Receipt,
@@ -43,6 +44,7 @@ const SECTIONS: MenuSection[] = [
       { to: '/clients',     label: '고객사',   Icon: Building2 },
       { to: '/experts',     label: '전문가',   Icon: UserStar },
       { to: '/shares',      label: '공유',     Icon: Share2 },
+      { to: '/attendance',  label: '출석체크', Icon: CheckSquare },
     ],
   },
   {

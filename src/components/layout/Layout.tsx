@@ -16,6 +16,7 @@ const TITLES: Record<string, string> = {
   '/clients':     '고객사',
   '/experts':     '전문가',
   '/shares':      '공유',
+  '/attendance':  '출석체크',
   '/income':      '수입',
   '/expense':     '지출',
   '/receipts':    '증빙',

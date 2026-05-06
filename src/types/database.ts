@@ -20,6 +20,14 @@ export type IncomeStatus = '대기' | '입금완료' | '반려';
 export type ExpenseStatus = '대기' | '출금완료' | '반려';
 export type WithholdingType = 'none' | 'business_3_3' | 'other_8_8';
 export type ReceiptType = '영수증' | '세금계산서' | '간이영수증' | '계좌이체' | '카드전표' | '기타';
+export type AttendeeRole = 'student' | 'instructor' | 'ta';
+export type CheckInMethod = 'qr' | 'link' | 'manual';
+export type ApplicationStatus = '검토중' | '승인' | '대기' | '취소';
+export type FormType = 'application' | 'survey' | 'feedback';
+export type FormFieldType = 'text' | 'number' | 'select' | 'textarea' | 'date';
+export type ActivityLogType = 'mentoring' | 'lecture' | 'business_trip' | 'ta' | 'operation';
+export type CertificateType = 'completion' | 'lecture';
+export type CertificateRecipientType = 'student' | 'instructor';
 
 // ─── 사용자 ───────────────────────────────────────────
 export interface Profile {
@@ -369,6 +377,150 @@ export interface Receipt {
   created_at: string;
 }
 
+// ─── 출석 (STEP 11-B) ───────────────────────────────
+export interface AttendanceSession {
+  id: string;
+  program_id: string;
+  curriculum_id?: string | null;
+  title: string;
+  session_date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  location?: string | null;
+  session_token: string;
+  token_expires_at?: string | null;
+  check_in_open: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  session_id: string;
+  attendee_role: AttendeeRole;
+  form_application_id?: string | null;
+  expert_id?: string | null;
+  attendee_name: string;
+  attendee_phone?: string | null;
+  check_in_at: string;
+  check_in_method: CheckInMethod;
+  ip_address?: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+// ─── 외부 폼 (STEP 11-E) ────────────────────────────
+export interface FormFieldSpec {
+  key: string;
+  label: string;
+  type: FormFieldType;
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+}
+
+export interface PublicForm {
+  id: string;
+  program_id: string;
+  form_token: string;
+  title: string;
+  description?: string | null;
+  form_type: FormType;
+  max_applicants?: number | null;
+  open_at?: string | null;
+  close_at?: string | null;
+  is_active: boolean;
+  fields: FormFieldSpec[];
+  auto_reply_email: boolean;
+  auto_reply_subject?: string | null;
+  auto_reply_body?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormApplication {
+  id: string;
+  form_id: string;
+  program_id?: string | null;
+  data: Record<string, string | number | boolean | null>;
+  applicant_name?: string | null;
+  applicant_phone?: string | null;
+  applicant_email?: string | null;
+  status: ApplicationStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+  submitted_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── 통합 일지 (STEP 11-D) ──────────────────────────
+export interface ActivityFile {
+  url: string;
+  name: string;
+  size?: number;
+}
+
+export interface ActivityLog {
+  id: string;
+  program_id?: string | null;
+  project_id?: string | null;
+  expert_id?: string | null;
+  log_type: ActivityLogType;
+  title: string;
+  activity_date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  duration_hours?: number | null;
+  location?: string | null;
+  attendee_count?: number | null;
+  content?: string | null;
+  outcome?: string | null;
+  issues?: string | null;
+  next_plan?: string | null;
+  file_urls?: ActivityFile[] | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+}
+
+// ─── 수료증 (STEP 11-C) ─────────────────────────────
+export interface CertificateTemplate {
+  id: string;
+  program_id: string;
+  cert_type: CertificateType;
+  title: string;
+  institution_name: string;
+  seal_file_url?: string | null;
+  signature_name?: string | null;
+  template_html?: string | null;
+  valid_hours?: number | null;
+  is_default: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IssuedCertificate {
+  id: string;
+  template_id: string;
+  program_id: string;
+  cert_type: CertificateType;
+  recipient_type: CertificateRecipientType;
+  form_application_id?: string | null;
+  expert_id?: string | null;
+  recipient_name: string;
+  issue_date: string;
+  cert_number?: string | null;
+  pdf_url?: string | null;
+  issued_by?: string | null;
+  created_at: string;
+}
+
 // ─── 정산 ─────────────────────────────────────────────
 export interface Settlement {
   id: string;
@@ -412,8 +564,10 @@ export interface Notification {
   created_at: string;
 }
 
-// ─── 활동 로그 ────────────────────────────────────────
-export interface ActivityLog {
+// ─── 감사 로그 (audit) ────────────────────────────────
+// STEP 11-D의 ActivityLog(활동 일지)와 구분.
+// 초기 스키마 activity_log(단수) 테이블용 — 시스템 감사용.
+export interface AuditLog {
   id: string;
   actor_id?: string | null;
   actor_name?: string | null;
