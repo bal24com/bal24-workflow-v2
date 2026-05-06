@@ -19,7 +19,8 @@ type Props = {
   projectId: string;
 };
 
-const SELECT_COLUMNS = '*, assignee:profiles(id,name)';
+// tasks → profiles FK가 두 개(assignee_id, created_by) 있어 명시적 별칭 필요 (PGRST201 방지)
+const SELECT_COLUMNS = '*, assignee:profiles!tasks_assignee_id_fkey(id,name)';
 
 function DDayBadge({ dueDate }: { dueDate?: string | null }) {
   const dday = computeDDay(dueDate);
