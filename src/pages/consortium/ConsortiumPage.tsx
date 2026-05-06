@@ -31,7 +31,7 @@ type ConsortiumRow = Consortium & {
 };
 
 const SELECT_COLUMNS =
-  '*, lead_client:clients!consortiums_lead_client_id_fkey(id,name), project:projects(id,name), members:consortium_members(id)';
+  '*, lead_client:clients!consortiums_lead_client_id_fkey(id,name), project:projects!consortiums_project_id_fkey(id,name), members:consortium_members(id)';
 
 function StatusFilterTabs({
   value, onChange, counts,
