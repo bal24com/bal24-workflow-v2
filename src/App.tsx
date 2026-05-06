@@ -76,7 +76,8 @@ export default function App() {
           {/* 재무 */}
           <Route path="/income" element={<IncomePage />} />
           <Route path="/expense" element={<ExpensesPage />} />
-          <Route path="/vouchers" element={<ReceiptsPage />} />
+          <Route path="/receipts" element={<ReceiptsPage />} />
+          <Route path="/vouchers" element={<Navigate to="/receipts" replace />} />
           <Route path="/reports" element={<PlaceholderPage title="리포트" description="재무·실적 리포트가 여기에 들어와요." />} />
 
           {/* 기타 */}

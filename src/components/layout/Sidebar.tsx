@@ -50,7 +50,7 @@ const SECTIONS: MenuSection[] = [
     items: [
       { to: '/income',   label: '수입',   Icon: TrendingUp },
       { to: '/expense',  label: '지출',   Icon: TrendingDown },
-      { to: '/vouchers', label: '증빙',   Icon: Receipt },
+      { to: '/receipts', label: '증빙',   Icon: Receipt },
       { to: '/reports',  label: '리포트', Icon: FileBarChart },
     ],
   },

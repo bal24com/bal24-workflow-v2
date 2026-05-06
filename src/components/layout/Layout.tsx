@@ -18,7 +18,7 @@ const TITLES: Record<string, string> = {
   '/shares':      '공유',
   '/income':      '수입',
   '/expense':     '지출',
-  '/vouchers':    '증빙',
+  '/receipts':    '증빙',
   '/reports':     '리포트',
   '/team':        '팀원',
   '/ai':          'AI',
