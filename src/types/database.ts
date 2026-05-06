@@ -67,6 +67,8 @@ export interface ClientContact {
 export interface StaffPool {
   id: string;
   name: string;
+  organization?: string | null;
+  position?: string | null;
   phone?: string | null;
   phone_mobile?: string | null;
   phone_office?: string | null;
@@ -75,6 +77,7 @@ export interface StaffPool {
   specialty?: string[] | null;
   career_summary?: string | null;
   portfolio_url?: string | null;
+  profile_image_url?: string | null;
   bank_name?: string | null;
   bank_account?: string | null;
   bank_holder?: string | null;

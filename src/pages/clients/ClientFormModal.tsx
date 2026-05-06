@@ -1,11 +1,12 @@
 // bal24 v2 — 고객사 신규 등록 모달
 // 기본정보 + 사업자등록증 파일 + 담당자 동적 추가/삭제 (client_contacts)
 
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
+import { Plus, Trash2, ScanLine, Loader2 } from 'lucide-react';
 import { Modal, Button, Input, FileDropZone } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import { extractBusinessCardInfo, ClaudeApiKeyMissingError, ClaudeApiError } from '../../lib/claude';
 import type { Profile } from '../../types/database';
 
 const STORAGE_BUCKET = 'client-files';
@@ -91,9 +92,12 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
 
   const [uploading, setUploading] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof ClientForm, string>>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
+  const cardInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -119,6 +123,7 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
     setLicenseName(null);
     setErrors({});
     setErrorMsg(null);
+    setInfoMsg(null);
   }, [open]);
 
   const update = <K extends keyof ClientForm>(key: K, value: ClientForm[K]) => {
@@ -132,6 +137,55 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
   const addContact = () => setContacts((prev) => [...prev, makeContact()]);
   const removeContact = (uid: string) =>
     setContacts((prev) => (prev.length > 1 ? prev.filter((c) => c.uid !== uid) : prev));
+
+  const handleScanCard = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setScanning(true);
+    setErrorMsg(null);
+    setInfoMsg(null);
+    try {
+      const info = await extractBusinessCardInfo(file);
+      // 빈 담당자 행에 채우거나, 모두 채워졌으면 새 행 추가
+      const newContact: ContactDraft = {
+        ...makeContact(),
+        name: info.name ?? '',
+        position: info.position ?? '',
+        phoneMobile: info.phone_mobile ?? '',
+        phoneOffice: info.phone_office ?? '',
+        email: info.email ?? '',
+      };
+      setContacts((prev) => {
+        const emptyIdx = prev.findIndex((c) => !c.name.trim());
+        if (emptyIdx >= 0) {
+          const next = [...prev];
+          next[emptyIdx] = { ...next[emptyIdx], ...newContact, uid: next[emptyIdx].uid };
+          return next;
+        }
+        return [...prev, newContact];
+      });
+      // 회사명이 있으면 상호명 비어있을 때만 채워줌
+      if (info.organization && !form.name.trim()) {
+        update('name', info.organization);
+      }
+      const filled = [info.name, info.organization, info.position, info.phone_mobile, info.phone_office, info.email].filter(Boolean).length;
+      setInfoMsg(`명함에서 ${filled}개 항목을 읽어와 담당자에 추가했어요.`);
+    } catch (err) {
+      if (err instanceof ClaudeApiKeyMissingError) {
+        setErrorMsg(err.message);
+      } else if (err instanceof ClaudeApiError) {
+        setErrorMsg(err.friendlyMessage);
+      } else {
+        const raw = err instanceof Error ? err.message : '';
+        console.error('[clients] 명함 인식 실패:', raw);
+        setErrorMsg('명함 인식 중 오류가 발생했어요.');
+      }
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const handleLicenseSelected = async (file: File) => {
     setUploading(true);
@@ -292,9 +346,22 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
         </section>
 
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">담당자 ({contacts.length})</h3>
-            <Button type="button" variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={addContact} disabled={submitting}>담당자 추가</Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                leftIcon={scanning ? <Loader2 size={12} className="animate-spin" /> : <ScanLine size={12} />}
+                onClick={() => cardInputRef.current?.click()}
+                disabled={submitting || scanning}
+              >
+                {scanning ? '인식 중…' : '명함 인식'}
+              </Button>
+              <Button type="button" variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={addContact} disabled={submitting}>담당자 추가</Button>
+              <input ref={cardInputRef} type="file" accept="image/*" hidden onChange={(e) => void handleScanCard(e)} />
+            </div>
           </div>
           <div className="space-y-3">
             {contacts.map((c, idx) => (
@@ -341,6 +408,9 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
           <p className="text-xs text-muted">이름이 비어 있는 담당자 행은 저장되지 않아요.</p>
         </section>
 
+        {infoMsg && (
+          <div role="status" className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5 text-sm text-emerald-700">{infoMsg}</div>
+        )}
         {errorMsg && (
           <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-2.5 text-sm text-danger">{errorMsg}</div>
         )}
