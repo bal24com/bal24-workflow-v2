@@ -19,6 +19,7 @@ import AttendancePage from './pages/attendance/AttendancePage';
 import AttendanceDetailPage from './pages/attendance/AttendanceDetailPage';
 import CheckInPage from './pages/attendance-checkin/CheckInPage';
 import CertificatePage from './pages/certificates/CertificatePage';
+import ActivityLogsPage from './pages/activity-logs/ActivityLogsPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -92,6 +93,9 @@ export default function App() {
 
           {/* 수료증·강의확인서 (STEP 11-C) */}
           <Route path="/certificates" element={<CertificatePage />} />
+
+          {/* 통합 일지 (STEP 11-D) */}
+          <Route path="/activity-logs" element={<ActivityLogsPage />} />
           <Route path="/reports" element={<PlaceholderPage title="리포트" description="재무·실적 리포트가 여기에 들어와요." />} />
 
           {/* 기타 */}

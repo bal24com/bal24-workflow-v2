@@ -13,6 +13,7 @@ import {
   Share2,
   CheckSquare,
   Award,
+  BookOpen,
   TrendingUp,
   TrendingDown,
   Receipt,
@@ -47,6 +48,7 @@ const SECTIONS: MenuSection[] = [
       { to: '/shares',      label: '공유',     Icon: Share2 },
       { to: '/attendance',  label: '출석체크', Icon: CheckSquare },
       { to: '/certificates', label: '수료증',  Icon: Award },
+      { to: '/activity-logs', label: '일지',   Icon: BookOpen },
     ],
   },
   {
