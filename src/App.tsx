@@ -31,6 +31,7 @@ import InstructorInvitePage from './pages/instructor-portal/InstructorInvitePage
 import SchedulePage from './pages/schedule/SchedulePage';
 import MembersPage from './pages/members/MembersPage';
 import SharesPage from './pages/shares/SharesPage';
+import ReportsPage from './pages/reports/ReportsPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -119,7 +120,7 @@ export default function App() {
           {/* 고객 문서 포털 (STEP 15) */}
           <Route path="/portals" element={<PortalManagePage />} />
           <Route path="/portal/templates" element={<PortalTemplatePage />} />
-          <Route path="/reports" element={<PlaceholderPage title="리포트" description="재무·실적 리포트가 여기에 들어와요." />} />
+          <Route path="/reports" element={<ReportsPage />} />
 
           {/* 기타 */}
           <Route path="/members" element={<MembersPage />} />
