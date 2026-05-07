@@ -239,6 +239,8 @@ export interface Education {
 export interface Curriculum {
   id: string;
   education_id: string;
+  /** V2 program 단위 운영용 — `/programs/:id` 상세에서 직접 join (2026-05-08 추가) */
+  program_id?: string | null;
   day_num: number;
   session_num: number;
   title: string;
@@ -324,6 +326,8 @@ export interface SurveyAnswer {
 export interface Survey {
   id: string;
   education_id: string;
+  /** V2 program 단위 운영용 — `/programs/:id` 상세에서 직접 join (2026-05-08 추가) */
+  program_id?: string | null;
   student_id: string;
   type: SurveyType;
   answers: SurveyAnswer[];

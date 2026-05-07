@@ -2,6 +2,7 @@
 // 리스트/카드 뷰 + 상태 필터 + 유형 필터 + 신규 등록 모달
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { LayoutGrid, List, Plus, Loader2, UserPlus } from 'lucide-react';
 import {
   Button,
@@ -134,42 +135,46 @@ function InviteButton({ onClick, size = 'sm' }: { onClick: (e: React.MouseEvent)
 
 function ProgramListItem({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow) => void }) {
   return (
-    <li className="flex items-start gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition">
-      <div className="flex-1 min-w-0 space-y-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
-          <span className={`${BADGE_BASE} ${PROGRAM_STATUS_STYLE[p.status]}`}>{p.status}</span>
-          <span className={`${BADGE_BASE} ${PROGRAM_TYPE_STYLE[p.type]}`}>{p.type}</span>
+    <li className="bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition">
+      <Link to={`/programs/${p.id}`} className="flex items-start gap-3 p-4">
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
+            <span className={`${BADGE_BASE} ${PROGRAM_STATUS_STYLE[p.status]}`}>{p.status}</span>
+            <span className={`${BADGE_BASE} ${PROGRAM_TYPE_STYLE[p.type]}`}>{p.type}</span>
+          </div>
+          <ProgramMeta p={p} />
         </div>
-        <ProgramMeta p={p} />
-      </div>
-      <InviteButton onClick={(e) => { e.stopPropagation(); onInvite(p); }} />
+        <InviteButton onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInvite(p); }} />
+      </Link>
     </li>
   );
 }
 
 function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow) => void }) {
   return (
-    <Card className="hover:border-primary/30 hover:shadow-md transition h-full">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="truncate">{p.name}</CardTitle>
-          <span className={`${BADGE_BASE} ${PROGRAM_STATUS_STYLE[p.status]}`}>{p.status}</span>
-        </div>
-        <CardDescription>
-          <span className={`${BADGE_BASE} ${PROGRAM_TYPE_STYLE[p.type]}`}>{p.type}</span>
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <ProgramMeta p={p} />
-        {p.description && (
-          <p className="text-xs text-muted line-clamp-2">{p.description}</p>
-        )}
-        <div className="pt-2 border-t border-slate-100 flex justify-end">
-          <InviteButton onClick={(e) => { e.stopPropagation(); onInvite(p); }} />
-        </div>
-      </CardContent>
-    </Card>
+    <Link to={`/programs/${p.id}`} className="block h-full">
+      <Card className="hover:border-primary/30 hover:shadow-md transition h-full">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="truncate">{p.name}</CardTitle>
+            <span className={`${BADGE_BASE} ${PROGRAM_STATUS_STYLE[p.status]}`}>{p.status}</span>
+          </div>
+          <CardDescription>
+            <span className={`${BADGE_BASE} ${PROGRAM_TYPE_STYLE[p.type]}`}>{p.type}</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <ProgramMeta p={p} />
+          {p.description && (
+            <p className="text-xs text-muted line-clamp-2">{p.description}</p>
+          )}
+          <div className="pt-2 border-t border-slate-100 flex justify-end">
+            <InviteButton onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInvite(p); }} />
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 

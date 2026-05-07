@@ -8,6 +8,7 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import ProjectsPage from './pages/projects/ProjectsPage';
 import ProjectDetailPage from './pages/projects/ProjectDetailPage';
 import ProgramsPage from './pages/programs/ProgramsPage';
+import ProgramDetailPage from './pages/programs/ProgramDetailPage';
 import ClientsPage from './pages/clients/ClientsPage';
 import ExpertsPage from './pages/experts/ExpertsPage';
 import ConsortiumPage from './pages/consortium/ConsortiumPage';
@@ -107,6 +108,7 @@ export default function App() {
           <Route path="/consortium/:id" element={<ConsortiumDetailPage />} />
           <Route path="/consortiums" element={<Navigate to="/consortium" replace />} />
           <Route path="/programs" element={<ProgramsPage />} />
+          <Route path="/programs/:id" element={<ProgramDetailPage />} />
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/experts" element={<ExpertsPage />} />
           <Route path="/shares" element={<SharesPage />} />
