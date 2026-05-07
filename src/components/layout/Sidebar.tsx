@@ -69,7 +69,7 @@ const SECTIONS: MenuSection[] = [
   {
     heading: '기타',
     items: [
-      { to: '/team', label: '팀원', Icon: Users },
+      { to: '/members', label: '팀원', Icon: Users },
       { to: '/ai',   label: 'AI',   Icon: Sparkles },
     ],
   },

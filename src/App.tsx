@@ -29,6 +29,7 @@ import PortalTemplatePage from './pages/portal/templates/PortalTemplatePage';
 import ClientPortalPage from './pages/client-portal/ClientPortalPage';
 import InstructorInvitePage from './pages/instructor-portal/InstructorInvitePage';
 import SchedulePage from './pages/schedule/SchedulePage';
+import MembersPage from './pages/members/MembersPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -120,7 +121,8 @@ export default function App() {
           <Route path="/reports" element={<PlaceholderPage title="리포트" description="재무·실적 리포트가 여기에 들어와요." />} />
 
           {/* 기타 */}
-          <Route path="/team" element={<PlaceholderPage title="팀원" description="내부 팀원 관리가 여기에 들어와요." />} />
+          <Route path="/members" element={<MembersPage />} />
+          <Route path="/team" element={<Navigate to="/members" replace />} />
           <Route path="/ai" element={<PlaceholderPage title="AI" description="AI 자동화 도구가 여기에 들어와요." />} />
 
           {/* 구 경로 호환 */}
