@@ -33,6 +33,10 @@ import MembersPage from './pages/members/MembersPage';
 import SharesPage from './pages/shares/SharesPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AiPage from './pages/ai/AiPage';
+import ApplicationPage from './pages/applications/ApplicationPage';
+import RecruitPage from './pages/recruit/RecruitPage';
+import ApplyPage from './pages/public-apply/ApplyPage';
+import RecruitApplyPage from './pages/public-recruit/RecruitApplyPage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
@@ -70,6 +74,8 @@ export default function App() {
         <Route path="/form/:token" element={<PublicFormPage />} />
         <Route path="/portal/:token" element={<ClientPortalPage />} />
         <Route path="/invitation/:token" element={<InstructorInvitePage />} />
+        <Route path="/apply/:programId" element={<ApplyPage />} />
+        <Route path="/recruit/:token" element={<RecruitApplyPage />} />
 
         <Route
           path="/login"
@@ -120,6 +126,10 @@ export default function App() {
 
           {/* 외부 공개 폼 관리 (STEP 11-E) */}
           <Route path="/forms" element={<FormManagePage />} />
+
+          {/* 교육생 신청·모집 공고 (STEP 11 옵션 B) */}
+          <Route path="/applications" element={<ApplicationPage />} />
+          <Route path="/recruit-manage" element={<RecruitPage />} />
 
           {/* 고객 문서 포털 (STEP 15) */}
           <Route path="/portals" element={<PortalManagePage />} />
