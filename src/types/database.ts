@@ -274,12 +274,44 @@ export interface ProgramShare {
   ready_date?: string | null;
   progress_date?: string | null;
   result_date?: string | null;
+  /** 학생 만족도 노출 시점 PM이 직접 설정 (Stage 3-B-2 / 2026-05-08 추가) */
+  survey_open_at?: string | null;
   client_token: string;
   student_token: string;
   expert_token: string;
   visibility: ShareVisibility;
   created_at: string;
   updated_at: string;
+}
+
+// ─── 외부공유 응답 (Stage 3-B-2 / 2026-05-08 신규) ────────
+
+export type EditRequestStatus = 'pending' | 'reviewing' | 'resolved' | 'rejected';
+
+export interface ProgramEditRequest {
+  id: string;
+  program_id: string;
+  requester_name: string;
+  requester_phone?: string | null;
+  content: string;
+  status: EditRequestStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+  created_at: string;
+}
+
+export type ShareCommentRole = 'client' | 'staff';
+
+export interface ProgramShareComment {
+  id: string;
+  program_id: string;
+  parent_id?: string | null;
+  author_role: ShareCommentRole;
+  author_name: string;
+  content: string;
+  is_deleted: boolean;
+  created_at: string;
 }
 
 // ─── 커리큘럼 템플릿 (Stage 3-C — 재활용 모음 / 2026-05-08 신규) ─

@@ -15,6 +15,7 @@ import {
   type ProgramKpis,
   type CurriculumRow,
 } from './programDetailUtils';
+import EditRequestsBadge from './share/EditRequestsBadge';
 
 interface Props {
   programId: string;
@@ -158,6 +159,8 @@ export default function OverviewTab({ programId, description }: Props) {
             </div>
           )}
         </section>
+
+        <EditRequestsBadge programId={programId} />
 
         <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
           <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
