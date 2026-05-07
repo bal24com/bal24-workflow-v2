@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil,
+  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -20,12 +20,13 @@ import StaffStudentsTab from './detail/StaffStudentsTab';
 import AttendanceLogTab from './detail/AttendanceLogTab';
 import SurveyResultTab from './detail/SurveyResultTab';
 import ShareTab from './detail/ShareTab';
+import ReportBuilderTab from './detail/ReportBuilderTab';
 
 type DetailProgram = Program & {
   project?: { id: string; name: string; status: string } | null;
 };
 
-type TabKey = 'overview' | 'staff' | 'attendance' | 'survey' | 'share';
+type TabKey = 'overview' | 'staff' | 'attendance' | 'survey' | 'share' | 'report';
 
 const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'overview',   label: '개요',         Icon: Info },
@@ -33,6 +34,7 @@ const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'attendance', label: '출석·일지',   Icon: ClipboardCheck },
   { key: 'survey',     label: '결과·만족도', Icon: FileText },
   { key: 'share',      label: '외부 공유',   Icon: Share2 },
+  { key: 'report',     label: '결과보고서',  Icon: FileBarChart },
 ];
 
 const SELECT_COLUMNS = '*, project:projects(id,name,status)';
@@ -206,6 +208,7 @@ export default function ProgramDetailPage() {
         {tab === 'attendance' && <AttendanceLogTab programId={programId} />}
         {tab === 'survey' && <SurveyResultTab programId={programId} />}
         {tab === 'share' && <ShareTab programId={programId} />}
+        {tab === 'report' && <ReportBuilderTab programId={programId} />}
       </div>
     </div>
   );
