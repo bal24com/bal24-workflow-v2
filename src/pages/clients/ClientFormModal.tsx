@@ -1,17 +1,23 @@
 // bal24 v2 — 고객사 등록·수정 모달
-// 기본정보 + 사업자등록증 파일 + 담당자 동적 추가/삭제 (client_contacts)
-// client prop 있으면 수정 모드, 없으면 신규 등록 모드.
+// client prop 있으면 수정 모드, 없으면 신규 등록.
+// 헬퍼·타입은 clientFormHelpers.ts, 담당자 섹션은 ClientContactsSection.tsx 로 분리.
 
-import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, FormEvent } from 'react';
-import { Plus, ScanLine, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 import { Modal, Button, Input, FileDropZone } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import { extractBusinessCardInfo, ClaudeApiKeyMissingError, ClaudeApiError } from '../../lib/claude';
 import type { Client, ClientContact, ClientType, Profile } from '../../types/database';
-import ContactRow, { makeContact, type ContactDraft } from './ContactRow';
-
-const STORAGE_BUCKET = 'client-files';
+import { makeContact, type ContactDraft } from './ContactRow';
+import {
+  STORAGE_BUCKET,
+  EMPTY_CLIENT,
+  clientToForm,
+  contactRowToDraft,
+  formatBusinessNumber,
+  translateClientError,
+  type ClientForm,
+} from './clientFormHelpers';
+import ClientContactsSection from './ClientContactsSection';
 
 type Props = {
   open: boolean;
@@ -22,93 +28,7 @@ type Props = {
   onSaved: () => void;
 };
 
-type ClientForm = {
-  name: string;
-  businessName: string;
-  ceoName: string;
-  clientType: ClientType;
-  representative: string;
-  businessNumber: string;
-  businessType: string;
-  businessItem: string;
-  bankName: string;
-  bankAccount: string;
-  bankHolder: string;
-  address: string;
-  phone: string;
-  email: string;
-  note: string;
-};
-
 type ProfileOption = Pick<Profile, 'id' | 'name'>;
-
-const EMPTY_CLIENT: ClientForm = {
-  name: '', businessName: '', ceoName: '', clientType: 'client',
-  representative: '', businessNumber: '',
-  businessType: '', businessItem: '',
-  bankName: '', bankAccount: '', bankHolder: '',
-  address: '', phone: '', email: '', note: '',
-};
-
-function clientToForm(c: Client): ClientForm {
-  return {
-    name: c.name ?? '',
-    businessName: c.business_name ?? '',
-    ceoName: c.ceo_name ?? '',
-    clientType: (c.client_type ?? 'client') as ClientType,
-    representative: c.representative ?? '',
-    businessNumber: c.business_number ?? '',
-    businessType: c.business_type ?? '',
-    businessItem: c.business_item ?? '',
-    bankName: c.bank_name ?? '',
-    bankAccount: c.bank_account ?? '',
-    bankHolder: c.bank_holder ?? '',
-    address: c.address ?? '',
-    phone: c.phone ?? '',
-    email: c.email ?? '',
-    note: c.note ?? '',
-  };
-}
-
-function contactRowToDraft(row: ClientContact): ContactDraft {
-  return {
-    uid: row.id,
-    name: row.name ?? '',
-    position: row.position ?? '',
-    mainDuties: row.main_duties ?? '',
-    phoneMobile: row.phone_mobile ?? '',
-    phoneOffice: row.phone_office ?? '',
-    email: row.email ?? '',
-    linkedProfileId: row.linked_profile_id ?? '',
-  };
-}
-
-function formatBusinessNumber(raw: string): string {
-  const d = raw.replace(/\D/g, '').slice(0, 10);
-  if (d.length < 4) return d;
-  if (d.length < 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
-  return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
-}
-
-function translateError(raw: string, ctx: 'upload' | 'insert' | 'contact'): string {
-  const m = raw.toLowerCase();
-  if (ctx === 'upload') {
-    if (m.includes('bucket not found')) return `파일 저장소(${STORAGE_BUCKET})가 없어요. Supabase에서 버킷을 먼저 만들어 주세요.`;
-    if (m.includes('payload too large') || m.includes('exceeded')) return '파일 용량이 너무 커요.';
-    if (m.includes('row-level security') || m.includes('permission denied')) return '파일을 올릴 권한이 없어요. 관리자에게 문의해 주세요.';
-    return '파일 업로드 중 오류가 발생했어요.';
-  }
-  if (m.includes("could not find the table 'public.client_contacts'") || m.includes('pgrst205')) {
-    return '담당자 테이블이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.';
-  }
-  if (m.includes('column') && m.includes('does not exist')) {
-    return '거래처 테이블 컬럼이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.';
-  }
-  if (m.includes('row-level security') || m.includes('permission denied')) return '저장 권한이 없어요. 관리자에게 문의해 주세요.';
-  return ctx === 'contact'
-    ? '담당자 저장 중 오류가 발생했어요. (고객사는 등록되었어요)'
-    : '거래처 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
-}
 
 export default function ClientFormModal({ open, client, onClose, onSaved }: Props) {
   const isEdit = Boolean(client);
@@ -119,12 +39,10 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
 
   const [uploading, setUploading] = useState(false);
-  const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof ClientForm, string>>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
-  const cardInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -149,7 +67,6 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
       setForm(clientToForm(client));
       setLicenseUrl(client.business_license_url ?? null);
       setLicenseName(client.business_license_url ? '등록된 사업자등록증' : null);
-      // 기존 contacts fetch
       let cancelled = false;
       void (async () => {
         const { data, error } = await supabase
@@ -189,63 +106,6 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const updateContact = (uid: string, patch: Partial<ContactDraft>) => {
-    setContacts((prev) => prev.map((c) => (c.uid === uid ? { ...c, ...patch } : c)));
-  };
-
-  const addContact = () => setContacts((prev) => [...prev, makeContact()]);
-  const removeContact = (uid: string) =>
-    setContacts((prev) => (prev.length > 1 ? prev.filter((c) => c.uid !== uid) : prev));
-
-  const handleScanCard = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-
-    setScanning(true);
-    setErrorMsg(null);
-    setInfoMsg(null);
-    try {
-      const info = await extractBusinessCardInfo(file);
-      // 빈 담당자 행에 채우거나, 모두 채워졌으면 새 행 추가
-      const newContact: ContactDraft = {
-        ...makeContact(),
-        name: info.name ?? '',
-        position: info.position ?? '',
-        phoneMobile: info.phone_mobile ?? '',
-        phoneOffice: info.phone_office ?? '',
-        email: info.email ?? '',
-      };
-      setContacts((prev) => {
-        const emptyIdx = prev.findIndex((c) => !c.name.trim());
-        if (emptyIdx >= 0) {
-          const next = [...prev];
-          next[emptyIdx] = { ...next[emptyIdx], ...newContact, uid: next[emptyIdx].uid };
-          return next;
-        }
-        return [...prev, newContact];
-      });
-      // 회사명이 있으면 상호명 비어있을 때만 채워줌
-      if (info.organization && !form.name.trim()) {
-        update('name', info.organization);
-      }
-      const filled = [info.name, info.organization, info.position, info.phone_mobile, info.phone_office, info.email].filter(Boolean).length;
-      setInfoMsg(`명함에서 ${filled}개 항목을 읽어와 담당자에 추가했어요.`);
-    } catch (err) {
-      if (err instanceof ClaudeApiKeyMissingError) {
-        setErrorMsg(err.message);
-      } else if (err instanceof ClaudeApiError) {
-        setErrorMsg(err.friendlyMessage);
-      } else {
-        const raw = err instanceof Error ? err.message : '';
-        console.error('[clients] 명함 인식 실패:', raw);
-        setErrorMsg('명함 인식 중 오류가 발생했어요.');
-      }
-    } finally {
-      setScanning(false);
-    }
-  };
-
   const handleLicenseSelected = async (file: File) => {
     setUploading(true);
     setErrorMsg(null);
@@ -261,7 +121,7 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[clients] 사업자등록증 업로드 실패:', raw);
-      setErrorMsg(translateError(raw, 'upload'));
+      setErrorMsg(translateClientError(raw, 'upload'));
     } finally {
       setUploading(false);
     }
@@ -350,7 +210,7 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
           const { error: contactsError } = await supabase.from('client_contacts').insert(rows);
           if (contactsError) {
             console.error('[clients] 담당자 저장 실패:', contactsError.message);
-            setErrorMsg(translateError(contactsError.message, 'contact'));
+            setErrorMsg(translateClientError(contactsError.message, 'contact'));
           }
         }
       }
@@ -360,7 +220,7 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error(`[clients] ${isEdit ? '수정' : '등록'} 실패:`, raw);
-      setErrorMsg(translateError(raw, 'insert'));
+      setErrorMsg(translateClientError(raw, 'insert'));
     } finally {
       setSubmitting(false);
     }
@@ -461,40 +321,24 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
           />
         </section>
 
-        <section className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">담당자 ({contacts.length})</h3>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                leftIcon={scanning ? <Loader2 size={12} className="animate-spin" /> : <ScanLine size={12} />}
-                onClick={() => cardInputRef.current?.click()}
-                disabled={submitting || scanning}
-              >
-                {scanning ? '인식 중…' : '명함 인식'}
-              </Button>
-              <Button type="button" variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={addContact} disabled={submitting}>담당자 추가</Button>
-              <input ref={cardInputRef} type="file" accept="image/*" hidden onChange={(e) => void handleScanCard(e)} />
-            </div>
-          </div>
-          <div className="space-y-3">
-            {contacts.map((c, idx) => (
-              <ContactRow
-                key={c.uid}
-                contact={c}
-                index={idx}
-                canRemove={contacts.length > 1}
-                profiles={profiles}
-                onUpdate={updateContact}
-                onRemove={removeContact}
-                disabled={submitting}
-              />
-            ))}
-          </div>
-          <p className="text-xs text-muted">이름이 비어 있는 담당자 행은 저장되지 않아요.</p>
-        </section>
+        <ClientContactsSection
+          contacts={contacts}
+          profiles={profiles}
+          disabled={submitting}
+          onCompanyNameSuggested={(name) => {
+            if (!form.name.trim()) update('name', name);
+          }}
+          onScanFeedback={(fb) => {
+            if (fb.type === 'info') {
+              setInfoMsg(fb.message);
+              setErrorMsg(null);
+            } else {
+              setErrorMsg(fb.message);
+              setInfoMsg(null);
+            }
+          }}
+          onChange={setContacts}
+        />
 
         {infoMsg && (
           <div role="status" className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5 text-sm text-emerald-700">{infoMsg}</div>
