@@ -7,12 +7,33 @@ import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-type Size = 'sm' | 'md' | 'lg';
+/**
+ * 모달 size variants:
+ *  - sm/md/lg: 기존 (Tailwind max-w-* + rounded-2xl + shadow-xl)
+ *  - brand: 박경수님 디자인 시스템 (max-w-[560px] + rounded-[20px] + 강한 shadow)
+ *    Q2=B 결정 — 기존 유지 + 신규 variant 추가, 점진 마이그레이션.
+ */
+type Size = 'sm' | 'md' | 'lg' | 'brand';
 
 const SIZE_CLASS: Record<Size, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
   lg: 'max-w-2xl',
+  brand: 'max-w-[560px]',
+};
+
+const ROUNDED_CLASS: Record<Size, string> = {
+  sm: 'rounded-2xl',
+  md: 'rounded-2xl',
+  lg: 'rounded-2xl',
+  brand: 'rounded-[20px]',
+};
+
+const SHADOW_CLASS: Record<Size, string> = {
+  sm: 'shadow-xl',
+  md: 'shadow-xl',
+  lg: 'shadow-xl',
+  brand: 'shadow-[0_20px_60px_rgba(30,27,75,0.15)]',
 };
 
 export type ModalProps = {
@@ -81,8 +102,10 @@ export default function Modal({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'relative w-full bg-white rounded-2xl shadow-xl outline-none flex flex-col max-h-[90vh]',
+          'relative w-full bg-white outline-none flex flex-col max-h-[90vh]',
           SIZE_CLASS[size],
+          ROUNDED_CLASS[size],
+          SHADOW_CLASS[size],
           className,
         )}
       >
