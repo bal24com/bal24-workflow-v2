@@ -1,7 +1,7 @@
 BalanceDot WorkFlow v2 — CLAUDE.md
 Claude Code가 매 세션마다 이 파일을 먼저 읽고 작업한다.
 수정 시 반드시 이 파일도 업데이트할 것.
-마지막 업데이트: 2026-05-06 (최종 확정)
+마지막 업데이트: 2026-05-07 (STEP-CON 컨소시엄 독립 홈 7탭까지 반영)
 
 1. 프로젝트 개요
 •	앱명: BalanceDot WorkFlow v2
@@ -465,7 +465,8 @@ URL 구조: /consortium/:id/portal
 
 ## 📌 현재 진행 상황 (2026-05-07 기준)
 
-> ⚠️ STEP 번호는 git commit 메시지 기준. 실제 구현 순서가 1~17 선형이 아니고, sub-step(11-B/C/D/E)이 본 STEP 12 이후에 진행되었음.
+> ⚠️ STEP 번호는 git commit 메시지 기준. 실제 구현 순서가 1~17 선형이 아니고, sub-step(11-B/C/D/E·11-옵션B)이 본 STEP 12 이후에 진행되었음.
+> STEP 22 는 비어 있음(skip) — 디자인 시스템(stage 1~2-D) → STEP 23(토스트) 순서.
 
 ### ✅ 완료된 STEP (commit 기준)
 
@@ -493,18 +494,44 @@ URL 구조: /consortium/:id/portal
 | 19 | 공유 링크 통합 뷰 (4종 외부 토큰 한 화면·복사·새탭) | `5f60462` |
 | 20 | 재무 리포트 (KPI+SVG 막대/도넛+미지급 + 항목 커스터마이징 layout DB 저장) | `b424d5f` |
 | 21 | AI 어시스턴트 (대화 목록 + 채팅 + Edge Function `ai-chat` Mock fallback + ai_conversations/ai_messages) | `61f0b86` |
+| 디자인 1 | 15개 페이지 헤더 통일 + `EmptyState`/`statusStyles` 헬퍼 신규 | `6a79d4c` |
+| 디자인 2-A | 페이지별 개선 — 프로그램 유형 배지·전문가 specialty pill·수입/지출 hover·프로젝트 상태 배지 통일 | `fddde56` |
+| 디자인 2-B | 빈 상태 EmptyState 헬퍼로 14 페이지 일괄 통일 | `4ccf6f9` |
+| 디자인 2-C | 상태 배지 `statusStyles` 일괄 통일 — 컨소시엄·프로그램·강사초대 | `b7ba728` |
+| 디자인 2-D | Modal에 `brand` size variant 추가 (max-w-560 + rounded-20 + 강한 shadow) | `9b3d064` |
+| 23 | 토스트 알림 시스템 (`ToastContext` + `ToastContainer`) + AiPage·ProjectsPage 시범 적용 | `1bd9df1` |
+| 23-B | 8개 메인 페이지 fetch 에러 `toast.error` 일괄 교체 | `60de9b8` |
+| 11-옵션B | 교육생 신청 + 강사·TA 모집 시스템 (participant_applications + recruit_forms + recruit_applications + 외부 `/apply/:programId`·`/recruit/:token`) | `eff2efc` |
+| Stage 3 | HomePage KPI Supabase 실데이터 + 최근 프로젝트/지출 (dashboardUtils) | `5602702` |
+| 출석/일지 외부 | 출석 QR 다운로드 + 외부 `/attend/:token`·`/log/:token` 라우트 + 통합일지 외부 발송 링크 + SignaturePad | `78e726e` |
+| 캘린더 개선 | 다일 이벤트 시작일 텍스트 + 한국 공휴일(`utils/holidays.ts`) + 색상 매핑 정리 | `776f3bd` |
+| **STEP-CON** | 컨소시엄 독립 홈 7탭 구조 (개요·프로그램·태스크·인력·재무·외부공유·포털 + consortium_staff/consortium_links/consortium_portal_permissions + tasks·income·expenses에 consortium_id 추가) | `2f367f4` |
 
 ---
 
-### 🎉 모든 사이드바 메뉴 구현 완료 (STEP 21 기준)
+### 🎉 사이드바 메뉴 구현 완료 (STEP-CON 시점)
 
-20개 사이드바 메뉴 모두 실제 페이지 동작. PlaceholderPage 사용처 없음.
+22개 사이드바 메뉴 모두 실제 페이지 동작. PlaceholderPage 사용처 없음.
 
 | 그룹 | 메뉴 (라우트) |
 |---|---|
-| **운영** | 홈 (`/home`) · 일정 (`/schedule`) · 프로젝트 (`/projects`) · 컨소시엄 (`/consortium`) · 프로그램 (`/programs`) · 고객사 (`/clients`) · 전문가 (`/experts`) · 공유 (`/shares`) · 출석체크 (`/attendance`) · 수료증 (`/certificates`) · 일지 (`/activity-logs`) · 폼 관리 (`/forms`) · 포털 (`/portals`) |
+| **운영** | 홈 (`/home`) · 일정 (`/schedule`) · 프로젝트 (`/projects`) · 컨소시엄 (`/consortium`) · 프로그램 (`/programs`) · 고객사 (`/clients`) · 전문가 (`/experts`) · 공유 (`/shares`) · 출석체크 (`/attendance`) · 수료증 (`/certificates`) · 일지 (`/activity-logs`) · 폼 관리 (`/forms`) · **신청 관리 (`/applications`)** · **모집 공고 (`/recruit-manage`)** · 포털 (`/portals`) |
 | **재무** | 수입 (`/income`) · 지출 (`/expense`) · 증빙 (`/receipts`) · 정산 (`/settlements`) · 리포트 (`/reports`) |
 | **기타** | 팀원 (`/members`) · AI (`/ai`) |
+
+### 🎯 컨소시엄 상세 — 7탭 구조 (STEP-CON)
+
+`/consortium/:id` 진입 시 7개 탭으로 독립 홈 형태 운영. 본 프로젝트(`/projects/:id`) 와 동일한 깊이의 탭 분리.
+
+| 탭 | 컴포넌트 | 핵심 |
+|---|---|---|
+| 개요 | `ConOverviewTab` | 참여기관·예산 배분 (금액→비율 자동) |
+| 프로그램 | `ConProgramsTab` | 컨소시엄에 묶인 programs 목록 |
+| 태스크 | `ConTasksTab` | tasks.consortium_id 로 필터, 기관별 share_pct |
+| 인력 | `ConStaffTab` | consortium_staff (instructor/ta/facilitator/mentor/coordinator) |
+| 재무 | `ConFinanceTab` | 기관별 수입·지출·잔액 집계 |
+| 외부공유 | `ConLinksTab` | consortium_links (token 기반 4종 외부) |
+| 포털 | `ConPortalTab` | consortium_portal_permissions (PARTNER 권한) |
 
 ---
 
@@ -530,10 +557,19 @@ URL 구조: /consortium/:id/portal
 | `ai_conversations` | id, user_id, title, context, updated_at |
 | `ai_messages` | id, conversation_id, role, content, created_at |
 | `profiles` | id, email, name, role, position, department, joined_at, is_active |
+| `participant_applications` | id, program_id, name, phone, status, privacy_agreed, attendance_rate (STEP 11 옵션 B) |
+| `recruit_forms` | id, program_id, recruit_type, form_token, deadline, max_count (STEP 11 옵션 B) |
+| `recruit_applications` | id, form_id, name, phone, career, portfolio_url, status (STEP 11 옵션 B) |
+| `consortiums` | id, name, status, project_id, lead_client_id, total_budget (STEP-CON 컬럼 추가) |
+| `consortium_members` | id, consortium_id, client_id, member_type, task_share_pct, allocated_budget, portal_enabled |
+| `consortium_staff` | id, consortium_id, expert_id, program_id, role, fee_type (STEP-CON 신규) |
+| `consortium_links` | id, consortium_id, link_type, token (STEP-CON 신규) |
+| `consortium_portal_permissions` | id, consortium_id, member_id, permission_level (STEP-CON 신규) |
 
-> ℹ️ 위 표는 자주 사용하는 핵심 컬럼만. 부수 테이블(`client_contacts`, `consortium_members`, `program_applicants`, `files`, `certificate_templates`, `issued_certificates`, `activity_logs`, `public_forms`, `form_applications`, `project_reports`, `project_settlements`, `project_portals`, `portal_items`, `portal_responses`, `portal_templates`, `portal_template_items`)도 코드에서 사용 중 — 컬럼은 코드 grep으로 확인.
+> ℹ️ 위 표는 자주 사용하는 핵심 컬럼만. 부수 테이블(`client_contacts`, `program_applicants`, `files`, `certificate_templates`, `issued_certificates`, `activity_logs`, `public_forms`, `form_applications`, `project_reports`, `project_settlements`, `project_portals`, `portal_items`, `portal_responses`, `portal_templates`, `portal_template_items`)도 코드에서 사용 중 — 컬럼은 코드 grep으로 확인.
 
-> ✅ supabase/migrations/ 폴더에 STEP 17~21 사후 보존 파일 추가됨 (`20260510_schedule_events.sql`·`20260511_profiles_extend.sql`·`20260512_report_layouts.sql`·`20260513_ai_chat.sql`).
+> ✅ supabase/migrations/ 폴더 보존 파일 — `20260510_schedule_events.sql`·`20260511_profiles_extend.sql`·`20260512_report_layouts.sql`·`20260513_ai_chat.sql`·`20260514_applications_recruit.sql`·`20260515_consortium_extend.sql`.
+> tasks·income·expenses 에 `consortium_id` 컬럼 추가됨 (STEP-CON 마이그레이션에 포함).
 > STEP 11-B/C/D/E·13·14·15·16 은 박경수님이 Supabase Dashboard 에서 직접 실행 (마이그레이션 파일 미보존).
 
 ---
@@ -546,6 +582,10 @@ URL 구조: /consortium/:id/portal
 | `/form/:token` | PublicFormPage | 외부 공개 폼 응답 (STEP 11-E) |
 | `/portal/:token` | ClientPortalPage | 고객 문서 포털 응답 (STEP 15) |
 | `/invitation/:token` | InstructorInvitePage | 강사 초대 수락 (STEP 16) |
+| `/apply/:programId` | ApplyPage | 교육생 신청 (STEP 11 옵션 B) |
+| `/recruit/:token` | RecruitApplyPage | 강사·TA 모집 지원 (STEP 11 옵션 B) |
+| `/attend/:token` | AttendCheckPage | 출석 외부 체크 (출석 QR) |
+| `/log/:token` | LogWritePage | 통합일지 외부 작성 + 서명 (SignaturePad) |
 
 ---
 
@@ -557,6 +597,6 @@ URL 구조: /consortium/:id/portal
 | GitHub | `https://github.com/bal24com/bal24-workflow-v2` |
 | 배포 | `https://bal24-workflow-v2.netlify.app` / `https://bal24.kr` |
 | Supabase | `https://clsljkxvgmqwenettkrz.supabase.co` |
-| 최근 커밋 | `61f0b86` (STEP 21 AI 어시스턴트) |
+| 최근 커밋 | `2f367f4` (STEP-CON 컨소시엄 독립 홈 7탭) |
 | 이전 프로젝트 | `C:\workflow\workflow_v7_full` → **폐기, 사용 안 함** |
 
