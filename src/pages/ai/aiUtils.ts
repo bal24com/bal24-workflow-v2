@@ -1,0 +1,156 @@
+// bal24 v2 — AI 어시스턴트 유틸 (STEP 21)
+// Edge Function 호출 + Mock fallback + 시스템 프롬프트 + 빠른 프롬프트 템플릿
+
+import { supabase } from '../../lib/supabase';
+
+export type AiRole = 'user' | 'assistant';
+
+export interface AiMessage {
+  role: AiRole;
+  content: string;
+}
+
+export interface AiConversationRow {
+  id: string;
+  user_id: string;
+  title: string;
+  context: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiMessageRow {
+  id: string;
+  conversation_id: string;
+  role: AiRole;
+  content: string;
+  created_at: string;
+}
+
+export const SYSTEM_PROMPT = `
+당신은 BalanceDot WorkFlow의 AI 어시스턴트입니다.
+교육 사업 운영, 프로젝트 관리, 재무 정산, 강사 섭외, 고객 관리 등
+업무 전반에 걸쳐 전문적인 도움을 드립니다.
+답변은 항상 한국어로 작성하며, 실무에 바로 활용할 수 있도록
+구체적이고 간결하게 작성합니다.
+`.trim();
+
+export interface PromptTemplate {
+  label: string;
+  text: string;
+}
+
+export const PROMPT_TEMPLATES: PromptTemplate[] = [
+  {
+    label: '📋 결과보고서 초안',
+    text: '교육 프로그램 결과보고서 초안을 작성해줘. 프로그램명, 기간, 참여자 수를 알려주면 작성해드릴게요.',
+  },
+  {
+    label: '📧 강사 섭외 메일',
+    text: '강사 섭외 이메일 초안을 작성해줘. 강의 주제와 일시를 알려주면 작성해드릴게요.',
+  },
+  {
+    label: '💰 예산 계획 정리',
+    text: '사업 예산 계획서 양식을 만들어줘. 항목별로 정리된 표 형태로 작성해드릴게요.',
+  },
+  {
+    label: '📊 주간 업무 보고',
+    text: '이번 주 업무 보고서 양식을 작성해줘. 주요 성과, 이슈, 다음 주 계획 포함.',
+  },
+  {
+    label: '🤝 제안서 개요',
+    text: '신규 교육 사업 제안서 개요를 작성해줘. 사업명과 목적을 알려주면 작성해드릴게요.',
+  },
+  {
+    label: '📅 일정 공문 작성',
+    text: '교육 일정 안내 공문을 작성해줘. 대상 기관, 일시, 장소를 알려주면 작성해드릴게요.',
+  },
+];
+
+const MAX_HISTORY = 10;
+
+/**
+ * Edge Function `ai-chat` 호출. 실패 시 자동으로 Mock 응답으로 fallback.
+ * 박경수님이 Edge Function 배포 후에는 자동으로 실제 AI 응답으로 전환됨.
+ */
+export async function sendToAi(
+  messages: AiMessage[],
+  systemPrompt: string = SYSTEM_PROMPT,
+): Promise<{ content: string; mock: boolean }> {
+  // 토큰 절약: 최근 N개만 전송
+  const trimmed = messages.slice(-MAX_HISTORY);
+
+  try {
+    const { data, error } = await supabase.functions.invoke('ai-chat', {
+      body: { messages: trimmed, systemPrompt },
+    });
+    if (error) throw error;
+    if (data && typeof data === 'object' && 'error' in data && data.error) {
+      throw new Error(String(data.error));
+    }
+    const content =
+      data && typeof data === 'object' && 'content' in data && typeof data.content === 'string'
+        ? data.content
+        : '';
+    if (!content) throw new Error('빈 응답');
+    return { content, mock: false };
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : '';
+    console.error('[ai] Edge Function 호출 실패 → Mock fallback:', raw);
+    await new Promise((r) => setTimeout(r, 600));
+    const last = trimmed[trimmed.length - 1];
+    const userText = last?.content ?? '';
+    return {
+      content: buildMockReply(userText),
+      mock: true,
+    };
+  }
+}
+
+function buildMockReply(userText: string): string {
+  const trimmed = userText.trim();
+  const head = trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
+  return [
+    `[Mock 모드] "${head}"에 대한 임시 응답이에요.`,
+    '',
+    'Edge Function `ai-chat`이 아직 배포되지 않아 실제 AI 응답 대신 Mock 메시지를 보여드리고 있어요.',
+    'Supabase 대시보드 → Edge Functions → `ai-chat` 배포 + `OPENAI_API_KEY` 설정을 마치시면',
+    '자동으로 실제 AI 응답으로 전환됩니다.',
+  ].join('\n');
+}
+
+/** 대화 제목 자동 생성 (첫 user 메시지 앞 20자) */
+export function generateTitle(firstMessage: string): string {
+  const v = firstMessage.trim();
+  if (v.length === 0) return '새 대화';
+  return v.length > 20 ? `${v.slice(0, 20)}…` : v;
+}
+
+/** 메시지 시간 표기 (오늘 HH:MM / 그 전 MM월 DD일) */
+export function formatMessageTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+/** 대화 목록 그룹 라벨 (오늘/어제/이전) */
+export function dateGroupLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '이전';
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDay = Math.floor((today - target) / 86400000);
+  if (diffDay === 0) return '오늘';
+  if (diffDay === 1) return '어제';
+  if (diffDay < 7) return `${diffDay}일 전`;
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}

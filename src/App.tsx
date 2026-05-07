@@ -32,7 +32,7 @@ import SchedulePage from './pages/schedule/SchedulePage';
 import MembersPage from './pages/members/MembersPage';
 import SharesPage from './pages/shares/SharesPage';
 import ReportsPage from './pages/reports/ReportsPage';
-import PlaceholderPage from './pages/PlaceholderPage';
+import AiPage from './pages/ai/AiPage';
 import { useAuth } from './contexts/AuthContext';
 
 function LoadingScreen() {
@@ -125,7 +125,7 @@ export default function App() {
           {/* 기타 */}
           <Route path="/members" element={<MembersPage />} />
           <Route path="/team" element={<Navigate to="/members" replace />} />
-          <Route path="/ai" element={<PlaceholderPage title="AI" description="AI 자동화 도구가 여기에 들어와요." />} />
+          <Route path="/ai" element={<AiPage />} />
 
           {/* 구 경로 호환 */}
           <Route path="/dashboard" element={<Navigate to="/home" replace />} />
