@@ -1,5 +1,6 @@
-// bal24 v2 — 고객사 신규 등록 모달
+// bal24 v2 — 고객사 등록·수정 모달
 // 기본정보 + 사업자등록증 파일 + 담당자 동적 추가/삭제 (client_contacts)
+// client prop 있으면 수정 모드, 없으면 신규 등록 모드.
 
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
@@ -7,15 +8,18 @@ import { Plus, ScanLine, Loader2 } from 'lucide-react';
 import { Modal, Button, Input, FileDropZone } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { extractBusinessCardInfo, ClaudeApiKeyMissingError, ClaudeApiError } from '../../lib/claude';
-import type { ClientType, Profile } from '../../types/database';
+import type { Client, ClientContact, ClientType, Profile } from '../../types/database';
 import ContactRow, { makeContact, type ContactDraft } from './ContactRow';
 
 const STORAGE_BUCKET = 'client-files';
 
 type Props = {
   open: boolean;
+  /** 수정 모드 시 기존 client. null/undefined면 신규 등록. */
+  client?: Client | null;
   onClose: () => void;
-  onCreated: () => void;
+  /** 저장(등록 or 수정) 완료 콜백 */
+  onSaved: () => void;
 };
 
 type ClientForm = {
@@ -29,7 +33,10 @@ type ClientForm = {
   businessItem: string;
   bankName: string;
   bankAccount: string;
+  bankHolder: string;
   address: string;
+  phone: string;
+  email: string;
   note: string;
 };
 
@@ -39,9 +46,42 @@ const EMPTY_CLIENT: ClientForm = {
   name: '', businessName: '', ceoName: '', clientType: 'client',
   representative: '', businessNumber: '',
   businessType: '', businessItem: '',
-  bankName: '', bankAccount: '',
-  address: '', note: '',
+  bankName: '', bankAccount: '', bankHolder: '',
+  address: '', phone: '', email: '', note: '',
 };
+
+function clientToForm(c: Client): ClientForm {
+  return {
+    name: c.name ?? '',
+    businessName: c.business_name ?? '',
+    ceoName: c.ceo_name ?? '',
+    clientType: (c.client_type ?? 'client') as ClientType,
+    representative: c.representative ?? '',
+    businessNumber: c.business_number ?? '',
+    businessType: c.business_type ?? '',
+    businessItem: c.business_item ?? '',
+    bankName: c.bank_name ?? '',
+    bankAccount: c.bank_account ?? '',
+    bankHolder: c.bank_holder ?? '',
+    address: c.address ?? '',
+    phone: c.phone ?? '',
+    email: c.email ?? '',
+    note: c.note ?? '',
+  };
+}
+
+function contactRowToDraft(row: ClientContact): ContactDraft {
+  return {
+    uid: row.id,
+    name: row.name ?? '',
+    position: row.position ?? '',
+    mainDuties: row.main_duties ?? '',
+    phoneMobile: row.phone_mobile ?? '',
+    phoneOffice: row.phone_office ?? '',
+    email: row.email ?? '',
+    linkedProfileId: row.linked_profile_id ?? '',
+  };
+}
 
 function formatBusinessNumber(raw: string): string {
   const d = raw.replace(/\D/g, '').slice(0, 10);
@@ -70,7 +110,8 @@ function translateError(raw: string, ctx: 'upload' | 'insert' | 'contact'): stri
     : '거래처 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }
 
-export default function ClientFormModal({ open, onClose, onCreated }: Props) {
+export default function ClientFormModal({ open, client, onClose, onSaved }: Props) {
+  const isEdit = Boolean(client);
   const [form, setForm] = useState<ClientForm>(EMPTY_CLIENT);
   const [contacts, setContacts] = useState<ContactDraft[]>([makeContact()]);
   const [licenseUrl, setLicenseUrl] = useState<string | null>(null);
@@ -100,6 +141,38 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
       });
     return () => { cancelled = true; };
   }, [open]);
+
+  // 모달 열릴 때 — client 있으면 prefill, 없으면 EMPTY
+  useEffect(() => {
+    if (!open) return;
+    if (client) {
+      setForm(clientToForm(client));
+      setLicenseUrl(client.business_license_url ?? null);
+      setLicenseName(client.business_license_url ? '등록된 사업자등록증' : null);
+      // 기존 contacts fetch
+      let cancelled = false;
+      void (async () => {
+        const { data, error } = await supabase
+          .from('client_contacts')
+          .select('*')
+          .eq('client_id', client.id)
+          .order('created_at', { ascending: true });
+        if (cancelled) return;
+        if (error) {
+          console.error('[clients] 담당자 조회 실패:', error.message);
+          setContacts([makeContact()]);
+          return;
+        }
+        const rows = (data as ClientContact[] | null) ?? [];
+        setContacts(rows.length > 0 ? rows.map(contactRowToDraft) : [makeContact()]);
+      })();
+      return () => { cancelled = true; };
+    }
+    setForm(EMPTY_CLIENT);
+    setContacts([makeContact()]);
+    setLicenseUrl(null);
+    setLicenseName(null);
+  }, [open, client]);
 
   useEffect(() => {
     if (open) return;
@@ -214,7 +287,7 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
     setSubmitting(true);
     try {
       const businessNumberDigits = form.businessNumber.replace(/\D/g, '');
-      const { data: clientData, error: insertError } = await supabase.from('clients').insert({
+      const payload = {
         name: form.name.trim(),
         business_name: form.businessName.trim() || null,
         ceo_name: form.ceoName.trim() || null,
@@ -224,39 +297,69 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
         business_type: form.businessType.trim() || null,
         business_item: form.businessItem.trim() || null,
         address: form.address.trim() || null,
+        phone: form.phone.trim() || null,
+        email: form.email.trim() || null,
         note: form.note.trim() || null,
         bank_name: form.bankName.trim() || null,
         bank_account: form.bankAccount.trim() || null,
+        bank_holder: form.bankHolder.trim() || null,
         business_license_url: licenseUrl,
-      }).select('id').single();
+      };
 
-      if (insertError) throw insertError;
+      let clientId: string | null = null;
 
-      const filledContacts = contacts.filter((c) => c.name.trim());
-      if (filledContacts.length > 0 && clientData) {
-        const rows = filledContacts.map((c) => ({
-          client_id: clientData.id,
-          name: c.name.trim(),
-          position: c.position.trim() || null,
-          main_duties: c.mainDuties.trim() || null,
-          phone_mobile: c.phoneMobile.trim() || null,
-          phone_office: c.phoneOffice.trim() || null,
-          email: c.email.trim() || null,
-          linked_profile_id: c.linkedProfileId || null,
-        }));
-        const { error: contactsError } = await supabase.from('client_contacts').insert(rows);
-        if (contactsError) {
-          console.error('[clients] 담당자 저장 실패:', contactsError.message);
-          setErrorMsg(translateError(contactsError.message, 'contact'));
-          // 고객사는 등록됐으니 onCreated는 호출하고 모달은 닫음
+      if (isEdit && client) {
+        const { error: updateError } = await supabase
+          .from('clients')
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq('id', client.id);
+        if (updateError) throw updateError;
+        clientId = client.id;
+      } else {
+        const { data: clientData, error: insertError } = await supabase
+          .from('clients')
+          .insert(payload)
+          .select('id')
+          .single();
+        if (insertError) throw insertError;
+        clientId = (clientData?.id as string | undefined) ?? null;
+      }
+
+      if (clientId) {
+        // 수정 모드: 기존 contacts 전체 삭제 후 재삽입 (단순·DB 동기화 정확)
+        if (isEdit) {
+          const { error: delErr } = await supabase
+            .from('client_contacts')
+            .delete()
+            .eq('client_id', clientId);
+          if (delErr) console.error('[clients] 담당자 초기화 실패:', delErr.message);
+        }
+
+        const filledContacts = contacts.filter((c) => c.name.trim());
+        if (filledContacts.length > 0) {
+          const rows = filledContacts.map((c) => ({
+            client_id: clientId,
+            name: c.name.trim(),
+            position: c.position.trim() || null,
+            main_duties: c.mainDuties.trim() || null,
+            phone_mobile: c.phoneMobile.trim() || null,
+            phone_office: c.phoneOffice.trim() || null,
+            email: c.email.trim() || null,
+            linked_profile_id: c.linkedProfileId || null,
+          }));
+          const { error: contactsError } = await supabase.from('client_contacts').insert(rows);
+          if (contactsError) {
+            console.error('[clients] 담당자 저장 실패:', contactsError.message);
+            setErrorMsg(translateError(contactsError.message, 'contact'));
+          }
         }
       }
 
-      onCreated();
+      onSaved();
       onClose();
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
-      console.error('[clients] 등록 실패:', raw);
+      console.error(`[clients] ${isEdit ? '수정' : '등록'} 실패:`, raw);
       setErrorMsg(translateError(raw, 'insert'));
     } finally {
       setSubmitting(false);
@@ -267,14 +370,16 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
     <Modal
       open={open}
       onClose={onClose}
-      title="고객사 신규 등록"
-      description="상호명만 필수예요. 담당자는 여러 명 등록할 수 있어요."
+      title={isEdit ? '고객사 수정' : '고객사 신규 등록'}
+      description={isEdit ? '정보를 수정하고 저장하면 즉시 반영돼요.' : '상호명만 필수예요. 담당자는 여러 명 등록할 수 있어요.'}
       size="lg"
       closeOnBackdrop={!submitting && !uploading}
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={submitting || uploading}>취소</Button>
-          <Button type="submit" form="client-form" variant="primary" loading={submitting} disabled={uploading}>저장하기</Button>
+          <Button type="submit" form="client-form" variant="primary" loading={submitting} disabled={uploading}>
+            {isEdit ? '수정 완료' : '저장하기'}
+          </Button>
         </>
       }
     >
@@ -316,6 +421,10 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
             <Input label="종목" value={form.businessItem} onChange={(e) => update('businessItem', e.target.value)} disabled={submitting} placeholder="예) 교육서비스" />
           </div>
           <Input label="주소" value={form.address} onChange={(e) => update('address', e.target.value)} disabled={submitting} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="대표 전화" type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} disabled={submitting} placeholder="02-0000-0000" />
+            <Input label="대표 이메일" type="email" value={form.email} onChange={(e) => update('email', e.target.value)} disabled={submitting} placeholder="contact@company.kr" />
+          </div>
           <div className="space-y-1.5">
             <label htmlFor="client-note" className="text-sm font-semibold text-slate-700">메모</label>
             <textarea
@@ -332,9 +441,10 @@ export default function ClientFormModal({ open, onClose, onCreated }: Props) {
 
         <section className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">계좌</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input label="계좌은행" value={form.bankName} onChange={(e) => update('bankName', e.target.value)} disabled={submitting} placeholder="예) 우리은행" />
             <Input label="계좌번호" value={form.bankAccount} onChange={(e) => update('bankAccount', e.target.value)} disabled={submitting} />
+            <Input label="예금주" value={form.bankHolder} onChange={(e) => update('bankHolder', e.target.value)} disabled={submitting} placeholder="예) (주)밸런스닷" />
           </div>
         </section>
 

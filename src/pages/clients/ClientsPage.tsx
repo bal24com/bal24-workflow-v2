@@ -1,21 +1,21 @@
 // bal24 v2 — 고객사 목록 페이지
-// 카드(기본) / 리스트 + 검색(상호/담당자) + 신규 등록 + 담당자 N명 표시
+// 카드(기본) / 리스트 + 검색(상호/담당자) + 신규 등록·수정·내용보기 + 담당자 N명 표시
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutGrid, List, Plus, Loader2, Search, Building2, Phone, Mail, Users,
+  Banknote, FileText, Briefcase, Eye, Pencil,
 } from 'lucide-react';
 import {
   Button,
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import type { Client, ClientContact } from '../../types/database';
+import type { Client, ClientContact, ClientType } from '../../types/database';
 import ClientFormModal from './ClientFormModal';
+import ClientDetailModal from './ClientDetailModal';
 
 type ViewMode = 'card' | 'list';
 
@@ -26,6 +26,12 @@ type ClientRow = Client & {
 const SELECT_COLUMNS =
   '*, contacts:client_contacts(id,name,position,phone_mobile,email)';
 
+const TYPE_BADGE: Record<ClientType, { bg: string; text: string; label: string }> = {
+  client: { bg: 'bg-violet-100', text: 'text-violet-700', label: '고객사' },
+  vendor: { bg: 'bg-orange-100', text: 'text-orange-700', label: '거래처' },
+  both: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: '고객·거래처' },
+};
+
 function formatBusinessNumber(raw?: string | null): string {
   if (!raw) return '';
   const d = raw.replace(/\D/g, '');
@@ -33,109 +39,178 @@ function formatBusinessNumber(raw?: string | null): string {
   return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
 }
 
-function ClientGridCard({ c }: { c: ClientRow }) {
-  const primary = c.contacts[0];
+function typeBadge(c: Client) {
+  const key = (c.client_type ?? 'client') as ClientType;
+  return TYPE_BADGE[key] ?? TYPE_BADGE.client;
+}
+
+interface CardActions {
+  onView: (c: ClientRow) => void;
+  onEdit: (c: ClientRow) => void;
+}
+
+function ClientGridCard({ c, onView, onEdit }: { c: ClientRow } & CardActions) {
+  const tone = typeBadge(c);
+  const ceo = c.ceo_name ?? c.representative;
+  const industry = [c.business_type, c.business_item].filter(Boolean).join(' · ');
+  const bankLine = [c.bank_name, c.bank_account, c.bank_holder].filter(Boolean).join(' ');
+  const primaryContact = c.contacts[0];
+
   return (
-    <Card className="hover:border-primary/30 hover:shadow-md transition h-full">
+    <Card className="hover:border-violet-200 hover:shadow-md transition h-full flex flex-col">
       <CardHeader>
         <div className="flex items-start gap-2">
-          <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary shrink-0">
-            <Building2 size={18} />
+          <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-violet-100 text-violet-600 shrink-0">
+            <Building2 size={18} aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <CardTitle className="truncate">{c.name}</CardTitle>
-            <CardDescription>
-              {c.representative ?? '대표자 미지정'}
-              {c.business_number && ` · ${formatBusinessNumber(c.business_number)}`}
-            </CardDescription>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone.bg} ${tone.text}`}>
+                {tone.label}
+              </span>
+            </div>
+            <div className="text-base font-bold text-[#1E1B4B] truncate">{c.name}</div>
+            {c.business_name && (
+              <div className="text-xs text-slate-500 truncate">{c.business_name}</div>
+            )}
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-1.5 text-xs text-muted">
-        {(c.business_type || c.business_item) && (
-          <div>
-            {c.business_type && <span className="text-slate-700">{c.business_type}</span>}
-            {c.business_type && c.business_item && ' · '}
-            {c.business_item && <span className="text-slate-700">{c.business_item}</span>}
-          </div>
+
+      <CardContent className="space-y-1.5 text-xs flex-1">
+        {ceo && (
+          <Line icon={<Users size={12} aria-hidden="true" />}>
+            <span className="text-slate-500">대표</span>{' '}
+            <span className="text-slate-700 font-medium">{ceo}</span>
+          </Line>
         )}
-        {primary ? (
-          <>
-            <div className="flex items-center gap-1.5">
-              <Users size={12} className="text-slate-400" />
-              <span className="text-slate-700 font-medium">{primary.name}</span>
-              {primary.position && <span>· {primary.position}</span>}
-              {c.contacts.length > 1 && (
-                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                  외 {c.contacts.length - 1}명
-                </span>
-              )}
-            </div>
-            {primary.phone_mobile && (
-              <div className="flex items-center gap-1.5">
-                <Phone size={12} className="text-slate-400" />
-                <span className="truncate">{primary.phone_mobile}</span>
-              </div>
+        {c.phone && (
+          <Line icon={<Phone size={12} aria-hidden="true" />}>
+            <span className="text-slate-700">{c.phone}</span>
+          </Line>
+        )}
+        {c.email && (
+          <Line icon={<Mail size={12} aria-hidden="true" />}>
+            <span className="text-slate-700 truncate">{c.email}</span>
+          </Line>
+        )}
+        {bankLine && (
+          <Line icon={<Banknote size={12} aria-hidden="true" />}>
+            <span className="text-slate-700 truncate">{bankLine}</span>
+          </Line>
+        )}
+        {c.business_number && (
+          <Line icon={<FileText size={12} aria-hidden="true" />}>
+            <span className="text-slate-500">사업자</span>{' '}
+            <span className="text-slate-700">{formatBusinessNumber(c.business_number)}</span>
+          </Line>
+        )}
+        {industry && (
+          <Line icon={<Briefcase size={12} aria-hidden="true" />}>
+            <span className="text-slate-700 truncate">{industry}</span>
+          </Line>
+        )}
+        {primaryContact && (
+          <Line icon={<Users size={12} aria-hidden="true" />}>
+            <span className="text-slate-500">담당</span>{' '}
+            <span className="text-slate-700 font-medium">{primaryContact.name}</span>
+            {primaryContact.position && <span className="text-slate-500"> · {primaryContact.position}</span>}
+            {c.contacts.length > 1 && (
+              <span className="ml-1 text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">
+                외 {c.contacts.length - 1}명
+              </span>
             )}
-            {primary.email && (
-              <div className="flex items-center gap-1.5">
-                <Mail size={12} className="text-slate-400" />
-                <span className="truncate">{primary.email}</span>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <Users size={12} />
-            담당자 미등록
-          </div>
+          </Line>
+        )}
+        {c.note && (
+          <p className="text-[11px] text-slate-500 italic line-clamp-1 pt-1">{c.note}</p>
         )}
       </CardContent>
+
+      <div className="flex items-center gap-2 px-5 pb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          leftIcon={<Eye size={14} />}
+          onClick={() => onView(c)}
+          className="!flex-1"
+        >
+          내용보기
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          leftIcon={<Pencil size={14} />}
+          onClick={() => onEdit(c)}
+          className="!flex-1"
+        >
+          수정
+        </Button>
+      </div>
     </Card>
   );
 }
 
-function ClientListRow({ c }: { c: ClientRow }) {
-  const primary = c.contacts[0];
+function Line({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <li className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition">
-      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary shrink-0">
-        <Building2 size={18} />
+    <div className="flex items-center gap-1.5 min-w-0">
+      <span className="text-slate-400 shrink-0">{icon}</span>
+      <span className="truncate">{children}</span>
+    </div>
+  );
+}
+
+function ClientListRow({ c, onView, onEdit }: { c: ClientRow } & CardActions) {
+  const tone = typeBadge(c);
+  const ceo = c.ceo_name ?? c.representative;
+  return (
+    <li className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-violet-200 hover:shadow-sm transition">
+      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-violet-100 text-violet-600 shrink-0">
+        <Building2 size={18} aria-hidden="true" />
       </span>
       <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-bold text-text truncate">{c.name}</div>
+          <div className="flex items-center gap-1.5">
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tone.bg} ${tone.text}`}>
+              {tone.label}
+            </span>
+            <span className="text-sm font-bold text-text truncate">{c.name}</span>
+          </div>
           <div className="text-xs text-muted truncate">
-            {c.representative ?? '대표자 미지정'}
+            {ceo ?? '대표자 미지정'}
             {c.business_number && ` · ${formatBusinessNumber(c.business_number)}`}
           </div>
         </div>
         <div className="min-w-0 text-xs text-muted">
-          {c.business_type || c.business_item ? (
-            <>
-              <span className="font-semibold text-slate-700">업종</span>{' '}
-              {[c.business_type, c.business_item].filter(Boolean).join(' · ')}
-            </>
-          ) : (
+          {[c.business_type, c.business_item].filter(Boolean).join(' · ') || (
             <span className="text-slate-400">업종 미지정</span>
           )}
         </div>
         <div className="min-w-0 text-xs text-muted truncate">
-          {primary ? (
+          {c.phone || c.email ? (
+            <>
+              {c.phone && <span>{c.phone}</span>}
+              {c.phone && c.email && ' · '}
+              {c.email}
+            </>
+          ) : c.contacts[0] ? (
             <>
               <span className="font-semibold text-slate-700">담당</span>{' '}
-              {primary.name}
-              {primary.phone_mobile && ` · ${primary.phone_mobile}`}
-              {c.contacts.length > 1 && (
-                <span className="ml-1 text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded">
-                  +{c.contacts.length - 1}
-                </span>
-              )}
+              {c.contacts[0].name}
+              {c.contacts[0].phone_mobile && ` · ${c.contacts[0].phone_mobile}`}
             </>
           ) : (
-            <span className="text-slate-400">담당자 미등록</span>
+            <span className="text-slate-400">연락처 미등록</span>
           )}
         </div>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={() => onView(c)}>
+          내용
+        </Button>
+        <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={() => onEdit(c)}>
+          수정
+        </Button>
       </div>
     </li>
   );
@@ -147,7 +222,10 @@ export default function ClientsPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>('card');
   const [search, setSearch] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Client | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Client | null>(null);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -182,10 +260,18 @@ export default function ClientsPage() {
     if (!q) return clients;
     return clients.filter((c) => {
       if (c.name?.toLowerCase().includes(q)) return true;
+      if (c.business_name?.toLowerCase().includes(q)) return true;
       if (c.representative?.toLowerCase().includes(q)) return true;
+      if (c.ceo_name?.toLowerCase().includes(q)) return true;
       return c.contacts.some((ct) => ct.name?.toLowerCase().includes(q));
     });
   }, [clients, search]);
+
+  const handleView = (c: ClientRow) => setDetailTarget(c);
+  const handleEdit = (c: ClientRow) => {
+    setDetailTarget(null);
+    setEditTarget(c);
+  };
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -225,7 +311,7 @@ export default function ClientsPage() {
             </button>
           </div>
 
-          <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setModalOpen(true)}>
+          <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setCreateOpen(true)}>
             신규 등록
           </Button>
         </div>
@@ -249,25 +335,51 @@ export default function ClientsPage() {
             {search.trim() ? '검색 결과가 없어요.' : '아직 등록된 고객사가 없어요.'}
           </p>
           {!search.trim() && (
-            <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
+            <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => setCreateOpen(true)}>
               첫 고객사 등록하기
             </Button>
           )}
         </div>
       ) : view === 'card' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visible.map((c) => (<ClientGridCard key={c.id} c={c} />))}
+          {visible.map((c) => (
+            <ClientGridCard key={c.id} c={c} onView={handleView} onEdit={handleEdit} />
+          ))}
         </div>
       ) : (
         <ul className="space-y-2">
-          {visible.map((c) => (<ClientListRow key={c.id} c={c} />))}
+          {visible.map((c) => (
+            <ClientListRow key={c.id} c={c} onView={handleView} onEdit={handleEdit} />
+          ))}
         </ul>
       )}
 
+      {/* 신규 등록 모달 */}
       <ClientFormModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onCreated={() => void fetchClients()}
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSaved={() => {
+          setCreateOpen(false);
+          void fetchClients();
+        }}
+      />
+
+      {/* 수정 모달 */}
+      <ClientFormModal
+        open={Boolean(editTarget)}
+        client={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSaved={() => {
+          setEditTarget(null);
+          void fetchClients();
+        }}
+      />
+
+      {/* 상세 모달 */}
+      <ClientDetailModal
+        open={Boolean(detailTarget)}
+        client={detailTarget}
+        onClose={() => setDetailTarget(null)}
       />
     </div>
   );
