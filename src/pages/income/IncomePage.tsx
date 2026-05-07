@@ -3,11 +3,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Loader2, Search, TrendingUp } from 'lucide-react';
-import { Badge, Button } from '../../components/ui';
+import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import { findIncomeCode } from '../../utils/accounting';
-import type { Income, IncomeStatus, LedgerType } from '../../types/database';
+import { BADGE_BASE, INCOME_STATUS_STYLE } from '../../utils/statusStyles';
+import type { Income, LedgerType } from '../../types/database';
 import IncomeFormModal from './IncomeFormModal';
 
 type IncomeRow = Income & {
@@ -19,11 +20,6 @@ type IncomeRow = Income & {
 const SELECT_COLUMNS =
   '*, client:clients(id,name), project:projects(id,name), consortium:consortiums(id,name)';
 
-function statusBadgeVariant(s: IncomeStatus) {
-  if (s === '입금완료') return 'success' as const;
-  if (s === '반려') return 'danger' as const;
-  return 'default' as const;
-}
 
 function LedgerTabs({ value, onChange, counts }: {
   value: LedgerType;
@@ -172,7 +168,7 @@ export default function IncomePage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visible.map((i) => (
-                <tr key={i.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={i.id} className="hover:bg-violet-50 transition-colors">
                   <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">{formatDateKo(i.income_date)}</td>
                   <td className="px-4 py-2.5 text-xs">
                     <span className="text-slate-700 font-medium">
@@ -183,9 +179,9 @@ export default function IncomePage() {
                   <td className="px-4 py-2.5 text-xs text-muted">
                     {[i.client?.name, ledger === 'own' ? i.project?.name : i.consortium?.name].filter(Boolean).join(' · ') || '–'}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-semibold text-text whitespace-nowrap">{formatMoney(i.amount)}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-text whitespace-nowrap tabular-nums">{formatMoney(i.amount)}</td>
                   <td className="px-4 py-2.5 text-center">
-                    <Badge variant={statusBadgeVariant(i.status)}>{i.status}</Badge>
+                    <span className={`${BADGE_BASE} ${INCOME_STATUS_STYLE[i.status]}`}>{i.status}</span>
                   </td>
                 </tr>
               ))}

@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LayoutGrid, List, Plus, Loader2 } from 'lucide-react';
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -15,8 +14,9 @@ import {
 } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
+import { BADGE_BASE, PROJECT_STATUS_STYLE } from '../../utils/statusStyles';
 import type { Project, ProjectStatus } from '../../types/database';
-import { PROJECT_STATUS_VALUES, statusToBadgeVariant } from './projectStatus';
+import { PROJECT_STATUS_VALUES } from './projectStatus';
 import ProjectFormModal from './ProjectFormModal';
 
 type ViewMode = 'list' | 'card';
@@ -113,7 +113,7 @@ function ProjectListItem({ p }: { p: ProjectRow }) {
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
-            <Badge variant={statusToBadgeVariant(p.status)}>{p.status}</Badge>
+            <span className={`${BADGE_BASE} ${PROJECT_STATUS_STYLE[p.status]}`}>{p.status}</span>
             {p.type?.map((t) => (
               <span key={t} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                 {t}
@@ -134,7 +134,7 @@ function ProjectCard({ p }: { p: ProjectRow }) {
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="truncate">{p.name}</CardTitle>
-            <Badge variant={statusToBadgeVariant(p.status)}>{p.status}</Badge>
+            <span className={`${BADGE_BASE} ${PROJECT_STATUS_STYLE[p.status]}`}>{p.status}</span>
           </div>
           <CardDescription>
             {p.type?.join(' · ') ?? '유형 미지정'}

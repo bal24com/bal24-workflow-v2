@@ -20,6 +20,7 @@ import {
   PROGRAM_TYPE_VALUES,
   programStatusToBadgeVariant,
 } from './programStatus';
+import { PROGRAM_TYPE_STYLE, BADGE_BASE } from '../../utils/statusStyles';
 import ProgramFormModal from './ProgramFormModal';
 import InvitationManagePanel from './InvitationManagePanel';
 
@@ -138,9 +139,7 @@ function ProgramListItem({ p, onInvite }: { p: ProgramRow; onInvite: (p: Program
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
           <Badge variant={programStatusToBadgeVariant(p.status)}>{p.status}</Badge>
-          <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-            {p.type}
-          </span>
+          <span className={`${BADGE_BASE} ${PROGRAM_TYPE_STYLE[p.type]}`}>{p.type}</span>
         </div>
         <ProgramMeta p={p} />
       </div>
@@ -157,7 +156,9 @@ function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow)
           <CardTitle className="truncate">{p.name}</CardTitle>
           <Badge variant={programStatusToBadgeVariant(p.status)}>{p.status}</Badge>
         </div>
-        <CardDescription>{p.type}</CardDescription>
+        <CardDescription>
+          <span className={`${BADGE_BASE} ${PROGRAM_TYPE_STYLE[p.type]}`}>{p.type}</span>
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         <ProgramMeta p={p} />

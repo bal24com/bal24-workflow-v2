@@ -3,14 +3,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Loader2, Search, TrendingDown } from 'lucide-react';
-import { Badge, Button } from '../../components/ui';
+import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import {
   findExpenseCode,
   findWithholdingOption,
 } from '../../utils/accounting';
-import type { Expense, ExpenseStatus, LedgerType } from '../../types/database';
+import { BADGE_BASE, EXPENSE_STATUS_STYLE } from '../../utils/statusStyles';
+import type { Expense, LedgerType } from '../../types/database';
 import ExpenseFormModal from './ExpenseFormModal';
 
 type ExpenseRow = Expense & {
@@ -23,12 +24,6 @@ type ExpenseRow = Expense & {
 // payee:clients는 단일 FK라 단축형 안전.
 const SELECT_COLUMNS =
   '*, payee:clients(id,name), project:projects(id,name), consortium:consortiums(id,name)';
-
-function statusBadgeVariant(s: ExpenseStatus) {
-  if (s === '출금완료') return 'success' as const;
-  if (s === '반려') return 'danger' as const;
-  return 'default' as const;
-}
 
 function LedgerTabs({ value, onChange, counts }: {
   value: LedgerType;
@@ -187,27 +182,27 @@ export default function ExpensesPage() {
               {visible.map((i) => {
                 const wh = findWithholdingOption(i.withholding_type);
                 return (
-                  <tr key={i.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={i.id} className="hover:bg-violet-50 transition-colors">
                     <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">{formatDateKo(i.expense_date)}</td>
                     <td className="px-4 py-2.5 text-xs text-slate-700 font-medium">{findExpenseCode(i.account_code)?.label ?? i.account_code}</td>
                     <td className="px-4 py-2.5 text-text">{i.description}</td>
                     <td className="px-4 py-2.5 text-xs text-muted">
                       {[i.payee?.name, ledger === 'own' ? i.project?.name : i.consortium?.name].filter(Boolean).join(' · ') || '–'}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-text whitespace-nowrap">{formatMoney(i.gross_amount)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-text whitespace-nowrap tabular-nums">{formatMoney(i.gross_amount)}</td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap">
                       {Number(i.withholding_amount) > 0 ? (
                         <div className="text-xs">
-                          <div className="text-danger font-semibold">- {formatMoney(i.withholding_amount)}</div>
+                          <div className="text-danger font-semibold tabular-nums">- {formatMoney(i.withholding_amount)}</div>
                           <div className="text-[10px] text-muted">{wh.label}</div>
                         </div>
                       ) : (
                         <span className="text-xs text-slate-400">없음</span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-bold text-primary whitespace-nowrap">{formatMoney(i.net_amount)}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-primary whitespace-nowrap tabular-nums">{formatMoney(i.net_amount)}</td>
                     <td className="px-4 py-2.5 text-center">
-                      <Badge variant={statusBadgeVariant(i.status)}>{i.status}</Badge>
+                      <span className={`${BADGE_BASE} ${EXPENSE_STATUS_STYLE[i.status]}`}>{i.status}</span>
                     </td>
                   </tr>
                 );

@@ -59,7 +59,7 @@ function ExpertGridCard({ s }: { s: StaffPool }) {
         {s.specialty?.length ? (
           <div className="flex flex-wrap gap-1">
             {s.specialty.map((t) => (
-              <span key={t} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px] font-semibold">
+              <span key={t} className="bg-violet-50 text-violet-600 border border-violet-200 px-2 py-0.5 rounded-full text-[11px] font-semibold">
                 {t}
               </span>
             ))}
@@ -106,7 +106,7 @@ function ExpertListRow({ s }: { s: StaffPool }) {
           {s.specialty?.length ? (
             <div className="flex flex-wrap gap-1">
               {s.specialty.map((t) => (
-                <span key={t} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px] font-semibold">{t}</span>
+                <span key={t} className="bg-violet-50 text-violet-600 border border-violet-200 px-2 py-0.5 rounded-full text-[11px] font-semibold">{t}</span>
               ))}
             </div>
           ) : (
