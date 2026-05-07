@@ -20,7 +20,6 @@ import ScheduleCard from './cards/ScheduleCard';
 import NoticeCard from './cards/NoticeCard';
 import GoalCard from './cards/GoalCard';
 import OutcomeLinkCard from './cards/OutcomeLinkCard';
-import CurriculumCard from './cards/CurriculumCard';
 import SurveyLinkCard from './cards/SurveyLinkCard';
 import ClassificationCard from './cards/ClassificationCard';
 import type { Program } from '../../../types/database';
@@ -127,7 +126,7 @@ export default function ProgramEditPage() {
           <div>
             <h1 className="text-2xl font-bold text-[#1E1B4B]">프로그램 수정</h1>
             <p className="mt-0.5 text-xs text-slate-500">
-              9개 카드를 채워 프로그램 정보를 풍부하게 보강하세요.
+              7개 카드를 채워 프로그램 정보를 풍부하게 보강하세요. 커리큘럼은 상세 → 커리큘럼 탭에서 관리해요.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -147,7 +146,6 @@ export default function ProgramEditPage() {
         <NoticeCard form={form} onChange={update} />
         <GoalCard form={form} onChange={update} />
         <OutcomeLinkCard programId={id} />
-        <CurriculumCard programId={id} />
         <SurveyLinkCard />
         <ClassificationCard />
       </div>

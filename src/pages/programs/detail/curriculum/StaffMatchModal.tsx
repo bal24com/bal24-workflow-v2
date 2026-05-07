@@ -8,7 +8,7 @@ import { Button } from '../../../../components/ui';
 import { useToast } from '../../../../contexts/ToastContext';
 import { supabase } from '../../../../lib/supabase';
 import { CURRICULUM_STAFF_ROLES } from '../../../../lib/curriculumStaff';
-import { inputClass, Field } from '../cards/CardShell';
+import { inputClass, Field } from '../../edit/cards/CardShell';
 import type {
   CurriculumStaffRole, StaffPool, Profile,
 } from '../../../../types/database';
@@ -23,9 +23,10 @@ interface Props {
   onClose: () => void;
   curriculumId: string;
   onAdded: () => void;
+  defaultRole?: CurriculumStaffRole;
 }
 
-export default function StaffMatchModal({ open, onClose, curriculumId, onAdded }: Props) {
+export default function StaffMatchModal({ open, onClose, curriculumId, onAdded, defaultRole }: Props) {
   const toast = useToast();
   const [tab, setTab] = useState<SourceTab>('external');
   const [search, setSearch] = useState('');
@@ -33,7 +34,7 @@ export default function StaffMatchModal({ open, onClose, curriculumId, onAdded }
   const [profileList, setProfileList] = useState<ProfileOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string>('');
-  const [role, setRole] = useState<CurriculumStaffRole>('강사');
+  const [role, setRole] = useState<CurriculumStaffRole>(defaultRole ?? '강사');
   const [feeText, setFeeText] = useState('');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -76,14 +77,15 @@ export default function StaffMatchModal({ open, onClose, curriculumId, onAdded }
   }, [open]);
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      setRole(defaultRole ?? '강사');
+    } else {
       setSearch('');
       setSelectedId('');
-      setRole('강사');
       setFeeText('');
       setNote('');
     }
-  }, [open]);
+  }, [open, defaultRole]);
 
   const filteredStaff = useMemo(() => {
     const q = search.trim().toLowerCase();

@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart,
+  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -16,6 +16,7 @@ import {
 } from '../../utils/statusStyles';
 import type { Program } from '../../types/database';
 import OverviewTab from './detail/OverviewTab';
+import CurriculumTab from './detail/CurriculumTab';
 import StaffStudentsTab from './detail/StaffStudentsTab';
 import AttendanceLogTab from './detail/AttendanceLogTab';
 import SurveyResultTab from './detail/SurveyResultTab';
@@ -26,10 +27,11 @@ type DetailProgram = Program & {
   project?: { id: string; name: string; status: string } | null;
 };
 
-type TabKey = 'overview' | 'staff' | 'attendance' | 'survey' | 'share' | 'report';
+type TabKey = 'overview' | 'curriculum' | 'staff' | 'attendance' | 'survey' | 'share' | 'report';
 
 const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'overview',   label: '개요',         Icon: Info },
+  { key: 'curriculum', label: '커리큘럼',     Icon: BookOpen },
   { key: 'staff',      label: '강사·교육생', Icon: Mic2 },
   { key: 'attendance', label: '출석·일지',   Icon: ClipboardCheck },
   { key: 'survey',     label: '결과·만족도', Icon: FileText },
@@ -204,6 +206,7 @@ export default function ProgramDetailPage() {
         {tab === 'overview' && (
           <OverviewTab programId={programId} description={program.description ?? null} />
         )}
+        {tab === 'curriculum' && <CurriculumTab programId={programId} />}
         {tab === 'staff' && <StaffStudentsTab programId={programId} />}
         {tab === 'attendance' && <AttendanceLogTab programId={programId} />}
         {tab === 'survey' && <SurveyResultTab programId={programId} />}

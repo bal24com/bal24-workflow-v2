@@ -18,6 +18,8 @@ export interface MatchedStaffRow {
   fee: number | null;
   token: string;
   note: string | null;
+  phone: string | null;
+  email: string | null;
 }
 
 interface Props {
@@ -38,12 +40,21 @@ export default function StaffMatchRow({ row, onDelete }: Props) {
   return (
     <div className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2">
       <span className={`${BADGE_BASE} ${STAFF_ROLE_STYLE[row.role]} shrink-0`}>{row.role}</span>
-      <span className="flex-1 min-w-0 truncate text-xs font-semibold text-[#1E1B4B]">
-        {row.name}
-        <span className="ml-1 text-[10px] text-slate-400 font-normal">
-          {row.source === 'external' ? '외부' : '내부'}
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        <span className="truncate text-xs font-semibold text-[#1E1B4B] shrink-0">
+          {row.name}
+          <span className="ml-1 text-[10px] text-slate-400 font-normal">
+            ({row.source === 'external' ? '외부' : '내부'})
+          </span>
         </span>
-      </span>
+        {(row.phone || row.email) && (
+          <span className="hidden sm:inline truncate text-[10px] text-slate-400">
+            {row.phone}
+            {row.phone && row.email ? ' · ' : ''}
+            {row.email}
+          </span>
+        )}
+      </div>
       {row.fee != null && (
         <span className="shrink-0 text-[11px] text-slate-500 tabular-nums">
           {formatMoney(row.fee)}

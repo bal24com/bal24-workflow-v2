@@ -215,8 +215,12 @@ export interface ProgramCurriculum {
   title: string;
   content?: string | null;
   session_date?: string | null;
-  /** 분 단위 */
+  /** 분 단위 — 자동 계산 또는 수동 입력 fallback */
   duration?: number | null;
+  /** 시작 시간 HH:MM:SS — V7 스타일 시간 picker (2026-05-08 추가) */
+  start_time?: string | null;
+  /** 종료 시간 HH:MM:SS — V7 스타일 시간 picker (2026-05-08 추가) */
+  end_time?: string | null;
   venue?: string | null;
   created_at: string;
 }
