@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LayoutGrid, List, Plus, Loader2, UserPlus } from 'lucide-react';
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -18,9 +17,8 @@ import type { Program, ProgramStatus, ProgramType } from '../../types/database';
 import {
   PROGRAM_STATUS_VALUES,
   PROGRAM_TYPE_VALUES,
-  programStatusToBadgeVariant,
 } from './programStatus';
-import { PROGRAM_TYPE_STYLE, BADGE_BASE } from '../../utils/statusStyles';
+import { PROGRAM_TYPE_STYLE, PROGRAM_STATUS_STYLE, BADGE_BASE } from '../../utils/statusStyles';
 import EmptyState from '../../components/EmptyState';
 import ProgramFormModal from './ProgramFormModal';
 import InvitationManagePanel from './InvitationManagePanel';
@@ -139,7 +137,7 @@ function ProgramListItem({ p, onInvite }: { p: ProgramRow; onInvite: (p: Program
       <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
-          <Badge variant={programStatusToBadgeVariant(p.status)}>{p.status}</Badge>
+          <span className={`${BADGE_BASE} ${PROGRAM_STATUS_STYLE[p.status]}`}>{p.status}</span>
           <span className={`${BADGE_BASE} ${PROGRAM_TYPE_STYLE[p.type]}`}>{p.type}</span>
         </div>
         <ProgramMeta p={p} />
@@ -155,7 +153,7 @@ function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow)
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="truncate">{p.name}</CardTitle>
-          <Badge variant={programStatusToBadgeVariant(p.status)}>{p.status}</Badge>
+          <span className={`${BADGE_BASE} ${PROGRAM_STATUS_STYLE[p.status]}`}>{p.status}</span>
         </div>
         <CardDescription>
           <span className={`${BADGE_BASE} ${PROGRAM_TYPE_STYLE[p.type]}`}>{p.type}</span>

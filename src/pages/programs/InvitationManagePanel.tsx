@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   X, Plus, Loader2, Copy, RefreshCw, FileIcon, ExternalLink,
 } from 'lucide-react';
-import { Badge, Button, Input } from '../../components/ui';
+import { Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import {
   ROLE_VALUES, STATUS_LABEL, formatRole, getInvitationUrl,
@@ -12,8 +12,9 @@ import {
 } from '../instructor-portal/invitationUtils';
 import { formatDateKo } from '../../lib/utils';
 import { copyToClipboard } from '../../lib/clipboard';
+import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../utils/statusStyles';
 import type {
-  InstructorInvitation, InvitationFile, InvitationRole, InvitationStatus, StaffPool,
+  InstructorInvitation, InvitationFile, InvitationRole, StaffPool,
 } from '../../types/database';
 
 type Props = {
@@ -23,14 +24,6 @@ type Props = {
   onClose: () => void;
 };
 
-function statusBadgeVariant(s: InvitationStatus) {
-  switch (s) {
-    case '수락': return 'primary' as const;
-    case '거절': return 'danger' as const;
-    case '완료': return 'success' as const;
-    default:      return 'default' as const;
-  }
-}
 
 function translateError(raw: string): string {
   const m = raw.toLowerCase();
@@ -250,7 +243,7 @@ export default function InvitationManagePanel({ open, programId, programName, on
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold text-text truncate">{inv.name}</span>
-                        <Badge variant={statusBadgeVariant(inv.status)}>{STATUS_LABEL[inv.status]}</Badge>
+                        <span className={`${BADGE_BASE} ${INVITATION_STATUS_STYLE[inv.status]}`}>{STATUS_LABEL[inv.status]}</span>
                         <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{formatRole(inv.role)}</span>
                       </div>
                       <div className="text-[11px] text-muted mt-0.5">

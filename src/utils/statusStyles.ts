@@ -12,6 +12,7 @@ import type {
   IncomeStatus,
   ExpenseStatus,
   InvitationStatus,
+  ConsortiumStatus,
 } from '../types/database';
 
 export const BADGE_BASE =
@@ -69,4 +70,12 @@ export const INVITATION_STATUS_STYLE: Record<InvitationStatus, string> = {
   수락: 'bg-emerald-50 text-emerald-600 border-emerald-200',
   거절: 'bg-rose-50 text-rose-500 border-rose-200',
   완료: 'bg-violet-50 text-violet-600 border-violet-200',
+};
+
+// ─── 컨소시엄 상태 ──────────────────────────────
+export const CONSORTIUM_STATUS_STYLE: Record<ConsortiumStatus, string> = {
+  구성중: 'bg-slate-100 text-slate-400 border-slate-300',
+  진행: 'bg-violet-50 text-violet-600 border-violet-200',
+  완료: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  해산: 'bg-rose-50 text-rose-500 border-rose-200',
 };

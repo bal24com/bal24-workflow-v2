@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LayoutGrid, List, Plus, Loader2, Search, Users2, Briefcase } from 'lucide-react';
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -15,11 +14,9 @@ import {
 } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
+import { BADGE_BASE, CONSORTIUM_STATUS_STYLE } from '../../utils/statusStyles';
 import type { Consortium, ConsortiumStatus } from '../../types/database';
-import {
-  CONSORTIUM_STATUS_VALUES,
-  consortiumStatusToBadgeVariant,
-} from './consortiumStatus';
+import { CONSORTIUM_STATUS_VALUES } from './consortiumStatus';
 import ConsortiumFormModal from './ConsortiumFormModal';
 
 type ViewMode = 'card' | 'list';
@@ -76,7 +73,7 @@ function ConsortiumGridCard({ c }: { c: ConsortiumRow }) {
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
                 <CardTitle className="truncate">{c.name}</CardTitle>
-                <Badge variant={consortiumStatusToBadgeVariant(c.status)}>{c.status}</Badge>
+                <span className={`${BADGE_BASE} ${CONSORTIUM_STATUS_STYLE[c.status]}`}>{c.status}</span>
               </div>
               <CardDescription>
                 {c.lead_client?.name ? `주관 ${c.lead_client.name}` : '주관사 미지정'}
@@ -115,7 +112,7 @@ function ConsortiumListRow({ c }: { c: ConsortiumRow }) {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <div className="text-sm font-bold text-text truncate">{c.name}</div>
-              <Badge variant={consortiumStatusToBadgeVariant(c.status)}>{c.status}</Badge>
+              <span className={`${BADGE_BASE} ${CONSORTIUM_STATUS_STYLE[c.status]}`}>{c.status}</span>
             </div>
             <div className="text-xs text-muted truncate">
               {c.lead_client?.name ? `주관 ${c.lead_client.name}` : '주관사 미지정'}
