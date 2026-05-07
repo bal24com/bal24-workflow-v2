@@ -244,6 +244,44 @@ export interface CurriculumStaff {
   created_at: string;
 }
 
+// ─── 프로그램 외부공유 4단계×3대상 (Stage 3-B / 2026-05-08 신규) ─
+
+export type ShareAudience = 'client' | 'student' | 'expert';
+
+export type ShareStage = 'before' | 'pre' | 'ready' | 'progress' | 'result';
+
+export type ShareItem =
+  | 'basic_info'
+  | 'curriculum'
+  | 'instructors'
+  | 'materials'
+  | 'survey_view'
+  | 'edit_request'
+  | 'feedback_comments'
+  | 'checkin'
+  | 'survey_submit'
+  | 'outcome_upload'
+  | 'invite_response'
+  | 'activity_log'
+  | 'lecture_certificate';
+
+/** 노출 항목 toggle 상태 — audience × item × boolean */
+export type ShareVisibility = Partial<Record<ShareAudience, Partial<Record<ShareItem, boolean>>>>;
+
+export interface ProgramShare {
+  program_id: string;
+  pre_date?: string | null;
+  ready_date?: string | null;
+  progress_date?: string | null;
+  result_date?: string | null;
+  client_token: string;
+  student_token: string;
+  expert_token: string;
+  visibility: ShareVisibility;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─── 커리큘럼 템플릿 (Stage 3-C — 재활용 모음 / 2026-05-08 신규) ─
 
 export interface CurriculumTemplate {
