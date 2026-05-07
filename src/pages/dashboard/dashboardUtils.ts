@@ -1,11 +1,11 @@
-// bal24 v2 — 대시보드 KPI 집계 유틸 (단계 3)
-// Supabase 실데이터 집계 — KPI 4개 + 최근 프로젝트/지출 5개
+// bal24 v2 — 대시보드 KPI 집계 유틸 (V7 → V2 이식: 단계별·태스크 알림 추가)
+// Supabase 실데이터 집계 — KPI 6개 + 단계별 통계 + 진행 중 프로젝트 + 오늘·지연 태스크
 
 import { supabase } from '../../lib/supabase';
-import type { ProjectStatus, ProgramStatus } from '../../types/database';
+import type { ProjectStatus, ProgramStatus, TaskStatus } from '../../types/database';
 
 export interface DashboardKpis {
-  /** 진행 중 프로젝트 수 */
+  /** 진행 중 프로젝트 수 (status: 진행·정산) */
   activeProjectCount: number;
   /** 이번달 수입 합계 (원) */
   thisMonthIncome: number;
@@ -17,6 +17,10 @@ export interface DashboardKpis {
   pendingExpenseCount: number;
   /** 진행 중 프로그램 수 */
   activeProgramCount: number;
+  /** 오늘 마감 태스크 수 (미완료) */
+  todayDueCount: number;
+  /** 지연 태스크 수 (미완료, 마감일 < 오늘) */
+  overdueCount: number;
 }
 
 export interface RecentProject {
@@ -37,6 +41,35 @@ export interface RecentExpense {
   payee_name: string | null;
 }
 
+export interface ActiveProjectRow {
+  id: string;
+  name: string;
+  status: ProjectStatus;
+  client_name: string | null;
+  updated_at: string;
+}
+
+export interface ProjectStageCounts {
+  제안: number;
+  진행: number;
+  정산: number;
+  종료: number;
+}
+
+export interface TaskAlertRow {
+  id: string;
+  project_id: string;
+  title: string;
+  status: TaskStatus;
+  due_date: string | null;
+  project_name: string | null;
+}
+
+export interface TaskBuckets {
+  todayDue: TaskAlertRow[];
+  overdue: TaskAlertRow[];
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
@@ -48,6 +81,11 @@ function monthBounds(year: number, month: number): { start: string; end: string 
   return { start, end };
 }
 
+function todayIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 export async function fetchDashboardKpis(): Promise<DashboardKpis> {
   const now = new Date();
   const thisYear = now.getFullYear();
@@ -56,43 +94,58 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
   const prevMonth = thisMonth === 1 ? 12 : thisMonth - 1;
   const thisRange = monthBounds(thisYear, thisMonth);
   const prevRange = monthBounds(prevYear, prevMonth);
+  const today = todayIso();
 
   const ACTIVE_PROJECT_STATUS: ProjectStatus[] = ['진행', '정산'];
   const ACTIVE_PROGRAM_STATUS: ProgramStatus[] = ['진행'];
+  const OPEN_TASK_STATUS: TaskStatus[] = ['인식', '실행', '검토'];
 
-  const [projRes, thisIncomeRes, prevIncomeRes, pendingRes, programRes] = await Promise.all([
-    supabase
-      .from('projects')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ACTIVE_PROJECT_STATUS),
-    supabase
-      .from('income')
-      .select('amount')
-      .is('deleted_at', null)
-      .gte('received_at', thisRange.start)
-      .lte('received_at', thisRange.end),
-    supabase
-      .from('income')
-      .select('amount')
-      .is('deleted_at', null)
-      .gte('received_at', prevRange.start)
-      .lte('received_at', prevRange.end),
-    supabase
-      .from('expenses')
-      .select('gross_amount', { count: 'exact' })
-      .eq('status', '대기')
-      .is('deleted_at', null),
-    supabase
-      .from('programs')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ACTIVE_PROGRAM_STATUS),
-  ]);
+  const [projRes, thisIncomeRes, prevIncomeRes, pendingRes, programRes, todayDueRes, overdueRes] =
+    await Promise.all([
+      supabase
+        .from('projects')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ACTIVE_PROJECT_STATUS),
+      supabase
+        .from('income')
+        .select('amount')
+        .is('deleted_at', null)
+        .gte('received_at', thisRange.start)
+        .lte('received_at', thisRange.end),
+      supabase
+        .from('income')
+        .select('amount')
+        .is('deleted_at', null)
+        .gte('received_at', prevRange.start)
+        .lte('received_at', prevRange.end),
+      supabase
+        .from('expenses')
+        .select('gross_amount', { count: 'exact' })
+        .eq('status', '대기')
+        .is('deleted_at', null),
+      supabase
+        .from('programs')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ACTIVE_PROGRAM_STATUS),
+      supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .in('status', OPEN_TASK_STATUS)
+        .eq('due_date', today),
+      supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .in('status', OPEN_TASK_STATUS)
+        .lt('due_date', today),
+    ]);
 
   if (projRes.error) console.error('[dashboard] 프로젝트 카운트 실패:', projRes.error.message);
   if (thisIncomeRes.error) console.error('[dashboard] 이번달 수입 실패:', thisIncomeRes.error.message);
   if (prevIncomeRes.error) console.error('[dashboard] 전월 수입 실패:', prevIncomeRes.error.message);
   if (pendingRes.error) console.error('[dashboard] 미정산 지출 실패:', pendingRes.error.message);
   if (programRes.error) console.error('[dashboard] 프로그램 카운트 실패:', programRes.error.message);
+  if (todayDueRes.error) console.error('[dashboard] 오늘 마감 태스크 실패:', todayDueRes.error.message);
+  if (overdueRes.error) console.error('[dashboard] 지연 태스크 실패:', overdueRes.error.message);
 
   const sumAmount = (rows: Array<{ amount: number | string | null }> | null) =>
     (rows ?? []).reduce((s, r) => s + Number(r.amount ?? 0), 0);
@@ -106,6 +159,8 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
     pendingExpenseTotal: sumGross(pendingRes.data as Array<{ gross_amount: number | string | null }> | null),
     pendingExpenseCount: pendingRes.count ?? 0,
     activeProgramCount: programRes.count ?? 0,
+    todayDueCount: todayDueRes.count ?? 0,
+    overdueCount: overdueRes.count ?? 0,
   };
 }
 
@@ -172,6 +227,109 @@ export async function fetchRecentExpenses(limit = 5): Promise<RecentExpense[]> {
       payee_name: payee?.name ?? null,
     };
   });
+}
+
+/** 진행 중 프로젝트 (status: 진행·정산) — 카드 리스트용. updated_at 내림차순 */
+export async function fetchActiveProjects(limit = 6): Promise<ActiveProjectRow[]> {
+  const ACTIVE_STATUS: ProjectStatus[] = ['진행', '정산'];
+
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, name, status, updated_at, client:clients(id, name)')
+    .in('status', ACTIVE_STATUS)
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('[dashboard] 진행 중 프로젝트 조회 실패:', error.message);
+    return [];
+  }
+
+  return ((data as Array<{
+    id: string;
+    name: string;
+    status: ProjectStatus;
+    updated_at: string;
+    client: { id: string; name: string } | { id: string; name: string }[] | null;
+  }> | null) ?? []).map((p) => {
+    const client = Array.isArray(p.client) ? p.client[0] : p.client;
+    return {
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      client_name: client?.name ?? null,
+      updated_at: p.updated_at,
+    };
+  });
+}
+
+/** 단계별 프로젝트 카운트 (제안·진행·정산·종료 4단계) */
+export async function fetchProjectStageCounts(): Promise<ProjectStageCounts> {
+  const { data, error } = await supabase.from('projects').select('status');
+
+  if (error) {
+    console.error('[dashboard] 단계별 프로젝트 카운트 실패:', error.message);
+    return { 제안: 0, 진행: 0, 정산: 0, 종료: 0 };
+  }
+
+  const counts: ProjectStageCounts = { 제안: 0, 진행: 0, 정산: 0, 종료: 0 };
+  ((data as Array<{ status: ProjectStatus }> | null) ?? []).forEach((row) => {
+    if (row.status in counts) counts[row.status] += 1;
+  });
+  return counts;
+}
+
+/** 오늘 마감 / 지연 태스크 (미완료) — 알림 패널용 */
+export async function fetchTaskBuckets(limit = 8): Promise<TaskBuckets> {
+  const today = todayIso();
+  const OPEN_TASK_STATUS: TaskStatus[] = ['인식', '실행', '검토'];
+
+  const [todayRes, overdueRes] = await Promise.all([
+    supabase
+      .from('tasks')
+      .select('id, project_id, title, status, due_date, project:projects(id, name)')
+      .in('status', OPEN_TASK_STATUS)
+      .eq('due_date', today)
+      .order('seq_num', { ascending: true })
+      .limit(limit),
+    supabase
+      .from('tasks')
+      .select('id, project_id, title, status, due_date, project:projects(id, name)')
+      .in('status', OPEN_TASK_STATUS)
+      .lt('due_date', today)
+      .order('due_date', { ascending: true })
+      .limit(limit),
+  ]);
+
+  if (todayRes.error) console.error('[dashboard] 오늘 마감 태스크 조회 실패:', todayRes.error.message);
+  if (overdueRes.error) console.error('[dashboard] 지연 태스크 조회 실패:', overdueRes.error.message);
+
+  const mapRow = (r: {
+    id: string;
+    project_id: string;
+    title: string;
+    status: TaskStatus;
+    due_date: string | null;
+    project: { id: string; name: string } | { id: string; name: string }[] | null;
+  }): TaskAlertRow => {
+    const project = Array.isArray(r.project) ? r.project[0] : r.project;
+    return {
+      id: r.id,
+      project_id: r.project_id,
+      title: r.title,
+      status: r.status,
+      due_date: r.due_date,
+      project_name: project?.name ?? null,
+    };
+  };
+
+  const todayRows = (todayRes.data as Parameters<typeof mapRow>[0][] | null) ?? [];
+  const overdueRows = (overdueRes.data as Parameters<typeof mapRow>[0][] | null) ?? [];
+
+  return {
+    todayDue: todayRows.map(mapRow),
+    overdue: overdueRows.map(mapRow),
+  };
 }
 
 /** 변화율 계산 (전월 대비) — 0 분모 처리 */

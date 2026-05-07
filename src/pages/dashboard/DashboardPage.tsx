@@ -1,28 +1,30 @@
-// bal24 v2 — 대시보드 메인 (단계 3 — Supabase 실데이터 KPI)
-// KPI 4개 + 전월 대비 변화율 + 최근 프로젝트 5개 + 최근 지출 5개
+// bal24 v2 — 대시보드 메인 (V7 → V2 이식: 단계별·태스크 알림·빠른 액션 통합)
+// KPI 6개 (수입 전월 변화율 포함) + 인사말 + 단계별 진행 + 태스크 알림 + 최근 지출 + 빠른 액션
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Briefcase, GraduationCap, TrendingUp, Wallet,
+  Calendar, AlertTriangle,
   ArrowUp, ArrowDown, Minus, Loader2, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import { useToast } from '../../contexts/ToastContext';
-import { BADGE_BASE, PROJECT_STATUS_STYLE } from '../../utils/statusStyles';
 import { findExpenseCode } from '../../utils/accounting';
 import {
   fetchDashboardKpis,
-  fetchRecentProjects,
   fetchRecentExpenses,
   computeChangeRate,
   type DashboardKpis,
-  type RecentProject,
   type RecentExpense,
 } from './dashboardUtils';
+import GreetingHeader from './components/GreetingHeader';
+import ProjectStagePanel from './components/ProjectStagePanel';
+import TaskAlertPanel from './components/TaskAlertPanel';
+import QuickActionsCard from './components/QuickActionsCard';
 
-type Tone = 'violet' | 'orange' | 'cyan' | 'emerald';
+type Tone = 'violet' | 'orange' | 'cyan' | 'emerald' | 'rose';
 
 interface KpiCardProps {
   label: string;
@@ -33,6 +35,7 @@ interface KpiCardProps {
   trend?: 'up' | 'down' | 'flat';
   rate?: number;
   trendLabel?: string;
+  alert?: boolean;
 }
 
 const TONE_STYLE: Record<Tone, { bg: string; text: string; ring: string }> = {
@@ -40,6 +43,7 @@ const TONE_STYLE: Record<Tone, { bg: string; text: string; ring: string }> = {
   orange:  { bg: 'bg-orange-100',  text: 'text-orange-600',  ring: 'border-orange-100' },
   cyan:    { bg: 'bg-cyan-100',    text: 'text-cyan-600',    ring: 'border-cyan-100' },
   emerald: { bg: 'bg-emerald-100', text: 'text-emerald-600', ring: 'border-emerald-100' },
+  rose:    { bg: 'bg-rose-100',    text: 'text-rose-600',    ring: 'border-rose-100' },
 };
 
 function TrendBadge({ trend, rate, label }: { trend: 'up' | 'down' | 'flat'; rate: number; label: string }) {
@@ -62,7 +66,7 @@ function TrendBadge({ trend, rate, label }: { trend: 'up' | 'down' | 'flat'; rat
   );
 }
 
-function KpiCard({ label, value, sub, Icon, tone, trend, rate, trendLabel }: KpiCardProps) {
+function KpiCard({ label, value, sub, Icon, tone, trend, rate, trendLabel, alert }: KpiCardProps) {
   const t = TONE_STYLE[tone];
   return (
     <div className={`rounded-2xl border ${t.ring} bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-2`}>
@@ -72,7 +76,7 @@ function KpiCard({ label, value, sub, Icon, tone, trend, rate, trendLabel }: Kpi
           <Icon size={18} aria-hidden="true" />
         </span>
       </div>
-      <div className={`text-2xl font-bold ${t.text}`}>{value}</div>
+      <div className={`text-2xl font-bold ${alert ? 'text-rose-600' : t.text}`}>{value}</div>
       <div className="min-h-[18px]">
         {sub && !trend && <span className="text-xs text-slate-400">{sub}</span>}
         {trend && <TrendBadge trend={trend} rate={rate ?? 0} label={trendLabel ?? '전월 대비'} />}
@@ -84,7 +88,6 @@ function KpiCard({ label, value, sub, Icon, tone, trend, rate, trendLabel }: Kpi
 export default function DashboardPage() {
   const toast = useToast();
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
-  const [projects, setProjects] = useState<RecentProject[]>([]);
   const [expenses, setExpenses] = useState<RecentExpense[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -93,14 +96,9 @@ export default function DashboardPage() {
     setLoading(true);
     void (async () => {
       try {
-        const [k, p, e] = await Promise.all([
-          fetchDashboardKpis(),
-          fetchRecentProjects(5),
-          fetchRecentExpenses(5),
-        ]);
+        const [k, e] = await Promise.all([fetchDashboardKpis(), fetchRecentExpenses(5)]);
         if (cancelled) return;
         setKpis(k);
-        setProjects(p);
         setExpenses(e);
       } catch (err) {
         if (cancelled) return;
@@ -126,15 +124,21 @@ export default function DashboardPage() {
         홈
       </h1>
 
-      {/* KPI 카드 4개 */}
+      <GreetingHeader />
+
+      {/* KPI 6개 — 기존 4 + 오늘마감/지연 2 */}
       {loading || !kpis ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-2xl border border-violet-100 bg-white p-5 animate-pulse h-[126px]" aria-hidden="true" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-violet-100 bg-white p-5 animate-pulse h-[126px]"
+              aria-hidden="true"
+            />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           <KpiCard
             label="진행 중 프로젝트"
             value={`${kpis.activeProjectCount}건`}
@@ -165,57 +169,33 @@ export default function DashboardPage() {
             Icon={GraduationCap}
             tone="cyan"
           />
+          <KpiCard
+            label="오늘 마감 태스크"
+            value={`${kpis.todayDueCount}건`}
+            sub={kpis.todayDueCount === 0 ? '여유 있어요 ✨' : '확인이 필요해요'}
+            Icon={Calendar}
+            tone="orange"
+            alert={kpis.todayDueCount > 0}
+          />
+          <KpiCard
+            label="지연 태스크"
+            value={`${kpis.overdueCount}건`}
+            sub={kpis.overdueCount === 0 ? '깨끗합니다 ✨' : '즉시 확인 필요'}
+            Icon={AlertTriangle}
+            tone="rose"
+            alert={kpis.overdueCount > 0}
+          />
         </div>
       )}
 
-      {/* 최근 프로젝트 + 최근 지출 — 2열 */}
+      {/* 진행 중 프로젝트 + 오늘·지연 할 일 — 2열 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
-          <header className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
-              <Briefcase size={16} className="text-violet-500" aria-hidden="true" />
-              최근 프로젝트
-            </h2>
-            <Link to="/projects" className="text-xs text-violet-600 hover:underline inline-flex items-center gap-0.5">
-              전체 보기
-              <ArrowRight size={12} aria-hidden="true" />
-            </Link>
-          </header>
+        <ProjectStagePanel />
+        <TaskAlertPanel />
+      </div>
 
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="animate-spin text-violet-400" size={20} aria-hidden="true" />
-            </div>
-          ) : projects.length === 0 ? (
-            <p className="text-sm text-slate-400 italic text-center py-6">아직 등록된 프로젝트가 없어요.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {projects.map((p) => (
-                <li key={p.id}>
-                  <Link
-                    to={`/projects/${p.id}`}
-                    className="flex items-center gap-2 py-2.5 hover:bg-violet-50/40 rounded-xl px-2 -mx-2 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="text-sm font-semibold text-[#1E1B4B] truncate">{p.name}</span>
-                        <span className={`${BADGE_BASE} ${PROJECT_STATUS_STYLE[p.status]} shrink-0`}>{p.status}</span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 truncate">
-                        {p.client_name && <span>{p.client_name}</span>}
-                        {p.client_name && (p.start_date || p.end_date) && <span> · </span>}
-                        {(p.start_date || p.end_date) && (
-                          <span>{formatDateKo(p.start_date)} ~ {formatDateKo(p.end_date)}</span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
+      {/* 최근 지출 + 빠른 액션 — 2열 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
           <header className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
@@ -256,6 +236,8 @@ export default function DashboardPage() {
             </ul>
           )}
         </section>
+
+        <QuickActionsCard />
       </div>
     </div>
   );
