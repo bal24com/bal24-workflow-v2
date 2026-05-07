@@ -244,6 +244,31 @@ export interface CurriculumStaff {
   created_at: string;
 }
 
+// ─── 커리큘럼 템플릿 (Stage 3-C — 재활용 모음 / 2026-05-08 신규) ─
+
+export interface CurriculumTemplate {
+  id: string;
+  name: string;
+  description?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CurriculumTemplateItem {
+  id: string;
+  template_id: string;
+  session_no: number;
+  title: string;
+  content?: string | null;
+  /** 분 단위 */
+  duration?: number | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  venue?: string | null;
+  created_at: string;
+}
+
 // ─── 결과보고서 빌더 (Stage 2에서 사용 / 2026-05-08 신규) ─
 export type ReportSectionType = 'auto' | 'custom';
 

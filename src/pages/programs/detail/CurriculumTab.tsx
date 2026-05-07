@@ -2,15 +2,18 @@
 // 테이블형 차시 + DateTimePicker + 매칭 모달 + 드래그 정렬.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Sparkles, Upload } from 'lucide-react';
+import { Loader2, Plus, Sparkles, Upload, Save, Download } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 import { supabase } from '../../../lib/supabase';
 import StaffMatchModal from './curriculum/StaffMatchModal';
 import CurriculumRow from './curriculum/CurriculumRow';
-import { fetchCurriculumBundle, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
+import SaveTemplateModal from './curriculum/SaveTemplateModal';
+import LoadTemplateModal from './curriculum/LoadTemplateModal';
+import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
 import type {
   CurriculumStaffRole, ProgramCurriculum,
 } from '../../../types/database';
+import type { CurriculumSessionMeta } from './curriculum/curriculumTemplateUtils';
 
 interface Props {
   programId: string;
@@ -22,6 +25,8 @@ export default function CurriculumTab({ programId }: Props) {
   const [loading, setLoading] = useState(true);
   const [matchTarget, setMatchTarget] = useState<{ curriculumId: string; defaultRole: CurriculumStaffRole } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [saveTplOpen, setSaveTplOpen] = useState(false);
+  const [loadTplOpen, setLoadTplOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await fetchCurriculumBundle(programId);
@@ -147,11 +152,28 @@ export default function CurriculumTab({ programId }: Props) {
             ⋮⋮ 드래그로 순서 변경 · 차시 펼침으로 입력 후 [저장] · 시간은 시·분 picker로 선택
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setLoadTplOpen(true)}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
+          >
+            <Download size={12} aria-hidden="true" />
+            템플릿 가져오기
+          </button>
+          <button
+            type="button"
+            onClick={() => setSaveTplOpen(true)}
+            disabled={items.length === 0}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Save size={12} aria-hidden="true" />
+            템플릿으로 저장
+          </button>
           <button
             type="button"
             onClick={() => showPlaceholder('새 파일 업로드')}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-slate-500 hover:bg-violet-50 transition-colors"
           >
             <Upload size={12} aria-hidden="true" />
             새 파일
@@ -221,6 +243,28 @@ export default function CurriculumTab({ programId }: Props) {
         curriculumId={matchTarget?.curriculumId ?? ''}
         defaultRole={matchTarget?.defaultRole}
         onAdded={() => void refresh()}
+      />
+
+      <SaveTemplateModal
+        open={saveTplOpen}
+        onClose={() => setSaveTplOpen(false)}
+        onSaved={() => { /* refresh 불필요 (템플릿 풀 별도) */ }}
+        sessions={items.map<CurriculumSessionMeta>((c) => ({
+          session_no: c.session_no,
+          title: c.title,
+          content: c.content ?? null,
+          duration: c.duration ?? null,
+          start_time: trimTime(c.start_time) || null,
+          end_time: trimTime(c.end_time) || null,
+          venue: c.venue ?? null,
+        }))}
+      />
+
+      <LoadTemplateModal
+        open={loadTplOpen}
+        onClose={() => setLoadTplOpen(false)}
+        programId={programId}
+        onLoaded={() => void refresh()}
       />
     </div>
   );
