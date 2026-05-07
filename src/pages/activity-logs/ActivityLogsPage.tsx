@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Plus, Loader2, BookOpen, Calendar, MapPin, Users, Edit3, Trash2, FileIcon,
+  Plus, Loader2, Calendar, MapPin, Users, Edit3, Trash2, FileIcon,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
+import EmptyState from '../../components/EmptyState';
 import { LOG_TYPE_LABELS, LOG_TYPE_VALUES } from './activityLogTypes';
 import type {
   ActivityLog,
@@ -198,17 +199,16 @@ export default function ActivityLogsPage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <BookOpen size={28} className="text-slate-300 mb-2" />
-          <p className="text-sm text-muted mb-3">
-            {(dateFrom || dateTo || programFilter !== '전체')
-              ? '조건에 맞는 일지가 없어요.'
-              : `아직 ${LOG_TYPE_LABELS[tab]} 일지가 없어요.`}
-          </p>
-          <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => { setEditingLog(null); setFormOpen(true); }}>
-            첫 일지 작성하기
-          </Button>
-        </div>
+        <EmptyState
+          emoji="📓"
+          title={(dateFrom || dateTo || programFilter !== '전체') ? '조건에 맞는 일지가 없어요.' : `아직 ${LOG_TYPE_LABELS[tab]} 일지가 없어요.`}
+          description="첫 일지를 작성해 보세요."
+          action={
+            <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => { setEditingLog(null); setFormOpen(true); }}>
+              + 일지 작성
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((l) => (

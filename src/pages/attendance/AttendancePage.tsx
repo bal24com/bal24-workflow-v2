@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Plus, Loader2, CheckSquare, Copy, MapPin, Calendar, Users,
+  Plus, Loader2, Copy, MapPin, Calendar, Users,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
 import { copyToClipboard } from '../../lib/clipboard';
+import EmptyState from '../../components/EmptyState';
 import {
   calcAttendanceSummary,
   formatTime,
@@ -108,15 +109,16 @@ export default function AttendancePage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <CheckSquare size={28} className="text-slate-300 mb-2" />
-          <p className="text-sm text-muted mb-3">
-            {programFilter !== '전체' ? '선택한 프로그램의 세션이 없어요.' : '아직 출석 세션이 없어요.'}
-          </p>
-          <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
-            첫 세션 만들기
-          </Button>
-        </div>
+        <EmptyState
+          emoji="✅"
+          title={programFilter !== '전체' ? '선택한 프로그램의 세션이 없어요.' : '아직 출석 세션이 없어요.'}
+          description="첫 세션을 만들어 보세요."
+          action={
+            <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
+              + 세션 추가
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((s) => {

@@ -3,9 +3,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Search, CreditCard, ArrowRight } from 'lucide-react';
+import { Loader2, Search, ArrowRight } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import EmptyState from '../../components/EmptyState';
 import { formatKoreanDate } from '../reports/reportUtils';
 import type { ProjectSettlementRow, SettlementStep } from '../../types/database';
 
@@ -153,15 +154,11 @@ export default function SettlementPage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <CreditCard size={28} className="text-slate-300 mb-2" />
-          <p className="text-sm text-muted mb-3">
-            {search.trim() ? '검색 결과가 없어요.' : '정산 진행 중인 프로젝트가 없어요.'}
-          </p>
-          <p className="text-xs text-muted">
-            결과보고서를 <strong>제출</strong>하면 자동으로 정산이 시작돼요.
-          </p>
-        </div>
+        <EmptyState
+          emoji="📊"
+          title={search.trim() ? '검색 결과가 없어요.' : '정산 진행 중인 프로젝트가 없어요.'}
+          description="결과보고서를 제출하면 자동으로 정산이 시작돼요."
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((s) => {

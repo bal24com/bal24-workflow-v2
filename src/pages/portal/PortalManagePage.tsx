@@ -1,11 +1,12 @@
 // bal24 v2 — 전체 포털 목록 (프로젝트별)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Link2, Copy, Settings, Search } from 'lucide-react';
+import { Loader2, Copy, Settings, Search } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../components/ui';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { copyToClipboard } from '../../lib/clipboard';
+import EmptyState from '../../components/EmptyState';
 import { getPortalUrl, STAGE_LABELS } from './portalConstants';
 import type { ProjectPortal } from '../../types/database';
 import PortalResponsesPanel from './PortalResponsesPanel';
@@ -105,10 +106,11 @@ export default function PortalManagePage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <Link2 size={28} className="text-slate-300 mb-2" />
-          <p className="text-sm text-muted">{search.trim() ? '검색 결과가 없어요.' : '아직 등록된 포털이 없어요.'}</p>
-        </div>
+        <EmptyState
+          emoji="🔐"
+          title={search.trim() ? '검색 결과가 없어요.' : '아직 등록된 포털이 없어요.'}
+          description={!search.trim() ? '프로젝트 상세 페이지에서 포털을 만들 수 있어요.' : undefined}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((p) => {

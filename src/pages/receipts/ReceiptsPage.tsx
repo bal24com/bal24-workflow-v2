@@ -3,11 +3,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Search, FileIcon, ExternalLink, Receipt as ReceiptIcon, Plus,
+  Loader2, Search, FileIcon, ExternalLink, Plus,
 } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
+import EmptyState from '../../components/EmptyState';
 import { RECEIPT_TYPE_VALUES } from '../../utils/accounting';
 import type { Receipt, ReceiptType } from '../../types/database';
 
@@ -151,17 +152,18 @@ export default function ReceiptsPage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <ReceiptIcon size={28} className="text-slate-300 mb-2" />
-          <p className="text-sm text-muted mb-3">
-            {search.trim() || filter !== '전체' ? '조건에 맞는 영수증이 없어요.' : '아직 등록된 영수증이 없어요.'}
-          </p>
-          {!search.trim() && filter === '전체' && (
-            <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => { window.location.href = '/expense'; }}>
-              지출 페이지로 이동
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          emoji="🧾"
+          title={search.trim() || filter !== '전체' ? '조건에 맞는 영수증이 없어요.' : '아직 등록된 영수증이 없어요.'}
+          description={!search.trim() && filter === '전체' ? '지출 페이지에서 영수증을 등록해 주세요.' : undefined}
+          action={
+            !search.trim() && filter === '전체' && (
+              <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => { window.location.href = '/expense'; }}>
+                지출 페이지로 이동
+              </Button>
+            )
+          }
+        />
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
           <table className="w-full text-sm">

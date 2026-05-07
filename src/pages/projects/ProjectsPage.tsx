@@ -15,6 +15,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import { BADGE_BASE, PROJECT_STATUS_STYLE } from '../../utils/statusStyles';
+import EmptyState from '../../components/EmptyState';
 import type { Project, ProjectStatus } from '../../types/database';
 import { PROJECT_STATUS_VALUES } from './projectStatus';
 import ProjectFormModal from './ProjectFormModal';
@@ -261,25 +262,18 @@ export default function ProjectsPage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xl mb-2">
-            📭
-          </div>
-          <p className="text-sm text-muted">
-            {filter === '전체' ? '아직 등록된 프로젝트가 없어요.' : `${filter} 상태인 프로젝트가 없어요.`}
-          </p>
-          {filter === '전체' && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              leftIcon={<Plus size={14} />}
-              onClick={() => setModalOpen(true)}
-            >
-              첫 프로젝트 만들기
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          emoji="📁"
+          title={filter === '전체' ? '아직 등록된 프로젝트가 없어요.' : `${filter} 상태인 프로젝트가 없어요.`}
+          description={filter === '전체' ? '첫 프로젝트를 만들어 보세요.' : undefined}
+          action={
+            filter === '전체' && (
+              <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
+                + 프로젝트 등록
+              </Button>
+            )
+          }
+        />
       ) : view === 'list' ? (
         <ul className="space-y-2">
           {visible.map((p) => (

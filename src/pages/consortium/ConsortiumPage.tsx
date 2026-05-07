@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import EmptyState from '../../components/EmptyState';
 import type { Consortium, ConsortiumStatus } from '../../types/database';
 import {
   CONSORTIUM_STATUS_VALUES,
@@ -230,19 +231,18 @@ export default function ConsortiumPage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
-            <Users2 size={20} />
-          </div>
-          <p className="text-sm text-muted mb-3">
-            {search.trim() || filter !== '전체' ? '조건에 맞는 컨소시엄이 없어요.' : '아직 등록된 컨소시엄이 없어요.'}
-          </p>
-          {!search.trim() && filter === '전체' && (
-            <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
-              첫 컨소시엄 만들기
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          emoji="🤝"
+          title={search.trim() || filter !== '전체' ? '조건에 맞는 컨소시엄이 없어요.' : '아직 등록된 컨소시엄이 없어요.'}
+          description={!search.trim() && filter === '전체' ? '첫 컨소시엄을 만들어 보세요.' : undefined}
+          action={
+            !search.trim() && filter === '전체' && (
+              <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
+                + 컨소시엄 등록
+              </Button>
+            )
+          }
+        />
       ) : view === 'card' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((c) => (<ConsortiumGridCard key={c.id} c={c} />))}

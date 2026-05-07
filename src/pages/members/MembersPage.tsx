@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Search, UserPlus } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import EmptyState from '../../components/EmptyState';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Profile, Role } from '../../types/database';
 import MemberFormModal from './MemberFormModal';
@@ -164,9 +165,18 @@ export default function MembersPage() {
           <Loader2 className="animate-spin text-violet-400" size={28} aria-hidden="true" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-violet-100 bg-white p-12 text-center text-sm text-slate-500">
-          {keyword || roleFilter !== 'ALL' ? '조건에 맞는 팀원이 없어요.' : '등록된 팀원이 없어요.'}
-        </div>
+        <EmptyState
+          emoji="👤"
+          title={keyword || roleFilter !== 'ALL' ? '조건에 맞는 팀원이 없어요.' : '아직 등록된 팀원이 없어요.'}
+          description={isAdmin && !keyword && roleFilter === 'ALL' ? '첫 팀원을 초대해 보세요.' : undefined}
+          action={
+            isAdmin && !keyword && roleFilter === 'ALL' && (
+              <Button variant="primary" onClick={openCreate}>
+                + 팀원 초대
+              </Button>
+            )
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((m) => {

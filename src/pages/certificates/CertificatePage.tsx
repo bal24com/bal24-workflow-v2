@@ -1,9 +1,10 @@
 // bal24 v2 — 수료증·강의확인서 발급 목록 + 일괄 발급
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Award, Loader2, Settings, Download, FileText, ExternalLink } from 'lucide-react';
+import { Award, Loader2, Settings, Download, ExternalLink } from 'lucide-react';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import EmptyState from '../../components/EmptyState';
 import {
   formatIssueDateKo,
   generateCertNumber,
@@ -304,12 +305,11 @@ export default function CertificatePage() {
               불러오는 중…
             </div>
           ) : recipients.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText size={28} className="mx-auto text-slate-300 mb-2" />
-              <p className="text-sm text-muted">
-                {tab === 'completion' ? '승인된 신청자가 없어요.' : '등록된 강사가 없어요.'}
-              </p>
-            </div>
+            <EmptyState
+              emoji="🏆"
+              title={tab === 'completion' ? '승인된 신청자가 없어요.' : '등록된 강사가 없어요.'}
+              description={tab === 'completion' ? '폼 관리에서 신청 승인을 진행해 주세요.' : '프로그램 강사 초대를 진행해 주세요.'}
+            />
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs">

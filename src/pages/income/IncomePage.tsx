@@ -2,12 +2,13 @@
 // ledger_type 자체(own) / 컨소시엄(consortium) 탭 분리
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Loader2, Search, TrendingUp } from 'lucide-react';
+import { Plus, Loader2, Search } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import { findIncomeCode } from '../../utils/accounting';
 import { BADGE_BASE, INCOME_STATUS_STYLE } from '../../utils/statusStyles';
+import EmptyState from '../../components/EmptyState';
 import type { Income, LedgerType } from '../../types/database';
 import IncomeFormModal from './IncomeFormModal';
 
@@ -142,17 +143,18 @@ export default function IncomePage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <TrendingUp size={28} className="text-slate-300 mb-2" />
-          <p className="text-sm text-muted mb-3">
-            {search.trim() ? '검색 결과가 없어요.' : `${ledger === 'own' ? '자체' : '컨소시엄'} 수입이 아직 없어요.`}
-          </p>
-          {!search.trim() && (
-            <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
-              첫 수입 등록하기
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          emoji="💰"
+          title={search.trim() ? '검색 결과가 없어요.' : `${ledger === 'own' ? '자체' : '컨소시엄'} 수입이 아직 없어요.`}
+          description={!search.trim() ? '첫 수입을 등록해 보세요.' : undefined}
+          action={
+            !search.trim() && (
+              <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
+                + 수입 등록
+              </Button>
+            )
+          }
+        />
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <table className="w-full text-sm">

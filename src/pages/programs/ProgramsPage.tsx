@@ -21,6 +21,7 @@ import {
   programStatusToBadgeVariant,
 } from './programStatus';
 import { PROGRAM_TYPE_STYLE, BADGE_BASE } from '../../utils/statusStyles';
+import EmptyState from '../../components/EmptyState';
 import ProgramFormModal from './ProgramFormModal';
 import InvitationManagePanel from './InvitationManagePanel';
 
@@ -317,26 +318,18 @@ export default function ProgramsPage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xl mb-2">
-            🎓
-          </div>
-          <p className="text-sm text-muted mb-3">
-            {statusFilter === '전체' && typeFilter === '전체'
-              ? '아직 등록된 프로그램이 없어요.'
-              : '조건에 맞는 프로그램이 없어요.'}
-          </p>
-          {statusFilter === '전체' && typeFilter === '전체' && (
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Plus size={14} />}
-              onClick={() => setModalOpen(true)}
-            >
-              첫 프로그램 만들기
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          emoji="🎓"
+          title={statusFilter === '전체' && typeFilter === '전체' ? '아직 등록된 프로그램이 없어요.' : '조건에 맞는 프로그램이 없어요.'}
+          description={statusFilter === '전체' && typeFilter === '전체' ? '첫 프로그램을 만들어 보세요.' : undefined}
+          action={
+            statusFilter === '전체' && typeFilter === '전체' && (
+              <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
+                + 프로그램 등록
+              </Button>
+            )
+          }
+        />
       ) : view === 'list' ? (
         <ul className="space-y-2">
           {visible.map((p) => (

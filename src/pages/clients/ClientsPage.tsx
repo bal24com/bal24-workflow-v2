@@ -13,6 +13,7 @@ import {
   CardHeader,
 } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import EmptyState from '../../components/EmptyState';
 import type { Client, ClientContact, ClientType } from '../../types/database';
 import ClientFormModal from './ClientFormModal';
 import ClientDetailModal from './ClientDetailModal';
@@ -331,19 +332,18 @@ export default function ClientsPage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
-            <Building2 size={20} />
-          </div>
-          <p className="text-sm text-muted mb-3">
-            {search.trim() ? '검색 결과가 없어요.' : '아직 등록된 고객사가 없어요.'}
-          </p>
-          {!search.trim() && (
-            <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => setCreateOpen(true)}>
-              첫 고객사 등록하기
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          emoji="🏢"
+          title={search.trim() ? '검색 결과가 없어요.' : '아직 등록된 고객사가 없어요.'}
+          description={!search.trim() ? '첫 고객사를 등록해 보세요.' : undefined}
+          action={
+            !search.trim() && (
+              <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => setCreateOpen(true)}>
+                + 고객사 등록
+              </Button>
+            )
+          }
+        />
       ) : view === 'card' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((c) => (

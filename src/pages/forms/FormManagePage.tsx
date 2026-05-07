@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Plus, Loader2, ClipboardList, Copy, X, Edit3, ExternalLink, Calendar, Users,
+  Plus, Loader2, Copy, X, Edit3, ExternalLink, Calendar, Users,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
 import { copyToClipboard } from '../../lib/clipboard';
+import EmptyState from '../../components/EmptyState';
 import type { FormType, Program, PublicForm } from '../../types/database';
 import FormCreateModal from './FormCreateModal';
 import FormApplicationsTab from './FormApplicationsTab';
@@ -123,15 +124,16 @@ export default function FormManagePage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <ClipboardList size={28} className="text-slate-300 mb-2" />
-          <p className="text-sm text-muted mb-3">
-            {programFilter !== '전체' ? '선택한 프로그램의 폼이 없어요.' : '아직 등록된 폼이 없어요.'}
-          </p>
-          <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => { setEditing(null); setCreateOpen(true); }}>
-            첫 폼 만들기
-          </Button>
-        </div>
+        <EmptyState
+          emoji="📋"
+          title={programFilter !== '전체' ? '선택한 프로그램의 폼이 없어요.' : '아직 등록된 폼이 없어요.'}
+          description="첫 폼을 만들어 보세요."
+          action={
+            <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => { setEditing(null); setCreateOpen(true); }}>
+              + 폼 등록
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((f) => {

@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import EmptyState from '../../components/EmptyState';
 import type { StaffPool } from '../../types/database';
 import ExpertFormModal from './ExpertFormModal';
 
@@ -256,19 +257,18 @@ export default function ExpertsPage() {
           불러오는 중…
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-xl border border-dashed border-slate-200">
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
-            <UserStar size={20} />
-          </div>
-          <p className="text-sm text-muted mb-3">
-            {search.trim() || field !== '전체' ? '조건에 맞는 전문가가 없어요.' : '아직 등록된 전문가가 없어요.'}
-          </p>
-          {!search.trim() && field === '전체' && (
-            <Button variant="outline" size="sm" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
-              첫 전문가 등록하기
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          emoji="👥"
+          title={search.trim() || field !== '전체' ? '조건에 맞는 전문가가 없어요.' : '아직 등록된 전문가가 없어요.'}
+          description={!search.trim() && field === '전체' ? '첫 전문가를 등록해 보세요.' : undefined}
+          action={
+            !search.trim() && field === '전체' && (
+              <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
+                + 전문가 등록
+              </Button>
+            )
+          }
+        />
       ) : view === 'card' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((s) => (<ExpertGridCard key={s.id} s={s} />))}
