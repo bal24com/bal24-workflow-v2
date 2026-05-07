@@ -488,20 +488,23 @@ URL 구조: /consortium/:id/portal
 | 14 | 정산 워크플로우 UI (SettlementPage + SettlementActionModal) | `92f99b4` |
 | 15 | 고객 문서 포털 (project_portals + portal_items + portal_responses + portal_templates + portal_template_items + 외부 /portal/:token) | `fcca93a` |
 | 16 | 강사 초대 수락 링크 (instructor_invitations.portal_token + 외부 /invitation/:token) | `640444a` |
+| 17 | 일정·캘린더 (월/주/목록 뷰 + Tailwind grid 자체 구현 + 5종 데이터 통합 + schedule_events) | `3f767c4` |
+| 18 | 팀원 관리 (3열 카드·5종 role·아바타 업로드·`/team`→`/members` redirect) | `63beea9` |
+| 19 | 공유 링크 통합 뷰 (4종 외부 토큰 한 화면·복사·새탭) | `5f60462` |
+| 20 | 재무 리포트 (KPI+SVG 막대/도넛+미지급 + 항목 커스터마이징 layout DB 저장) | `b424d5f` |
+| 21 | AI 어시스턴트 (대화 목록 + 채팅 + Edge Function `ai-chat` Mock fallback + ai_conversations/ai_messages) | `61f0b86` |
 
 ---
 
-### 🚧 미구현 영역 (사이드바에는 있지만 PlaceholderPage 만 표시)
+### 🎉 모든 사이드바 메뉴 구현 완료 (STEP 21 기준)
 
-App.tsx 라우트는 등록되어 있고 사이드바 메뉴도 보이지만 컴포넌트는 PlaceholderPage 임:
+20개 사이드바 메뉴 모두 실제 페이지 동작. PlaceholderPage 사용처 없음.
 
-| 메뉴 그룹 | 라우트 | 사이드바 라벨 | 메모 |
-|---|---|---|---|
-| 운영 (홈 다음 2번째) | `/schedule` | 일정 | 캘린더 (프로젝트 기간·프로그램 일자·태스크 D-day·출석세션 통합 가능) |
-| 운영 (전문가 다음) | `/shares` | 공유 | 외부링크 통합 대시보드 (현재 /checkin·/form·/portal·/invitation 4종이 분산) |
-| 재무 (마지막) | `/reports` | 리포트 | 재무·실적 통합 리포트 (STEP 13 ProjectReportPage 와 별개) |
-| 기타 | `/team` | 팀원 | profiles 관리 + 권한(roles) UI ([결정 1] 5종 역할 시스템 명세 있음) |
-| 기타 | `/ai` | AI | AI 어시스턴트 ([결정 8.A] AI 태스크 자동 생성 명세 있음 — Claude API 이미 STEP 10-B에서 사용 중) |
+| 그룹 | 메뉴 (라우트) |
+|---|---|
+| **운영** | 홈 (`/home`) · 일정 (`/schedule`) · 프로젝트 (`/projects`) · 컨소시엄 (`/consortium`) · 프로그램 (`/programs`) · 고객사 (`/clients`) · 전문가 (`/experts`) · 공유 (`/shares`) · 출석체크 (`/attendance`) · 수료증 (`/certificates`) · 일지 (`/activity-logs`) · 폼 관리 (`/forms`) · 포털 (`/portals`) |
+| **재무** | 수입 (`/income`) · 지출 (`/expense`) · 증빙 (`/receipts`) · 정산 (`/settlements`) · 리포트 (`/reports`) |
+| **기타** | 팀원 (`/members`) · AI (`/ai`) |
 
 ---
 
@@ -523,12 +526,15 @@ App.tsx 라우트는 등록되어 있고 사이드바 메뉴도 보이지만 컴
 | `expenses` | id, project_id, account_code, gross_amount, withholding_type, ledger_type |
 | `receipts` | id, expense_id, receipt_type, file_url |
 | `schedule_events` | id, title, event_date, start_time, end_time, category, all_day |
-| `profiles` | id, email, name, role |
+| `report_layouts` | id, user_id, ledger_type, layout (jsonb), unique(user_id, ledger_type) |
+| `ai_conversations` | id, user_id, title, context, updated_at |
+| `ai_messages` | id, conversation_id, role, content, created_at |
+| `profiles` | id, email, name, role, position, department, joined_at, is_active |
 
 > ℹ️ 위 표는 자주 사용하는 핵심 컬럼만. 부수 테이블(`client_contacts`, `consortium_members`, `program_applicants`, `files`, `certificate_templates`, `issued_certificates`, `activity_logs`, `public_forms`, `form_applications`, `project_reports`, `project_settlements`, `project_portals`, `portal_items`, `portal_responses`, `portal_templates`, `portal_template_items`)도 코드에서 사용 중 — 컬럼은 코드 grep으로 확인.
 
-> ⚠️ supabase/migrations/ 폴더에는 STEP 11-B 이후의 마이그레이션 파일이 보존되지 않음. 박경수님이 Supabase Dashboard에서 직접 SQL 실행. 최신 보존 파일은 `20260509_consortium_extend.sql`.
-> 사후 보존이 필요하면 별도 작업으로 STEP 11-B/C/D/E·13·14·15·16 의 DDL 을 마이그레이션 파일로 추출.
+> ✅ supabase/migrations/ 폴더에 STEP 17~21 사후 보존 파일 추가됨 (`20260510_schedule_events.sql`·`20260511_profiles_extend.sql`·`20260512_report_layouts.sql`·`20260513_ai_chat.sql`).
+> STEP 11-B/C/D/E·13·14·15·16 은 박경수님이 Supabase Dashboard 에서 직접 실행 (마이그레이션 파일 미보존).
 
 ---
 
@@ -551,6 +557,6 @@ App.tsx 라우트는 등록되어 있고 사이드바 메뉴도 보이지만 컴
 | GitHub | `https://github.com/bal24com/bal24-workflow-v2` |
 | 배포 | `https://bal24-workflow-v2.netlify.app` / `https://bal24.kr` |
 | Supabase | `https://clsljkxvgmqwenettkrz.supabase.co` |
-| 최근 커밋 | `640444a` (STEP 16 강사 초대 수락 링크) |
+| 최근 커밋 | `61f0b86` (STEP 21 AI 어시스턴트) |
 | 이전 프로젝트 | `C:\workflow\workflow_v7_full` → **폐기, 사용 안 함** |
 
