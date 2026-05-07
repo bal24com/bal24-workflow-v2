@@ -12,6 +12,7 @@ import {
 } from '../../utils/accounting';
 import { BADGE_BASE, EXPENSE_STATUS_STYLE } from '../../utils/statusStyles';
 import EmptyState from '../../components/EmptyState';
+import { useToast } from '../../contexts/ToastContext';
 import type { Expense, LedgerType } from '../../types/database';
 import ExpenseFormModal from './ExpenseFormModal';
 
@@ -62,16 +63,15 @@ function LedgerTabs({ value, onChange, counts }: {
 }
 
 export default function ExpensesPage() {
+  const toast = useToast();
   const [items, setItems] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [ledger, setLedger] = useState<LedgerType>('own');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
-    setErrorMsg(null);
     try {
       const { data, error } = await supabase
         .from('expenses')
@@ -83,11 +83,11 @@ export default function ExpensesPage() {
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[expenses] 조회 실패:', raw);
-      setErrorMsg('지출 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      toast.error('지출 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
@@ -142,10 +142,6 @@ export default function ExpensesPage() {
           <span>· 실지급 <span className="text-primary font-bold">{formatMoney(totals.net)}</span></span>
         </div>
       </div>
-
-      {errorMsg && (
-        <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-3 text-sm text-danger">{errorMsg}</div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted">

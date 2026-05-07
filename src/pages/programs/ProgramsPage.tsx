@@ -20,6 +20,7 @@ import {
 } from './programStatus';
 import { PROGRAM_TYPE_STYLE, PROGRAM_STATUS_STYLE, BADGE_BASE } from '../../utils/statusStyles';
 import EmptyState from '../../components/EmptyState';
+import { useToast } from '../../contexts/ToastContext';
 import ProgramFormModal from './ProgramFormModal';
 import InvitationManagePanel from './InvitationManagePanel';
 
@@ -173,9 +174,9 @@ function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow)
 }
 
 export default function ProgramsPage() {
+  const toast = useToast();
   const [programs, setPrograms] = useState<ProgramRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>('list');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('전체');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('전체');
@@ -184,7 +185,6 @@ export default function ProgramsPage() {
 
   const fetchPrograms = useCallback(async () => {
     setLoading(true);
-    setErrorMsg(null);
     try {
       const { data, error } = await supabase
         .from('programs')
@@ -198,14 +198,14 @@ export default function ProgramsPage() {
       console.error('[programs] 목록 조회 실패:', raw);
       const m = raw.toLowerCase();
       if (m.includes("could not find the table 'public.programs'") || m.includes('pgrst205')) {
-        setErrorMsg('프로그램 테이블이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.');
+        toast.error('프로그램 테이블이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.');
       } else {
-        setErrorMsg('프로그램 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+        toast.error('프로그램 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void fetchPrograms();
@@ -303,12 +303,6 @@ export default function ProgramsPage() {
           />
         </div>
       </div>
-
-      {errorMsg && (
-        <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-3 text-sm text-danger">
-          {errorMsg}
-        </div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted">

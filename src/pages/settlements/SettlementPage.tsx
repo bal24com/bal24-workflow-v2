@@ -7,6 +7,7 @@ import { Loader2, Search, ArrowRight } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
+import { useToast } from '../../contexts/ToastContext';
 import { formatKoreanDate } from '../reports/reportUtils';
 import type { ProjectSettlementRow, SettlementStep } from '../../types/database';
 
@@ -51,15 +52,14 @@ const TABS: { key: Filter; label: string }[] = [
 ];
 
 export default function SettlementPage() {
+  const toast = useToast();
   const [items, setItems] = useState<SettlementRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
-    setErrorMsg(null);
     try {
       const { data, error } = await supabase
         .from('project_settlements')
@@ -70,11 +70,11 @@ export default function SettlementPage() {
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[settlement] 조회 실패:', raw);
-      setErrorMsg('정산 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      toast.error('정산 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
@@ -143,10 +143,6 @@ export default function SettlementPage() {
           className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
       </div>
-
-      {errorMsg && (
-        <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-3 text-sm text-danger">{errorMsg}</div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted">

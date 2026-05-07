@@ -15,6 +15,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
 import { BADGE_BASE, CONSORTIUM_STATUS_STYLE } from '../../utils/statusStyles';
+import { useToast } from '../../contexts/ToastContext';
 import type { Consortium, ConsortiumStatus } from '../../types/database';
 import { CONSORTIUM_STATUS_VALUES } from './consortiumStatus';
 import ConsortiumFormModal from './ConsortiumFormModal';
@@ -131,9 +132,9 @@ function ConsortiumListRow({ c }: { c: ConsortiumRow }) {
 }
 
 export default function ConsortiumPage() {
+  const toast = useToast();
   const [items, setItems] = useState<ConsortiumRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>('card');
   const [filter, setFilter] = useState<StatusFilter>('전체');
   const [search, setSearch] = useState('');
@@ -141,7 +142,6 @@ export default function ConsortiumPage() {
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
-    setErrorMsg(null);
     try {
       const { data, error } = await supabase
         .from('consortiums')
@@ -154,14 +154,14 @@ export default function ConsortiumPage() {
       console.error('[consortium] 목록 조회 실패:', raw);
       const m = raw.toLowerCase();
       if (m.includes('column') && m.includes('does not exist')) {
-        setErrorMsg('컨소시엄 테이블 컬럼이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.');
+        toast.error('컨소시엄 테이블 컬럼이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.');
       } else {
-        setErrorMsg('컨소시엄 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+        toast.error('컨소시엄 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
@@ -217,10 +217,6 @@ export default function ConsortiumPage() {
           className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
       </div>
-
-      {errorMsg && (
-        <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-3 text-sm text-danger">{errorMsg}</div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted">

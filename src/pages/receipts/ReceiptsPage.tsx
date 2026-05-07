@@ -9,6 +9,7 @@ import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import EmptyState from '../../components/EmptyState';
+import { useToast } from '../../contexts/ToastContext';
 import { RECEIPT_TYPE_VALUES } from '../../utils/accounting';
 import type { Receipt, ReceiptType } from '../../types/database';
 
@@ -64,15 +65,14 @@ function TypeFilterTabs({ value, onChange, counts }: {
 }
 
 export default function ReceiptsPage() {
+  const toast = useToast();
   const [items, setItems] = useState<ReceiptRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<TypeFilter>('전체');
   const [search, setSearch] = useState('');
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
-    setErrorMsg(null);
     try {
       const { data, error } = await supabase
         .from('receipts')
@@ -84,11 +84,11 @@ export default function ReceiptsPage() {
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[receipts] 조회 실패:', raw);
-      setErrorMsg('증빙 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      toast.error('증빙 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
@@ -141,10 +141,6 @@ export default function ReceiptsPage() {
       <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-900">
         💡 신규 증빙은 <strong>지출 등록 시 자동 첨부</strong>돼요. 이 페이지는 모든 영수증을 한곳에서 보고·검색하는 용도예요.
       </div>
-
-      {errorMsg && (
-        <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-3 text-sm text-danger">{errorMsg}</div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted">
