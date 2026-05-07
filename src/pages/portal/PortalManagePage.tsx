@@ -5,6 +5,7 @@ import { Loader2, Link2, Copy, Settings, Search } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../components/ui';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { copyToClipboard } from '../../lib/clipboard';
 import { getPortalUrl, STAGE_LABELS } from './portalConstants';
 import type { ProjectPortal } from '../../types/database';
 import PortalResponsesPanel from './PortalResponsesPanel';
@@ -59,14 +60,12 @@ export default function PortalManagePage() {
   }, [items, search]);
 
   const handleCopy = async (token: string) => {
-    try {
-      await navigator.clipboard.writeText(getPortalUrl(token));
+    const ok = await copyToClipboard(getPortalUrl(token));
+    if (ok) {
       setCopiedToken(token);
       setTimeout(() => setCopiedToken(null), 1500);
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[portals] 복사 실패:', raw);
-      setErrorMsg('링크 복사에 실패했어요.');
+    } else {
+      setErrorMsg('링크 복사에 실패했어요. 직접 선택해서 복사해 주세요.');
     }
   };
 

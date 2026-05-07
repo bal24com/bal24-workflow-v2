@@ -2,6 +2,7 @@
 // 4종 외부 토큰을 하나의 SharedLink[] 로 병합
 
 import { supabase } from '../../lib/supabase';
+import { copyToClipboard as copyToClipboardLib } from '../../lib/clipboard';
 
 export type LinkCategory = 'invitation' | 'attendance' | 'portal' | 'form';
 
@@ -44,17 +45,8 @@ export function buildLink(path: string, token: string): string {
   return `${window.location.origin}${path}/${token}`;
 }
 
-/** 클립보드 복사 + 결과 반환 */
-export async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch (err) {
-    const raw = err instanceof Error ? err.message : '';
-    console.error('[shares] 클립보드 복사 실패:', raw);
-    return false;
-  }
-}
+/** 클립보드 복사 — lib/clipboard 의 fallback 포함 구현을 re-export */
+export const copyToClipboard = copyToClipboardLib;
 
 /** 상태값 한글 통일 (영문이 들어오면 한글로, 한글이면 그대로) */
 function statusLabel(raw: string | null | undefined): string | undefined {

@@ -12,6 +12,7 @@ import {
 } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
+import { copyToClipboard } from '../../lib/clipboard';
 import {
   ROLE_LABELS, METHOD_LABELS, getCheckInUrl, isSessionExpired, formatTime,
 } from './attendanceUtils';
@@ -83,14 +84,12 @@ export default function AttendanceDetailPage() {
   }), [records]);
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(checkinUrl);
+    const ok = await copyToClipboard(checkinUrl);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[attendance-detail] 복사 실패:', raw);
-      setErrorMsg('링크 복사에 실패했어요.');
+    } else {
+      setErrorMsg('링크 복사에 실패했어요. 직접 선택해서 복사해 주세요.');
     }
   };
 

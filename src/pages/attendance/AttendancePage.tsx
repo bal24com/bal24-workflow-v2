@@ -8,6 +8,7 @@ import {
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
+import { copyToClipboard } from '../../lib/clipboard';
 import {
   calcAttendanceSummary,
   formatTime,
@@ -67,13 +68,11 @@ export default function AttendancePage() {
   }, [sessions, programFilter]);
 
   const handleCopy = async (token: string) => {
-    try {
-      await navigator.clipboard.writeText(getCheckInUrl(token));
+    const ok = await copyToClipboard(getCheckInUrl(token));
+    if (ok) {
       setCopiedToken(token);
       setTimeout(() => setCopiedToken(null), 1500);
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[attendance] 복사 실패:', raw);
+    } else {
       setErrorMsg('링크 복사에 실패했어요. 직접 선택해서 복사해 주세요.');
     }
   };

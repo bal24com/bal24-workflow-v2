@@ -11,6 +11,7 @@ import {
   fileSizeLabel, extractStoragePath, INSTRUCTOR_FILES_BUCKET,
 } from '../instructor-portal/invitationUtils';
 import { formatDateKo } from '../../lib/utils';
+import { copyToClipboard } from '../../lib/clipboard';
 import type {
   InstructorInvitation, InvitationFile, InvitationRole, InvitationStatus, StaffPool,
 } from '../../types/database';
@@ -127,14 +128,12 @@ export default function InvitationManagePanel({ open, programId, programName, on
   };
 
   const handleCopyLink = async (token: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(getInvitationUrl(token));
+    const ok = await copyToClipboard(getInvitationUrl(token));
+    if (ok) {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 1500);
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[invite-manage] 복사 실패:', raw);
-      setErrorMsg('링크 복사에 실패했어요.');
+    } else {
+      setErrorMsg('링크 복사에 실패했어요. 직접 선택해서 복사해 주세요.');
     }
   };
 

@@ -7,6 +7,7 @@ import {
 import { Badge, Button, Card, CardContent } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
+import { copyToClipboard } from '../../lib/clipboard';
 import type { FormType, Program, PublicForm } from '../../types/database';
 import FormCreateModal from './FormCreateModal';
 import FormApplicationsTab from './FormApplicationsTab';
@@ -67,14 +68,12 @@ export default function FormManagePage() {
   }, [forms, programFilter]);
 
   const handleCopy = async (token: string) => {
-    try {
-      await navigator.clipboard.writeText(getFormPublicUrl(token));
+    const ok = await copyToClipboard(getFormPublicUrl(token));
+    if (ok) {
       setCopiedToken(token);
       setTimeout(() => setCopiedToken(null), 1500);
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[forms] 복사 실패:', raw);
-      setErrorMsg('링크 복사에 실패했어요.');
+    } else {
+      setErrorMsg('링크 복사에 실패했어요. 직접 선택해서 복사해 주세요.');
     }
   };
 
