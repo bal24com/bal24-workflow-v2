@@ -63,14 +63,15 @@ export default function CurriculumTab({ programId }: Props) {
     toast.success('차시를 추가했어요.');
   }
 
-  async function updateCurriculum(id: string, patch: Partial<ProgramCurriculum>) {
+  async function saveCurriculum(id: string, patch: Partial<ProgramCurriculum>) {
     const { error } = await supabase.from('program_curriculum').update(patch).eq('id', id);
     if (error) {
-      console.error('[curriculum-tab] 차시 수정 실패:', error.message);
-      toast.error('차시 수정에 실패했어요.');
+      console.error('[curriculum-tab] 차시 저장 실패:', error.message);
+      toast.error('차시 저장에 실패했어요.');
       return;
     }
     setItems((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    toast.success('차시를 저장했어요.');
   }
 
   async function removeCurriculum(id: string) {
@@ -143,7 +144,7 @@ export default function CurriculumTab({ programId }: Props) {
         <div>
           <p className="text-sm font-bold text-[#1E1B4B]">커리큘럼</p>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            ⋮⋮ 드래그로 순서 변경 · 차시 펼침으로 강사·멘토·설명 입력 · 시간은 시·분 picker로 선택
+            ⋮⋮ 드래그로 순서 변경 · 차시 펼침으로 입력 후 [저장] · 시간은 시·분 picker로 선택
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -199,7 +200,7 @@ export default function CurriculumTab({ programId }: Props) {
               <CurriculumRow
                 key={c.id}
                 item={c}
-                onUpdate={(patch) => updateCurriculum(c.id, patch)}
+                onSave={(patch) => saveCurriculum(c.id, patch)}
                 onDelete={() => removeCurriculum(c.id)}
                 onOpenMatch={(role) => setMatchTarget({ curriculumId: c.id, defaultRole: role })}
                 onDeleteStaff={removeStaff}
