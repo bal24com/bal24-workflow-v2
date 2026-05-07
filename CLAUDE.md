@@ -505,27 +505,27 @@ App.tsx 라우트는 등록되어 있고 사이드바 메뉴도 보이지만 컴
 
 ---
 
-### 📋 실제 사용 중 Supabase 테이블 (코드 grep 기준)
+### 📋 실제 사용 중 Supabase 테이블 (핵심 컬럼)
 
-| 테이블 | 도입 STEP |
+| 테이블 | 핵심 컬럼 |
 |---|---|
-| `profiles` | STEP 2 |
-| `clients` / `client_contacts` | STEP 2 / STEP 10-A |
-| `staff_pool` | STEP 2 |
-| `projects` / `tasks` | STEP 2 / STEP 8 |
-| `consortiums` / `consortium_members` | STEP 2 / STEP 11 |
-| `programs` / `program_curriculum` / `program_applicants` | STEP 9 |
-| `income` | STEP 12 |
-| `expenses` (withholding GENERATED 컬럼) | STEP 12 |
-| `receipts` | STEP 12 |
-| `files` (공통 첨부) | 공통 |
-| `attendance_sessions` / `attendance_records` | STEP 11-B |
-| `certificate_templates` / `issued_certificates` | STEP 11-C |
-| `activity_logs` | STEP 11-D |
-| `public_forms` / `form_applications` | STEP 11-E |
-| `project_reports` / `project_settlements` | STEP 13 / 14 |
-| `project_portals` / `portal_items` / `portal_responses` / `portal_templates` / `portal_template_items` | STEP 15 |
-| `instructor_invitations` (portal_token 컬럼 포함) | STEP 16 |
+| `projects` | id, name, status, start_date, end_date, client_id |
+| `tasks` | id, title, status, due_date, start_date, project_id |
+| `programs` | id, name, type, status, start_date, end_date, project_id |
+| `program_curriculum` | id, program_id, session_date, title, start_time, end_time |
+| `staff_pool` | id, name, phone, email, role |
+| `instructor_invitations` | id, program_id, expert_id, role, status, portal_token |
+| `attendance_sessions` | id, program_id, title, session_date, start_time, end_time, learner_token, instructor_token, ta_token |
+| `attendance_records` | id, session_id, role, name, phone, checked_in_at |
+| `clients` | id, name, business_name, client_type |
+| `consortiums` | id, name, status, project_id |
+| `income` | id, project_id, account_code, amount, ledger_type |
+| `expenses` | id, project_id, account_code, gross_amount, withholding_type, ledger_type |
+| `receipts` | id, expense_id, receipt_type, file_url |
+| `schedule_events` | id, title, event_date, start_time, end_time, category, all_day |
+| `profiles` | id, email, name, role |
+
+> ℹ️ 위 표는 자주 사용하는 핵심 컬럼만. 부수 테이블(`client_contacts`, `consortium_members`, `program_applicants`, `files`, `certificate_templates`, `issued_certificates`, `activity_logs`, `public_forms`, `form_applications`, `project_reports`, `project_settlements`, `project_portals`, `portal_items`, `portal_responses`, `portal_templates`, `portal_template_items`)도 코드에서 사용 중 — 컬럼은 코드 grep으로 확인.
 
 > ⚠️ supabase/migrations/ 폴더에는 STEP 11-B 이후의 마이그레이션 파일이 보존되지 않음. 박경수님이 Supabase Dashboard에서 직접 SQL 실행. 최신 보존 파일은 `20260509_consortium_extend.sql`.
 > 사후 보존이 필요하면 별도 작업으로 STEP 11-B/C/D/E·13·14·15·16 의 DDL 을 마이그레이션 파일로 추출.
