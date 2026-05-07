@@ -1,280 +1,305 @@
-// bal24 v2 — 컨소시엄 상세 페이지
-// 탭: 개요(기본정보+참여사+지분율) / 파일
+// bal24 v2 — 컨소시엄 독립 홈 (STEP-CON 7탭 허브)
+// 헤더 + 진행 바 + 사이드 요약 카드 + 탭 네비게이션 + 탭 컨텐츠
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, FileText, Info, Loader2, Briefcase, Building2, Users2,
+  ArrowLeft, Loader2, Building2, Briefcase, GraduationCap, ListChecks,
+  Wallet, Users, Share2, ShieldCheck, Pencil, Check,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import { Button } from '../../components/ui';
 import {
-  consortiumStatusToBadgeVariant,
-  roleToBadgeVariant,
-} from './consortiumStatus';
-import type { Consortium, ConsortiumMember } from '../../types/database';
-import ConsortiumFilesTab from './ConsortiumFilesTab';
+  CONSORTIUM_STATUS,
+  MEMBER_TYPE_LABEL,
+  MEMBER_TYPE_STYLE,
+  type ConsortiumMember,
+  type ConsortiumStatus,
+  type MemberType,
+} from './consortiumTypes';
+import {
+  formatConDate,
+  formatKRW,
+  getStageIndex,
+  getStatusBadgeClass,
+} from './consortiumUtils';
+import ConOverviewTab from './detail/ConOverviewTab';
+import ConProgramsTab from './detail/ConProgramsTab';
+import ConTasksTab from './detail/ConTasksTab';
+import ConFinanceTab from './detail/ConFinanceTab';
+import ConStaffTab from './detail/ConStaffTab';
+import ConLinksTab from './detail/ConLinksTab';
+import ConPortalTab from './detail/ConPortalTab';
 
-type DetailRow = Consortium & {
-  lead_client?: { id: string; name: string } | null;
-  project?: { id: string; name: string } | null;
-};
+interface ConsortiumDetail {
+  id: string;
+  name: string;
+  status: ConsortiumStatus;
+  start_date: string | null;
+  end_date: string | null;
+  total_budget: number | null;
+  currency: string | null;
+  description: string | null;
+  lead_client_id: string | null;
+  internal_manager_id: string | null;
+  project_id: string | null;
+  lead_client: { id: string; name: string } | null;
+  project: { id: string; name: string } | null;
+  pm: { id: string; name: string } | null;
+}
 
-type MemberRow = ConsortiumMember & {
-  client?: { id: string; name: string } | null;
-};
+type TabKey = 'overview' | 'programs' | 'tasks' | 'finance' | 'staff' | 'links' | 'portal';
 
-type TabKey = 'overview' | 'files';
-
-const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
-  { key: 'overview', label: '개요', Icon: Info },
-  { key: 'files',    label: '파일', Icon: FileText },
+const TAB_LIST: Array<{ key: TabKey; label: string; Icon: typeof Briefcase }> = [
+  { key: 'overview', label: '개요', Icon: Building2 },
+  { key: 'programs', label: '프로그램', Icon: GraduationCap },
+  { key: 'tasks', label: '태스크', Icon: ListChecks },
+  { key: 'finance', label: '재무', Icon: Wallet },
+  { key: 'staff', label: '인력·자원', Icon: Users },
+  { key: 'links', label: '외부공유', Icon: Share2 },
+  { key: 'portal', label: '포털', Icon: ShieldCheck },
 ];
 
-const SELECT_COLUMNS =
-  '*, lead_client:clients!consortiums_lead_client_id_fkey(id,name), project:projects!consortiums_project_id_fkey(id,name)';
+const SELECT_COLUMNS = `
+  id, name, status, start_date, end_date, total_budget, currency, description,
+  lead_client_id, internal_manager_id, project_id,
+  lead_client:clients!consortiums_lead_client_id_fkey(id, name),
+  project:projects!consortiums_project_id_fkey(id, name),
+  pm:profiles!consortiums_internal_manager_id_fkey(id, name)
+`.replace(/\s+/g, ' ');
 
-const MEMBER_SELECT =
-  '*, client:clients(id,name)';
-
-function NotFound() {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xl mb-2">🔍</div>
-      <p className="text-sm text-muted mb-3">컨소시엄을 찾을 수 없어요.</p>
-      <Link to="/consortium" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
-        <ArrowLeft size={14} />
-        컨소시엄 목록으로
-      </Link>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <div className="text-xs text-muted">{label}</div>
-      <div className="text-sm text-text font-medium">{children}</div>
-    </div>
-  );
-}
-
-function MembersList({ members, totalRatio }: { members: MemberRow[]; totalRatio: number }) {
-  if (members.length === 0) {
-    return (
-      <p className="text-sm text-muted text-center py-6">아직 등록된 참여사가 없어요.</p>
-    );
-  }
-  return (
-    <div className="space-y-3">
-      <ul className="divide-y divide-slate-100 -mx-1">
-        {members.map((m) => (
-          <li key={m.id} className="flex items-center gap-3 py-3 px-1">
-            <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary">
-              <Building2 size={16} />
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold text-text truncate">
-                  {m.client?.name ?? m.org_name ?? '이름 미지정'}
-                </span>
-                {m.role && <Badge variant={roleToBadgeVariant(m.role)}>{m.role}</Badge>}
-              </div>
-              {m.responsibilities && (
-                <div className="text-xs text-muted truncate">{m.responsibilities}</div>
-              )}
-            </div>
-            <div className="text-right shrink-0">
-              <div className="text-sm font-bold text-text">
-                {m.budget_ratio != null ? `${m.budget_ratio}%` : '–'}
-              </div>
-              <div className="text-[10px] text-muted">지분율</div>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-        <span className="text-xs font-semibold text-slate-500">합계</span>
-        <span className={['text-sm font-bold',
-          totalRatio === 100 ? 'text-success' : totalRatio > 100 ? 'text-danger' : 'text-text'].join(' ')}>
-          {totalRatio.toFixed(1)}%
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function OverviewTab({ c, members }: { c: DetailRow; members: MemberRow[] }) {
-  const totalRatio = members.reduce((s, m) => s + (m.budget_ratio ?? 0), 0);
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>기본 정보</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-            <Field label="상태">
-              <Badge variant={consortiumStatusToBadgeVariant(c.status)}>{c.status}</Badge>
-            </Field>
-            <Field label="주관사">{c.lead_client?.name ?? '미지정'}</Field>
-            <Field label="연결 프로젝트">
-              {c.project?.name ? (
-                <Link to={`/projects/${c.project.id}`} className="text-primary hover:underline inline-flex items-center gap-1">
-                  <Briefcase size={12} />
-                  {c.project.name}
-                </Link>
-              ) : (
-                '미연결'
-              )}
-            </Field>
-            <Field label="등록일">
-              {c.created_at ? new Date(c.created_at).toLocaleDateString('ko-KR') : '–'}
-            </Field>
-          </dl>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>설명</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {c.description ? (
-            <p className="text-sm text-text whitespace-pre-wrap leading-relaxed">{c.description}</p>
-          ) : (
-            <p className="text-sm text-muted">아직 설명이 없어요.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>참여사 ({members.length})</CardTitle>
-            <span className="inline-flex items-center gap-1.5 text-xs text-muted">
-              <Users2 size={12} />
-              지분율 합계 {totalRatio.toFixed(1)}%
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <MembersList members={members} totalRatio={totalRatio} />
-        </CardContent>
-      </Card>
-    </div>
-  );
+interface CountSummary {
+  programs: number;
+  tasks: number;
 }
 
 export default function ConsortiumDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
-  const [item, setItem] = useState<DetailRow | null>(null);
-  const [members, setMembers] = useState<MemberRow[]>([]);
+  const toast = useToast();
+  const [consortium, setConsortium] = useState<ConsortiumDetail | null>(null);
+  const [members, setMembers] = useState<ConsortiumMember[]>([]);
+  const [counts, setCounts] = useState<CountSummary>({ programs: 0, tasks: 0 });
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
 
-  useEffect(() => {
+  const loadConsortium = useCallback(async () => {
     if (!id) return;
+    try {
+      const [{ data: c, error: cErr }, { data: m, error: mErr }, { count: pCount }, { count: tCount }] = await Promise.all([
+        supabase.from('consortiums').select(SELECT_COLUMNS).eq('id', id).maybeSingle(),
+        supabase
+          .from('consortium_members')
+          .select('*, clients!consortium_members_client_id_fkey(id, name, business_name)')
+          .eq('consortium_id', id),
+        supabase.from('programs').select('id', { count: 'exact', head: true }).eq('consortium_id', id).is('deleted_at', null),
+        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('consortium_id', id).is('deleted_at', null),
+      ]);
+      if (cErr) console.error('[consortium-detail] 컨소시엄 조회 실패:', cErr.message);
+      if (mErr) console.error('[consortium-detail] 참여사 조회 실패:', mErr.message);
+      setConsortium((c as ConsortiumDetail | null) ?? null);
+      setMembers((m as ConsortiumMember[] | null) ?? []);
+      setCounts({ programs: pCount ?? 0, tasks: tCount ?? 0 });
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : '';
+      console.error('[consortium-detail] 데이터 로드 실패:', raw);
+      toast.error('컨소시엄 정보를 불러오지 못했어요.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, toast]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setErrorMsg(null);
-
-    Promise.all([
-      supabase.from('consortiums').select(SELECT_COLUMNS).eq('id', id).maybeSingle(),
-      supabase.from('consortium_members').select(MEMBER_SELECT).eq('consortium_id', id).order('created_at', { ascending: true }),
-    ]).then(([cRes, mRes]) => {
+    void (async () => {
+      await loadConsortium();
       if (cancelled) return;
-      if (cRes.error) {
-        console.error('[consortium-detail] 조회 실패:', cRes.error.message);
-        setErrorMsg('컨소시엄 정보를 불러오지 못했어요.');
-      } else {
-        setItem((cRes.data ?? null) as DetailRow | null);
-      }
-      if (mRes.error) {
-        console.error('[consortium-members] 조회 실패:', mRes.error.message);
-      } else {
-        setMembers((mRes.data ?? []) as MemberRow[]);
-      }
-      setLoading(false);
-    });
-
+    })();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [loadConsortium]);
 
-  const consortiumId = useMemo(() => id ?? '', [id]);
+  const stageIdx = useMemo(
+    () => (consortium ? getStageIndex(consortium.status) : 0),
+    [consortium],
+  );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-sm text-muted">
-        <Loader2 size={18} className="animate-spin mr-2" />
-        불러오는 중…
+      <div className="flex justify-center items-center py-20">
+        <Loader2 className="animate-spin text-violet-400" size={28} aria-hidden="true" />
       </div>
     );
   }
 
-  if (errorMsg) {
+  if (!consortium || !id) {
     return (
-      <div className="space-y-3">
-        <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-3 text-sm text-danger">{errorMsg}</div>
-        <Link to="/consortium" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
-          <ArrowLeft size={14} />
-          컨소시엄 목록으로
-        </Link>
+      <div className="rounded-2xl border border-rose-100 bg-white p-12 text-center">
+        <p className="text-lg font-bold text-[#1E1B4B] mb-2">컨소시엄을 찾을 수 없어요</p>
+        <Link to="/consortium" className="text-sm text-violet-600 hover:underline">목록으로 돌아가기</Link>
       </div>
     );
   }
 
-  if (!item) return <NotFound />;
+  const TabContent: Record<TabKey, ReactNode> = {
+    overview: <ConOverviewTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} />,
+    programs: <ConProgramsTab consortiumId={id} members={members} />,
+    tasks: <ConTasksTab consortiumId={id} members={members} />,
+    finance: <ConFinanceTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} />,
+    staff: <ConStaffTab consortiumId={id} />,
+    links: <ConLinksTab consortiumId={id} />,
+    portal: <ConPortalTab consortiumId={id} status={consortium.status} members={members} />,
+  };
 
   return (
     <div className="space-y-5 max-w-[1400px]">
-      <div className="space-y-2">
-        <Link to="/consortium" className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-primary">
-          <ArrowLeft size={12} />
+      {/* 헤더 */}
+      <div className="space-y-3">
+        <Link to="/consortium" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-violet-600">
+          <ArrowLeft size={14} aria-hidden="true" />
           컨소시엄 목록
         </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold text-text">{item.name}</h1>
-          <Badge variant={consortiumStatusToBadgeVariant(item.status)}>{item.status}</Badge>
-        </div>
-        <div className="text-xs text-muted">
-          {item.lead_client?.name ? `주관 ${item.lead_client.name}` : '주관사 미지정'}
-          {item.project?.name && ` · 프로젝트 ${item.project.name}`}
-          {` · 참여사 ${members.length}곳`}
+
+        <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
+                <span aria-hidden="true">🤝</span>
+                {consortium.name}
+              </h1>
+              <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-md border ${getStatusBadgeClass(consortium.status)}`}>
+                {consortium.status}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500">
+              {formatConDate(consortium.start_date)} ~ {formatConDate(consortium.end_date)}
+              {consortium.project && (
+                <span className="ml-2">· 연결 프로젝트 <Link to={`/projects/${consortium.project.id}`} className="text-violet-600 hover:underline">{consortium.project.name}</Link></span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {members.map((m) => (
+                <span
+                  key={m.id}
+                  className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border ${MEMBER_TYPE_STYLE[m.member_type as MemberType] ?? MEMBER_TYPE_STYLE.observer}`}
+                  title={`${MEMBER_TYPE_LABEL[m.member_type as MemberType]} · 지분율 ${m.task_share_pct}%`}
+                >
+                  <span className="opacity-70">{MEMBER_TYPE_LABEL[m.member_type as MemberType]}</span>
+                  <span className="font-bold">{m.clients?.name ?? '미지정'}</span>
+                </span>
+              ))}
+              {members.length === 0 && (
+                <span className="text-xs text-slate-400 italic">참여사 미등록</span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => toast.info('수정 모달 — 추후 STEP-CON 후속 작업')}>
+              <Pencil size={14} className="mr-1" aria-hidden="true" />
+              수정
+            </Button>
+          </div>
+        </header>
+
+        {/* 진행 바 */}
+        <div className="rounded-2xl border border-violet-100 bg-white p-3 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
+          <div className="flex items-center justify-between gap-2">
+            {CONSORTIUM_STATUS.map((s, idx) => {
+              const reached = idx <= stageIdx;
+              const isCurrent = idx === stageIdx;
+              return (
+                <div key={s} className="flex-1 flex items-center gap-2">
+                  <div
+                    className={`flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold shrink-0 ${
+                      isCurrent
+                        ? 'bg-violet-600 text-white'
+                        : reached
+                          ? 'bg-violet-100 text-violet-700'
+                          : 'bg-slate-100 text-slate-400'
+                    }`}
+                  >
+                    {reached && !isCurrent ? <Check size={14} aria-hidden="true" /> : idx + 1}
+                  </div>
+                  <span className={`text-xs font-semibold whitespace-nowrap ${isCurrent ? 'text-violet-700' : reached ? 'text-violet-500' : 'text-slate-400'}`}>{s}</span>
+                  {idx < CONSORTIUM_STATUS.length - 1 && (
+                    <div className={`flex-1 h-0.5 ${reached ? 'bg-violet-200' : 'bg-slate-200'}`} aria-hidden="true" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <nav role="tablist" aria-label="컨소시엄 상세 탭"
-        className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto">
-        {TABS.map(({ key, label, Icon }) => {
-          const active = tab === key;
-          return (
-            <button key={key} type="button" role="tab" aria-selected={active}
-              onClick={() => setTab(key)}
-              className={['inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors',
-                active ? 'text-primary border-primary' : 'text-slate-500 border-transparent hover:text-text'].join(' ')}>
-              <Icon size={15} />
-              {label}
-            </button>
-          );
-        })}
-      </nav>
+      {/* 2단 레이아웃 */}
+      <div className="flex flex-col lg:flex-row gap-5">
+        {/* 사이드 요약 */}
+        <aside className="lg:w-64 shrink-0 space-y-3">
+          <div className="rounded-2xl border border-violet-100 bg-white p-4 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-2">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">요약</div>
+            <SummaryRow label="총사업비" value={formatKRW(Number(consortium.total_budget ?? 0))} />
+            <SummaryRow label="기간" value={`${formatConDate(consortium.start_date)} ~ ${formatConDate(consortium.end_date)}`} />
+            <SummaryRow label="담당 PM" value={consortium.pm?.name ?? '-'} />
+            <SummaryRow label="참여사" value={`${members.length}곳`} />
+            <SummaryRow label="프로그램" value={`${counts.programs}건`} />
+            <SummaryRow label="태스크" value={`${counts.tasks}건`} />
+          </div>
 
-      <div role="tabpanel">
-        {tab === 'overview' && <OverviewTab c={item} members={members} />}
-        {tab === 'files' && <ConsortiumFilesTab consortiumId={consortiumId} uploaderId={user?.id} />}
+          {members.length > 0 && (
+            <div className="rounded-2xl border border-violet-100 bg-white p-4 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
+              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">참여사 목록</div>
+              <ul className="space-y-1.5">
+                {members.map((m) => (
+                  <li key={m.id} className="flex items-center gap-1.5 text-xs">
+                    <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded ${MEMBER_TYPE_STYLE[m.member_type as MemberType] ?? MEMBER_TYPE_STYLE.observer}`}>
+                      {MEMBER_TYPE_LABEL[m.member_type as MemberType]}
+                    </span>
+                    <span className="text-slate-700 truncate flex-1">{m.clients?.name ?? '미지정'}</span>
+                    <span className="text-slate-400 tabular-nums shrink-0">{m.task_share_pct}%</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </aside>
+
+        {/* 탭 영역 */}
+        <section className="flex-1 min-w-0 space-y-4">
+          <nav role="tablist" className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto" aria-label="컨소시엄 탭">
+            {TAB_LIST.map((t) => {
+              const Icon = t.Icon;
+              const active = tab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(t.key)}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                    active ? 'text-violet-700 border-violet-600' : 'text-slate-500 border-transparent hover:text-slate-700'
+                  }`}
+                >
+                  <Icon size={14} aria-hidden="true" />
+                  {t.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div>{TabContent[tab]}</div>
+        </section>
       </div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-semibold text-[#1E1B4B] truncate">{value}</span>
     </div>
   );
 }
