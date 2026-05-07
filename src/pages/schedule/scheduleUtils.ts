@@ -35,13 +35,13 @@ export interface UnifiedEvent {
   description?: string | null;
 }
 
-// 컬러 매핑 (디자인 토큰: violet / orange / cyan / emerald / slate)
+// 컬러 매핑 (박경수님 명세: 프로젝트 violet / 프로그램 emerald / 개인 slate / 기본 orange)
 export const SOURCE_COLOR: Record<EventSource, string> = {
-  project: '#7C3AED',
-  task: '#F97316',
-  program: '#06B6D4',
-  attendance: '#10B981',
-  custom: '#64748B',
+  project: '#7C3AED',     // violet (프로젝트)
+  program: '#10B981',     // emerald (프로그램·교육)
+  custom: '#64748B',      // slate (개인 일정)
+  task: '#F97316',        // orange (기본·태스크)
+  attendance: '#F59E0B',  // amber (출석 — orange 계열 약간 차별)
 };
 
 export const SOURCE_LABEL: Record<EventSource, string> = {

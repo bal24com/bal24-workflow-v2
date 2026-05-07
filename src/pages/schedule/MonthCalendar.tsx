@@ -1,8 +1,9 @@
-// bal24 v2 — 월간 캘린더 그리드 (STEP 17)
-// 6주 × 7일 grid, 오늘 강조, 기간 이벤트 바, 단일 이벤트 점 + 제목
+// bal24 v2 — 월간 캘린더 그리드 (STEP 17 + 캘린더 개선)
+// 6주 × 7일 grid, 오늘 강조, 다일 이벤트 시작일 텍스트 / 이후 빈 바, 공휴일 라벨
 
 import { useMemo } from 'react';
 import { eventsOnDate, type UnifiedEvent } from './scheduleUtils';
+import { getHoliday } from '../../utils/holidays';
 
 interface Props {
   year: number;
@@ -58,6 +59,31 @@ function buildGrid(year: number, month: number): Array<{ date: string; inMonth: 
   return cells;
 }
 
+function isMultiDay(event: UnifiedEvent): boolean {
+  return Boolean(event.endDate && event.endDate !== event.date);
+}
+
+function eventLabel(event: UnifiedEvent, cellDate: string): string {
+  // 다일 이벤트: 시작일 셀에만 제목, 이후 셀은 빈 텍스트
+  if (isMultiDay(event)) {
+    return event.date === cellDate ? event.title : '';
+  }
+  // 단일 이벤트: "HH:MM 제목" 또는 종일이면 제목만
+  if (event.allDay || !event.startTime) return event.title;
+  return `${event.startTime} ${event.title}`;
+}
+
+function eventBorderRadius(event: UnifiedEvent, cellDate: string): string {
+  if (!isMultiDay(event)) return 'rounded';
+  // 다일 이벤트: 시작일/종료일 양 끝만 둥글게, 중간은 직각
+  const isStart = event.date === cellDate;
+  const isEnd = event.endDate === cellDate;
+  if (isStart && isEnd) return 'rounded';
+  if (isStart) return 'rounded-l';
+  if (isEnd) return 'rounded-r';
+  return '';
+}
+
 export default function MonthCalendar({ year, month, events, onCellClick, onEventClick }: Props) {
   const cells = useMemo(() => buildGrid(year, month), [year, month]);
   const todayIso = useMemo(() => {
@@ -88,6 +114,10 @@ export default function MonthCalendar({ year, month, events, onCellClick, onEven
           const dayOfWeek = new Date(`${cell.date}T00:00:00`).getDay();
           const isToday = cell.date === todayIso;
           const cellEvents = eventsOnDate(events, cell.date);
+          const holidayName = getHoliday(cell.date);
+          // 빨간색: 일요일·공휴일 / 파란색: 토요일
+          const isRed = dayOfWeek === 0 || Boolean(holidayName);
+          const isBlue = dayOfWeek === 6;
 
           return (
             <div
@@ -100,9 +130,9 @@ export default function MonthCalendar({ year, month, events, onCellClick, onEven
                 onCellClick?.(cell.date);
               }}
               role="gridcell"
-              aria-label={`${cell.date} 날짜 칸`}
+              aria-label={`${cell.date} 날짜 칸${holidayName ? ` ${holidayName}` : ''}`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-1">
                 <span
                   className={
                     isToday
@@ -110,9 +140,9 @@ export default function MonthCalendar({ year, month, events, onCellClick, onEven
                       : `text-xs font-semibold ${
                           !cell.inMonth
                             ? 'text-slate-300'
-                            : dayOfWeek === 0
+                            : isRed
                               ? 'text-rose-500'
-                              : dayOfWeek === 6
+                              : isBlue
                                 ? 'text-sky-600'
                                 : 'text-slate-700'
                         }`
@@ -120,25 +150,35 @@ export default function MonthCalendar({ year, month, events, onCellClick, onEven
                 >
                   {dayNum}
                 </span>
+                {holidayName && cell.inMonth && (
+                  <span className="text-[10px] font-medium text-rose-500 truncate">{holidayName}</span>
+                )}
               </div>
 
               <div className="flex flex-col gap-0.5 overflow-hidden">
-                {cellEvents.slice(0, 3).map((event) => (
-                  <button
-                    key={event.id}
-                    type="button"
-                    data-event-chip="true"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEventClick?.(event);
-                    }}
-                    className="truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium text-white hover:opacity-90 transition-opacity"
-                    style={{ backgroundColor: event.color }}
-                    title={event.title}
-                  >
-                    {event.allDay ? event.title : `${event.startTime ?? ''} ${event.title}`}
-                  </button>
-                ))}
+                {cellEvents.slice(0, 3).map((event) => {
+                  const label = eventLabel(event, cell.date);
+                  const radius = eventBorderRadius(event, cell.date);
+                  const isContinuation = isMultiDay(event) && event.date !== cell.date;
+                  return (
+                    <button
+                      key={event.id}
+                      type="button"
+                      data-event-chip="true"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventClick?.(event);
+                      }}
+                      className={`${radius} truncate px-1.5 py-0.5 text-left text-[11px] font-medium text-white hover:opacity-90 transition-opacity ${
+                        isContinuation ? '-mx-1.5 px-1.5' : ''
+                      }`}
+                      style={{ backgroundColor: event.color }}
+                      title={event.title}
+                    >
+                      {label || ' '}
+                    </button>
+                  );
+                })}
                 {cellEvents.length > 3 && (
                   <span className="px-1.5 text-[10px] text-slate-500">+{cellEvents.length - 3}개 더</span>
                 )}
