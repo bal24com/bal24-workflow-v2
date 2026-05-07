@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import {
   Plus, Loader2, Copy, MapPin, Calendar, Users,
 } from 'lucide-react';
+import QrDownloadButton from '../../components/QrDownloadButton';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
@@ -165,6 +166,12 @@ export default function AttendancePage() {
                       <Copy size={12} />
                       {copiedToken === s.session_token ? '복사됨!' : '체크인 링크 복사'}
                     </button>
+                    <span className="text-slate-300" aria-hidden="true">·</span>
+                    <QrDownloadButton
+                      url={getCheckInUrl(s.session_token)}
+                      filename={`attendance-${s.session_date}-${s.title.replace(/[^\w가-힣]/g, '_').slice(0, 20)}`}
+                      label="QR 저장"
+                    />
                   </div>
                 </CardContent>
               </Card>

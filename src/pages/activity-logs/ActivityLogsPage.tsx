@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Plus, Loader2, Calendar, MapPin, Users, Edit3, Trash2, FileIcon,
+  Plus, Loader2, Calendar, MapPin, Users, Edit3, Trash2, FileIcon, Send,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
+import { copyToClipboard } from '../../lib/clipboard';
+import { useToast } from '../../contexts/ToastContext';
 import EmptyState from '../../components/EmptyState';
 import { LOG_TYPE_LABELS, LOG_TYPE_VALUES } from './activityLogTypes';
 import type {
@@ -31,12 +33,36 @@ const SELECT_COLUMNS =
   '*, program:programs(id,name), project:projects(id,name)';
 
 export default function ActivityLogsPage() {
+  const toast = useToast();
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [programs, setPrograms] = useState<Pick<Program, 'id' | 'name'>[]>([]);
   const [projects, setProjects] = useState<Pick<Project, 'id' | 'name'>[]>([]);
   const [experts, setExperts] = useState<Pick<StaffPool, 'id' | 'name'>[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleCopyLogLink = async (logId: string) => {
+    // log_token 컬럼이 ALTER 추가됐다고 가정 — 없으면 toast 안내
+    const { data, error } = await supabase
+      .from('activity_logs')
+      .select('log_token')
+      .eq('id', logId)
+      .maybeSingle();
+    if (error || !data) {
+      console.error('[activity-logs] log_token 조회 실패:', error?.message);
+      toast.error('외부 작성 링크를 가져오지 못했어요. log_token 컬럼을 확인해 주세요.');
+      return;
+    }
+    const tokenValue = (data as { log_token?: string | null }).log_token;
+    if (!tokenValue) {
+      toast.warning('외부 작성 토큰이 발급되지 않았어요.');
+      return;
+    }
+    const url = `${window.location.origin}/log/${tokenValue}`;
+    const ok = await copyToClipboard(url);
+    if (ok) toast.success('외부 작성 링크를 복사했어요.');
+    else toast.error('복사에 실패했어요. 직접 선택해서 복사해 주세요.');
+  };
 
   const [tab, setTab] = useState<ActivityLogType>('mentoring');
   const [programFilter, setProgramFilter] = useState<string>('전체');
@@ -224,6 +250,11 @@ export default function ActivityLogsPage() {
                     <div className="text-xs text-muted truncate mt-0.5">{l.program?.name ?? '프로그램 미연결'}</div>
                   </button>
                   <div className="flex items-center gap-0.5 shrink-0">
+                    <button type="button" onClick={() => void handleCopyLogLink(l.id)}
+                      className="p-1.5 rounded text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                      aria-label="외부 작성 링크 복사">
+                      <Send size={14} />
+                    </button>
                     <button type="button" onClick={() => handleEdit(l)}
                       className="p-1.5 rounded text-slate-400 hover:text-primary hover:bg-primary/5"
                       aria-label="수정">

@@ -37,6 +37,8 @@ import ApplicationPage from './pages/applications/ApplicationPage';
 import RecruitPage from './pages/recruit/RecruitPage';
 import ApplyPage from './pages/public-apply/ApplyPage';
 import RecruitApplyPage from './pages/public-recruit/RecruitApplyPage';
+import AttendCheckPage from './pages/public-attend/AttendCheckPage';
+import LogWritePage from './pages/public-log/LogWritePage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
@@ -76,6 +78,8 @@ export default function App() {
         <Route path="/invitation/:token" element={<InstructorInvitePage />} />
         <Route path="/apply/:programId" element={<ApplyPage />} />
         <Route path="/recruit/:token" element={<RecruitApplyPage />} />
+        <Route path="/attend/:token" element={<AttendCheckPage />} />
+        <Route path="/log/:token" element={<LogWritePage />} />
 
         <Route
           path="/login"
