@@ -115,6 +115,10 @@ export default function ReceiptsPage() {
 
   return (
     <div className="space-y-5 max-w-[1400px]">
+      <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
+        <span aria-hidden="true">🧾</span>
+        증빙
+      </h1>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <TypeFilterTabs value={filter} onChange={setFilter} counts={counts} />
         <div className="flex items-center gap-2 text-xs text-muted">

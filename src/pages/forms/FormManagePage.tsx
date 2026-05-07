@@ -92,6 +92,10 @@ export default function FormManagePage() {
 
   return (
     <div className="space-y-5 max-w-[1400px]">
+      <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
+        <span aria-hidden="true">📋</span>
+        폼 관리
+      </h1>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-slate-500">프로그램 필터</label>

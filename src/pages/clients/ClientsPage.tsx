@@ -275,6 +275,10 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-5 max-w-[1400px]">
+      <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
+        <span aria-hidden="true">🏢</span>
+        고객사
+      </h1>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />

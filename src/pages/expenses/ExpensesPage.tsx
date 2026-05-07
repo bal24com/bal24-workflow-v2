@@ -120,6 +120,10 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-5 max-w-[1400px]">
+      <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
+        <span aria-hidden="true">💸</span>
+        지출
+      </h1>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <LedgerTabs value={ledger} onChange={setLedger} counts={counts} />
         <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setModalOpen(true)}>신규 등록</Button>

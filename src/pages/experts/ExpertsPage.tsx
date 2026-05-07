@@ -188,6 +188,10 @@ export default function ExpertsPage() {
 
   return (
     <div className="space-y-5 max-w-[1400px]">
+      <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
+        <span aria-hidden="true">👥</span>
+        전문가
+      </h1>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="분야 필터">
           {FIELD_FILTERS.map((f) => {

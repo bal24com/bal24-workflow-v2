@@ -128,6 +128,10 @@ export default function ActivityLogsPage() {
 
   return (
     <div className="space-y-5 max-w-[1400px]">
+      <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
+        <span aria-hidden="true">📓</span>
+        일지
+      </h1>
       <nav role="tablist" aria-label="일지 유형" className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto">
         {LOG_TYPE_VALUES.map((t) => {
           const active = tab === t;

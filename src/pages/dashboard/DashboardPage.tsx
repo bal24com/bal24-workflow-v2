@@ -120,6 +120,10 @@ function GanttPlaceholder() {
 export default function DashboardPage() {
   return (
     <div className="space-y-6 max-w-[1400px]">
+      <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
+        <span aria-hidden="true">🏠</span>
+        홈
+      </h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {KPIS.map((kpi) => (
           <KpiCard key={kpi.label} kpi={kpi} />
