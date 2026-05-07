@@ -179,6 +179,12 @@ export interface ProjectMember {
 }
 
 // ─── 프로그램 ─────────────────────────────────────────
+export interface ProgramFile {
+  url: string;
+  name: string;
+  size?: number;
+}
+
 export interface Program {
   id: string;
   project_id?: string | null;
@@ -190,7 +196,62 @@ export interface Program {
   venue?: string | null;
   capacity?: number | null;
   description?: string | null;
+  /** V7 ③ 공지사항 (집합장소·시간·준비물 등) — 2026-05-08 추가 */
+  notice?: string | null;
+  /** V7 ③-1 공지 첨부 — 2026-05-08 추가 */
+  notice_files?: ProgramFile[] | null;
+  /** V7 ④ 성과 목표 — 2026-05-08 추가 */
+  goal_text?: string | null;
   created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── 프로그램 커리큘럼 (V7 ⑥ 카드 / 2026-05-08 신규) ─────
+export interface ProgramCurriculum {
+  id: string;
+  program_id: string;
+  session_no: number;
+  title: string;
+  content?: string | null;
+  session_date?: string | null;
+  /** 분 단위 */
+  duration?: number | null;
+  venue?: string | null;
+  created_at: string;
+}
+
+export type CurriculumStaffRole = '강사' | 'FT' | '멘토' | 'TA' | '운영진';
+export type CurriculumStaffStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface CurriculumStaff {
+  id: string;
+  curriculum_id: string;
+  /** 외부 전문가 (정산 연동) — profile_id와 둘 중 하나만 값 */
+  staff_pool_id?: string | null;
+  /** 내부 직원 (급여 별도) — staff_pool_id와 둘 중 하나만 값 */
+  profile_id?: string | null;
+  role: CurriculumStaffRole;
+  fee?: number | null;
+  note?: string | null;
+  token: string;
+  status: CurriculumStaffStatus;
+  responded_at?: string | null;
+  created_at: string;
+}
+
+// ─── 결과보고서 빌더 (Stage 2에서 사용 / 2026-05-08 신규) ─
+export type ReportSectionType = 'auto' | 'custom';
+
+export interface ReportSection {
+  id: string;
+  program_id: string;
+  section_key: string;
+  title: string;
+  content?: string | null;
+  is_visible: boolean;
+  sort_order: number;
+  section_type: ReportSectionType;
   created_at: string;
   updated_at: string;
 }

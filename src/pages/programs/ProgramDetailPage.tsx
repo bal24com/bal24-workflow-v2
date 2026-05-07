@@ -4,9 +4,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2,
+  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDateKo } from '../../lib/utils';
@@ -133,7 +134,7 @@ export default function ProgramDetailPage() {
           <ArrowLeft size={12} aria-hidden="true" />
           프로그램 목록
         </Link>
-        <div className="flex flex-wrap items-start gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold text-[#1E1B4B] truncate">{program.name}</h1>
@@ -161,6 +162,11 @@ export default function ProgramDetailPage() {
               )}
             </div>
           </div>
+          <Link to={`/programs/${program.id}/edit`} className="shrink-0">
+            <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />}>
+              수정
+            </Button>
+          </Link>
         </div>
       </div>
 
