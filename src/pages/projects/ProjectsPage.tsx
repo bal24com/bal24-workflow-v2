@@ -16,6 +16,7 @@ import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import { BADGE_BASE, PROJECT_STATUS_STYLE } from '../../utils/statusStyles';
 import EmptyState from '../../components/EmptyState';
+import { useToast } from '../../contexts/ToastContext';
 import type { Project, ProjectStatus } from '../../types/database';
 import { PROJECT_STATUS_VALUES } from './projectStatus';
 import ProjectFormModal from './ProjectFormModal';
@@ -153,16 +154,15 @@ function ProjectCard({ p }: { p: ProjectRow }) {
 }
 
 export default function ProjectsPage() {
+  const toast = useToast();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>('list');
   const [filter, setFilter] = useState<StatusFilter>('전체');
   const [modalOpen, setModalOpen] = useState(false);
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
-    setErrorMsg(null);
     try {
       const { data, error } = await supabase
         .from('projects')
@@ -174,11 +174,11 @@ export default function ProjectsPage() {
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[projects] 목록 조회 실패:', raw);
-      setErrorMsg('프로젝트 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      toast.error('프로젝트 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void fetchProjects();
@@ -249,12 +249,6 @@ export default function ProjectsPage() {
           </Button>
         </div>
       </div>
-
-      {errorMsg && (
-        <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-3 text-sm text-danger">
-          {errorMsg}
-        </div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted">

@@ -6,11 +6,13 @@ import { Plus, Loader2, Trash2, MessageSquare } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { dateGroupLabel, type AiConversationRow } from './aiUtils';
 import AiChatWindow from './AiChatWindow';
 
 export default function AiPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const userId = user?.id ?? null;
 
   const [conversations, setConversations] = useState<AiConversationRow[]>([]);
@@ -74,10 +76,11 @@ export default function AiPage() {
     const { error } = await supabase.from('ai_conversations').delete().eq('id', id);
     if (error) {
       console.error('[ai] 대화 삭제 실패:', error.message);
-      window.alert('삭제 중 오류가 발생했어요.');
+      toast.error('삭제 중 오류가 발생했어요.');
       return;
     }
     if (activeId === id) setActiveId(null);
+    toast.success('대화를 삭제했어요.');
     void reloadList();
   };
 

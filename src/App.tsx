@@ -34,6 +34,8 @@ import SharesPage from './pages/shares/SharesPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AiPage from './pages/ai/AiPage';
 import { useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
+import ToastContainer from './components/ToastContainer';
 
 function LoadingScreen() {
   return (
@@ -59,7 +61,9 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <ToastProvider>
+      <ToastContainer />
+      <BrowserRouter>
       <Routes>
         {/* 인증 불필요 — 외부 공개 라우트 (token 기반) */}
         <Route path="/checkin/:token" element={<CheckInPage />} />
@@ -133,6 +137,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
