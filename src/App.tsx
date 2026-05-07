@@ -30,6 +30,7 @@ import ClientPortalPage from './pages/client-portal/ClientPortalPage';
 import InstructorInvitePage from './pages/instructor-portal/InstructorInvitePage';
 import SchedulePage from './pages/schedule/SchedulePage';
 import MembersPage from './pages/members/MembersPage';
+import SharesPage from './pages/shares/SharesPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import { useAuth } from './contexts/AuthContext';
 
@@ -93,7 +94,7 @@ export default function App() {
           <Route path="/programs" element={<ProgramsPage />} />
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/experts" element={<ExpertsPage />} />
-          <Route path="/shares" element={<PlaceholderPage title="공유" description="외부 공유 링크 관리가 여기에 들어와요." />} />
+          <Route path="/shares" element={<SharesPage />} />
 
           {/* 재무 */}
           <Route path="/income" element={<IncomePage />} />
