@@ -15,6 +15,7 @@ import TasksTab from './detail/TasksTab';
 import MembersTab from './detail/MembersTab';
 import FilesTab from './detail/FilesTab';
 import PortalTab from './detail/PortalTab';
+import StageProgressBar from './detail/StageProgressBar';
 
 type DetailProject = Project & {
   client?: { id: string; name: string } | null;
@@ -144,6 +145,8 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      <StageProgressBar status={project.status} />
+
       <nav
         role="tablist"
         aria-label="프로젝트 상세 탭"
@@ -173,7 +176,12 @@ export default function ProjectDetailPage() {
       </nav>
 
       <div role="tabpanel">
-        {tab === 'overview' && <OverviewTab project={project} />}
+        {tab === 'overview' && (
+          <OverviewTab
+            project={project}
+            onOpenTab={(t) => setTab(t)}
+          />
+        )}
         {tab === 'tasks' && <TasksTab projectId={projectId} />}
         {tab === 'members' && <MembersTab projectId={projectId} />}
         {tab === 'files' && <FilesTab projectId={projectId} uploaderId={user?.id} />}
