@@ -30,6 +30,7 @@ import PortalManagePage from './pages/portal/PortalManagePage';
 import PortalTemplatePage from './pages/portal/templates/PortalTemplatePage';
 import ClientPortalPage from './pages/client-portal/ClientPortalPage';
 import InstructorInvitePage from './pages/instructor-portal/InstructorInvitePage';
+import CurriculumInvitePage from './pages/curriculum-invite/CurriculumInvitePage';
 import SchedulePage from './pages/schedule/SchedulePage';
 import MembersPage from './pages/members/MembersPage';
 import SharesPage from './pages/shares/SharesPage';
@@ -82,6 +83,7 @@ export default function App() {
         <Route path="/form/:token" element={<PublicFormPage />} />
         <Route path="/portal/:token" element={<ClientPortalPage />} />
         <Route path="/invitation/:token" element={<InstructorInvitePage />} />
+        <Route path="/curriculum-invite/:token" element={<CurriculumInvitePage />} />
         <Route path="/apply/:programId" element={<ApplyPage />} />
         <Route path="/recruit/:token" element={<RecruitApplyPage />} />
         <Route path="/attend/:token" element={<AttendCheckPage />} />
