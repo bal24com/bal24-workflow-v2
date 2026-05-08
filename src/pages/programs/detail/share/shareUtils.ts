@@ -39,8 +39,9 @@ export function isItemVisible(
   return v?.[audience]?.[item] !== false;
 }
 
-/** program_share 단건 fetch + 없으면 default 시드 INSERT 후 반환 */
+/** program_share 단건 fetch + 없으면 default 시드 (upsert 패턴) 후 반환 */
 export async function fetchOrSeedProgramShare(programId: string): Promise<ProgramShare | null> {
+  // 1) 우선 SELECT — 있으면 그대로 반환
   const sel = await supabase
     .from('program_share')
     .select('*')
@@ -52,16 +53,34 @@ export async function fetchOrSeedProgramShare(programId: string): Promise<Progra
   }
   if (sel.data) return sel.data as ProgramShare;
 
-  const ins = await supabase
+  // 2) 없으면 upsert — 동시 진입 race condition 회피 + RLS·중복 충돌 안전
+  //    onConflict='program_id'로 PK 충돌 시 기존 row 유지, ignoreDuplicates=true는 INSERT만 시도
+  const ups = await supabase
     .from('program_share')
-    .insert({ program_id: programId, visibility: defaultVisibility() })
-    .select('*')
-    .maybeSingle();
-  if (ins.error) {
-    console.error('[program-share] 초기 시드 INSERT 실패:', ins.error.message);
+    .upsert(
+      { program_id: programId, visibility: defaultVisibility() },
+      { onConflict: 'program_id', ignoreDuplicates: true },
+    )
+    .select('*');
+  if (ups.error) {
+    console.error('[program-share] 초기 시드 upsert 실패:', ups.error.message);
     return null;
   }
-  return ins.data as ProgramShare | null;
+
+  // upsert가 ignoreDuplicates=true 일 때 충돌 row는 빈 배열 반환 → 다시 SELECT
+  const upserted = (ups.data as ProgramShare[] | null) ?? [];
+  if (upserted.length > 0) return upserted[0];
+
+  const reSel = await supabase
+    .from('program_share')
+    .select('*')
+    .eq('program_id', programId)
+    .maybeSingle();
+  if (reSel.error) {
+    console.error('[program-share] 재조회 실패:', reSel.error.message);
+    return null;
+  }
+  return (reSel.data as ProgramShare | null) ?? null;
 }
 
 export interface SaveDatesPayload {
