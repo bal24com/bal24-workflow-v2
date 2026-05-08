@@ -4,12 +4,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, Search, ArrowRight } from 'lucide-react';
-import { Badge, Button, Card, CardContent } from '../../components/ui';
+import { Button, Card, CardContent } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
 import { formatKoreanDate } from '../reports/reportUtils';
-import type { ProjectSettlementRow, SettlementStep } from '../../types/database';
+import {
+  getStepLabel, getStepColor, isSettlementDone, lastUpdatedAt,
+} from './settlementUtils';
+import SettlementActionModal from './SettlementActionModal';
+import type { ProjectSettlementRow } from '../../types/database';
 
 type Filter = 'all' | 1 | 2 | 3 | 4 | 5 | 'done';
 
@@ -21,33 +25,13 @@ type SettlementRow = ProjectSettlementRow & {
 const SELECT_COLUMNS =
   '*, project:projects(id, name, client:clients(name))';
 
-const STEP_LABEL: Record<SettlementStep, string> = {
-  1: '제출대기', 2: '승인대기', 3: '세금계산서', 4: '입금확인', 5: '출금처리',
-};
-
-const STEP_COLORS: Record<SettlementStep, string> = {
-  1: 'bg-slate-100 text-slate-600',
-  2: 'bg-secondary/10 text-secondary',
-  3: 'bg-accent/10 text-accent',
-  4: 'bg-blue-100 text-blue-700',
-  5: 'bg-primary/10 text-primary',
-};
-
-function isDone(s: ProjectSettlementRow): boolean {
-  return s.current_step === 5 && Boolean(s.paid_out_at);
-}
-
-function lastUpdated(s: ProjectSettlementRow): string | null {
-  return s.paid_out_at ?? s.received_at ?? s.invoice_at ?? s.approved_at ?? s.created_at ?? null;
-}
-
 const TABS: { key: Filter; label: string }[] = [
   { key: 'all',  label: '전체' },
-  { key: 1,      label: '1.제출대기' },
-  { key: 2,      label: '2.승인대기' },
-  { key: 3,      label: '3.세금계산서' },
-  { key: 4,      label: '4.입금확인' },
-  { key: 5,      label: '5.출금처리' },
+  { key: 1,      label: '1. 보고서 대기' },
+  { key: 2,      label: '2. 승인 대기' },
+  { key: 3,      label: '3. 세금계산서' },
+  { key: 4,      label: '4. 입금 확인' },
+  { key: 5,      label: '5. 출금 처리' },
   { key: 'done', label: '완료' },
 ];
 
@@ -57,6 +41,7 @@ export default function SettlementPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<SettlementRow | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -83,7 +68,7 @@ export default function SettlementPage() {
       all: items.length, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, done: 0,
     };
     for (const s of items) {
-      if (isDone(s)) acc.done += 1;
+      if (isSettlementDone(s)) acc.done += 1;
       else acc[s.current_step] = (acc[s.current_step] ?? 0) + 1;
     }
     return acc;
@@ -93,9 +78,9 @@ export default function SettlementPage() {
     const q = search.trim().toLowerCase();
     return items.filter((s) => {
       if (filter === 'done') {
-        if (!isDone(s)) return false;
+        if (!isSettlementDone(s)) return false;
       } else if (filter !== 'all') {
-        if (isDone(s)) return false;
+        if (isSettlementDone(s)) return false;
         if (s.current_step !== filter) return false;
       }
       if (!q) return true;
@@ -158,10 +143,18 @@ export default function SettlementPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((s) => {
-            const done = isDone(s);
-            const stamp = lastUpdated(s);
+            const stamp = lastUpdatedAt(s);
+            const isDoneState = isSettlementDone(s);
+            const cardClickable = !isDoneState; // 완료 정산은 모달 안 열림 (변경할 게 없음)
             return (
-              <Card key={s.id} className="hover:border-primary/30 hover:shadow-md transition h-full">
+              <Card
+                key={s.id}
+                onClick={cardClickable ? () => setSelected(s) : undefined}
+                className={[
+                  'hover:border-primary/30 hover:shadow-md transition h-full',
+                  cardClickable ? 'cursor-pointer' : '',
+                ].join(' ')}
+              >
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -170,14 +163,12 @@ export default function SettlementPage() {
                         {s.project?.client?.name ? `고객사 ${s.project.client.name}` : '고객사 미지정'}
                       </div>
                     </div>
-                    {done ? (
-                      <Badge variant="success">완료</Badge>
-                    ) : (
-                      <span className={['inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap',
-                        STEP_COLORS[s.current_step]].join(' ')}>
-                        {s.current_step}.{STEP_LABEL[s.current_step]}
-                      </span>
-                    )}
+                    <span className={[
+                      'inline-flex items-center px-2 py-0.5 rounded-md border text-xs font-semibold whitespace-nowrap',
+                      getStepColor(s),
+                    ].join(' ')}>
+                      {getStepLabel(s)}
+                    </span>
                   </div>
                   {stamp && (
                     <div className="text-[11px] text-muted">최근 업데이트 {formatKoreanDate(stamp)}</div>
@@ -185,8 +176,15 @@ export default function SettlementPage() {
                   {s.note && (
                     <p className="text-xs text-muted line-clamp-2 bg-slate-50/60 rounded-lg p-2">{s.note}</p>
                   )}
+                  {s.invoice_number && (
+                    <p className="text-[11px] text-slate-500">세금계산서 #{s.invoice_number}</p>
+                  )}
                   {s.project?.id && (
-                    <Link to={`/projects/${s.project.id}/report`} className="inline-flex items-center justify-end w-full">
+                    <Link
+                      to={`/projects/${s.project.id}/report`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center justify-end w-full"
+                    >
                       <Button variant="outline" size="sm" rightIcon={<ArrowRight size={12} />}>
                         보고서 열기
                       </Button>
@@ -197,6 +195,20 @@ export default function SettlementPage() {
             );
           })}
         </div>
+      )}
+
+      {selected && selected.project?.id && (
+        <SettlementActionModal
+          open={Boolean(selected)}
+          settlement={selected}
+          projectId={selected.project.id}
+          projectName={selected.project.name ?? '프로젝트'}
+          onClose={() => setSelected(null)}
+          onSaved={() => {
+            setSelected(null);
+            void fetchItems();
+          }}
+        />
       )}
     </div>
   );

@@ -856,6 +856,7 @@ export interface ProjectSettlementRow {
   report_id?: string | null;
   approved_at?: string | null;
   invoice_at?: string | null;
+  invoice_number?: string | null;
   received_at?: string | null;
   paid_out_at?: string | null;
   note?: string | null;

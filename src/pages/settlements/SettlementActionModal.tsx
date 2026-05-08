@@ -66,6 +66,7 @@ export default function SettlementActionModal({
   const [actionDate, setActionDate] = useState(today());
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [amount, setAmount] = useState('');
+  const [payoutAmount, setPayoutAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [clientCheck, setClientCheck] = useState<ClientCheckResult | null>(null);
@@ -114,7 +115,7 @@ export default function SettlementActionModal({
 
   useEffect(() => {
     if (open) return;
-    setNote(''); setActionDate(today()); setInvoiceNumber(''); setAmount('');
+    setNote(''); setActionDate(today()); setInvoiceNumber(''); setAmount(''); setPayoutAmount('');
     setErrorMsg(null); setClientCheck(null);
   }, [open]);
 
@@ -131,6 +132,10 @@ export default function SettlementActionModal({
       const n = Number(amount.replace(/,/g, ''));
       if (!amount.trim() || Number.isNaN(n) || n <= 0) { setErrorMsg('입금액은 0보다 큰 숫자여야 해요.'); return; }
     }
+    if (target === 5) {
+      const n = Number(payoutAmount.replace(/,/g, ''));
+      if (!payoutAmount.trim() || Number.isNaN(n) || n <= 0) { setErrorMsg('출금액은 0보다 큰 숫자여야 해요.'); return; }
+    }
 
     setSubmitting(true);
     try {
@@ -140,15 +145,14 @@ export default function SettlementActionModal({
       if (target === 2) fieldUpdates.approved_at = dateIso;
       if (target === 3) {
         fieldUpdates.invoice_at = dateIso;
-        const tag = `세금계산서 #${invoiceNumber.trim()}`;
-        fieldUpdates.note = note.trim() ? `${tag} | ${note.trim()}` : tag;
+        fieldUpdates.invoice_number = invoiceNumber.trim();
       }
       if (target === 4) fieldUpdates.received_at = dateIso;
       if (target === 5) fieldUpdates.paid_out_at = dateIso;
 
-      // step 2/5는 메모만 별도로 추가 (step 3은 위에서 이미 처리)
-      if ((target === 2 || target === 4 || target === 5) && note.trim()) {
-        const prefix = target === 2 ? '승인' : target === 4 ? '입금' : '출금';
+      // 메모는 step 2·3·4·5 모두 동일 패턴으로 누적
+      if (note.trim()) {
+        const prefix = target === 2 ? '승인' : target === 3 ? '세금계산서' : target === 4 ? '입금' : '출금';
         const baseNote = settlement.note ? `${settlement.note} | ` : '';
         fieldUpdates.note = `${baseNote}[${prefix}] ${note.trim()}`;
       }
@@ -175,6 +179,26 @@ export default function SettlementActionModal({
         if (incErr) {
           console.error('[settlement] income 자동 insert 실패:', incErr.message);
           setErrorMsg('단계는 변경됐지만 수입 내역 자동 등록에 실패했어요. 수입 페이지에서 수동으로 추가해 주세요.');
+        }
+      }
+
+      // step 5 → expenses 자동 insert (step 4 income 대칭)
+      if (target === 5) {
+        const amtNum = Number(payoutAmount.replace(/,/g, ''));
+        const { error: expErr } = await supabase.from('expenses').insert({
+          ledger_type: 'own',
+          project_id: projectId,
+          account_code: 'EXPENSE_SETTLEMENT',
+          description: `${projectName} 정산 출금`,
+          gross_amount: amtNum,
+          withholding_type: 'none',
+          expense_date: actionDate || today(),
+          status: '출금완료',
+          paid_at: dateIso,
+        });
+        if (expErr) {
+          console.error('[settlement] expense 자동 insert 실패:', expErr.message);
+          setErrorMsg('단계는 변경됐지만 지출 내역 자동 등록에 실패했어요. 지출 페이지에서 수동으로 추가해 주세요.');
         }
       }
 
@@ -250,6 +274,21 @@ export default function SettlementActionModal({
             helperText={amount.trim() && !Number.isNaN(Number(amount.replace(/,/g, '')))
               ? `수입에 ${formatMoney(Number(amount.replace(/,/g, '')))}이 자동 등록돼요.`
               : '수입 내역에 자동 등록돼요.'}
+          />
+        )}
+
+        {target === 5 && (
+          <Input
+            label="출금액 (원)"
+            required
+            inputMode="numeric"
+            value={payoutAmount}
+            onChange={(e) => setPayoutAmount(e.target.value)}
+            disabled={submitting}
+            placeholder="예) 4,500,000"
+            helperText={payoutAmount.trim() && !Number.isNaN(Number(payoutAmount.replace(/,/g, '')))
+              ? `지출에 ${formatMoney(Number(payoutAmount.replace(/,/g, '')))}이 자동 등록돼요.`
+              : '지출 내역에 자동 등록돼요.'}
           />
         )}
 
