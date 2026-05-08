@@ -6,6 +6,7 @@ import { Button } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import EmptyState from '../../../components/EmptyState';
+import ConPortalPermissionModal from './ConPortalPermissionModal';
 import {
   PERM_LEVEL,
   PERM_LEVEL_LABEL,
@@ -47,22 +48,11 @@ const PERM_COLUMNS: Array<{ key: PermField; label: string; sensitive?: boolean }
   { key: 'perm_links', label: '링크' },
 ];
 
-const DEFAULT_PERM = (memberId: string, consortiumId: string): Omit<PermRow, 'id'> => ({
-  consortium_id: consortiumId,
-  member_id: memberId,
-  perm_overview: 'read',
-  perm_programs: 'read',
-  perm_tasks: 'read',
-  perm_finance: 'none',
-  perm_staff: 'none',
-  perm_links: 'none',
-  is_active: true,
-});
-
 export default function ConPortalTab({ consortiumId, status, members }: Props) {
   const toast = useToast();
   const [perms, setPerms] = useState<PermRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [permModalTarget, setPermModalTarget] = useState<ConsortiumMember | null>(null);
   const debounceRef = useRef<Map<string, number>>(new Map());
 
   const dissolved = status === '해산';
@@ -143,19 +133,9 @@ export default function ConPortalTab({ consortiumId, status, members }: Props) {
     void fetchPerms();
   };
 
-  const handleAdd = async (memberId: string) => {
+  const openPermModal = (member: ConsortiumMember) => {
     if (dissolved) return;
-    try {
-      const payload = DEFAULT_PERM(memberId, consortiumId);
-      const { error } = await supabase.from('consortium_portal_permissions').insert(payload);
-      if (error) throw error;
-      toast.success('권한 설정을 추가했어요.');
-      void fetchPerms();
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[con-portal] 권한 추가 실패:', raw);
-      toast.error('권한 추가 중 오류가 발생했어요.');
-    }
+    setPermModalTarget(member);
   };
 
   return (
@@ -266,7 +246,7 @@ export default function ConPortalTab({ consortiumId, status, members }: Props) {
                   </span>
                   <span className="font-semibold text-[#1E1B4B] truncate">{m.clients?.name ?? '미지정'}</span>
                 </div>
-                <Button variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={() => void handleAdd(m.id)}>
+                <Button variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={() => openPermModal(m)}>
                   권한 설정 추가
                 </Button>
               </li>
@@ -278,6 +258,17 @@ export default function ConPortalTab({ consortiumId, status, members }: Props) {
       <p className="text-xs text-slate-400 italic">
         💡 변경은 자동 저장됩니다 (500ms 디바운스). ⚠ 표시는 민감 정보 (재무·인력) — 신중히 권한 부여.
       </p>
+
+      <ConPortalPermissionModal
+        open={permModalTarget !== null}
+        onClose={() => setPermModalTarget(null)}
+        onSaved={() => {
+          setPermModalTarget(null);
+          void fetchPerms();
+        }}
+        consortiumId={consortiumId}
+        member={permModalTarget}
+      />
     </div>
   );
 }
