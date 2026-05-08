@@ -19,12 +19,22 @@ export interface CertificatePayload {
   bodyText?: string;
 }
 
+export interface PdfOptions {
+  /** 기본 'landscape' (수료증). 'portrait' 는 보고서 등 세로형 + 멀티페이지 자동 분할 */
+  orientation?: 'landscape' | 'portrait';
+}
+
 /**
  * DOM element를 PDF로 변환.
- * - element는 외부에서 미리 렌더해둔 hidden 영역 (CertViewPage가 관리)
- * - 결과는 jsPDF Blob → URL 반환 (caller가 a.download 처리)
+ * - landscape: 가로 1페이지 (수료증 패턴, 컨텐츠가 페이지보다 작으면 세로 중앙 정렬)
+ * - portrait: 세로 + 컨텐츠가 길면 멀티페이지로 자동 분할 (보고서 패턴)
+ * - 실패 시 null 반환 (caller 가 toast 처리)
  */
-export async function elementToPdfBlob(el: HTMLElement): Promise<Blob | null> {
+export async function elementToPdfBlob(
+  el: HTMLElement,
+  options?: PdfOptions,
+): Promise<Blob | null> {
+  const orientation = options?.orientation ?? 'landscape';
   try {
     const canvas = await html2canvas(el, {
       scale: 2,
@@ -32,17 +42,26 @@ export async function elementToPdfBlob(el: HTMLElement): Promise<Blob | null> {
       backgroundColor: '#ffffff',
     });
     const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4',
-    });
-    const pageWidth = 297;
-    const pageHeight = 210;
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const yOffset = imgHeight < pageHeight ? (pageHeight - imgHeight) / 2 : 0;
-    pdf.addImage(imgData, 'PNG', 0, yOffset, imgWidth, imgHeight);
+    const pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
+
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgW = pageW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+
+    if (orientation === 'portrait' && imgH > pageH) {
+      // 멀티페이지 — 한 장씩 yOffset 으로 잘라 붙임
+      let yOffset = 0;
+      while (yOffset < imgH) {
+        if (yOffset > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, -yOffset, imgW, imgH);
+        yOffset += pageH;
+      }
+    } else {
+      const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
+      pdf.addImage(imgData, 'PNG', 0, yOffset, imgW, imgH);
+    }
+
     return pdf.output('blob');
   } catch (err) {
     const raw = err instanceof Error ? err.message : '';

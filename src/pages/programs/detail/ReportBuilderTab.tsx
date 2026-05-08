@@ -1,10 +1,12 @@
 // bal24 v2 — 결과보고서 빌더 탭 (Stage 2)
 // 진입 시 8 auto 섹션 default seeding → 단일 페이지 섹션 목록.
 
-import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Sparkles, FileDown } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Loader2, Plus, Sparkles, FileDown, FileText } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 import { supabase } from '../../../lib/supabase';
+import { elementToPdfBlob, downloadBlob } from '../../../lib/certificatePdf';
+import { generateReportDocx } from '../../../lib/reportDocx';
 import type { ReportSection } from '../../../types/database';
 import ReportSectionCard from './report/ReportSectionCard';
 import CustomSectionAddModal from './report/CustomSectionAddModal';
@@ -23,6 +25,10 @@ export default function ReportBuilderTab({ programId }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [aiDraftLoading, setAiDraftLoading] = useState(false);
   const [aiDraft, setAiDraft] = useState<string | null>(null);
+  const [programName, setProgramName] = useState<string>('프로그램');
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [docxLoading, setDocxLoading] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
     const { data, error } = await supabase
@@ -164,8 +170,51 @@ export default function ReportBuilderTab({ programId }: Props) {
     await persistOrder(sections);
   }
 
-  function showPlaceholder(label: string) {
-    toast.info(`${label}은 STEP-AI-PREP / STEP-EXPORT 완료 후 활성화 예정이에요.`);
+  // 프로그램 이름 fetch — export 파일명·표지용 (1회)
+  useEffect(() => {
+    if (!programId) return;
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase.from('programs').select('name').eq('id', programId).maybeSingle();
+      if (cancelled || error || !data?.name) {
+        if (error) console.error('[report-builder] 프로그램명 조회 실패:', error.message);
+        return;
+      }
+      setProgramName(data.name);
+    })();
+    return () => { cancelled = true; };
+  }, [programId]);
+
+  const buildFilename = (ext: 'pdf' | 'docx') =>
+    `결과보고서_${programName}_${new Date().toISOString().slice(0, 10)}.${ext}`;
+
+  async function handlePdfExport() {
+    if (!reportRef.current) { toast.error('보고서 영역을 찾을 수 없어요.'); return; }
+    setPdfLoading(true);
+    const blob = await elementToPdfBlob(reportRef.current, { orientation: 'portrait' });
+    if (blob) {
+      downloadBlob(blob, buildFilename('pdf'));
+      toast.success('PDF를 다운로드했어요.');
+    } else {
+      toast.error('PDF 생성에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    }
+    setPdfLoading(false);
+  }
+
+  async function handleDocxExport() {
+    if (sections.length === 0) { toast.error('내보낼 보고서 내용이 없어요.'); return; }
+    setDocxLoading(true);
+    try {
+      const blob = await generateReportDocx(programName, sections);
+      downloadBlob(blob, buildFilename('docx'));
+      toast.success('Word 파일을 다운로드했어요.');
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : '';
+      console.error('[report-docx] 생성 실패:', raw);
+      toast.error('Word 파일 생성 중 오류가 발생했어요.');
+    } finally {
+      setDocxLoading(false);
+    }
   }
 
   async function handleAiFullDraft() {
@@ -249,11 +298,25 @@ export default function ReportBuilderTab({ programId }: Props) {
           </button>
           <button
             type="button"
-            onClick={() => showPlaceholder('PDF 내보내기')}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
+            onClick={() => void handleDocxExport()}
+            disabled={docxLoading || sections.length === 0}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <FileDown size={12} aria-hidden="true" />
-            PDF 내보내기
+            {docxLoading
+              ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+              : <FileText size={12} aria-hidden="true" />}
+            {docxLoading ? '생성 중…' : 'Word'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handlePdfExport()}
+            disabled={pdfLoading || sections.length === 0}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {pdfLoading
+              ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+              : <FileDown size={12} aria-hidden="true" />}
+            {pdfLoading ? '생성 중…' : 'PDF'}
           </button>
         </div>
       </header>
@@ -285,7 +348,15 @@ export default function ReportBuilderTab({ programId }: Props) {
           섹션이 없어요. "+ 항목 추가"로 시작하세요.
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div ref={reportRef} className="flex flex-col gap-3 bg-white">
+          {/* PDF 캡처용 표지 — 섹션 카드들과 함께 캔버스에 포함 */}
+          <header className="rounded-2xl border border-violet-100 bg-white p-5">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">결과보고서</p>
+            <h2 className="mt-2 text-xl font-bold text-[#1E1B4B]">{programName}</h2>
+            <p className="mt-1 text-xs text-slate-500">발행일 · {new Date().toLocaleDateString('ko-KR')}</p>
+            <div className="mt-3 w-12 h-0.5 bg-violet-300" aria-hidden="true" />
+          </header>
+
           {sections.map((s) => (
             <ReportSectionCard
               key={s.id}
