@@ -1,40 +1,82 @@
-// bal24 v2 — 프로그램 상세 · 강사·교육생 탭
-// instructor_invitations + participant_applications + recruit_forms 임베드.
+// bal24 v2 — 프로그램 상세 · 강사·교육생 탭 (Stage 11-③ 재작성)
+// 4 sub 섹션: 강사 / 교육생 / 신청 / 모집
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Loader2, Mic2, UserPlus, Megaphone, ArrowRight,
+  Loader2, Mic2, Users, UserPlus, Megaphone, ArrowRight, GraduationCap,
 } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
-import { formatDateKo, formatMoney } from '../../../lib/utils';
+import { formatMoney } from '../../../lib/utils';
 import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../../utils/statusStyles';
-import { RECRUIT_TYPE_LABEL } from '../../../types/application';
 import {
-  fetchProgramInvitations,
-  fetchProgramApplications,
-  fetchProgramRecruits,
-  PARTICIPANT_STATUS_LABEL,
-  type InvitationRow,
-  type ApplicationRow,
-  type RecruitRow,
+  fetchProgramInvitations, fetchProgramApplications,
+  PARTICIPANT_STATUS_LABEL, type InvitationRow, type ApplicationRow,
 } from './programDetailUtils';
+import ApplicationsPanel from './applications/ApplicationsPanel';
+import RecruitsPanel from './applications/RecruitsPanel';
 import type { ParticipantStatus } from '../../../types/application';
 
-const APPLICATION_STATUS_STYLE: Record<ParticipantStatus, string> = {
-  applied: 'bg-slate-100 text-slate-500 border-slate-300',
-  reviewing: 'bg-orange-50 text-orange-600 border-orange-200',
-  accepted: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  rejected: 'bg-rose-50 text-rose-600 border-rose-200',
-  withdrawn: 'bg-slate-100 text-slate-400 border-slate-300',
-  completed: 'bg-violet-50 text-violet-700 border-violet-200',
-};
+type SubTab = 'instructor' | 'student' | 'application' | 'recruit';
+
+const SUB_TABS: { key: SubTab; label: string; Icon: typeof Mic2 }[] = [
+  { key: 'instructor',  label: '강사',     Icon: Mic2 },
+  { key: 'student',     label: '교육생',   Icon: Users },
+  { key: 'application', label: '신청',     Icon: UserPlus },
+  { key: 'recruit',     label: '모집',     Icon: Megaphone },
+];
 
 export default function StaffStudentsTab({ programId }: { programId: string }) {
+  const [sub, setSub] = useState<SubTab>('instructor');
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* sub 탭 */}
+      <nav
+        role="tablist"
+        aria-label="강사·교육생 sub 탭"
+        className="inline-flex items-center bg-violet-50 rounded-full p-0.5 border border-violet-100 self-start"
+      >
+        {SUB_TABS.map(({ key, label, Icon }) => {
+          const active = sub === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setSub(key)}
+              className={`inline-flex items-center gap-1 h-8 px-3 text-xs font-bold rounded-full transition-colors ${
+                active ? 'bg-violet-600 text-white' : 'text-violet-600 hover:bg-violet-100'
+              }`}
+            >
+              <Icon size={12} aria-hidden="true" />
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* sub 본문 */}
+      {sub === 'instructor' && <InstructorSection programId={programId} />}
+      {sub === 'student' && <StudentSection programId={programId} />}
+      {sub === 'application' && (
+        <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
+          <ApplicationsPanel programId={programId} />
+        </section>
+      )}
+      {sub === 'recruit' && (
+        <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
+          <RecruitsPanel programId={programId} />
+        </section>
+      )}
+    </div>
+  );
+}
+
+function InstructorSection({ programId }: { programId: string }) {
   const toast = useToast();
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
-  const [applications, setApplications] = useState<ApplicationRow[]>([]);
-  const [recruits, setRecruits] = useState<RecruitRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,172 +85,133 @@ export default function StaffStudentsTab({ programId }: { programId: string }) {
     setLoading(true);
     void (async () => {
       try {
-        const [inv, app, rec] = await Promise.all([
-          fetchProgramInvitations(programId),
-          fetchProgramApplications(programId, 20),
-          fetchProgramRecruits(programId),
-        ]);
+        const inv = await fetchProgramInvitations(programId);
         if (cancelled) return;
         setInvitations(inv);
-        setApplications(app);
-        setRecruits(rec);
       } catch (err) {
         if (cancelled) return;
         const raw = err instanceof Error ? err.message : '';
-        console.error('[program-detail] 강사·교육생 로드 실패:', raw);
-        toast.error('강사·교육생 정보를 불러오지 못했어요.');
+        console.error('[step-11/staff] 강사 조회 실패:', raw);
+        toast.error('강사 정보를 불러오지 못했어요.');
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [programId, toast]);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-10">
-        <Loader2 className="animate-spin text-violet-400" size={20} aria-hidden="true" />
-      </div>
-    );
-  }
+  return (
+    <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
+      <header className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
+          <Mic2 size={16} className="text-violet-500" aria-hidden="true" />
+          강사 초빙 ({invitations.length})
+        </h3>
+        <Link to="/programs" className="text-xs text-violet-600 hover:underline inline-flex items-center gap-0.5">
+          관리
+          <ArrowRight size={12} aria-hidden="true" />
+        </Link>
+      </header>
+      {loading ? (
+        <div className="flex justify-center py-6">
+          <Loader2 className="animate-spin text-violet-400" size={18} aria-hidden="true" />
+        </div>
+      ) : invitations.length === 0 ? (
+        <p className="text-xs text-slate-400 italic text-center py-4">초빙된 강사가 없어요.</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {invitations.map((inv) => (
+            <li
+              key={inv.id}
+              className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2"
+            >
+              <span className="flex-1 min-w-0 truncate text-xs font-semibold text-[#1E1B4B]">
+                {inv.name}
+                {inv.role && <span className="ml-1 text-[10px] text-slate-400">· {inv.role}</span>}
+              </span>
+              {inv.lecture_fee != null && (
+                <span className="text-[11px] text-slate-500 tabular-nums shrink-0">
+                  {formatMoney(inv.lecture_fee)}
+                </span>
+              )}
+              <span className={`${BADGE_BASE} ${INVITATION_STATUS_STYLE[inv.status]} shrink-0`}>
+                {inv.status}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+const ACCEPTED_STATUSES: ParticipantStatus[] = ['accepted', 'completed'];
+
+function StudentSection({ programId }: { programId: string }) {
+  const toast = useToast();
+  const [students, setStudents] = useState<ApplicationRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!programId) return;
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      try {
+        const all = await fetchProgramApplications(programId, 100);
+        if (cancelled) return;
+        setStudents(all.filter((a) => ACCEPTED_STATUSES.includes(a.status)));
+      } catch (err) {
+        if (cancelled) return;
+        const raw = err instanceof Error ? err.message : '';
+        console.error('[step-11/student] 교육생 조회 실패:', raw);
+        toast.error('교육생 정보를 불러오지 못했어요.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [programId, toast]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* 강사 초빙 */}
-      <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
-        <header className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
-            <Mic2 size={16} className="text-violet-500" aria-hidden="true" />
-            강사 초빙 ({invitations.length})
-          </h3>
-          <Link to="/programs" className="text-xs text-violet-600 hover:underline inline-flex items-center gap-0.5">
-            관리
-            <ArrowRight size={12} aria-hidden="true" />
-          </Link>
-        </header>
-        {invitations.length === 0 ? (
-          <p className="text-xs text-slate-400 italic text-center py-4">초빙된 강사가 없어요.</p>
-        ) : (
-          <ul className="flex flex-col gap-1.5">
-            {invitations.slice(0, 8).map((inv) => (
-              <li
-                key={inv.id}
-                className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2"
-              >
-                <span className="flex-1 min-w-0 truncate text-xs font-semibold text-[#1E1B4B]">
-                  {inv.name}
-                  {inv.role && <span className="ml-1 text-[10px] text-slate-400">· {inv.role}</span>}
-                </span>
-                {inv.lecture_fee != null && (
-                  <span className="text-[11px] text-slate-500 tabular-nums shrink-0">
-                    {formatMoney(inv.lecture_fee)}
-                  </span>
-                )}
-                <span className={`${BADGE_BASE} ${INVITATION_STATUS_STYLE[inv.status]} shrink-0`}>
-                  {inv.status}
-                </span>
-              </li>
-            ))}
-            {invitations.length > 8 && (
-              <li className="text-[11px] text-slate-400 text-center pt-1">
-                +{invitations.length - 8}명 더
-              </li>
-            )}
-          </ul>
-        )}
-      </section>
-
-      {/* 교육생 신청 */}
-      <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
-        <header className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
-            <UserPlus size={16} className="text-cyan-500" aria-hidden="true" />
-            교육생 신청 ({applications.length})
-          </h3>
-          <Link
-            to="/applications"
-            className="text-xs text-violet-600 hover:underline inline-flex items-center gap-0.5"
-          >
-            전체 검토
-            <ArrowRight size={12} aria-hidden="true" />
-          </Link>
-        </header>
-        {applications.length === 0 ? (
-          <p className="text-xs text-slate-400 italic text-center py-4">아직 신청자가 없어요.</p>
-        ) : (
-          <ul className="flex flex-col gap-1.5 max-h-[360px] overflow-y-auto pr-1">
-            {applications.map((a) => (
-              <li
-                key={a.id}
-                className="flex items-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50/30 px-3 py-2"
-              >
-                <span className="flex-1 min-w-0 truncate text-xs font-semibold text-[#1E1B4B]">
-                  {a.name}
-                  <span className="ml-1 text-[10px] text-slate-400">· {a.phone}</span>
-                </span>
-                <span className="text-[10px] text-slate-400 tabular-nums shrink-0">
-                  {formatDateKo(a.created_at).replace(/^\d{4}년\s/, '')}
-                </span>
-                <span
-                  className={`${BADGE_BASE} ${APPLICATION_STATUS_STYLE[a.status]} shrink-0`}
-                >
-                  {PARTICIPANT_STATUS_LABEL[a.status]}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* 모집 공고 — 두 컬럼 아래 가로 전체 */}
-      <section className="lg:col-span-2 rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
-        <header className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
-            <Megaphone size={16} className="text-orange-500" aria-hidden="true" />
-            모집 공고 ({recruits.length})
-          </h3>
-          <Link
-            to="/recruit-manage"
-            className="text-xs text-violet-600 hover:underline inline-flex items-center gap-0.5"
-          >
-            관리
-            <ArrowRight size={12} aria-hidden="true" />
-          </Link>
-        </header>
-        {recruits.length === 0 ? (
-          <p className="text-xs text-slate-400 italic text-center py-4">등록된 모집 공고가 없어요.</p>
-        ) : (
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {recruits.map((r) => (
-              <li
-                key={r.id}
-                className="flex items-center gap-2 rounded-xl border border-orange-100 bg-orange-50/30 px-3 py-2"
-              >
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-100 text-orange-700 shrink-0">
-                  {RECRUIT_TYPE_LABEL[r.recruit_type]}
-                </span>
-                <span className="flex-1 min-w-0 truncate text-xs font-semibold text-[#1E1B4B]">
-                  {r.title}
-                </span>
-                {r.deadline && (
-                  <span className="text-[10px] text-slate-500 tabular-nums shrink-0">
-                    ~ {formatDateKo(r.deadline).replace(/^\d{4}년\s/, '')}
-                  </span>
-                )}
-                <span
-                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                    r.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
-                  }`}
-                >
-                  {r.is_active ? '진행중' : '종료'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
+    <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
+      <header className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
+          <GraduationCap size={16} className="text-cyan-500" aria-hidden="true" />
+          확정 교육생 ({students.length})
+        </h3>
+        <p className="text-[11px] text-slate-500">신청 → 승인 또는 수료 완료된 학생</p>
+      </header>
+      {loading ? (
+        <div className="flex justify-center py-6">
+          <Loader2 className="animate-spin text-violet-400" size={18} aria-hidden="true" />
+        </div>
+      ) : students.length === 0 ? (
+        <p className="text-xs text-slate-400 italic text-center py-4">
+          확정된 교육생이 없어요. "신청" sub에서 신청자를 승인해 주세요.
+        </p>
+      ) : (
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          {students.map((s) => (
+            <li
+              key={s.id}
+              className="flex items-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50/30 px-3 py-2"
+            >
+              <span className="flex-1 min-w-0 truncate text-xs font-semibold text-[#1E1B4B]">
+                {s.name}
+                <span className="ml-1 text-[10px] text-slate-400 font-normal">· {s.phone}</span>
+              </span>
+              <span className={`${BADGE_BASE} ${
+                s.status === 'completed'
+                  ? 'bg-violet-50 text-violet-700 border-violet-200'
+                  : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+              } shrink-0`}>
+                {PARTICIPANT_STATUS_LABEL[s.status]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
