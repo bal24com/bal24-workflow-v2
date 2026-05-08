@@ -1,15 +1,19 @@
-// bal24 v2 — 컨소시엄 신규 등록 모달
-// 기본정보 + 주관사 + 참여사 동적 추가/삭제 (consortium_members)
+// bal24 v2 — 컨소시엄 등록·수정 모달 (STEP-CON-B: 수정 모드 추가)
+// 신규: 기본정보 + 주관사 + 참여사 동적 추가/삭제 (consortium_members)
+// 수정: 기본정보·주관사 UPDATE만 (참여사 변경은 후속 STEP-CON-C)
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
 import { Modal, Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import {
   CONSORTIUM_STATUS_VALUES,
   CONSORTIUM_ROLE_VALUES,
 } from './consortiumStatus';
+import ConsortiumMembersField, {
+  makeMember,
+  type MemberDraft,
+} from './ConsortiumMembersField';
 import type {
   Client,
   ConsortiumRole,
@@ -20,10 +24,23 @@ import type {
 type ClientOption = Pick<Client, 'id' | 'name'>;
 type ProjectOption = Pick<Project, 'id' | 'name'>;
 
+export interface ConsortiumInitialData {
+  id: string;
+  name: string;
+  description: string;
+  lead_client_id: string | null;
+  project_id: string | null;
+  status: ConsortiumStatus;
+  start_date: string;
+  end_date: string;
+}
+
 type Props = {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  /** 수정 모드 — 값이 있으면 UPDATE 모드로 동작 */
+  initialData?: ConsortiumInitialData;
 };
 
 type ConsortiumForm = {
@@ -33,32 +50,31 @@ type ConsortiumForm = {
   leadClientId: string;
   leadRole: ConsortiumRole;
   description: string;
-};
-
-type MemberDraft = {
-  uid: string;
-  clientId: string;
-  role: ConsortiumRole | '';
-  shareRatio: string;
-  responsibilities: string;
+  startDate: string;
+  endDate: string;
 };
 
 const EMPTY: ConsortiumForm = {
   name: '', projectId: '', status: '구성중',
   leadClientId: '', leadRole: '주관',
   description: '',
+  startDate: '', endDate: '',
 };
 
-function makeMember(): MemberDraft {
+function fromInitial(d: ConsortiumInitialData): ConsortiumForm {
   return {
-    uid: typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}_${Math.random()}`,
-    clientId: '', role: '', shareRatio: '', responsibilities: '',
+    name: d.name,
+    projectId: d.project_id ?? '',
+    status: d.status,
+    leadClientId: d.lead_client_id ?? '',
+    leadRole: '주관',
+    description: d.description,
+    startDate: d.start_date,
+    endDate: d.end_date,
   };
 }
 
-function translateError(raw: string, ctx: 'insert' | 'member'): string {
+function translateError(raw: string, ctx: 'insert' | 'update' | 'member'): string {
   const m = raw.toLowerCase();
   if (m.includes('column') && m.includes('does not exist')) {
     return '컨소시엄 테이블 컬럼이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.';
@@ -66,13 +82,14 @@ function translateError(raw: string, ctx: 'insert' | 'member'): string {
   if (m.includes('row-level security') || m.includes('permission denied')) {
     return '저장 권한이 없어요. 관리자에게 문의해 주세요.';
   }
-  return ctx === 'member'
-    ? '참여사 저장 중 오류가 발생했어요. (컨소시엄은 등록되었어요)'
-    : '컨소시엄 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
+  if (ctx === 'member') return '참여사 저장 중 오류가 발생했어요. (컨소시엄은 등록되었어요)';
+  if (ctx === 'update') return '컨소시엄 수정 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
+  return '컨소시엄 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }
 
-export default function ConsortiumFormModal({ open, onClose, onCreated }: Props) {
-  const [form, setForm] = useState<ConsortiumForm>(EMPTY);
+export default function ConsortiumFormModal({ open, onClose, onCreated, initialData }: Props) {
+  const isEditMode = !!initialData?.id;
+  const [form, setForm] = useState<ConsortiumForm>(initialData ? fromInitial(initialData) : EMPTY);
   const [members, setMembers] = useState<MemberDraft[]>([makeMember()]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -100,13 +117,20 @@ export default function ConsortiumFormModal({ open, onClose, onCreated }: Props)
     return () => { cancelled = true; };
   }, [open]);
 
+  // 모달 열릴 때마다 폼 초기값 동기화 (initialData 가 바뀌면 pre-fill)
   useEffect(() => {
-    if (open) return;
-    setForm(EMPTY);
+    if (!open) {
+      setForm(EMPTY);
+      setMembers([makeMember()]);
+      setNameError(null);
+      setErrorMsg(null);
+      return;
+    }
+    setForm(initialData ? fromInitial(initialData) : EMPTY);
     setMembers([makeMember()]);
     setNameError(null);
     setErrorMsg(null);
-  }, [open]);
+  }, [open, initialData]);
 
   const update = <K extends keyof ConsortiumForm>(key: K, value: ConsortiumForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -146,6 +170,32 @@ export default function ConsortiumFormModal({ open, onClose, onCreated }: Props)
 
     setSubmitting(true);
     try {
+      if (isEditMode && initialData) {
+        // 수정 모드 — consortiums UPDATE만 (참여사 변경은 STEP-CON-C)
+        const { error: uErr } = await supabase
+          .from('consortiums')
+          .update({
+            name: form.name.trim(),
+            project_id: form.projectId || null,
+            status: form.status,
+            lead_client_id: form.leadClientId || null,
+            description: form.description.trim() || null,
+            start_date: form.startDate || null,
+            end_date: form.endDate || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', initialData.id);
+        if (uErr) {
+          console.error('[consortium] 수정 실패:', uErr.message);
+          setErrorMsg(translateError(uErr.message, 'update'));
+          return;
+        }
+        onCreated();
+        onClose();
+        return;
+      }
+
+      // 신규 등록
       const { data: cData, error: cErr } = await supabase
         .from('consortiums')
         .insert({
@@ -154,6 +204,8 @@ export default function ConsortiumFormModal({ open, onClose, onCreated }: Props)
           status: form.status,
           lead_client_id: form.leadClientId || null,
           description: form.description.trim() || null,
+          start_date: form.startDate || null,
+          end_date: form.endDate || null,
         })
         .select('id')
         .single();
@@ -161,7 +213,6 @@ export default function ConsortiumFormModal({ open, onClose, onCreated }: Props)
 
       // 주관사 + 참여사 행을 consortium_members에 일괄 INSERT
       const memberRows: Array<Record<string, unknown>> = [];
-      // 주관사 자동 등록 (선택했을 경우)
       if (form.leadClientId) {
         const lead = clients.find((c) => c.id === form.leadClientId);
         memberRows.push({
@@ -203,18 +254,23 @@ export default function ConsortiumFormModal({ open, onClose, onCreated }: Props)
     }
   };
 
+  const SELECT_CLASS =
+    'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60';
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="컨소시엄 신규 등록"
-      description="컨소시엄명만 필수예요. 참여사는 여러 곳 추가할 수 있어요."
+      title={isEditMode ? '컨소시엄 수정' : '컨소시엄 신규 등록'}
+      description={isEditMode ? '기본 정보·주관사를 수정해요. 참여사 변경은 후속 기능에서 가능해요.' : '컨소시엄명만 필수예요. 참여사는 여러 곳 추가할 수 있어요.'}
       size="lg"
       closeOnBackdrop={!submitting}
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={submitting}>취소</Button>
-          <Button type="submit" form="consortium-form" variant="primary" loading={submitting}>저장하기</Button>
+          <Button type="submit" form="consortium-form" variant="primary" loading={submitting}>
+            {isEditMode ? '수정 완료' : '저장하기'}
+          </Button>
         </>
       }
     >
@@ -229,7 +285,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated }: Props)
                 value={form.status}
                 onChange={(e) => update('status', e.target.value as ConsortiumStatus)}
                 disabled={submitting}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                className={SELECT_CLASS}
               >
                 {CONSORTIUM_STATUS_VALUES.map((s) => (<option key={s} value={s}>{s}</option>))}
               </select>
@@ -240,12 +296,28 @@ export default function ConsortiumFormModal({ open, onClose, onCreated }: Props)
                 value={form.projectId}
                 onChange={(e) => update('projectId', e.target.value)}
                 disabled={submitting || loadingRefs}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                className={SELECT_CLASS}
               >
                 <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음'}</option>
                 {projects.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
               </select>
             </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              type="date"
+              label="시작일"
+              value={form.startDate}
+              onChange={(e) => update('startDate', e.target.value)}
+              disabled={submitting}
+            />
+            <Input
+              type="date"
+              label="종료일"
+              value={form.endDate}
+              onChange={(e) => update('endDate', e.target.value)}
+              disabled={submitting}
+            />
           </div>
           <div className="space-y-1.5">
             <label htmlFor="consortium-desc" className="text-sm font-semibold text-slate-700">설명</label>
@@ -270,98 +342,48 @@ export default function ConsortiumFormModal({ open, onClose, onCreated }: Props)
                 value={form.leadClientId}
                 onChange={(e) => update('leadClientId', e.target.value)}
                 disabled={submitting || loadingRefs}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                className={SELECT_CLASS}
               >
                 <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음'}</option>
                 {clients.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
               </select>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">역할</label>
-              <select
-                value={form.leadRole}
-                onChange={(e) => update('leadRole', e.target.value as ConsortiumRole)}
-                disabled={submitting || !form.leadClientId}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-              >
-                {CONSORTIUM_ROLE_VALUES.map((r) => (<option key={r} value={r}>{r}</option>))}
-              </select>
-            </div>
+            {!isEditMode && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">역할</label>
+                <select
+                  value={form.leadRole}
+                  onChange={(e) => update('leadRole', e.target.value as ConsortiumRole)}
+                  disabled={submitting || !form.leadClientId}
+                  className={SELECT_CLASS}
+                >
+                  {CONSORTIUM_ROLE_VALUES.map((r) => (<option key={r} value={r}>{r}</option>))}
+                </select>
+              </div>
+            )}
           </div>
-          <p className="text-xs text-muted">선택한 주관사는 참여사 목록에도 자동 추가돼요.</p>
+          {!isEditMode && (
+            <p className="text-xs text-muted">선택한 주관사는 참여사 목록에도 자동 추가돼요.</p>
+          )}
         </section>
 
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">참여사 ({members.filter((m) => m.clientId).length})</h3>
-            <Button type="button" variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={addMember} disabled={submitting}>참여사 추가</Button>
-          </div>
-          <div className="space-y-3">
-            {members.map((m, idx) => (
-              <div key={m.uid} className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500">참여사 #{idx + 1}</span>
-                  {members.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeMember(m.uid)}
-                      disabled={submitting}
-                      className="p-1 rounded text-slate-400 hover:text-danger hover:bg-danger/5"
-                      aria-label={`참여사 #${idx + 1} 삭제`}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-sm font-semibold text-slate-700">고객사</label>
-                    <select
-                      value={m.clientId}
-                      onChange={(e) => updateMember(m.uid, { clientId: e.target.value })}
-                      disabled={submitting || loadingRefs}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-                    >
-                      <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음'}</option>
-                      {clients.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-700">역할</label>
-                    <select
-                      value={m.role}
-                      onChange={(e) => updateMember(m.uid, { role: e.target.value as ConsortiumRole | '' })}
-                      disabled={submitting}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-                    >
-                      <option value="">선택 없음</option>
-                      {CONSORTIUM_ROLE_VALUES.map((r) => (<option key={r} value={r}>{r}</option>))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    label="지분율 (%)"
-                    inputMode="decimal"
-                    value={m.shareRatio}
-                    onChange={(e) => updateMember(m.uid, { shareRatio: e.target.value })}
-                    disabled={submitting}
-                    placeholder="예) 30"
-                    helperText="0 ~ 100 사이 숫자"
-                  />
-                  <Input
-                    label="담당업무"
-                    value={m.responsibilities}
-                    onChange={(e) => updateMember(m.uid, { responsibilities: e.target.value })}
-                    disabled={submitting}
-                    placeholder="예) 콘텐츠 기획 / 운영"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-muted">고객사를 선택하지 않은 행은 저장되지 않아요.</p>
-        </section>
+        {!isEditMode && (
+          <ConsortiumMembersField
+            members={members}
+            clients={clients}
+            loadingRefs={loadingRefs}
+            submitting={submitting}
+            onAdd={addMember}
+            onRemove={removeMember}
+            onUpdate={updateMember}
+          />
+        )}
+
+        {isEditMode && (
+          <p className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-xs text-slate-500">
+            ⓘ 참여사 추가/변경은 후속 기능에서 지원돼요. 현재는 기본 정보·주관사만 수정할 수 있어요.
+          </p>
+        )}
 
         {errorMsg && (
           <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-2.5 text-sm text-danger">{errorMsg}</div>

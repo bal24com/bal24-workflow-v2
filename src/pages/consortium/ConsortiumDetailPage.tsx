@@ -32,6 +32,7 @@ import ConFinanceTab from './detail/ConFinanceTab';
 import ConStaffTab from './detail/ConStaffTab';
 import ConLinksTab from './detail/ConLinksTab';
 import ConPortalTab from './detail/ConPortalTab';
+import ConsortiumFormModal from './ConsortiumFormModal';
 
 interface ConsortiumDetail {
   id: string;
@@ -80,6 +81,7 @@ export default function ConsortiumDetailPage() {
   const [counts, setCounts] = useState<CountSummary>({ programs: 0, tasks: 0 });
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>('overview');
+  const [editOpen, setEditOpen] = useState(false);
 
   const loadConsortium = useCallback(async () => {
     if (!id) return;
@@ -192,7 +194,7 @@ export default function ConsortiumDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={() => toast.info('수정 모달 — 추후 STEP-CON 후속 작업')}>
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil size={14} className="mr-1" aria-hidden="true" />
               수정
             </Button>
@@ -287,6 +289,25 @@ export default function ConsortiumDetailPage() {
           <div>{TabContent[tab]}</div>
         </section>
       </div>
+
+      <ConsortiumFormModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onCreated={() => {
+          setEditOpen(false);
+          void loadConsortium();
+        }}
+        initialData={{
+          id: consortium.id,
+          name: consortium.name,
+          description: consortium.description ?? '',
+          lead_client_id: consortium.lead_client_id ?? null,
+          project_id: consortium.project_id ?? null,
+          status: consortium.status,
+          start_date: consortium.start_date ?? '',
+          end_date: consortium.end_date ?? '',
+        }}
+      />
     </div>
   );
 }
