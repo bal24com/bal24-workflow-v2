@@ -884,9 +884,17 @@ export interface Settlement {
 export interface FileRecord {
   id: string;
   project_id?: string | null;
+  consortium_id?: string | null;
+  program_id?: string | null;
+  /** @deprecated V2 에서는 program_id 사용. 레거시 호환을 위해 필드만 유지. */
   education_id?: string | null;
   uploader_id?: string | null;
   file_name: string;
+  /**
+   * 신규 행: Storage path (예: "abc-123/1715000000000_파일.pdf").
+   * 레거시 행: publicUrl (https://... — STEP-STORAGE 이전 데이터).
+   * 다운로드 시 https 로 시작하면 그대로 열고, 아니면 createSignedUrl 로 1시간 임시 URL 생성.
+   */
   file_url: string;
   file_size?: number | null;
   file_type?: string | null;
