@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Building2, Briefcase, GraduationCap, ListChecks,
-  Wallet, Users, Share2, ShieldCheck, Pencil, Check,
+  Wallet, Users, Share2, ShieldCheck, Pencil, Check, FolderOpen,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
@@ -32,6 +32,7 @@ import ConFinanceTab from './detail/ConFinanceTab';
 import ConStaffTab from './detail/ConStaffTab';
 import ConLinksTab from './detail/ConLinksTab';
 import ConPortalTab from './detail/ConPortalTab';
+import ConsortiumFilesTab from './ConsortiumFilesTab';
 import ConsortiumFormModal from './ConsortiumFormModal';
 
 interface ConsortiumDetail {
@@ -48,7 +49,7 @@ interface ConsortiumDetail {
   project: { id: string; name: string } | null;
 }
 
-type TabKey = 'overview' | 'programs' | 'tasks' | 'finance' | 'staff' | 'links' | 'portal';
+type TabKey = 'overview' | 'programs' | 'tasks' | 'finance' | 'staff' | 'links' | 'portal' | 'files';
 
 const TAB_LIST: Array<{ key: TabKey; label: string; Icon: typeof Briefcase }> = [
   { key: 'overview', label: '개요', Icon: Building2 },
@@ -58,6 +59,7 @@ const TAB_LIST: Array<{ key: TabKey; label: string; Icon: typeof Briefcase }> = 
   { key: 'staff', label: '인력·자원', Icon: Users },
   { key: 'links', label: '외부공유', Icon: Share2 },
   { key: 'portal', label: '포털', Icon: ShieldCheck },
+  { key: 'files', label: '파일', Icon: FolderOpen },
 ];
 
 // 0515 마이그레이션이 일부 적용 안 됐을 가능성 — internal_manager_id·currency·해당 FK 제거하여 안전한 핵심 컬럼만 사용
@@ -149,6 +151,7 @@ export default function ConsortiumDetailPage() {
     staff: <ConStaffTab consortiumId={id} />,
     links: <ConLinksTab consortiumId={id} />,
     portal: <ConPortalTab consortiumId={id} status={consortium.status} members={members} />,
+    files: <ConsortiumFilesTab consortiumId={id} />,
   };
 
   return (
