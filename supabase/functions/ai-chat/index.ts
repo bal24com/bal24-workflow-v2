@@ -12,9 +12,9 @@ import { getSystemPrompt } from './prompts.ts';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 
-// 모델 매핑 (호출 시 override 가능)
+// 모델 매핑 (호출 시 override 가능) — Claude 4.X 최신 ID
 const MODEL_ID: Record<AiModel, string> = {
-  sonnet: 'claude-sonnet-4-7',
+  sonnet: 'claude-sonnet-4-6',
   haiku: 'claude-haiku-4-5-20251001',
 };
 
@@ -185,12 +185,23 @@ serve(async (req: Request) => {
     const errText = await res.text();
     console.error('[ai-chat] HTTP', res.status, errText);
     if (res.status === 401 || res.status === 403) {
-      return jsonResponse({ ok: false, error: 'AI 서비스 인증에 실패했어요. 관리자에게 문의해 주세요.' }, 500);
+      return jsonResponse({ ok: false, error: `AI 서비스 인증 실패 (HTTP ${res.status}). 관리자에게 문의해 주세요.` }, 500);
     }
     if (res.status === 429) {
       return jsonResponse({ ok: false, error: RATE_LIMIT_FRIENDLY }, 429);
     }
-    return jsonResponse({ ok: false, error: 'AI 호출 중 오류가 발생했어요.' }, 502);
+    // 디버깅 용이 — Anthropic 응답 본문에서 핵심 메시지 추출
+    let upstream = errText;
+    try {
+      const parsed = JSON.parse(errText) as { error?: { type?: string; message?: string } };
+      if (parsed.error?.message) {
+        upstream = `${parsed.error.type ?? 'error'}: ${parsed.error.message}`;
+      }
+    } catch {
+      // not JSON
+    }
+    if (upstream.length > 300) upstream = upstream.slice(0, 300) + '…';
+    return jsonResponse({ ok: false, error: `AI 호출 실패 (HTTP ${res.status}): ${upstream}` }, 502);
   }
 
   const data = await res.json() as {

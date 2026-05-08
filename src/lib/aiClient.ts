@@ -77,15 +77,6 @@ export async function callAi(options: CallAiOptions): Promise<CallAiResult> {
     body: options,
   });
 
-  if (error) {
-    const raw = error.message ?? '';
-    console.error('[ai-client] 호출 실패:', raw);
-    return {
-      ok: false,
-      errorMessage: 'AI 호출에 실패했어요. 잠시 후 다시 시도해 주세요.',
-    };
-  }
-
   type Body = {
     ok: boolean;
     text?: string;
@@ -93,6 +84,41 @@ export async function callAi(options: CallAiOptions): Promise<CallAiResult> {
     usage?: CallAiResult['usage'];
     rateLimit?: CallAiResult['rateLimit'];
   };
+
+  // FunctionsHttpError(=Edge가 4xx/5xx로 응답): supabase-js가 error에 context를 담아 던짐.
+  // 본문에 우리 표준 에러 객체가 있을 수 있으니 우선 읽어본다.
+  if (error) {
+    const raw = error.message ?? '';
+    console.error('[ai-client] invoke 실패:', raw, error);
+    let serverMessage: string | undefined;
+    type WithContext = { context?: { json?: () => Promise<unknown>; text?: () => Promise<string> } };
+    const ctx = (error as unknown as WithContext).context;
+    if (ctx) {
+      try {
+        if (typeof ctx.json === 'function') {
+          const parsed = (await ctx.json()) as Body | null;
+          if (parsed && typeof parsed === 'object') {
+            serverMessage = parsed.error;
+            console.error('[ai-client] server error body:', parsed);
+          }
+        } else if (typeof ctx.text === 'function') {
+          const txt = await ctx.text();
+          if (txt) {
+            console.error('[ai-client] server error text:', txt);
+            serverMessage = txt.length > 200 ? txt.slice(0, 200) + '…' : txt;
+          }
+        }
+      } catch (parseErr) {
+        const r = parseErr instanceof Error ? parseErr.message : '';
+        console.error('[ai-client] error body 파싱 실패:', r);
+      }
+    }
+    return {
+      ok: false,
+      errorMessage: serverMessage ?? `AI 호출 실패: ${raw || '네트워크 오류'}`,
+    };
+  }
+
   const body = data as Body | null;
 
   if (!body) {
