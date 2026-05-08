@@ -1,7 +1,5 @@
-// bal24 v2 — AI 어시스턴트 유틸 (STEP 21)
-// Edge Function 호출 + Mock fallback + 시스템 프롬프트 + 빠른 프롬프트 템플릿
-
-import { supabase } from '../../lib/supabase';
+// bal24 v2 — AI 어시스턴트 유틸 (STEP 21 → STEP-AI-PREP)
+// callAi('chat') Edge Function 호출 + Mock fallback + 시스템 프롬프트 + 빠른 프롬프트 템플릿
 
 export type AiRole = 'user' | 'assistant';
 
@@ -70,8 +68,8 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
 const MAX_HISTORY = 10;
 
 /**
- * Edge Function `ai-chat` 호출. 실패 시 자동으로 Mock 응답으로 fallback.
- * 박경수님이 Edge Function 배포 후에는 자동으로 실제 AI 응답으로 전환됨.
+ * STEP-AI-PREP — callAi('chat') Edge Function 호출.
+ * Edge Function 배포 전에는 Mock fallback (박경수님 deploy 후 자동 실제 전환).
  */
 export async function sendToAi(
   messages: AiMessage[],
@@ -80,42 +78,41 @@ export async function sendToAi(
   // 토큰 절약: 최근 N개만 전송
   const trimmed = messages.slice(-MAX_HISTORY);
 
-  try {
-    const { data, error } = await supabase.functions.invoke('ai-chat', {
-      body: { messages: trimmed, systemPrompt },
-    });
-    if (error) throw error;
-    if (data && typeof data === 'object' && 'error' in data && data.error) {
-      throw new Error(String(data.error));
-    }
-    const content =
-      data && typeof data === 'object' && 'content' in data && typeof data.content === 'string'
-        ? data.content
-        : '';
-    if (!content) throw new Error('빈 응답');
-    return { content, mock: false };
-  } catch (err) {
-    const raw = err instanceof Error ? err.message : '';
-    console.error('[ai] Edge Function 호출 실패 → Mock fallback:', raw);
-    await new Promise((r) => setTimeout(r, 600));
-    const last = trimmed[trimmed.length - 1];
-    const userText = last?.content ?? '';
-    return {
-      content: buildMockReply(userText),
-      mock: true,
-    };
+  // 동적 import — aiClient는 lazy load (Mock fallback 없는 환경에서도 동작)
+  const { callAi } = await import('../../lib/aiClient');
+  const res = await callAi({
+    preset: 'chat',
+    systemOverride: systemPrompt,
+    messages: trimmed,
+    maxTokens: 2048,
+  });
+
+  if (res.ok && res.text) {
+    return { content: res.text, mock: false };
   }
+
+  // 실제 호출 실패 (Edge 미배포·인증·rate limit 등) → Mock fallback
+  console.error('[ai] callAi 실패 → Mock fallback:', res.errorMessage);
+  await new Promise((r) => setTimeout(r, 400));
+  const last = trimmed[trimmed.length - 1];
+  const userText = last?.content ?? '';
+  return {
+    content: buildMockReply(userText, res.errorMessage),
+    mock: true,
+  };
 }
 
-function buildMockReply(userText: string): string {
+function buildMockReply(userText: string, errorMessage?: string): string {
   const trimmed = userText.trim();
   const head = trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
+  const reasonLine = errorMessage ? `\n사유: ${errorMessage}\n` : '';
   return [
-    `[Mock 모드] "${head}"에 대한 임시 응답이에요.`,
-    '',
-    'Edge Function `ai-chat`이 아직 배포되지 않아 실제 AI 응답 대신 Mock 메시지를 보여드리고 있어요.',
-    'Supabase 대시보드 → Edge Functions → `ai-chat` 배포 + `OPENAI_API_KEY` 설정을 마치시면',
-    '자동으로 실제 AI 응답으로 전환됩니다.',
+    `[Mock 모드] "${head}"에 대한 임시 응답이에요.${reasonLine}`,
+    'Edge Function `ai-chat`이 아직 배포되지 않았거나 호출에 실패했어요.',
+    'Supabase Dashboard에서 다음을 확인해 주세요:',
+    '1. Edge Functions → `ai-chat` 배포 (`supabase functions deploy ai-chat`)',
+    '2. Secrets → `ANTHROPIC_API_KEY` 등록',
+    '3. (선택) 일일 호출 한도 / billing limit',
   ].join('\n');
 }
 

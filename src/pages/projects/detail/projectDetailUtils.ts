@@ -39,6 +39,7 @@ const ACTIVITY_LOG_TYPE_LABEL: Record<ActivityLogType, string> = {
   business_trip: '출장',
   ta: 'TA',
   operation: '운영',
+  dispatch: '파견',
 };
 
 export function activityLogTypeLabel(t: ActivityLogType): string {
