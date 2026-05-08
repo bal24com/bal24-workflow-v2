@@ -40,14 +40,11 @@ interface ConsortiumDetail {
   start_date: string | null;
   end_date: string | null;
   total_budget: number | null;
-  currency: string | null;
   description: string | null;
   lead_client_id: string | null;
-  internal_manager_id: string | null;
   project_id: string | null;
   lead_client: { id: string; name: string } | null;
   project: { id: string; name: string } | null;
-  pm: { id: string; name: string } | null;
 }
 
 type TabKey = 'overview' | 'programs' | 'tasks' | 'finance' | 'staff' | 'links' | 'portal';
@@ -62,12 +59,12 @@ const TAB_LIST: Array<{ key: TabKey; label: string; Icon: typeof Briefcase }> = 
   { key: 'portal', label: '포털', Icon: ShieldCheck },
 ];
 
+// 0515 마이그레이션이 일부 적용 안 됐을 가능성 — internal_manager_id·currency·해당 FK 제거하여 안전한 핵심 컬럼만 사용
 const SELECT_COLUMNS = `
-  id, name, status, start_date, end_date, total_budget, currency, description,
-  lead_client_id, internal_manager_id, project_id,
+  id, name, status, start_date, end_date, total_budget, description,
+  lead_client_id, project_id,
   lead_client:clients!consortiums_lead_client_id_fkey(id, name),
-  project:projects!consortiums_project_id_fkey(id, name),
-  pm:profiles!consortiums_internal_manager_id_fkey(id, name)
+  project:projects!consortiums_project_id_fkey(id, name)
 `.replace(/\s+/g, ' ');
 
 interface CountSummary {
@@ -240,7 +237,6 @@ export default function ConsortiumDetailPage() {
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">요약</div>
             <SummaryRow label="총사업비" value={formatKRW(Number(consortium.total_budget ?? 0))} />
             <SummaryRow label="기간" value={`${formatConDate(consortium.start_date)} ~ ${formatConDate(consortium.end_date)}`} />
-            <SummaryRow label="담당 PM" value={consortium.pm?.name ?? '-'} />
             <SummaryRow label="참여사" value={`${members.length}곳`} />
             <SummaryRow label="프로그램" value={`${counts.programs}건`} />
             <SummaryRow label="태스크" value={`${counts.tasks}건`} />
