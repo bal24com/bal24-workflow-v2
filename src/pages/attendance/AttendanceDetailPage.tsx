@@ -68,7 +68,7 @@ export default function AttendanceDetailPage() {
   }, [sessionId, fetchData]);
 
   const checkinUrl = useMemo(
-    () => session ? getCheckInUrl(session.session_token) : '',
+    () => session ? getCheckInUrl(session.session_token ?? '') : '',
     [session],
   );
 

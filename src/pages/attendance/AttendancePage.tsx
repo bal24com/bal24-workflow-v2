@@ -160,7 +160,7 @@ export default function AttendancePage() {
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button
                       type="button"
-                      onClick={(e) => { e.preventDefault(); void handleCopy(s.session_token); }}
+                      onClick={(e) => { e.preventDefault(); void handleCopy(s.session_token ?? ''); }}
                       className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                     >
                       <Copy size={12} />
@@ -168,7 +168,7 @@ export default function AttendancePage() {
                     </button>
                     <span className="text-slate-300" aria-hidden="true">·</span>
                     <QrDownloadButton
-                      url={getCheckInUrl(s.session_token)}
+                      url={getCheckInUrl(s.session_token ?? '')}
                       filename={`attendance-${s.session_date}-${s.title.replace(/[^\w가-힣]/g, '_').slice(0, 20)}`}
                       label="QR 저장"
                     />

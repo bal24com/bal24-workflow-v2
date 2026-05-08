@@ -12,9 +12,17 @@ import { Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
 import { useToast } from '../../contexts/ToastContext';
-import type { AttendanceSession, AttendeeRole } from '../../types/database';
+import type {
+  AttendanceCheckStatus, AttendanceSession, AttendeeRole,
+} from '../../types/database';
 
 type CheckStatus = 'present' | 'late' | 'absent';
+
+const CHECK_STATUS_TO_DB: Record<CheckStatus, AttendanceCheckStatus> = {
+  present: 'O',
+  late: '△',
+  absent: 'X',
+};
 
 const ROLE_LABEL: Record<AttendeeRole, string> = {
   student: '교육생',
@@ -67,10 +75,13 @@ export default function AttendCheckPage() {
     setLoading(true);
     void (async () => {
       // 3 토큰 중 일치하는 컬럼으로 역할 판별
+      // student_token (Stage 11-① 표준) + learner_token (transition 호환)
       const { data, error } = await supabase
         .from('attendance_sessions')
         .select('*, program:programs(id, name)')
-        .or(`learner_token.eq.${token},instructor_token.eq.${token},ta_token.eq.${token}`)
+        .or(
+          `student_token.eq.${token},learner_token.eq.${token},instructor_token.eq.${token},ta_token.eq.${token}`,
+        )
         .maybeSingle();
 
       if (cancelled) return;
@@ -85,16 +96,13 @@ export default function AttendCheckPage() {
       }
 
       const sess = data as AttendanceSession & {
-        learner_token: string;
-        instructor_token: string;
-        ta_token: string;
         program: ProgramRef | ProgramRef[] | null;
       };
       setSession(sess);
       const prog = Array.isArray(sess.program) ? sess.program[0] : sess.program;
       setProgram(prog ?? null);
 
-      // 역할 판별
+      // 역할 판별 — instructor·ta가 아니면 학생
       let detectedRole: AttendeeRole = 'student';
       if (sess.instructor_token === token) detectedRole = 'instructor';
       else if (sess.ta_token === token) detectedRole = 'ta';
@@ -132,7 +140,7 @@ export default function AttendCheckPage() {
         attendee_name: name.trim(),
         attendee_phone: phone.trim(),
         check_in_method: 'link' as const,
-        status,
+        status: CHECK_STATUS_TO_DB[status],
         note: null,
       };
       const { error } = await supabase.from('attendance_records').insert(payload);

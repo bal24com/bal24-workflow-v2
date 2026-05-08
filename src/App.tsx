@@ -41,6 +41,7 @@ import ApplyPage from './pages/public-apply/ApplyPage';
 import RecruitApplyPage from './pages/public-recruit/RecruitApplyPage';
 import AttendCheckPage from './pages/public-attend/AttendCheckPage';
 import LogWritePage from './pages/public-log/LogWritePage';
+import CertViewPage from './pages/public-cert/CertViewPage';
 import ClientSharePage from './pages/share-portal/ClientSharePage';
 import StudentSharePage from './pages/share-portal/StudentSharePage';
 import ExpertSharePage from './pages/share-portal/ExpertSharePage';
@@ -85,6 +86,7 @@ export default function App() {
         <Route path="/recruit/:token" element={<RecruitApplyPage />} />
         <Route path="/attend/:token" element={<AttendCheckPage />} />
         <Route path="/log/:token" element={<LogWritePage />} />
+        <Route path="/cert/:token" element={<CertViewPage />} />
         <Route path="/share/client/:token" element={<ClientSharePage />} />
         <Route path="/share/student/:token" element={<StudentSharePage />} />
         <Route path="/share/expert/:token" element={<ExpertSharePage />} />

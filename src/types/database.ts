@@ -572,17 +572,30 @@ export interface Receipt {
   created_at: string;
 }
 
-// ─── 출석 (STEP 11-B) ───────────────────────────────
+// ─── 출석 (STEP 11-B / Stage 11-① 보강 2026-05-08) ───
+export type AttendanceCheckStatus = 'O' | '△' | 'X';
+
 export interface AttendanceSession {
   id: string;
   program_id: string;
   curriculum_id?: string | null;
   title: string;
+  /** 차시 번호 (Stage 11-① 추가) */
+  session_no?: number | null;
   session_date: string;
   start_time?: string | null;
   end_time?: string | null;
   location?: string | null;
-  session_token: string;
+  /** 호환용 (구버전) — 신규는 student_token 사용 */
+  session_token?: string | null;
+  /** 학생 외부 출석 토큰 (Stage 11-① 추가). V2 기존 learner_token 호환 alias */
+  student_token: string;
+  /** 학생 토큰 호환 — 점진 폐기 */
+  learner_token?: string | null;
+  /** 강사 외부 출석 토큰 */
+  instructor_token: string;
+  /** TA 외부 출석 토큰 */
+  ta_token: string;
   token_expires_at?: string | null;
   check_in_open: boolean;
   created_by?: string | null;
@@ -600,6 +613,8 @@ export interface AttendanceRecord {
   attendee_phone?: string | null;
   check_in_at: string;
   check_in_method: CheckInMethod;
+  /** 출석 상태 (Stage 11-① 추가) — O 출석 / △ 지각 / X 결석 */
+  status: AttendanceCheckStatus;
   ip_address?: string | null;
   note?: string | null;
   created_at: string;
@@ -712,6 +727,8 @@ export interface IssuedCertificate {
   issue_date: string;
   cert_number?: string | null;
   pdf_url?: string | null;
+  /** 외부 /cert/:token 접근용 토큰 (Stage 11-① 추가) */
+  token: string;
   issued_by?: string | null;
   created_at: string;
 }

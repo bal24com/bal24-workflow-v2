@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
 import { useToast } from '../../contexts/ToastContext';
 import type { Program } from '../../types/database';
+import PromoSection from './PromoSection';
 
 interface FormState {
   name: string;
@@ -196,8 +197,10 @@ export default function ApplyPage() {
         </div>
       </header>
 
-      {/* 본문 폼 */}
-      <main className="max-w-3xl mx-auto px-5 py-8">
+      {/* 본문 — 홍보 + 폼 */}
+      <main className="max-w-3xl mx-auto px-5 py-8 flex flex-col gap-4">
+        <PromoSection program={program} />
+
         {closed ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
             <p className="text-sm font-semibold text-amber-800">모집이 종료된 프로그램이에요.</p>
