@@ -21,6 +21,7 @@ const LOG_TYPE_LABELS: Record<ActivityLogType, string> = {
   business_trip: '출장 일지',
   ta: 'TA 운영보고서',
   operation: '운영 보고서',
+  dispatch: '파견·외부 활동 일지',
 };
 
 interface UploadedFile {

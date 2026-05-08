@@ -3,7 +3,7 @@
 import type { ActivityLogType } from '../../types/database';
 
 export const LOG_TYPE_VALUES: ActivityLogType[] = [
-  'mentoring', 'lecture', 'business_trip', 'ta', 'operation',
+  'mentoring', 'lecture', 'business_trip', 'ta', 'operation', 'dispatch',
 ];
 
 export const LOG_TYPE_LABELS: Record<ActivityLogType, string> = {
@@ -12,6 +12,7 @@ export const LOG_TYPE_LABELS: Record<ActivityLogType, string> = {
   business_trip: '출장',
   ta: 'TA',
   operation: '운영보고서',
+  dispatch: '파견·외부 활동',
 };
 
 /** "HH:MM" 두 시각 차이를 시간 단위(소수점 1자리)로 반환. 잘못된 값이면 null. */

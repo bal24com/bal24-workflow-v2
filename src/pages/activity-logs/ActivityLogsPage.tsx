@@ -115,7 +115,7 @@ export default function ActivityLogsPage() {
 
   const counts = useMemo<Record<ActivityLogType, number>>(() => {
     const acc: Record<ActivityLogType, number> = {
-      mentoring: 0, lecture: 0, business_trip: 0, ta: 0, operation: 0,
+      mentoring: 0, lecture: 0, business_trip: 0, ta: 0, operation: 0, dispatch: 0,
     };
     for (const l of logs) acc[l.log_type] = (acc[l.log_type] ?? 0) + 1;
     return acc;

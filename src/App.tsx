@@ -42,6 +42,8 @@ import RecruitApplyPage from './pages/public-recruit/RecruitApplyPage';
 import AttendCheckPage from './pages/public-attend/AttendCheckPage';
 import LogWritePage from './pages/public-log/LogWritePage';
 import ClientSharePage from './pages/share-portal/ClientSharePage';
+import StudentSharePage from './pages/share-portal/StudentSharePage';
+import ExpertSharePage from './pages/share-portal/ExpertSharePage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
@@ -84,6 +86,8 @@ export default function App() {
         <Route path="/attend/:token" element={<AttendCheckPage />} />
         <Route path="/log/:token" element={<LogWritePage />} />
         <Route path="/share/client/:token" element={<ClientSharePage />} />
+        <Route path="/share/student/:token" element={<StudentSharePage />} />
+        <Route path="/share/expert/:token" element={<ExpertSharePage />} />
 
         <Route
           path="/login"

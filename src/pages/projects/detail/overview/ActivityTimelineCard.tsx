@@ -19,6 +19,7 @@ const TYPE_STYLE: Record<ActivityLogType, string> = {
   business_trip: 'bg-cyan-50 text-cyan-600 border-cyan-200',
   ta: 'bg-emerald-50 text-emerald-600 border-emerald-200',
   operation: 'bg-slate-100 text-slate-600 border-slate-200',
+  dispatch: 'bg-rose-50 text-rose-600 border-rose-200',
 };
 
 export default function ActivityTimelineCard({ projectId }: { projectId: string }) {
