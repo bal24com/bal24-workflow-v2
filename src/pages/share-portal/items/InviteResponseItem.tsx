@@ -1,5 +1,5 @@
 // bal24 v2 — 외부공유 항목 · 초대수락/거절 (전문가, 사전·준비)
-// curriculum_staff 본인 매칭된 차시 → status (pending/accepted/rejected) UPDATE.
+// curriculum_staff 본인 매칭된 차시 → status (대기/수락/거절) UPDATE.
 
 import { useEffect, useState } from 'react';
 import {
@@ -92,7 +92,7 @@ export default function InviteResponseItem({ curriculumStaffIds }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curriculumStaffIds.join(',')]);
 
-  async function changeStatus(id: string, next: 'accepted' | 'rejected') {
+  async function changeStatus(id: string, next: '수락' | '거절') {
     setBusy(id);
     try {
       const { error } = await supabase
@@ -167,11 +167,11 @@ export default function InviteResponseItem({ curriculumStaffIds }: Props) {
                 <p className="text-[11px] text-slate-600 whitespace-pre-wrap">{m.note}</p>
               )}
 
-              {m.status === 'pending' ? (
+              {m.status === '대기' ? (
                 <div className="flex items-center gap-2 pt-1 border-t border-violet-100/70">
                   <button
                     type="button"
-                    onClick={() => void changeStatus(m.id, 'rejected')}
+                    onClick={() => void changeStatus(m.id, '거절')}
                     disabled={busy === m.id}
                     className="flex-1 inline-flex items-center justify-center gap-1 h-10 rounded-xl border border-rose-200 bg-white text-sm font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50 transition-colors"
                   >
@@ -180,7 +180,7 @@ export default function InviteResponseItem({ curriculumStaffIds }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void changeStatus(m.id, 'accepted')}
+                    onClick={() => void changeStatus(m.id, '수락')}
                     disabled={busy === m.id}
                     className="flex-1 inline-flex items-center justify-center gap-1 h-10 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                   >

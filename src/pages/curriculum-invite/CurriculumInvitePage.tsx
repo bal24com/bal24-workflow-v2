@@ -40,7 +40,7 @@ export default function CurriculumInvitePage() {
       }
       setInvite(data);
       if (data.responded_at) {
-        setScreen(data.status === 'accepted' ? 'done_accept' : 'done_reject');
+        setScreen(data.status === '수락' ? 'done_accept' : 'done_reject');
       } else {
         setScreen('ready');
       }
@@ -58,7 +58,7 @@ export default function CurriculumInvitePage() {
       const { error } = await supabase
         .from('curriculum_staff')
         .update({
-          status: 'accepted',
+          status: '수락',
           responded_at: new Date().toISOString(),
         })
         .eq('id', invite.id);
@@ -85,7 +85,7 @@ export default function CurriculumInvitePage() {
       const { error } = await supabase
         .from('curriculum_staff')
         .update({
-          status: 'rejected',
+          status: '거절',
           responded_at: new Date().toISOString(),
           note: rejectReason.trim(),
         })
@@ -173,7 +173,7 @@ export default function CurriculumInvitePage() {
                   </div>
                 )}
               </div>
-              {invite.note && invite.status === 'pending' && (
+              {invite.note && invite.status === '대기' && (
                 <div className="bg-slate-50 rounded-lg p-3 text-sm text-text whitespace-pre-wrap">
                   {invite.note}
                 </div>
@@ -193,7 +193,7 @@ export default function CurriculumInvitePage() {
                   disabled={submitting}
                   className="w-full rounded-xl py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 bg-gradient-to-r from-[#7C3AED] to-[#EC4899] hover:opacity-95 disabled:opacity-60 transition"
                 >
-                  {submitting ? '처리 중…' : `${STAFF_STATUS_LABEL.accepted}하기`}
+                  {submitting ? '처리 중…' : `${STAFF_STATUS_LABEL['수락']}하기`}
                 </button>
                 <button
                   type="button"
@@ -201,7 +201,7 @@ export default function CurriculumInvitePage() {
                   disabled={submitting}
                   className="w-full rounded-xl py-3 text-sm font-bold text-text bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-60 transition"
                 >
-                  {STAFF_STATUS_LABEL.rejected}하기
+                  {STAFF_STATUS_LABEL['거절']}하기
                 </button>
               </div>
             )}

@@ -227,7 +227,7 @@ export interface ProgramCurriculum {
 }
 
 export type CurriculumStaffRole = '강사' | 'FT' | '멘토' | 'TA' | '운영진';
-export type CurriculumStaffStatus = 'pending' | 'accepted' | 'rejected';
+export type CurriculumStaffStatus = '대기' | '수락' | '거절';
 
 export interface CurriculumStaff {
   id: string;

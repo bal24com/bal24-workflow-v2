@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 
 export interface CurriculumInviteData {
   id: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: '대기' | '수락' | '거절';
   role: string;
   fee?: number | null;
   note?: string | null;
@@ -33,7 +33,7 @@ function pickOne<T>(v: T | T[] | null | undefined): T | null {
 
 interface RawRow {
   id: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: '대기' | '수락' | '거절';
   role: string;
   fee: number | null;
   note: string | null;

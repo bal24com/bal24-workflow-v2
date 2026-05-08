@@ -19,16 +19,18 @@ export const STAFF_ROLE_STYLE: Record<CurriculumStaffRole, string> = {
   운영진: 'bg-slate-100 text-slate-600 border-slate-200',
 };
 
+// V2 정책: status 한글 저장 — InvitationStatus 등 다른 한글 status 와 일관 (STEP-INVITE-UNIFY 옵션 B)
+// 라벨은 DB 값과 동일하지만 외부 표시 일관성을 위해 매핑 유지.
 export const STAFF_STATUS_LABEL: Record<CurriculumStaffStatus, string> = {
-  pending: '대기',
-  accepted: '수락',
-  rejected: '거절',
+  대기: '대기',
+  수락: '수락',
+  거절: '거절',
 };
 
 export const STAFF_STATUS_STYLE: Record<CurriculumStaffStatus, string> = {
-  pending: 'bg-slate-100 text-slate-500 border-slate-300',
-  accepted: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  rejected: 'bg-rose-50 text-rose-600 border-rose-200',
+  대기: 'bg-slate-100 text-slate-500 border-slate-300',
+  수락: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  거절: 'bg-rose-50 text-rose-600 border-rose-200',
 };
 
 /** 외부 참여의사 페이지 URL */
