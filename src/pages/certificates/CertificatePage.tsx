@@ -105,12 +105,13 @@ export default function CertificatePage() {
             };
           });
       } else {
-        // 강의확인서: instructor_invitations 전체 (program 필터 불가 — 컬럼 부재)
+        // 강의확인서: 해당 프로그램의 수락된 강사만 (instructor_invitations.program_id 필터 + status='수락')
         const { data: invs, error: invsErr } = await supabase
           .from('instructor_invitations')
           .select('id, staff_pool_id, profile_id, name, status')
-          .order('created_at', { ascending: false })
-          .limit(100);
+          .eq('program_id', programId)
+          .eq('status', '수락')
+          .order('created_at', { ascending: false });
         if (invsErr) throw invsErr;
         rows = ((invs ?? []) as InvitationRow[]).map((v) => {
           const expertId = v.staff_pool_id ?? null;
@@ -282,9 +283,9 @@ export default function CertificatePage() {
         </div>
       )}
 
-      {tab === 'lecture' && (
-        <div className="rounded-xl bg-primary/5 border border-primary/20 px-4 py-2.5 text-xs text-primary">
-          ℹ️ 강의확인서는 instructor_invitations 전체에서 표시돼요 (program 필터 미적용 — 추후 컬럼 추가 시 개선).
+      {tab === 'lecture' && programId && !loading && recipients.length === 0 && (
+        <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-500 text-center">
+          이 프로그램에 수락된 강사가 없어요. 강사 초청 후 강사가 수락하면 여기에 표시돼요.
         </div>
       )}
 
