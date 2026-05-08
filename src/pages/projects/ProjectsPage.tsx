@@ -31,13 +31,13 @@ type StatusFilter = ProjectStatus | '전체';
 type ProjectRow = Project & {
   client?: { id: string; name: string } | null;
   pm?: { id: string; name: string } | null;
-  consortium?: { id: string; name: string } | null;
 };
 
-// projects → profiles FK가 두 개(pm_id, created_by) 있어 명시적 별칭 필요 (PGRST201 방지)
-// projects.consortium_id → consortiums(id) — FK 하나뿐이라 단축형 안전
+// projects → profiles FK가 두 개(pm_id, created_by) 있어 명시적 별칭 필요 (PGRST201 방지).
+// consortium join은 projects.consortium_id 컬럼이 미적용된 환경에서 400 유발 → 제거.
+// 필터링은 '*' 에 포함되는 consortium_id 컬럼만 사용 (컬럼이 없으면 자동으로 undefined → 전체/자체 사업 분기 정상 작동).
 const SELECT_COLUMNS =
-  '*, client:clients(id,name), pm:profiles!projects_pm_id_fkey(id,name), consortium:consortiums(id,name)';
+  '*, client:clients(id,name), pm:profiles!projects_pm_id_fkey(id,name)';
 
 function StatusFilterTabs({
   value,
