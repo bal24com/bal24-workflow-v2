@@ -9,6 +9,7 @@ import StaffMatchModal from './curriculum/StaffMatchModal';
 import CurriculumRow from './curriculum/CurriculumRow';
 import SaveTemplateModal from './curriculum/SaveTemplateModal';
 import LoadTemplateModal from './curriculum/LoadTemplateModal';
+import AiCurriculumModal from './curriculum/AiCurriculumModal';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
 import type {
   CurriculumStaffRole, ProgramCurriculum,
@@ -27,6 +28,7 @@ export default function CurriculumTab({ programId }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [loadTplOpen, setLoadTplOpen] = useState(false);
+  const [aiCurriculumOpen, setAiCurriculumOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await fetchCurriculumBundle(programId);
@@ -139,10 +141,6 @@ export default function CurriculumTab({ programId }: Props) {
     await persistOrder(items);
   }
 
-  function showPlaceholder(label: string) {
-    toast.info(`${label}은 STEP-AI-PREP / STEP-STORAGE 완료 후 활성화 예정이에요.`);
-  }
-
   return (
     <div className="flex flex-col gap-3">
       <header className="rounded-2xl border border-violet-100 bg-white p-4 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-wrap items-center justify-between gap-3">
@@ -172,15 +170,15 @@ export default function CurriculumTab({ programId }: Props) {
           </button>
           <button
             type="button"
-            onClick={() => showPlaceholder('새 파일 업로드')}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-slate-500 hover:bg-violet-50 transition-colors"
+            onClick={() => setAiCurriculumOpen(true)}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
           >
             <Upload size={12} aria-hidden="true" />
             새 파일
           </button>
           <button
             type="button"
-            onClick={() => showPlaceholder('AI 생성')}
+            onClick={() => setAiCurriculumOpen(true)}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-violet-50/40 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors"
           >
             <Sparkles size={12} aria-hidden="true" />
@@ -265,6 +263,14 @@ export default function CurriculumTab({ programId }: Props) {
         onClose={() => setLoadTplOpen(false)}
         programId={programId}
         onLoaded={() => void refresh()}
+      />
+
+      <AiCurriculumModal
+        open={aiCurriculumOpen}
+        onClose={() => setAiCurriculumOpen(false)}
+        programId={programId}
+        nextSessionNo={items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0) + 1}
+        onSaved={() => void refresh()}
       />
     </div>
   );

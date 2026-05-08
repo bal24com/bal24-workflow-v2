@@ -97,13 +97,19 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
     const res = await fetch(url, init);
     lastRateLimit = parseRateLimitHeaders(res.headers);
 
-    if (res.status !== 429) return res;
+    if (res.status !== 429 && res.status !== 529) return res;
     if (attempt >= MAX_RETRIES) return res;
 
-    const headerWait = (lastRateLimit.retryAfter ?? 0) * 1000;
-    const expBackoff = Math.pow(2, attempt) * 1000;
-    const wait = Math.max(headerWait, expBackoff);
-    console.warn(`[ai-chat] 429 rate limit — ${wait}ms 후 재시도 (${attempt + 1}/${MAX_RETRIES})`);
+    let wait: number;
+    if (res.status === 529) {
+      wait = 3_000 * (attempt + 1); // 3s → 6s → 9s
+      console.warn(`[ai-chat] 529 과부하 → ${wait}ms 재시도 (${attempt + 1}/${MAX_RETRIES})`);
+    } else {
+      const headerWait = (lastRateLimit.retryAfter ?? 0) * 1_000;
+      const expBackoff = Math.pow(2, attempt) * 1_000;
+      wait = Math.max(headerWait, expBackoff);
+      console.warn(`[ai-chat] 429 rate limit → ${wait}ms 재시도 (${attempt + 1}/${MAX_RETRIES})`);
+    }
     await sleep(wait);
     attempt++;
   }
@@ -186,6 +192,9 @@ serve(async (req: Request) => {
     console.error('[ai-chat] HTTP', res.status, errText);
     if (res.status === 401 || res.status === 403) {
       return jsonResponse({ ok: false, error: `AI 서비스 인증 실패 (HTTP ${res.status}). 관리자에게 문의해 주세요.` }, 500);
+    }
+    if (res.status === 529) {
+      return jsonResponse({ ok: false, error: 'AI 서비스가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.' }, 503);
     }
     if (res.status === 429) {
       return jsonResponse({ ok: false, error: RATE_LIMIT_FRIENDLY }, 429);

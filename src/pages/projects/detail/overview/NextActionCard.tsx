@@ -1,7 +1,10 @@
-// bal24 v2 — 프로젝트 개요 · 다음 행동 안내 (V7 AI 다음 행동 패널의 정적 버전)
-// status 4종 분기. callClaude 호출 X — STEP-AI-PREP 완료 후 동적 안내로 전환 예정.
+// bal24 v2 — 프로젝트 다음 행동 안내 (Stage AI-②)
+// status 4종 정적 가이드 + AI 추천 버튼 (next-action preset, Haiku 4.5)
 
-import { Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Sparkles, Loader2 } from 'lucide-react';
+import { supabase } from '../../../../lib/supabase';
+import { useToast } from '../../../../contexts/ToastContext';
 import type { ProjectStatus } from '../../../../types/database';
 
 const STAGE_TIPS: Record<ProjectStatus, string[]> = {
@@ -32,30 +35,89 @@ const STAGE_TIPS: Record<ProjectStatus, string[]> = {
 };
 
 export default function NextActionCard({ status }: { status: ProjectStatus }) {
+  const toast = useToast();
   const tips = STAGE_TIPS[status];
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<string | null>(null);
+
+  async function handleAiClick() {
+    setAiLoading(true);
+    setAiResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          preset: 'next-action',
+          messages: [
+            {
+              role: 'user',
+              content: `현재 프로젝트 상태는 "${status}" 단계입니다. 이 단계에서 우선 처리해야 할 행동 3~5가지를 번호 목록으로 간결하게 안내해 주세요.`,
+            },
+          ],
+        },
+      });
+      if (error) throw new Error(error.message);
+      const body = data as { ok?: boolean; text?: string; error?: string } | null;
+      if (!body?.ok) throw new Error(body?.error ?? 'AI 오류');
+      setAiResult(body.text ?? '');
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : '';
+      console.error('[next-action] AI 호출 실패:', raw);
+      toast.error('AI 추천 생성에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   return (
     <section className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/40 to-orange-50/40 p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-2.5">
-      <header className="flex items-center gap-1.5">
-        <Sparkles size={16} className="text-violet-500" aria-hidden="true" />
-        <h3 className="text-sm font-bold text-[#1E1B4B]">다음 행동 안내</h3>
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <Sparkles size={16} className="text-violet-500" aria-hidden="true" />
+          <h3 className="text-sm font-bold text-[#1E1B4B]">다음 행동 안내</h3>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleAiClick()}
+          disabled={aiLoading}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-violet-100 bg-violet-50/60 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {aiLoading
+            ? <Loader2 size={10} className="animate-spin" aria-hidden="true" />
+            : <Sparkles size={10} aria-hidden="true" />}
+          {aiLoading ? 'AI 분석 중…' : 'AI 추천'}
+        </button>
       </header>
 
-      <ul className="flex flex-col gap-1.5">
-        {tips.map((t, i) => (
-          <li
-            key={t}
-            className={`flex items-start gap-1.5 text-[11px] leading-relaxed ${
-              i === 0 ? 'font-bold text-[#1E1B4B]' : 'text-slate-600'
-            }`}
+      {aiResult ? (
+        <div className="flex flex-col gap-2">
+          <div className="rounded-xl bg-white border border-violet-100 p-3 text-[11px] text-slate-700 whitespace-pre-wrap leading-relaxed">
+            {aiResult}
+          </div>
+          <button
+            type="button"
+            onClick={() => setAiResult(null)}
+            className="self-end text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
           >
-            <span aria-hidden="true" className="text-violet-400 shrink-0">
-              {i === 0 ? '📌' : '·'}
-            </span>
-            <span className="flex-1">{t}</span>
-          </li>
-        ))}
-      </ul>
+            닫기
+          </button>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {tips.map((t, i) => (
+            <li
+              key={t}
+              className={`flex items-start gap-1.5 text-[11px] leading-relaxed ${
+                i === 0 ? 'font-bold text-[#1E1B4B]' : 'text-slate-600'
+              }`}
+            >
+              <span aria-hidden="true" className="text-violet-400 shrink-0">
+                {i === 0 ? '📌' : '·'}
+              </span>
+              <span className="flex-1">{t}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

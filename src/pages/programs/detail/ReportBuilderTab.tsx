@@ -21,6 +21,8 @@ export default function ReportBuilderTab({ programId }: Props) {
   const [seeding, setSeeding] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [aiDraftLoading, setAiDraftLoading] = useState(false);
+  const [aiDraft, setAiDraft] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const { data, error } = await supabase
@@ -166,6 +168,53 @@ export default function ReportBuilderTab({ programId }: Props) {
     toast.info(`${label}은 STEP-AI-PREP / STEP-EXPORT 완료 후 활성화 예정이에요.`);
   }
 
+  async function handleAiFullDraft() {
+    setAiDraftLoading(true);
+    setAiDraft(null);
+    try {
+      const { data: prog, error: progErr } = await supabase
+        .from('programs')
+        .select('name, type, status, start_date, end_date, description')
+        .eq('id', programId)
+        .maybeSingle();
+      if (progErr) {
+        console.error('[report-full] 프로그램 조회 실패:', progErr.message);
+        toast.error('프로그램 정보를 불러오지 못했어요.');
+        return;
+      }
+
+      const p = prog as {
+        name?: string | null;
+        type?: string | null;
+        start_date?: string | null;
+        end_date?: string | null;
+        description?: string | null;
+      } | null;
+      const context = p
+        ? `프로그램명: ${p.name ?? '미정'}\n유형: ${p.type ?? ''}\n기간: ${p.start_date ?? ''} ~ ${p.end_date ?? ''}\n설명: ${p.description ?? '없음'}`
+        : '프로그램 정보 없음';
+
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          preset: 'report-full',
+          systemOverride: '당신은 교육 프로그램 결과보고서 작성 전문가입니다. 아래 정보를 바탕으로 결과보고서 전체 초안을 작성해 주세요. 각 섹션을 ### 제목 형식으로 구분하여 상세히 작성하세요.',
+          messages: [{ role: 'user', content: context }],
+          maxTokens: 4096,
+        },
+      });
+      if (error) throw new Error(error.message);
+      const body = data as { ok?: boolean; text?: string; error?: string } | null;
+      if (!body?.ok) throw new Error(body?.error ?? 'AI 오류');
+      setAiDraft(body.text ?? '');
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : '';
+      console.error('[report-full] AI 초안 실패:', raw);
+      toast.error('AI 초안 생성에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setAiDraftLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-10">
@@ -189,11 +238,14 @@ export default function ReportBuilderTab({ programId }: Props) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => showPlaceholder('전체 AI 초안')}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-violet-50/40 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors"
+            onClick={() => void handleAiFullDraft()}
+            disabled={aiDraftLoading}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-violet-50/40 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <Sparkles size={12} aria-hidden="true" />
-            전체 AI 초안
+            {aiDraftLoading
+              ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+              : <Sparkles size={12} aria-hidden="true" />}
+            {aiDraftLoading ? 'AI 작성 중…' : '전체 AI 초안'}
           </button>
           <button
             type="button"
@@ -205,6 +257,28 @@ export default function ReportBuilderTab({ programId }: Props) {
           </button>
         </div>
       </header>
+
+      {aiDraft && (
+        <div className="rounded-2xl border border-violet-100 bg-violet-50/30 p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Sparkles size={14} className="text-violet-500" aria-hidden="true" />
+              <span className="text-sm font-bold text-slate-800">AI 결과보고서 초안</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAiDraft(null)}
+              className="text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              닫기
+            </button>
+          </div>
+          <div className="rounded-xl bg-white border border-violet-100 p-4 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
+            {aiDraft}
+          </div>
+          <p className="text-[10px] text-slate-400">💡 위 내용을 각 섹션 편집창에 복사하여 붙여넣으세요.</p>
+        </div>
+      )}
 
       {sections.length === 0 ? (
         <p className="text-sm text-slate-400 italic text-center py-8">
