@@ -14,6 +14,10 @@ import ConsortiumMembersField, {
   makeMember,
   type MemberDraft,
 } from './ConsortiumMembersField';
+import {
+  fetchMemberDrafts, replaceMembers, createConsortiumWithMembers, translateConsortiumError,
+} from './consortiumMembersUtils';
+import { useToast } from '../../contexts/ToastContext';
 import type {
   Client,
   ConsortiumRole,
@@ -74,23 +78,12 @@ function fromInitial(d: ConsortiumInitialData): ConsortiumForm {
   };
 }
 
-function translateError(raw: string, ctx: 'insert' | 'update' | 'member'): string {
-  const m = raw.toLowerCase();
-  if (m.includes('column') && m.includes('does not exist')) {
-    return '컨소시엄 테이블 컬럼이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.';
-  }
-  if (m.includes('row-level security') || m.includes('permission denied')) {
-    return '저장 권한이 없어요. 관리자에게 문의해 주세요.';
-  }
-  if (ctx === 'member') return '참여사 저장 중 오류가 발생했어요. (컨소시엄은 등록되었어요)';
-  if (ctx === 'update') return '컨소시엄 수정 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
-  return '컨소시엄 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
-}
-
 export default function ConsortiumFormModal({ open, onClose, onCreated, initialData }: Props) {
+  const toast = useToast();
   const isEditMode = !!initialData?.id;
   const [form, setForm] = useState<ConsortiumForm>(initialData ? fromInitial(initialData) : EMPTY);
   const [members, setMembers] = useState<MemberDraft[]>([makeMember()]);
+  const [membersLoading, setMembersLoading] = useState(false);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loadingRefs, setLoadingRefs] = useState(false);
@@ -132,17 +125,27 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
     setErrorMsg(null);
   }, [open, initialData]);
 
+  // 수정 모드에서 기존 참여사 fetch
+  useEffect(() => {
+    if (!open || !isEditMode || !initialData?.id) return;
+    let cancelled = false;
+    setMembersLoading(true);
+    void (async () => {
+      const { drafts, error } = await fetchMemberDrafts(initialData.id);
+      if (cancelled) return;
+      if (error) {
+        toast.error('참여사 정보를 불러오지 못했어요.');
+      } else {
+        setMembers(drafts);
+      }
+      setMembersLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [open, isEditMode, initialData?.id, toast]);
+
   const update = <K extends keyof ConsortiumForm>(key: K, value: ConsortiumForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
-
-  const updateMember = (uid: string, patch: Partial<MemberDraft>) => {
-    setMembers((prev) => prev.map((m) => (m.uid === uid ? { ...m, ...patch } : m)));
-  };
-
-  const addMember = () => setMembers((prev) => [...prev, makeMember()]);
-  const removeMember = (uid: string) =>
-    setMembers((prev) => (prev.length > 1 ? prev.filter((m) => m.uid !== uid) : prev));
 
   const validate = (): boolean => {
     if (!form.name.trim()) {
@@ -171,7 +174,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
     setSubmitting(true);
     try {
       if (isEditMode && initialData) {
-        // 수정 모드 — consortiums UPDATE만 (참여사 변경은 STEP-CON-C)
+        // 수정 모드 — consortiums UPDATE → 참여사 일괄 DELETE+INSERT (Q4=A)
         const { error: uErr } = await supabase
           .from('consortiums')
           .update({
@@ -187,18 +190,33 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
           .eq('id', initialData.id);
         if (uErr) {
           console.error('[consortium] 수정 실패:', uErr.message);
-          setErrorMsg(translateError(uErr.message, 'update'));
+          setErrorMsg(translateConsortiumError(uErr.message, 'update'));
           return;
         }
+
+        const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
+        const replaceRes = await replaceMembers({
+          consortiumId: initialData.id,
+          drafts: members,
+          clientNameById,
+        });
+        if (replaceRes.error) {
+          const msg = replaceRes.stage === 'delete'
+            ? '참여사 초기화에 실패했어요. 잠시 후 다시 시도해 주세요.'
+            : '참여사 저장에 실패했어요. (기본 정보는 수정됐어요. 다시 저장해 주세요.)';
+          setErrorMsg(msg);
+          return;
+        }
+        toast.success('컨소시엄이 수정됐어요.');
         onCreated();
         onClose();
         return;
       }
 
-      // 신규 등록
-      const { data: cData, error: cErr } = await supabase
-        .from('consortiums')
-        .insert({
+      // 신규 등록 — utils 위임
+      const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
+      const res = await createConsortiumWithMembers({
+        payload: {
           name: form.name.trim(),
           project_id: form.projectId || null,
           status: form.status,
@@ -206,49 +224,21 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
           description: form.description.trim() || null,
           start_date: form.startDate || null,
           end_date: form.endDate || null,
-        })
-        .select('id')
-        .single();
-      if (cErr) throw cErr;
-
-      // 주관사 + 참여사 행을 consortium_members에 일괄 INSERT
-      const memberRows: Array<Record<string, unknown>> = [];
-      if (form.leadClientId) {
-        const lead = clients.find((c) => c.id === form.leadClientId);
-        memberRows.push({
-          consortium_id: cData.id,
-          client_id: form.leadClientId,
-          org_name: lead?.name ?? '주관사',
-          role: form.leadRole,
-        });
+        },
+        leadRole: form.leadRole,
+        drafts: members,
+        clientNameById,
+      });
+      if (res.error) {
+        setErrorMsg(translateConsortiumError(res.error, res.ctx ?? 'insert'));
+        if (res.ctx !== 'member') return; // 컨소시엄 등록 자체 실패
       }
-      for (const mem of members) {
-        if (!mem.clientId) continue;
-        const target = clients.find((c) => c.id === mem.clientId);
-        memberRows.push({
-          consortium_id: cData.id,
-          client_id: mem.clientId,
-          org_name: target?.name ?? '참여사',
-          role: mem.role || null,
-          budget_ratio: mem.shareRatio.trim() ? Number(mem.shareRatio) : null,
-          responsibilities: mem.responsibilities.trim() || null,
-        });
-      }
-
-      if (memberRows.length > 0) {
-        const { error: mErr } = await supabase.from('consortium_members').insert(memberRows);
-        if (mErr) {
-          console.error('[consortium] 참여사 저장 실패:', mErr.message);
-          setErrorMsg(translateError(mErr.message, 'member'));
-        }
-      }
-
       onCreated();
       onClose();
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[consortium] 등록 실패:', raw);
-      setErrorMsg(translateError(raw, 'insert'));
+      setErrorMsg(translateConsortiumError(raw, 'insert'));
     } finally {
       setSubmitting(false);
     }
@@ -262,7 +252,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
       open={open}
       onClose={onClose}
       title={isEditMode ? '컨소시엄 수정' : '컨소시엄 신규 등록'}
-      description={isEditMode ? '기본 정보·주관사를 수정해요. 참여사 변경은 후속 기능에서 가능해요.' : '컨소시엄명만 필수예요. 참여사는 여러 곳 추가할 수 있어요.'}
+      description={isEditMode ? '기본 정보·주관사·참여사를 수정해요.' : '컨소시엄명만 필수예요. 참여사는 여러 곳 추가할 수 있어요.'}
       size="lg"
       closeOnBackdrop={!submitting}
       footer={
@@ -367,22 +357,18 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
           )}
         </section>
 
-        {!isEditMode && (
+        {membersLoading ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+            참여사 정보를 불러오는 중…
+          </div>
+        ) : (
           <ConsortiumMembersField
-            members={members}
+            value={members}
+            onChange={setMembers}
             clients={clients}
             loadingRefs={loadingRefs}
             submitting={submitting}
-            onAdd={addMember}
-            onRemove={removeMember}
-            onUpdate={updateMember}
           />
-        )}
-
-        {isEditMode && (
-          <p className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-xs text-slate-500">
-            ⓘ 참여사 추가/변경은 후속 기능에서 지원돼요. 현재는 기본 정보·주관사만 수정할 수 있어요.
-          </p>
         )}
 
         {errorMsg && (
