@@ -9,6 +9,8 @@ import { TASK_STATUS_VALUES } from './taskStatus';
 import type { Profile, TaskStatus } from '../../../types/database';
 
 type ProfileOption = Pick<Profile, 'id' | 'name'>;
+type ConsortiumOption = { id: string; name: string };
+type MemberOption = { id: string; client_name: string };
 
 type Props = {
   open: boolean;
@@ -21,12 +23,17 @@ export default function TaskFormModal({ open, projectId, onClose, onCreated }: P
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<TaskStatus>('인식');
   const [assigneeId, setAssigneeId] = useState('');
+  const [consortiumId, setConsortiumId] = useState('');
+  const [memberId, setMemberId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [description, setDescription] = useState('');
 
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
+  const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
+  const [members, setMembers] = useState<MemberOption[]>([]);
   const [loadingRefs, setLoadingRefs] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [titleError, setTitleError] = useState<string | null>(null);
@@ -38,19 +45,25 @@ export default function TaskFormModal({ open, projectId, onClose, onCreated }: P
     let cancelled = false;
     setLoadingRefs(true);
 
-    supabase
-      .from('profiles')
-      .select('id, name')
-      .eq('is_active', true)
-      .order('name', { ascending: true })
-      .then(({ data, error }) => {
+    Promise.all([
+      supabase.from('profiles').select('id, name').eq('is_active', true).order('name', { ascending: true }),
+      supabase.from('consortiums').select('id, name').in('status', ['구성중', '진행']).order('name', { ascending: true }),
+    ])
+      .then(([profRes, conRes]) => {
         if (cancelled) return;
-        if (error) {
-          console.error('[tasks] 담당자 조회 실패:', error.message);
+        if (profRes.error) {
+          console.error('[tasks] 담당자 조회 실패:', profRes.error.message);
         } else {
-          setProfiles(data ?? []);
+          setProfiles(profRes.data ?? []);
         }
-        setLoadingRefs(false);
+        if (conRes.error) {
+          console.error('[tasks] 컨소시엄 조회 실패:', conRes.error.message);
+        } else {
+          setConsortiums((conRes.data as ConsortiumOption[] | null) ?? []);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRefs(false);
       });
 
     return () => {
@@ -58,12 +71,53 @@ export default function TaskFormModal({ open, projectId, onClose, onCreated }: P
     };
   }, [open]);
 
+  // 컨소시엄 변경 시 참여사 cascade 조회
+  useEffect(() => {
+    if (!consortiumId) {
+      setMembers([]);
+      setMemberId('');
+      return;
+    }
+    let cancelled = false;
+    setLoadingMembers(true);
+    void (async () => {
+      const { data, error } = await supabase
+        .from('consortium_members')
+        .select('id, clients!consortium_members_client_id_fkey(name)')
+        .eq('consortium_id', consortiumId)
+        .order('created_at', { ascending: true });
+      if (cancelled) return;
+      if (error) {
+        console.error('[tasks] 참여사 조회 실패:', error.message);
+        setMembers([]);
+      } else {
+        // Supabase는 inner join 객체를 단일 또는 배열 형태로 반환할 수 있음 — 둘 다 안전 처리
+        const rows = (data as unknown as Array<{
+          id: string;
+          clients: { name: string } | { name: string }[] | null;
+        }>) ?? [];
+        setMembers(
+          rows.map((m) => {
+            const c = Array.isArray(m.clients) ? m.clients[0] : m.clients;
+            return { id: m.id, client_name: c?.name ?? '이름 없음' };
+          }),
+        );
+      }
+      setLoadingMembers(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [consortiumId]);
+
   useEffect(() => {
     if (open) return;
     // 모달 닫히면 폼 초기화
     setTitle('');
     setStatus('인식');
     setAssigneeId('');
+    setConsortiumId('');
+    setMemberId('');
     setStartDate('');
     setDueDate('');
     setDescription('');
@@ -92,6 +146,8 @@ export default function TaskFormModal({ open, projectId, onClose, onCreated }: P
         title: title.trim(),
         status,
         assignee_id: assigneeId || null,
+        consortium_id: consortiumId || null,
+        consortium_member_id: memberId || null,
         start_date: startDate || null,
         due_date: dueDate || null,
         description: description.trim() || null,
@@ -173,6 +229,50 @@ export default function TaskFormModal({ open, projectId, onClose, onCreated }: P
               <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음'}</option>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700">
+              컨소시엄 <span className="text-xs font-normal text-slate-400">(선택)</span>
+            </label>
+            <select
+              value={consortiumId}
+              onChange={(e) => setConsortiumId(e.target.value)}
+              disabled={submitting || loadingRefs}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+            >
+              <option value="">연결 안 함</option>
+              {consortiums.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700">
+              참여사 <span className="text-xs font-normal text-slate-400">(선택)</span>
+            </label>
+            <select
+              value={memberId}
+              onChange={(e) => setMemberId(e.target.value)}
+              disabled={submitting || !consortiumId || loadingMembers || members.length === 0}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {!consortiumId
+                  ? '컨소시엄을 먼저 선택하세요'
+                  : loadingMembers
+                    ? '불러오는 중…'
+                    : members.length === 0
+                      ? '참여사 없음'
+                      : '참여사 선택'}
+              </option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>{m.client_name}</option>
               ))}
             </select>
           </div>

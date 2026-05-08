@@ -21,6 +21,10 @@ import {
 } from './programStatus';
 import { PROGRAM_TYPE_STYLE, PROGRAM_STATUS_STYLE, BADGE_BASE } from '../../utils/statusStyles';
 import EmptyState from '../../components/EmptyState';
+import ConsortiumFilterTabs, {
+  type ConsortiumFilter,
+  type ConsortiumOption,
+} from '../../components/ConsortiumFilterTabs';
 import { useToast } from '../../contexts/ToastContext';
 import ProgramFormModal from './ProgramFormModal';
 import InvitationManagePanel from './InvitationManagePanel';
@@ -31,10 +35,11 @@ type TypeFilter = ProgramType | '전체';
 
 type ProgramRow = Program & {
   project?: { id: string; name: string } | null;
+  consortium?: { id: string; name: string } | null;
 };
 
-// programs.project_id → projects(id) FK 하나뿐이라 단축형 안전
-const SELECT_COLUMNS = '*, project:projects(id,name)';
+// programs.project_id → projects(id), programs.consortium_id → consortiums(id) — FK 하나씩이라 단축형 안전
+const SELECT_COLUMNS = '*, project:projects(id,name), consortium:consortiums(id,name)';
 
 function FilterTabs<T extends string>({
   values,
@@ -185,8 +190,30 @@ export default function ProgramsPage() {
   const [view, setView] = useState<ViewMode>('list');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('전체');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('전체');
+  const [filterConsortiumId, setFilterConsortiumId] = useState<ConsortiumFilter>(null);
+  const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [invitePanel, setInvitePanel] = useState<ProgramRow | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('consortiums')
+        .select('id, name')
+        .in('status', ['구성중', '진행'])
+        .order('name', { ascending: true });
+      if (cancelled) return;
+      if (error) {
+        console.error('[programs] 컨소시엄 조회 실패:', error.message);
+        return;
+      }
+      setConsortiums((data as ConsortiumOption[] | null) ?? []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fetchPrograms = useCallback(async () => {
     setLoading(true);
@@ -233,12 +260,14 @@ export default function ProgramsPage() {
   }, [programs]);
 
   const visible = useMemo(() => {
-    return programs.filter(
-      (p) =>
-        (statusFilter === '전체' || p.status === statusFilter) &&
-        (typeFilter === '전체' || p.type === typeFilter),
-    );
-  }, [programs, statusFilter, typeFilter]);
+    return programs.filter((p) => {
+      if (statusFilter !== '전체' && p.status !== statusFilter) return false;
+      if (typeFilter !== '전체' && p.type !== typeFilter) return false;
+      if (filterConsortiumId === 'none' && p.consortium_id) return false;
+      if (filterConsortiumId && filterConsortiumId !== 'none' && p.consortium_id !== filterConsortiumId) return false;
+      return true;
+    });
+  }, [programs, statusFilter, typeFilter, filterConsortiumId]);
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -307,6 +336,12 @@ export default function ProgramsPage() {
             ariaLabel="유형 필터"
           />
         </div>
+
+        <ConsortiumFilterTabs
+          consortiums={consortiums}
+          value={filterConsortiumId}
+          onChange={setFilterConsortiumId}
+        />
       </div>
 
       {loading ? (

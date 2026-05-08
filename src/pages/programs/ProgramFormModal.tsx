@@ -9,6 +9,7 @@ import { PROGRAM_STATUS_VALUES, PROGRAM_TYPE_VALUES } from './programStatus';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
 
 type ProjectOption = Pick<Project, 'id' | 'name'>;
+type ConsortiumOption = { id: string; name: string };
 
 type Props = {
   open: boolean;
@@ -21,6 +22,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   const [type, setType] = useState<ProgramType>('교육');
   const [status, setStatus] = useState<ProgramStatus>('준비');
   const [projectId, setProjectId] = useState('');
+  const [consortiumId, setConsortiumId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [venue, setVenue] = useState('');
@@ -28,6 +30,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   const [description, setDescription] = useState('');
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
   const [loadingRefs, setLoadingRefs] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -40,18 +43,25 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     let cancelled = false;
     setLoadingRefs(true);
 
-    supabase
-      .from('projects')
-      .select('id, name')
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
+    Promise.all([
+      supabase.from('projects').select('id, name').order('created_at', { ascending: false }),
+      supabase.from('consortiums').select('id, name').in('status', ['구성중', '진행']).order('name', { ascending: true }),
+    ])
+      .then(([projRes, conRes]) => {
         if (cancelled) return;
-        if (error) {
-          console.error('[programs] 프로젝트 조회 실패:', error.message);
+        if (projRes.error) {
+          console.error('[programs] 프로젝트 조회 실패:', projRes.error.message);
         } else {
-          setProjects(data ?? []);
+          setProjects(projRes.data ?? []);
         }
-        setLoadingRefs(false);
+        if (conRes.error) {
+          console.error('[programs] 컨소시엄 조회 실패:', conRes.error.message);
+        } else {
+          setConsortiums((conRes.data as ConsortiumOption[] | null) ?? []);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRefs(false);
       });
 
     return () => {
@@ -65,6 +75,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     setType('교육');
     setStatus('준비');
     setProjectId('');
+    setConsortiumId('');
     setStartDate('');
     setEndDate('');
     setVenue('');
@@ -98,6 +109,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     try {
       const { error } = await supabase.from('programs').insert({
         project_id: projectId || null,
+        consortium_id: consortiumId || null,
         name: name.trim(),
         type,
         status,
@@ -188,19 +200,38 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-slate-700">연결 프로젝트</label>
-          <select
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-            disabled={submitting || loadingRefs}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-          >
-            <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음'}</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700">연결 프로젝트</label>
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              disabled={submitting || loadingRefs}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+            >
+              <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음'}</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700">
+              컨소시엄 <span className="text-xs font-normal text-slate-400">(선택)</span>
+            </label>
+            <select
+              value={consortiumId}
+              onChange={(e) => setConsortiumId(e.target.value)}
+              disabled={submitting || loadingRefs}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+            >
+              <option value="">연결 안 함 (자체 사업)</option>
+              {consortiums.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

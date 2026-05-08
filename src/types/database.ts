@@ -188,6 +188,7 @@ export interface ProgramFile {
 export interface Program {
   id: string;
   project_id?: string | null;
+  consortium_id?: string | null;
   name: string;
   type: ProgramType;
   status: ProgramStatus;
@@ -359,6 +360,8 @@ export interface ReportSection {
 export interface Task {
   id: string;
   project_id: string;
+  consortium_id?: string | null;
+  consortium_member_id?: string | null;
   title: string;
   description?: string | null;
   status: TaskStatus;

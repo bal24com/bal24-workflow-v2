@@ -17,6 +17,7 @@ const PROJECT_TYPES: ProjectType[] = ['교육', '컨설팅', '이벤트'];
 
 type ClientOption = Pick<Client, 'id' | 'name'>;
 type ProfileOption = Pick<Profile, 'id' | 'name'>;
+type ConsortiumOption = { id: string; name: string };
 
 type Props = {
   open: boolean;
@@ -33,10 +34,12 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
   const [budget, setBudget] = useState('');
   const [clientId, setClientId] = useState('');
   const [pmId, setPmId] = useState('');
+  const [consortiumId, setConsortiumId] = useState('');
   const [description, setDescription] = useState('');
 
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
+  const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
   const [loadingRefs, setLoadingRefs] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -52,8 +55,9 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
     Promise.all([
       supabase.from('clients').select('id, name').order('name', { ascending: true }),
       supabase.from('profiles').select('id, name').eq('is_active', true).order('name', { ascending: true }),
+      supabase.from('consortiums').select('id, name').in('status', ['구성중', '진행']).order('name', { ascending: true }),
     ])
-      .then(([clientsRes, profilesRes]) => {
+      .then(([clientsRes, profilesRes, conRes]) => {
         if (cancelled) return;
         if (clientsRes.error) {
           console.error('[projects] 고객사 조회 실패:', clientsRes.error.message);
@@ -64,6 +68,11 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
           console.error('[projects] 담당자 조회 실패:', profilesRes.error.message);
         } else {
           setProfiles(profilesRes.data ?? []);
+        }
+        if (conRes.error) {
+          console.error('[projects] 컨소시엄 조회 실패:', conRes.error.message);
+        } else {
+          setConsortiums((conRes.data as ConsortiumOption[] | null) ?? []);
         }
       })
       .finally(() => {
@@ -86,6 +95,7 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
     setBudget('');
     setClientId('');
     setPmId('');
+    setConsortiumId('');
     setDescription('');
     setErrorMsg(null);
     setNameError(null);
@@ -123,6 +133,7 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
         description: description.trim() || null,
         client_id: clientId || null,
         pm_id: pmId || null,
+        consortium_id: consortiumId || null,
       });
 
       if (error) throw error;
@@ -261,6 +272,23 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
               ))}
             </select>
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-700">
+            컨소시엄 <span className="text-xs font-normal text-slate-400">(선택)</span>
+          </label>
+          <select
+            value={consortiumId}
+            onChange={(e) => setConsortiumId(e.target.value)}
+            disabled={submitting || loadingRefs}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+          >
+            <option value="">연결 안 함 (자체 사업)</option>
+            {consortiums.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-1.5">
