@@ -35,11 +35,10 @@ type TypeFilter = ProgramType | '전체';
 
 type ProgramRow = Program & {
   project?: { id: string; name: string } | null;
-  consortium?: { id: string; name: string } | null;
 };
 
-// programs.project_id → projects(id), programs.consortium_id → consortiums(id) — FK 하나씩이라 단축형 안전
-const SELECT_COLUMNS = '*, project:projects(id,name), consortium:consortiums(id,name)';
+// consortium join은 일부 환경에서 400 유발 → 선제 제거. consortium_id 는 '*' 로 수신되어 필터 로직 그대로 작동.
+const SELECT_COLUMNS = '*, project:projects(id,name)';
 
 function FilterTabs<T extends string>({
   values,
