@@ -73,7 +73,7 @@ interface SessionRow {
   title: string;
   session_date: string;
   check_in_open: boolean;
-  learner_token: string | null;
+  student_token: string | null;
   instructor_token: string | null;
   ta_token: string | null;
   created_at: string;
@@ -117,7 +117,7 @@ export async function fetchAllLinks(): Promise<SharedLink[]> {
     supabase
       .from('attendance_sessions')
       .select(
-        'id, title, session_date, check_in_open, learner_token, instructor_token, ta_token, created_at, programs(name)',
+        'id, title, session_date, check_in_open, student_token, instructor_token, ta_token, created_at, programs(name)',
       )
       .order('session_date', { ascending: false })
       .limit(30),
@@ -160,7 +160,7 @@ export async function fetchAllLinks(): Promise<SharedLink[]> {
         : s.session_date;
       const status = s.check_in_open ? '열림' : '닫힘';
       const tokens: Array<{ token: string | null; role: string }> = [
-        { token: s.learner_token, role: '교육생' },
+        { token: s.student_token, role: '교육생' },
         { token: s.instructor_token, role: '강사' },
         { token: s.ta_token, role: 'TA' },
       ];

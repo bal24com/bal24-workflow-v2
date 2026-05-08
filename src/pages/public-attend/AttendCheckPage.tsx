@@ -74,13 +74,12 @@ export default function AttendCheckPage() {
     let cancelled = false;
     setLoading(true);
     void (async () => {
-      // 3 토큰 중 일치하는 컬럼으로 역할 판별
-      // student_token (Stage 11-① 표준) + learner_token (transition 호환)
+      // 3 토큰 중 일치하는 컬럼으로 역할 판별 (student/instructor/ta)
       const { data, error } = await supabase
         .from('attendance_sessions')
         .select('*, program:programs(id, name)')
         .or(
-          `student_token.eq.${token},learner_token.eq.${token},instructor_token.eq.${token},ta_token.eq.${token}`,
+          `student_token.eq.${token},instructor_token.eq.${token},ta_token.eq.${token}`,
         )
         .maybeSingle();
 

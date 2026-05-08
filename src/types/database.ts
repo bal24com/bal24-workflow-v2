@@ -588,10 +588,8 @@ export interface AttendanceSession {
   location?: string | null;
   /** 호환용 (구버전) — 신규는 student_token 사용 */
   session_token?: string | null;
-  /** 학생 외부 출석 토큰 (Stage 11-① 추가). V2 기존 learner_token 호환 alias */
+  /** 학생 외부 출석 토큰 */
   student_token: string;
-  /** 학생 토큰 호환 — 점진 폐기 */
-  learner_token?: string | null;
   /** 강사 외부 출석 토큰 */
   instructor_token: string;
   /** TA 외부 출석 토큰 */
