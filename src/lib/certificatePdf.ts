@@ -1,27 +1,17 @@
-// bal24 v2 — 수료증·강의확인서 PDF 즉석 생성 (Stage 11-①)
-// jspdf + html2canvas — 단순 캔버스 → 이미지 → A4 PDF.
+// bal24 v2 — PDF 변환 코어 (lib/, 순수 함수)
+// 두 입력 모델 지원:
+//   - elementToPdfBlob: 미리 렌더된 DOM 캡처 (외부 페이지·보고서 미리보기)
+//   - htmlToPdfBlob: 동적 HTML 문자열 (PM 일괄 발급용 — certificateUtils 가 호출)
+// jspdf + html2canvas 사용. domain 의존성 없음 (Storage·시퀀스는 certificates/ 에 분리).
 
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export interface CertificatePayload {
-  /** 수료증 / 강의확인서 */
-  title: string;
-  institutionName: string;
-  recipientName: string;
-  programName: string;
-  /** 'YYYY-MM-DD' */
-  issueDate: string;
-  certNumber?: string | null;
-  sealImageUrl?: string | null;
-  signatureName?: string | null;
-  /** 추가 본문 (예: "위 사람은 ..." 문장) */
-  bodyText?: string;
-}
-
 export interface PdfOptions {
   /** 기본 'landscape' (수료증). 'portrait' 는 보고서 등 세로형 + 멀티페이지 자동 분할 */
   orientation?: 'landscape' | 'portrait';
+  /** html2canvas scale (기본 2 — 고해상도) */
+  scale?: number;
 }
 
 /**
@@ -35,9 +25,10 @@ export async function elementToPdfBlob(
   options?: PdfOptions,
 ): Promise<Blob | null> {
   const orientation = options?.orientation ?? 'landscape';
+  const scale = options?.scale ?? 2;
   try {
     const canvas = await html2canvas(el, {
-      scale: 2,
+      scale,
       useCORS: true,
       backgroundColor: '#ffffff',
     });
@@ -67,6 +58,44 @@ export async function elementToPdfBlob(
     const raw = err instanceof Error ? err.message : '';
     console.error('[certificate-pdf] PDF 생성 실패:', raw);
     return null;
+  }
+}
+
+/**
+ * HTML 문자열 → PDF Blob (PM 발급용 핵심 코어).
+ * - 임시 div 를 화면 밖에 렌더 → html2canvas 캡처 → jsPDF.
+ * - portrait 기본 (수료증·강의확인서 794×1123 패턴).
+ * - finally 블록에서 임시 div 정리.
+ */
+export async function htmlToPdfBlob(
+  html: string,
+  options?: PdfOptions,
+): Promise<Blob> {
+  const orientation = options?.orientation ?? 'portrait';
+  const scale = options?.scale ?? 2;
+
+  const container = document.createElement('div');
+  container.style.cssText = `
+    width:794px; height:1123px; padding:80px;
+    background:#fff; font-family: Pretendard, sans-serif;
+    position:absolute; left:-9999px; top:0; box-sizing:border-box;
+  `;
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  try {
+    const canvas = await html2canvas(container, {
+      scale,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+    });
+    const pdf = new jsPDF({ orientation, unit: 'px', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, pageH);
+    return pdf.output('blob');
+  } finally {
+    document.body.removeChild(container);
   }
 }
 

@@ -1,11 +1,8 @@
-// bal24 v2 — 수료증 / 강의확인서 PDF 생성 + 증서번호 생성
-//
-// html2canvas + jspdf로 HTML 템플릿을 A4 PDF로 렌더링한 뒤,
-// Supabase Storage('certificates' 버킷)에 업로드하여 공개 URL을 얻는다.
+// bal24 v2 — 수료증 / 강의확인서 도메인 로직 (HTML 템플릿 + Storage + 시퀀스)
+// PDF 변환 코어는 lib/certificatePdf.ts 의 htmlToPdfBlob 사용 (STEP-CERT-UNIFY).
 
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { supabase } from '../../lib/supabase';
+import { htmlToPdfBlob } from '../../lib/certificatePdf';
 import type { CertificateType } from '../../types/database';
 
 const STORAGE_BUCKET = 'certificates';
@@ -86,31 +83,10 @@ export function buildCertificateHTML(data: CertificateData): string {
   `;
 }
 
-// ─── PDF 생성 ──────────────────────────────────────
+// ─── PDF 생성 (얇은 래퍼) ─────────────────────────
+// HTML 템플릿(buildCertificateHTML)은 도메인 책임, PDF 코어는 lib 으로 이동.
 export async function generateCertificatePDF(data: CertificateData): Promise<Blob> {
-  const container = document.createElement('div');
-  container.style.cssText = `
-    width:794px; height:1123px; padding:80px;
-    background:#fff; font-family: Pretendard, sans-serif;
-    position:absolute; left:-9999px; top:0; box-sizing:border-box;
-  `;
-  container.innerHTML = buildCertificateHTML(data);
-  document.body.appendChild(container);
-
-  try {
-    const canvas = await html2canvas(container, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-    });
-    const pdf = new jsPDF({ unit: 'px', format: 'a4', orientation: 'portrait' });
-    const w = pdf.internal.pageSize.getWidth();
-    const h = pdf.internal.pageSize.getHeight();
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, w, h);
-    return pdf.output('blob');
-  } finally {
-    document.body.removeChild(container);
-  }
+  return htmlToPdfBlob(buildCertificateHTML(data), { orientation: 'portrait', scale: 2 });
 }
 
 // ─── 증서번호 생성: CERT-YYYYMMDD-0001 ───────────
@@ -180,7 +156,4 @@ export async function getNextCertSeq(): Promise<number> {
   return 1000 + (count ?? 0) + 1;
 }
 
-// ─── 한국어 날짜 표기 ─────────────────────────────
-export function formatIssueDateKo(date: Date): string {
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
-}
+// 한국어 날짜 표기는 lib/certificatePdf 의 formatIssueDateKo (iso: string) 사용 — 중복 제거.

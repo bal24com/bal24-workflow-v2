@@ -6,12 +6,12 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '../../c
 import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
 import {
-  formatIssueDateKo,
   generateCertNumber,
   generateCertificatePDF,
   getNextCertSeq,
   uploadCertificatePDF,
 } from './certificateUtils';
+import { formatIssueDateKo } from '../../lib/certificatePdf';
 import type {
   CertificateTemplate,
   CertificateType,
@@ -156,7 +156,7 @@ export default function CertificatePage() {
       const blob = await generateCertificatePDF({
         recipientName: row.recipientName,
         programName,
-        issueDate: formatIssueDateKo(now),
+        issueDate: formatIssueDateKo(now.toISOString().slice(0, 10)),
         validHours: defaultTemplate.valid_hours,
         certNumber,
         institutionName: defaultTemplate.institution_name,
