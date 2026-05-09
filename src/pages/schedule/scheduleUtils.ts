@@ -4,6 +4,18 @@
 
 import { supabase } from '../../lib/supabase';
 
+/**
+ * Supabase 응답에서 "테이블이 스키마에 없음" 에러 여부 판정.
+ * PostgREST PGRST205 ("Could not find the table 'public.X' in the schema cache")
+ * — 마이그레이션 미적용 환경에서 안전하게 빈 결과로 fallback 하기 위함.
+ */
+export function isMissingTableError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return m.includes('pgrst205') ||
+    (m.includes('could not find the table') && m.includes('schema cache'));
+}
+
 export type EventSource =
   | 'project'
   | 'task'
@@ -149,7 +161,10 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
   if (tasks.error) console.error('[schedule] tasks 조회 실패:', tasks.error.message);
   if (programs.error) console.error('[schedule] programs 조회 실패:', programs.error.message);
   if (sessions.error) console.error('[schedule] attendance_sessions 조회 실패:', sessions.error.message);
-  if (customs.error) console.error('[schedule] schedule_events 조회 실패:', customs.error.message);
+  // schedule_events 가 아직 마이그레이션 안 된 환경 → 빈 결과로 안전 fallback
+  if (customs.error && !isMissingTableError(customs.error.message)) {
+    console.error('[schedule] schedule_events 조회 실패:', customs.error.message);
+  }
 
   const events: UnifiedEvent[] = [];
 

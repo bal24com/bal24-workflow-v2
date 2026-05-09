@@ -12,6 +12,7 @@ import {
   weekRange,
   SOURCE_EMOJI,
   SOURCE_LABEL,
+  isMissingTableError,
   type EventSource,
   type UnifiedEvent,
 } from './scheduleUtils';
@@ -158,7 +159,10 @@ export default function SchedulePage() {
       .eq('id', event.relatedId)
       .maybeSingle();
     if (error || !data) {
-      console.error('[schedule] 일정 조회 실패:', error?.message);
+      // schedule_events 테이블 미적용 환경 → 조용히 skip (편집 불가 상태)
+      if (error && !isMissingTableError(error.message)) {
+        console.error('[schedule] 일정 조회 실패:', error.message);
+      }
       return;
     }
     setModalEditTarget(data as ScheduleEvent);

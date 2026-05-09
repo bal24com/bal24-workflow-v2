@@ -2,6 +2,7 @@
 // 재무 합계 / 이벤트 통합 / 활동 로그 / 참여자 미리보기
 
 import { supabase } from '../../../lib/supabase';
+import { isMissingTableError } from '../../schedule/scheduleUtils';
 import type {
   ActivityLog,
   ActivityLogType,
@@ -131,7 +132,10 @@ export async function fetchProjectEvents(projectId: string): Promise<ProjectEven
   ]);
 
   if (programsRes.error) console.error('[project-detail] 프로그램 조회 실패:', programsRes.error.message);
-  if (schedulesRes.error) console.error('[project-detail] 일정 조회 실패:', schedulesRes.error.message);
+  // schedule_events 미적용 환경 → 빈 배열 안전 fallback (콘솔 노이즈 X)
+  if (schedulesRes.error && !isMissingTableError(schedulesRes.error.message)) {
+    console.error('[project-detail] 일정 조회 실패:', schedulesRes.error.message);
+  }
 
   return {
     programs: (programsRes.data as ProjectEventsBundle['programs'] | null) ?? [],
