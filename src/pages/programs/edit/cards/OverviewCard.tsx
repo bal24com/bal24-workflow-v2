@@ -4,8 +4,16 @@
 import { useEffect, useState } from 'react';
 import CardShell, { Field, inputClass, textareaClass } from './CardShell';
 import { PROGRAM_TYPE_VALUES } from '../../programStatus';
-import { fetchProjectOptions, type ProjectOption, type ProgramEditForm } from '../programEditUtils';
+import {
+  fetchProjectOptions, type ProjectOption, type ProgramEditForm, type ProgramVisibility,
+} from '../programEditUtils';
 import type { ProgramType } from '../../../../types/database';
+
+const VISIBILITY_OPTIONS: { value: ProgramVisibility; label: string; desc: string }[] = [
+  { value: 'internal', label: '팀 내부 공개', desc: '로그인한 팀원 전체 조회 가능' },
+  { value: 'private',  label: '배정자 한정',  desc: '배정 담당자·강사·멘토만' },
+  { value: 'public',   label: '외부 공개',    desc: '외부 링크로도 접근 가능' },
+];
 
 interface Props {
   form: ProgramEditForm;
@@ -73,6 +81,18 @@ export default function OverviewCard({ form, onChange, errorField }: Props) {
           </select>
         </Field>
       </div>
+
+      <Field label="가시성" hint="프로그램을 누구에게 노출할지 (RLS 자동 적용)">
+        <select
+          value={form.visibility}
+          onChange={(e) => onChange('visibility', e.target.value as ProgramVisibility)}
+          className={inputClass}
+        >
+          {VISIBILITY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label} — {o.desc}</option>
+          ))}
+        </select>
+      </Field>
 
       <Field label="요약 설명" hint="간단한 소개 — 외부 신청 폼에 노출될 수 있어요">
         <textarea

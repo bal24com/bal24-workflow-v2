@@ -6,6 +6,8 @@ import type {
   Program, ProgramFile, ProgramStatus, ProgramType,
 } from '../../../types/database';
 
+export type ProgramVisibility = 'private' | 'internal' | 'public';
+
 export interface ProgramEditForm {
   name: string;
   type: ProgramType;
@@ -19,6 +21,8 @@ export interface ProgramEditForm {
   notice: string;
   notice_files: ProgramFile[];
   goal_text: string;
+  /** STEP-PROGRAM-EDIT-VISIBILITY — 가시성 (private/internal/public) */
+  visibility: ProgramVisibility;
 }
 
 export function emptyForm(): ProgramEditForm {
@@ -35,6 +39,7 @@ export function emptyForm(): ProgramEditForm {
     notice: '',
     notice_files: [],
     goal_text: '',
+    visibility: 'internal',
   };
 }
 
@@ -52,6 +57,7 @@ export function programToForm(p: Program): ProgramEditForm {
     notice: p.notice ?? '',
     notice_files: p.notice_files ?? [],
     goal_text: p.goal_text ?? '',
+    visibility: (p.visibility ?? 'internal') as ProgramVisibility,
   };
 }
 
@@ -90,6 +96,7 @@ export async function saveProgram(programId: string, f: ProgramEditForm): Promis
       notice: f.notice.trim() || null,
       notice_files: f.notice_files.length > 0 ? f.notice_files : null,
       goal_text: f.goal_text.trim() || null,
+      visibility: f.visibility,
       updated_at: new Date().toISOString(),
     })
     .eq('id', programId);
