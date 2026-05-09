@@ -200,6 +200,8 @@ export interface Program {
   /** STEP-PROGRAM-TYPE — 활성 모듈 ID 배열 (program_templates.modules 복사) */
   modules?: string[] | null;
   status: ProgramStatus;
+  /** STEP-PROGRAM-VISIBILITY — RLS 가시성 (private / internal / public) */
+  visibility?: 'private' | 'internal' | 'public';
   start_date?: string | null;
   end_date?: string | null;
   venue?: string | null;

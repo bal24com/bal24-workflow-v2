@@ -23,6 +23,13 @@ function toLegacyType(pt: ExtendedProgramType): ProgramType {
 
 type ProjectOption = Pick<Project, 'id' | 'name'>;
 type ConsortiumOption = { id: string; name: string };
+type Visibility = 'private' | 'internal' | 'public';
+
+const VISIBILITY_OPTIONS: { value: Visibility; label: string; desc: string }[] = [
+  { value: 'internal', label: '팀 내부 공개', desc: '로그인한 팀원 전체가 조회 가능' },
+  { value: 'private',  label: '배정자 한정',  desc: '배정된 담당자·강사·멘토만 조회 가능' },
+  { value: 'public',   label: '외부 공개',    desc: '외부 링크로도 접근 가능' },
+];
 
 type Props = {
   open: boolean;
@@ -43,6 +50,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   const [venue, setVenue] = useState('');
   const [capacity, setCapacity] = useState('');
   const [description, setDescription] = useState('');
+  const [visibility, setVisibility] = useState<Visibility>('internal');
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
@@ -98,6 +106,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     setVenue('');
     setCapacity('');
     setDescription('');
+    setVisibility('internal');
     setNameError(null);
     setErrorMsg(null);
   }, [open]);
@@ -134,6 +143,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
         display_order: Number.isFinite(orderNum) ? orderNum : 0,
         modules,                           // jsonb 배열
         status,
+        visibility,                        // STEP-PROGRAM-VISIBILITY
         start_date: startDate || null,
         end_date: endDate || null,
         venue: venue.trim() || null,
@@ -319,6 +329,23 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
             placeholder="예) 30"
             helperText="비워두면 무제한"
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="program-visibility" className="text-sm font-semibold text-slate-700">
+            가시성 <span className="text-xs font-normal text-slate-400">— 누구에게 노출할지 선택</span>
+          </label>
+          <select
+            id="program-visibility"
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value as Visibility)}
+            disabled={submitting}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+          >
+            {VISIBILITY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label} — {o.desc}</option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-1.5">
