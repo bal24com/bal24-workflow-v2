@@ -14,10 +14,10 @@ import {
 import ProgramTemplateSelector from './detail/ProgramTemplateSelector';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
 
-/** program_type(13종) → 기존 programs.type(4종) 매핑 — type 컬럼 NOT NULL 호환용 */
+/** program_type(14종 영문) → 기존 programs.type(4종 한글) 매핑 — type 컬럼 NOT NULL 호환용 */
 function toLegacyType(pt: ExtendedProgramType): ProgramType {
-  if (pt === '교육') return '교육';
-  if (pt === '행사') return '행사';
+  if (pt === 'education') return '교육';
+  if (pt === 'event') return '행사';
   return '기타';
 }
 
@@ -39,7 +39,7 @@ type Props = {
 
 export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   const [name, setName] = useState('');
-  const [programType, setProgramType] = useState<ExtendedProgramType>('교육');
+  const [programType, setProgramType] = useState<ExtendedProgramType>('education');
   const [status, setStatus] = useState<ProgramStatus>('준비');
   const [projectId, setProjectId] = useState('');
   const [consortiumId, setConsortiumId] = useState('');
@@ -95,7 +95,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   useEffect(() => {
     if (open) return;
     setName('');
-    setProgramType('교육');
+    setProgramType('education');
     setStatus('준비');
     setProjectId('');
     setConsortiumId('');
@@ -221,7 +221,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
                   }`}
                 >
                   <span aria-hidden="true">{c.emoji}</span>
-                  <span className="truncate">{c.type}</span>
+                  <span className="truncate">{c.label}</span>
                 </button>
               );
             })}

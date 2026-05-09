@@ -197,8 +197,28 @@ export interface Program {
   consortium_id?: string | null;
   name: string;
   type: ProgramType;
-  /** STEP-PROGRAM-TYPE — 13종 확장 유형 (programs.program_type) */
-  program_type?: string | null;
+  /**
+   * STEP-PROGRAM-TYPE-TS — 14종 영문 enum
+   * (DB 마이그레이션: 한글 → 영문 키. 화면 표시는 PROGRAM_TYPE_LABELS 사용)
+   */
+  program_type?:
+    | 'education' | 'support_grant' | 'mentoring' | 'event'
+    | 'experience' | 'market' | 'marketing' | 'delivery'
+    | 'planning' | 'recruitment' | 'fieldwork' | 'report'
+    | 'research' | 'general'
+    | null;
+  /** STEP-PROGRAM-TYPE-TS — 신청 방식 (open/evaluation) */
+  application_type?: 'open' | 'evaluation' | null;
+  /** STEP-PROGRAM-TYPE-TS — 보조금·지원형 사용 여부 */
+  grant_enabled?: boolean | null;
+  /** STEP-PROGRAM-TYPE-TS — 보조금 예산 */
+  grant_budget?: number | null;
+  /** STEP-PROGRAM-TYPE-TS — 신청 시작일 */
+  application_start_date?: string | null;
+  /** STEP-PROGRAM-TYPE-TS — 신청 종료일 */
+  application_end_date?: string | null;
+  /** STEP-PROGRAM-TYPE-TS — 모집 정원 */
+  max_applicants?: number | null;
   /** STEP-PROGRAM-TYPE — 표시 순서 (오름차순) */
   display_order?: number | null;
   /** STEP-PROGRAM-TYPE — 활성 모듈 ID 배열 (program_templates.modules 복사) */

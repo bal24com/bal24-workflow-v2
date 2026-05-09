@@ -4,6 +4,8 @@
 import { Card, CardContent } from '../../components/ui';
 import { formatDateKo } from '../../lib/utils';
 import { BADGE_BASE } from '../../utils/statusStyles';
+import { getProgramTypeLabel } from '../../constants/programTypes';
+import { getProgramTypeConfig } from '../programs/programTypeConfig';
 import type { MyPageProgram } from '../../types/mypage';
 import { PARTICIPATION_ROLE_LABEL, PARTICIPATION_ROLE_COLOR } from '../../types/mypage';
 
@@ -12,15 +14,18 @@ interface Props {
 }
 
 /** 프로그램 유형별 이모지 (program_type 우선, fallback type) */
-const TYPE_EMOJI: Record<string, string> = {
-  교육: '📚', 컨설팅: '💼', 이벤트: '🎉',
-  멘토링: '🤝', 캠프: '🏕️', 세미나: '🎤', 워크숍: '🛠️',
-  공모전: '🏆', 행사: '🎪', 출장: '✈️', 기타: '📌',
+/** legacy programs.type (4종 한글) → 이모지 — fallback 표시용 */
+const LEGACY_TYPE_EMOJI: Record<string, string> = {
+  교육: '📚', 캠프: '🏕️', 행사: '🎉', 기타: '📌',
 };
 
 export default function MyProgramCard({ program }: Props) {
-  const displayType = program.program_type || program.type || '기타';
-  const emoji = TYPE_EMOJI[displayType] ?? '📌';
+  // STEP-PROGRAM-TYPE-TS — program_type(영문) 우선, 없으면 legacy type(한글) fallback
+  const config = program.program_type ? getProgramTypeConfig(program.program_type) : null;
+  const displayType = program.program_type
+    ? getProgramTypeLabel(program.program_type)
+    : (program.type ?? '기타');
+  const emoji = config?.emoji ?? LEGACY_TYPE_EMOJI[program.type ?? '기타'] ?? '📌';
 
   return (
     <Card className="h-full hover:border-violet-300 hover:shadow-md transition-all">

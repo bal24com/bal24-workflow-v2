@@ -1,39 +1,41 @@
-// bal24 v2 — 프로그램 유형 13종 상수 + 이모지·컬러·설명
-// V7 의 lib/v9/educationType.ts 차용 — localStorage 의존 제거 + V2 표준 (Tailwind 토큰).
+// bal24 v2 — 프로그램 유형 14종 상수 + 이모지·컬러·설명
+// STEP-PROGRAM-TYPE-TS: 한글 → 영문 enum 마이그레이션. 한글 라벨은 PROGRAM_TYPE_LABELS 매핑.
 
-export const PROGRAM_TYPES = [
-  '교육', '멘토링', '행사', '체험', '마켓', '마케팅',
-  '납품', '기획', '모집', '이동', '보고', '조사·연구', '기타',
-] as const;
+import { PROGRAM_TYPE_VALUES, PROGRAM_TYPE_LABELS } from '../../constants/programTypes';
+import type { ProgramTypeKey } from '../../constants/programTypes';
 
-export type ExtendedProgramType = typeof PROGRAM_TYPES[number];
+export { PROGRAM_TYPE_VALUES as PROGRAM_TYPES };
+export type ExtendedProgramType = ProgramTypeKey;
 
 export interface ProgramTypeConfig {
   type: ExtendedProgramType;
+  /** 한글 라벨 (PROGRAM_TYPE_LABELS 매핑) */
+  label: string;
   emoji: string;
   color: string;       // Tailwind border + bg 클래스
   description: string; // 드롭다운 카드 설명
 }
 
 export const PROGRAM_TYPE_CONFIG: ProgramTypeConfig[] = [
-  { type: '교육',     emoji: '📚', color: 'border-violet-300 bg-violet-50',   description: '커리큘럼·강사·출석·만족도' },
-  { type: '멘토링',   emoji: '🤝', color: 'border-cyan-300 bg-cyan-50',       description: '멘토 매칭·세션·제출물·피드백' },
-  { type: '행사',     emoji: '🎉', color: 'border-orange-300 bg-orange-50',   description: '행사 일정·출연진·홍보·체크리스트' },
-  { type: '체험',     emoji: '🎨', color: 'border-pink-300 bg-pink-50',       description: '체험 프로그램·예약·참가자' },
-  { type: '마켓',     emoji: '🛍', color: 'border-yellow-300 bg-yellow-50',  description: '셀러·부스·운영실적' },
-  { type: '마케팅',   emoji: '📱', color: 'border-sky-300 bg-sky-50',         description: 'SNS·콘텐츠 계획·발행실적' },
-  { type: '납품',     emoji: '📦', color: 'border-gray-300 bg-gray-50',       description: '산출물·버전관리·발주처 승인' },
-  { type: '기획',     emoji: '📋', color: 'border-indigo-300 bg-indigo-50',   description: '과업목록·산출물·회의록' },
-  { type: '모집',     emoji: '📝', color: 'border-emerald-300 bg-emerald-50', description: '지원서·선발·결과' },
-  { type: '이동',     emoji: '✈️', color: 'border-blue-300 bg-blue-50',       description: '국내이동·항공·해외이동' },
-  { type: '보고',     emoji: '📊', color: 'border-green-300 bg-green-50',     description: '보고서·증빙·성과품' },
-  { type: '조사·연구', emoji: '🔍', color: 'border-blue-300 bg-blue-50',       description: '환경분석·수요조사·타당성검토' },
-  { type: '기타',     emoji: '⚙️', color: 'border-slate-300 bg-slate-50',     description: '기본 탭 구성' },
+  { type: 'education',    label: PROGRAM_TYPE_LABELS.education,    emoji: '📚', color: 'border-violet-300 bg-violet-50',   description: '커리큘럼·강사·출석·만족도' },
+  { type: 'support_grant',label: PROGRAM_TYPE_LABELS.support_grant,emoji: '💰', color: 'border-amber-300 bg-amber-50',     description: '지원금·보조금 평가형 선발' },
+  { type: 'mentoring',    label: PROGRAM_TYPE_LABELS.mentoring,    emoji: '🤝', color: 'border-cyan-300 bg-cyan-50',       description: '멘토 매칭·세션·제출물·피드백' },
+  { type: 'event',        label: PROGRAM_TYPE_LABELS.event,        emoji: '🎉', color: 'border-orange-300 bg-orange-50',   description: '행사 일정·출연진·홍보·체크리스트' },
+  { type: 'experience',   label: PROGRAM_TYPE_LABELS.experience,   emoji: '🎨', color: 'border-pink-300 bg-pink-50',       description: '체험 프로그램·예약·참가자' },
+  { type: 'market',       label: PROGRAM_TYPE_LABELS.market,       emoji: '🛍', color: 'border-yellow-300 bg-yellow-50',  description: '셀러·부스·운영실적' },
+  { type: 'marketing',    label: PROGRAM_TYPE_LABELS.marketing,    emoji: '📱', color: 'border-sky-300 bg-sky-50',         description: 'SNS·콘텐츠 계획·발행실적' },
+  { type: 'delivery',     label: PROGRAM_TYPE_LABELS.delivery,     emoji: '📦', color: 'border-gray-300 bg-gray-50',       description: '산출물·버전관리·발주처 승인' },
+  { type: 'planning',     label: PROGRAM_TYPE_LABELS.planning,     emoji: '📋', color: 'border-indigo-300 bg-indigo-50',   description: '과업목록·산출물·회의록' },
+  { type: 'recruitment',  label: PROGRAM_TYPE_LABELS.recruitment,  emoji: '📝', color: 'border-emerald-300 bg-emerald-50', description: '지원서·선발·결과' },
+  { type: 'fieldwork',    label: PROGRAM_TYPE_LABELS.fieldwork,    emoji: '✈️', color: 'border-blue-300 bg-blue-50',       description: '국내이동·항공·해외이동' },
+  { type: 'report',       label: PROGRAM_TYPE_LABELS.report,       emoji: '📊', color: 'border-green-300 bg-green-50',     description: '보고서·증빙·성과품' },
+  { type: 'research',     label: PROGRAM_TYPE_LABELS.research,     emoji: '🔍', color: 'border-blue-300 bg-blue-50',       description: '환경분석·수요조사·타당성검토' },
+  { type: 'general',      label: PROGRAM_TYPE_LABELS.general,      emoji: '⚙️', color: 'border-slate-300 bg-slate-50',     description: '기본 탭 구성' },
 ];
 
 const FALLBACK = PROGRAM_TYPE_CONFIG[PROGRAM_TYPE_CONFIG.length - 1];
 
-/** 유형 키로 이모지·컬러·설명 조회. 미매칭 시 '기타' 반환. */
+/** 유형 키로 이모지·컬러·설명 조회. 미매칭 시 'general' 반환. */
 export function getProgramTypeConfig(type: string | null | undefined): ProgramTypeConfig {
   if (!type) return FALLBACK;
   return PROGRAM_TYPE_CONFIG.find((c) => c.type === type) ?? FALLBACK;
