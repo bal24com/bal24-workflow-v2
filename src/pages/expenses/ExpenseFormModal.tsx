@@ -28,6 +28,7 @@ import type {
 } from '../../types/database';
 import ExpenseReceiptsSection, { makeReceipt } from './ExpenseReceiptsSection';
 import type { ReceiptDraft } from './ExpenseReceiptsSection';
+import { usePartnerProfile } from '../../hooks/usePartnerProfile';
 
 type Props = {
   open: boolean;
@@ -73,6 +74,8 @@ function translateError(raw: string): string {
 }
 
 export default function ExpenseFormModal({ open, ledgerType, onClose, onCreated }: Props) {
+  // STEP-PARTNER-EXPENSE-AUTOFILL — PARTNER 면 본인 회사 ID 자동 주입
+  const { isPartner, consortiumMemberId } = usePartnerProfile();
   const [form, setForm] = useState<FormState>(EMPTY());
   const [receipts, setReceipts] = useState<ReceiptDraft[]>([makeReceipt()]);
   const [clients, setClients] = useState<Pick<Client, 'id' | 'name'>[]>([]);
@@ -135,6 +138,7 @@ export default function ExpenseFormModal({ open, ledgerType, onClose, onCreated 
     setSubmitting(true);
     try {
       // ⚠ withholding_rate/amount/net_amount는 GENERATED — INSERT body에 포함하지 않음
+      // STEP-PARTNER-EXPENSE-AUTOFILL — PARTNER 면 consortium_member_id 자동 주입 (UI 비노출)
       const { data: created, error } = await supabase.from('expenses').insert({
         ledger_type: ledgerType,
         project_id: form.projectId || null,
@@ -147,6 +151,9 @@ export default function ExpenseFormModal({ open, ledgerType, onClose, onCreated 
         expense_date: form.expenseDate,
         status: form.status,
         memo: form.memo.trim() || null,
+        ...(isPartner && consortiumMemberId
+          ? { consortium_member_id: consortiumMemberId }
+          : {}),
       }).select('id').single();
       if (error) throw error;
 
