@@ -46,6 +46,9 @@ import CertViewPage from './pages/public-cert/CertViewPage';
 import ClientSharePage from './pages/share-portal/ClientSharePage';
 import StudentSharePage from './pages/share-portal/StudentSharePage';
 import ExpertSharePage from './pages/share-portal/ExpertSharePage';
+import MentoringMentorPage from './pages/mentoring/MentoringMentorPage';
+import MentoringStudentPage from './pages/mentoring/MentoringStudentPage';
+import MentoringPartnerView from './pages/mentoring/MentoringPartnerView';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
@@ -92,6 +95,8 @@ export default function App() {
         <Route path="/share/client/:token" element={<ClientSharePage />} />
         <Route path="/share/student/:token" element={<StudentSharePage />} />
         <Route path="/share/expert/:token" element={<ExpertSharePage />} />
+        <Route path="/mentoring-mentor/:token" element={<MentoringMentorPage />} />
+        <Route path="/mentoring-student/:token" element={<MentoringStudentPage />} />
 
         <Route
           path="/login"
@@ -153,6 +158,9 @@ export default function App() {
           <Route path="/portals" element={<PortalManagePage />} />
           <Route path="/portal/templates" element={<PortalTemplatePage />} />
           <Route path="/reports" element={<ReportsPage />} />
+
+          {/* 멘토링 — PARTNER 본인 배정 뷰 (STEP-MENTORING) */}
+          <Route path="/mentoring" element={<MentoringPartnerView />} />
 
           {/* 기타 */}
           <Route path="/members" element={<MembersPage />} />

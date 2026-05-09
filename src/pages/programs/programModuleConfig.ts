@@ -4,7 +4,8 @@
 /** ProgramDetailPage 의 기존 TabKey 와 동일하게 유지 */
 export type TabKey =
   | 'overview' | 'curriculum' | 'staff' | 'attendance'
-  | 'survey'   | 'files'      | 'report' | 'share';
+  | 'survey'   | 'files'      | 'report' | 'share'
+  | 'mentoring';
 
 /**
  * module ID → TabKey 매핑.
@@ -20,8 +21,8 @@ export const MODULE_TO_TAB: Record<string, TabKey | null> = {
   participants:            'staff',     // Q6-A: staff alias
   attendance:              'attendance',
   survey:                  'survey',
+  mentoring:               'mentoring', // STEP-MENTORING: 실제 탭 구현 완료
   // 미구현 (placeholder 표시)
-  mentoring:               null,
   domestic_travel:         null,
   flight:                  null,
   overseas_travel:         null,
@@ -45,7 +46,6 @@ export const MODULE_TO_TAB: Record<string, TabKey | null> = {
 
 /** 미구현 모듈을 탭으로 표시할 때 보여줄 한글 라벨 */
 export const MODULE_LABEL: Record<string, string> = {
-  mentoring:               '멘토링',
   domestic_travel:         '국내 이동',
   flight:                  '항공',
   overseas_travel:         '해외 이동',
@@ -90,6 +90,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   files:      '파일',
   report:     '결과보고서',
   share:      '외부 공유',
+  mentoring:  '멘토링',
 };
 
 export function getTabLabel(key: TabKey): string {
@@ -111,7 +112,7 @@ export function resolveVisibleTabs(modules: string[] | null | undefined): Visibl
 
   // 고정 순서 — share 는 호출자가 별도 처리
   const FIXED_ORDER: TabKey[] = [
-    'overview', 'curriculum', 'staff', 'attendance', 'survey', 'report', 'files',
+    'overview', 'curriculum', 'staff', 'attendance', 'mentoring', 'survey', 'report', 'files',
   ];
 
   const result: VisibleTab[] = [];
