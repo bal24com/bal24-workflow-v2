@@ -12,35 +12,27 @@ import MemberFormModal from './MemberFormModal';
 import MemberDetailPanel from './MemberDetailPanel';
 import MemberInviteModal from './MemberInviteModal';
 import InviteListSection from './InviteListSection';
+import {
+  ROLE_LABELS, ROLE_BADGE_TONE,
+  getRoleBadgeTone, getRoleLabel, normalizeRole, hasRole,
+} from '../../constants/roles';
 
+// STEP-ROLE-TYPE-AUDIT — 모든 role 비교는 소문자 통일
 const ROLE_OPTIONS: Array<{ value: Role | 'ALL'; label: string }> = [
   { value: 'ALL', label: '전체' },
-  { value: 'ADMIN', label: 'ADMIN' },
-  { value: 'PM', label: 'PM' },
-  { value: 'STAFF', label: 'STAFF' },
-  { value: 'FINANCE', label: 'FINANCE' },
-  { value: 'PARTNER', label: 'PARTNER' },
+  { value: 'admin',   label: ROLE_LABELS.admin },
+  { value: 'pm',      label: ROLE_LABELS.pm },
+  { value: 'staff',   label: ROLE_LABELS.staff },
+  { value: 'finance', label: ROLE_LABELS.finance },
+  { value: 'partner', label: ROLE_LABELS.partner },
 ];
 
-export const ROLE_BADGE: Record<Role, { bg: string; text: string }> = {
-  ADMIN: { bg: 'bg-violet-100', text: 'text-violet-700' },
-  PM: { bg: 'bg-cyan-100', text: 'text-cyan-700' },
-  STAFF: { bg: 'bg-slate-100', text: 'text-slate-600' },
-  FINANCE: { bg: 'bg-orange-100', text: 'text-orange-700' },
-  PARTNER: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
-  MEMBER: { bg: 'bg-slate-100', text: 'text-slate-500' },
-};
+/** Legacy export — 외부에서 import 중. constants/roles.ts 의 ROLE_BADGE_TONE 와 동일 */
+export const ROLE_BADGE = ROLE_BADGE_TONE;
 
-/** V2 보정: profiles.role 이 소문자('admin') 또는 대문자('ADMIN') 어느 쪽이든 안전 조회 */
-const ROLE_BADGE_FALLBACK = { bg: 'bg-slate-100', text: 'text-slate-500' };
-export function getRoleBadge(role: string | null | undefined): { bg: string; text: string } {
-  if (!role) return ROLE_BADGE_FALLBACK;
-  const upper = role.toString().toUpperCase() as Role;
-  return ROLE_BADGE[upper] ?? ROLE_BADGE_FALLBACK;
-}
-export function normalizeRole(role: string | null | undefined): string {
-  return (role ?? '').toString().toUpperCase();
-}
+/** Legacy alias — 다른 파일에서 import 중일 수 있음. 동작 동일 */
+export const getRoleBadge = getRoleBadgeTone;
+export { normalizeRole };
 
 function initial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
@@ -62,8 +54,8 @@ export default function MembersPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteReloadKey, setInviteReloadKey] = useState(0);
 
-  // V2 보정: profiles.role 소문자 ('admin') / 기존 대문자 ('ADMIN') 둘 다 허용
-  const isAdmin = (myRole?.toString().toLowerCase() ?? '') === 'admin';
+  // STEP-ROLE-TYPE-AUDIT — hasRole 헬퍼 사용
+  const isAdmin = hasRole(myRole, 'admin');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -114,7 +106,7 @@ export default function MembersPage() {
   const filtered = useMemo(() => {
     const k = keyword.trim().toLowerCase();
     return members.filter((m) => {
-      // V2 보정: profiles.role 은 소문자 'admin' 등 → 비교 시 정규화
+      // STEP-ROLE-TYPE-AUDIT — 소문자 통일 비교
       if (roleFilter !== 'ALL' && normalizeRole(m.role) !== roleFilter) return false;
       if (!k) return true;
       const hay = [m.name, m.department ?? '', m.position ?? ''].join(' ').toLowerCase();
@@ -201,8 +193,8 @@ export default function MembersPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((m) => {
-            const tone = getRoleBadge(m.role);
-            const roleLabel = normalizeRole(m.role) || '미정';
+            const tone = getRoleBadgeTone(m.role);
+            const roleLabel = getRoleLabel(m.role);
             return (
               <article
                 key={m.id}

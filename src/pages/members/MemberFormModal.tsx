@@ -8,8 +8,10 @@ import { Trash2, Upload, X } from 'lucide-react';
 import { Modal, Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import type { Profile, Role } from '../../types/database';
+import { ROLE_LABELS } from '../../constants/roles';
 
-const ROLE_VALUES: Role[] = ['ADMIN', 'PM', 'STAFF', 'FINANCE', 'PARTNER'];
+// STEP-ROLE-TYPE-AUDIT — DB 실측 소문자 통일
+const ROLE_VALUES: Role[] = ['admin', 'pm', 'staff', 'finance', 'partner'];
 
 interface Props {
   open: boolean;
@@ -34,7 +36,7 @@ interface FormState {
 const EMPTY: FormState = {
   name: '',
   email: '',
-  role: 'STAFF',
+  role: 'staff',
   department: '',
   position: '',
   phone: '',
@@ -306,7 +308,7 @@ export default function MemberFormModal({ open, editTarget, onClose, onSaved }: 
             >
               {ROLE_VALUES.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {ROLE_LABELS[r] ?? r}
                 </option>
               ))}
             </select>

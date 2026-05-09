@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { hasRole } from '../constants/roles';
 import type { Profile, Role } from '../types/database';
 
 export type UserProfileSummary = Pick<
@@ -42,10 +43,11 @@ export function useUserProfile() {
     return () => { cancelled = true; };
   }, [user]);
 
+  // STEP-ROLE-TYPE-AUDIT — hasRole 헬퍼 사용 (소문자 통일 + 대소문자 안전망)
   const role: Role | null = profile?.role ?? null;
-  const isAdmin = role === 'ADMIN';
-  const isPM = role === 'PM' || isAdmin;
-  const isFinance = role === 'FINANCE' || isAdmin;
+  const isAdmin = hasRole(role, 'admin');
+  const isPM = hasRole(role, 'pm') || isAdmin;
+  const isFinance = hasRole(role, 'finance') || isAdmin;
   const isMember = !!profile?.consortium_member_id;
 
   return { profile, loading, role, isAdmin, isPM, isFinance, isMember };

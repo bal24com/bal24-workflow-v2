@@ -8,7 +8,7 @@ import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
 import type { Profile, ProjectStatus } from '../../types/database';
-import { getRoleBadge, normalizeRole } from './MembersPage';
+import { getRoleBadgeTone, getRoleLabel } from '../../constants/roles';
 
 interface ProjectRow {
   id: string;
@@ -108,10 +108,10 @@ export default function MemberDetailPanel({ memberId, isAdmin, onClose, onEdit }
                   <div className="text-sm text-slate-500 truncate">{member.position ?? '직책 미등록'}</div>
                   <div className="mt-2 flex items-center gap-2">
                     {(() => {
-                      const tone = getRoleBadge(member.role);
+                      const tone = getRoleBadgeTone(member.role);
                       return (
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone.bg} ${tone.text}`}>
-                          {normalizeRole(member.role) || '미정'}
+                          {getRoleLabel(member.role)}
                         </span>
                       );
                     })()}

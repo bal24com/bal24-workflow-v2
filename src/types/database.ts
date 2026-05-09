@@ -11,7 +11,8 @@ export type InvitationStatus = '대기' | '수락' | '거절' | '완료';
 /** STEP-MEMBER-INVITE — 팀원 이메일 초대 상태 (instructor_invitations 와 별개) */
 export type MemberInvitationStatus = 'pending' | 'accepted' | 'expired';
 export type ProjectType = '교육' | '컨설팅' | '이벤트';
-export type Role = 'ADMIN' | 'PM' | 'STAFF' | 'FINANCE' | 'PARTNER' | 'MEMBER';
+/** STEP-ROLE-TYPE-AUDIT — DB profiles.role 실측 소문자 통일 (2026-05-09) */
+export type Role = 'admin' | 'pm' | 'staff' | 'finance' | 'partner' | 'member';
 export type Priority = '낮음' | '보통' | '높음' | '긴급';
 export type SurveyType = '사전' | '사후';
 export type ProgramType = '교육' | '캠프' | '행사' | '기타';
