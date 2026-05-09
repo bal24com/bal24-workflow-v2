@@ -592,6 +592,8 @@ export interface Expense {
   memo?: string | null;
   deleted_at?: string | null;
   created_by?: string | null;
+  /** STEP-PARTNER-EXPENSE-FILTER — PARTNER 본인 회사 지출 필터링용 */
+  consortium_member_id?: string | null;
   created_at: string;
   updated_at: string;
 }

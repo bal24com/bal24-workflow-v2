@@ -15,6 +15,7 @@ import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
 import type { Expense, LedgerType } from '../../types/database';
 import ExpenseFormModal from './ExpenseFormModal';
+import { usePartnerProfile } from '../../hooks/usePartnerProfile';
 
 type ExpenseRow = Expense & {
   payee?: { id: string; name: string } | null;
@@ -64,6 +65,8 @@ function LedgerTabs({ value, onChange, counts }: {
 
 export default function ExpensesPage() {
   const toast = useToast();
+  // STEP-PARTNER-EXPENSE-FILTER — PARTNER 면 본인 회사(consortium_member_id) 지출만
+  const { isPartner, consortiumMemberId, isLoading: partnerLoading } = usePartnerProfile();
   const [items, setItems] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [ledger, setLedger] = useState<LedgerType>('own');
@@ -73,11 +76,15 @@ export default function ExpensesPage() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('expenses')
         .select(SELECT_COLUMNS)
-        .is('deleted_at', null)
-        .order('expense_date', { ascending: false });
+        .is('deleted_at', null);
+      // PARTNER 분기 — 본인 회사 행만 (NULL 인 expenses 는 제외됨)
+      if (isPartner && consortiumMemberId) {
+        query = query.eq('consortium_member_id', consortiumMemberId);
+      }
+      const { data, error } = await query.order('expense_date', { ascending: false });
       if (error) throw error;
       setItems((data ?? []) as ExpenseRow[]);
     } catch (err) {
@@ -87,9 +94,13 @@ export default function ExpensesPage() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, isPartner, consortiumMemberId]);
 
-  useEffect(() => { void fetchItems(); }, [fetchItems]);
+  useEffect(() => {
+    // PARTNER 인데 consortium_member_id 가 아직 로딩 중이면 대기
+    if (isPartner && partnerLoading) return;
+    void fetchItems();
+  }, [fetchItems, isPartner, partnerLoading]);
 
   const counts = useMemo(() => ({
     own: items.filter((i) => i.ledger_type === 'own').length,
@@ -113,6 +124,16 @@ export default function ExpensesPage() {
     const withholding = visible.reduce((s, i) => s + Number(i.withholding_amount || 0), 0);
     return { gross, net, withholding };
   }, [visible]);
+
+  // STEP-PARTNER-EXPENSE-FILTER — PARTNER 인데 소속 참여사 미지정 시 차단
+  if (isPartner && !partnerLoading && !consortiumMemberId) {
+    return (
+      <div className="rounded-2xl border border-orange-200 bg-orange-50 p-8 text-center max-w-md mx-auto mt-8">
+        <p className="text-orange-700 font-bold text-base">소속 참여사 정보가 없습니다.</p>
+        <p className="text-sm text-slate-500 mt-1">관리자에게 문의해 주세요.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 max-w-[1400px]">

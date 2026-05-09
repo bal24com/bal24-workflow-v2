@@ -36,6 +36,8 @@ interface PartnerHookResult {
   programIds: Set<string>;
   isPartner: boolean;
   isLoading: boolean;
+  /** STEP-PARTNER-EXPENSE-FILTER 편의 필드 — profile.consortium_member_id alias */
+  consortiumMemberId: string | null;
 }
 
 export function usePartnerProfile(): PartnerHookResult {
@@ -123,6 +125,7 @@ export function usePartnerProfile(): PartnerHookResult {
 
   const programIds = useMemo(() => new Set(programs.map((p) => p.id)), [programs]);
   const isPartner = (profile?.role ?? '') === 'partner';
+  const consortiumMemberId = profile?.consortium_member_id ?? null;
 
-  return { profile, programs, programIds, isPartner, isLoading };
+  return { profile, programs, programIds, isPartner, isLoading, consortiumMemberId };
 }
