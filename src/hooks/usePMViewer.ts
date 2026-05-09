@@ -39,9 +39,8 @@ export function usePMViewer(): PMViewerResult {
           console.error('[pm-viewer] 프로필 조회 실패:', error.message);
         }
         if (!cancelled) {
-          // V2 보정: profiles.role 은 대문자 'PM' / 'ADMIN' 만 사용 (database.ts Role 타입 참조)
-          const role = data?.role ?? null;
-          const isPMorAdmin = role === 'PM' || role === 'ADMIN';
+          // V2 실제 role 값: 'admin' 단일 확인됨 (소문자) — DB 실측 기준
+          const isPMorAdmin = data?.role === 'admin';
           setIsViewer(isPMorAdmin);
           setViewerName(data?.name ?? '');
           setIsLoading(false);
