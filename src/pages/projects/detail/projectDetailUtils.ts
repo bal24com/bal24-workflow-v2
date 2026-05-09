@@ -156,3 +156,58 @@ export async function fetchProjectActivities(projectId: string, limit = 8): Prom
 
   return (data as ActivityRow[] | null) ?? [];
 }
+
+// ─── 프로그램 흐름도 (STEP-PROJECT-FLOW / 2026-05-09 신규) ─
+
+export interface FlowProgram {
+  id: string;
+  name: string;
+  program_type: string | null;
+  display_order: number | null;
+  status: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+}
+
+export type FlowSortKey = 'display_order' | 'name' | 'created_at' | 'end_date';
+
+export const FLOW_SORT_OPTIONS: { value: FlowSortKey; label: string }[] = [
+  { value: 'display_order', label: '지정 순서' },
+  { value: 'name',          label: '가나다순' },
+  { value: 'created_at',    label: '생성일순' },
+  { value: 'end_date',      label: '종료일순' },
+];
+
+export async function fetchProjectPrograms(projectId: string): Promise<FlowProgram[]> {
+  const { data, error } = await supabase
+    .from('programs')
+    .select('id, name, program_type, display_order, status, start_date, end_date, created_at')
+    .eq('project_id', projectId);
+  if (error) {
+    console.error('[project-flow] 프로그램 목록 조회 실패:', error.message);
+    return [];
+  }
+  return (data as FlowProgram[] | null) ?? [];
+}
+
+export function sortPrograms(programs: FlowProgram[], key: FlowSortKey): FlowProgram[] {
+  return [...programs].sort((a, b) => {
+    if (key === 'display_order') {
+      const oa = a.display_order ?? 999;
+      const ob = b.display_order ?? 999;
+      if (oa !== ob) return oa - ob;
+      return (a.start_date ?? '').localeCompare(b.start_date ?? '');
+    }
+    if (key === 'name') return (a.name ?? '').localeCompare(b.name ?? '', 'ko');
+    if (key === 'created_at') return (a.created_at ?? '').localeCompare(b.created_at ?? '');
+    if (key === 'end_date') return (a.end_date ?? '9999').localeCompare(b.end_date ?? '9999');
+    return 0;
+  });
+}
+
+/** 완료 판별 — V2 ProgramStatus '완료' + 안전 fallback (종료/done/completed) */
+export function isProgramDone(status: string | null | undefined): boolean {
+  if (!status) return false;
+  return ['완료', '종료', 'done', 'completed'].includes(status);
+}

@@ -11,6 +11,7 @@ import EventsTimelineCard from './overview/EventsTimelineCard';
 import ActivityTimelineCard from './overview/ActivityTimelineCard';
 import NextActionCard from './overview/NextActionCard';
 import QuickActionsCard from './overview/QuickActionsCard';
+import ProgramFlowChart from './ProgramFlowChart';
 
 type DetailProject = Project & {
   client?: { id: string; name: string } | null;
@@ -36,8 +37,12 @@ export default function OverviewTab({ project, onOpenTab }: Props) {
   const projectId = project.id;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-4">
-      {/* 좌 컬럼 */}
+    <div className="space-y-4">
+      {/* 프로그램 흐름도 — 전체 너비 (Q1-A) */}
+      <ProgramFlowChart projectId={projectId} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-4">
+        {/* 좌 컬럼 */}
       <div className="flex flex-col gap-4 min-w-0">
         <FinanceSummaryCard projectId={projectId} />
         <MembersPreviewCard
@@ -93,15 +98,16 @@ export default function OverviewTab({ project, onOpenTab }: Props) {
         </Card>
       </div>
 
-      {/* 우 컬럼 */}
-      <div className="flex flex-col gap-4 min-w-0">
-        <ActivityTimelineCard projectId={projectId} />
-        <NextActionCard status={status} />
-        <QuickActionsCard
-          projectId={projectId}
-          consortiumId={project.consortium_id ?? null}
-          onOpenTasksTab={onOpenTab ? () => onOpenTab('tasks') : undefined}
-        />
+        {/* 우 컬럼 */}
+        <div className="flex flex-col gap-4 min-w-0">
+          <ActivityTimelineCard projectId={projectId} />
+          <NextActionCard status={status} />
+          <QuickActionsCard
+            projectId={projectId}
+            consortiumId={project.consortium_id ?? null}
+            onOpenTasksTab={onOpenTab ? () => onOpenTab('tasks') : undefined}
+          />
+        </div>
       </div>
     </div>
   );
