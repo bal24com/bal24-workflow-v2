@@ -10,6 +10,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { Profile, Role } from '../../types/database';
 import MemberFormModal from './MemberFormModal';
 import MemberDetailPanel from './MemberDetailPanel';
+import MemberInviteModal from './MemberInviteModal';
+import InviteListSection from './InviteListSection';
 
 const ROLE_OPTIONS: Array<{ value: Role | 'ALL'; label: string }> = [
   { value: 'ALL', label: '전체' },
@@ -45,8 +47,12 @@ export default function MembersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Profile | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  // STEP-MEMBER-INVITE — 이메일 초대 모달
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteReloadKey, setInviteReloadKey] = useState(0);
 
-  const isAdmin = myRole === 'ADMIN';
+  // V2 보정: profiles.role 소문자 ('admin') / 기존 대문자 ('ADMIN') 둘 다 허용
+  const isAdmin = (myRole?.toString().toLowerCase() ?? '') === 'admin';
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -123,10 +129,13 @@ export default function MembersPage() {
           팀원 관리
         </h1>
         {isAdmin && (
-          <Button variant="primary" onClick={openCreate}>
-            <UserPlus size={16} className="mr-1.5" aria-hidden="true" />
-            팀원 초대
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={openCreate}>직접 등록</Button>
+            <Button variant="primary" onClick={() => setInviteOpen(true)}>
+              <UserPlus size={16} className="mr-1.5" aria-hidden="true" />
+              이메일 초대
+            </Button>
+          </div>
         )}
       </header>
 
@@ -171,8 +180,8 @@ export default function MembersPage() {
           description={isAdmin && !keyword && roleFilter === 'ALL' ? '첫 팀원을 초대해 보세요.' : undefined}
           action={
             isAdmin && !keyword && roleFilter === 'ALL' && (
-              <Button variant="primary" onClick={openCreate}>
-                + 팀원 초대
+              <Button variant="primary" onClick={() => setInviteOpen(true)}>
+                + 이메일로 팀원 초대
               </Button>
             )
           }
@@ -228,6 +237,9 @@ export default function MembersPage() {
         </div>
       )}
 
+      {/* STEP-MEMBER-INVITE — 초대 대기 목록 (ADMIN 전용) */}
+      {isAdmin && <InviteListSection isAdmin={isAdmin} reloadKey={inviteReloadKey} />}
+
       <MemberFormModal
         open={modalOpen}
         editTarget={editTarget}
@@ -235,6 +247,12 @@ export default function MembersPage() {
         onSaved={() => {
           void reload();
         }}
+      />
+
+      <MemberInviteModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onSent={() => setInviteReloadKey((k) => k + 1)}
       />
 
       {detailId && (

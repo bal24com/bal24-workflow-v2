@@ -51,6 +51,7 @@ import MentoringStudentPage from './pages/mentoring/MentoringStudentPage';
 import MentoringPartnerView from './pages/mentoring/MentoringPartnerView';
 import MyPage from './pages/mypage/MyPage';
 import PartnerHomePage from './pages/partner/PartnerHomePage';
+import MemberInvitePage from './pages/invite/MemberInvitePage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
@@ -100,6 +101,7 @@ export default function App() {
         <Route path="/mentoring-mentor/:token" element={<MentoringMentorPage />} />
         <Route path="/mentoring-student/:token" element={<MentoringStudentPage />} />
         <Route path="/my/:token" element={<MyPage />} />
+        <Route path="/invite/member/:token" element={<MemberInvitePage />} />
 
         <Route
           path="/login"

@@ -7,6 +7,9 @@ export type TaskStatus = '인식' | '실행' | '검토' | '완료';
 export type SettlementStatus = '미지급' | '부분지급' | '지급완료';
 export type EducationStatus = '준비' | '진행' | '완료';
 export type InvitationStatus = '대기' | '수락' | '거절' | '완료';
+
+/** STEP-MEMBER-INVITE — 팀원 이메일 초대 상태 (instructor_invitations 와 별개) */
+export type MemberInvitationStatus = 'pending' | 'accepted' | 'expired';
 export type ProjectType = '교육' | '컨설팅' | '이벤트';
 export type Role = 'ADMIN' | 'PM' | 'STAFF' | 'FINANCE' | 'PARTNER' | 'MEMBER';
 export type Priority = '낮음' | '보통' | '높음' | '긴급';
@@ -991,4 +994,21 @@ export interface ScheduleEvent {
   created_by?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ─── STEP-MEMBER-INVITE 팀원 이메일 초대 ──────────────────────
+export interface MemberInvitation {
+  id: string;
+  email: string;
+  /** 소문자 role: admin / pm / staff / finance / partner / member */
+  role: string;
+  department?: string | null;
+  position?: string | null;
+  token: string;
+  status: MemberInvitationStatus;
+  invited_by?: string | null;
+  accepted_at?: string | null;
+  expires_at: string;
+  created_at: string;
+  deleted_at?: string | null;
 }
