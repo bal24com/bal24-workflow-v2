@@ -49,6 +49,7 @@ import ExpertSharePage from './pages/share-portal/ExpertSharePage';
 import MentoringMentorPage from './pages/mentoring/MentoringMentorPage';
 import MentoringStudentPage from './pages/mentoring/MentoringStudentPage';
 import MentoringPartnerView from './pages/mentoring/MentoringPartnerView';
+import MyPage from './pages/mypage/MyPage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
@@ -97,6 +98,7 @@ export default function App() {
         <Route path="/share/expert/:token" element={<ExpertSharePage />} />
         <Route path="/mentoring-mentor/:token" element={<MentoringMentorPage />} />
         <Route path="/mentoring-student/:token" element={<MentoringStudentPage />} />
+        <Route path="/my/:token" element={<MyPage />} />
 
         <Route
           path="/login"
