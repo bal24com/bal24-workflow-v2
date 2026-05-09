@@ -1,12 +1,25 @@
 // bal24 v2 — 프로그램 신규 등록 모달
 // 공통 Modal + Input + Button. programs 테이블 INSERT.
+// STEP-PROGRAM-TYPE: program_type(13종) + display_order + modules + 템플릿 선택 통합.
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Modal, Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import { PROGRAM_STATUS_VALUES, PROGRAM_TYPE_VALUES } from './programStatus';
+import { PROGRAM_STATUS_VALUES } from './programStatus';
+import {
+  PROGRAM_TYPE_CONFIG, getProgramTypeConfig,
+  type ExtendedProgramType,
+} from './programTypeConfig';
+import ProgramTemplateSelector from './detail/ProgramTemplateSelector';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
+
+/** program_type(13종) → 기존 programs.type(4종) 매핑 — type 컬럼 NOT NULL 호환용 */
+function toLegacyType(pt: ExtendedProgramType): ProgramType {
+  if (pt === '교육') return '교육';
+  if (pt === '행사') return '행사';
+  return '기타';
+}
 
 type ProjectOption = Pick<Project, 'id' | 'name'>;
 type ConsortiumOption = { id: string; name: string };
@@ -19,10 +32,12 @@ type Props = {
 
 export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   const [name, setName] = useState('');
-  const [type, setType] = useState<ProgramType>('교육');
+  const [programType, setProgramType] = useState<ExtendedProgramType>('교육');
   const [status, setStatus] = useState<ProgramStatus>('준비');
   const [projectId, setProjectId] = useState('');
   const [consortiumId, setConsortiumId] = useState('');
+  const [displayOrder, setDisplayOrder] = useState('0');
+  const [modules, setModules] = useState<string[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [venue, setVenue] = useState('');
@@ -72,10 +87,12 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   useEffect(() => {
     if (open) return;
     setName('');
-    setType('교육');
+    setProgramType('교육');
     setStatus('준비');
     setProjectId('');
     setConsortiumId('');
+    setDisplayOrder('0');
+    setModules([]);
     setStartDate('');
     setEndDate('');
     setVenue('');
@@ -107,11 +124,15 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
 
     setSubmitting(true);
     try {
+      const orderNum = displayOrder.trim() ? Number(displayOrder.replace(/,/g, '')) : 0;
       const { error } = await supabase.from('programs').insert({
         project_id: projectId || null,
         consortium_id: consortiumId || null,
         name: name.trim(),
-        type,
+        type: toLegacyType(programType),  // 4종 enum 호환
+        program_type: programType,        // STEP-PROGRAM-TYPE 13종
+        display_order: Number.isFinite(orderNum) ? orderNum : 0,
+        modules,                           // jsonb 배열
         status,
         start_date: startDate || null,
         end_date: endDate || null,
@@ -170,21 +191,34 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
           placeholder="예) 2026 상반기 리더십 캠프"
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-700">유형</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as ProgramType)}
-              disabled={submitting}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-            >
-              {PROGRAM_TYPE_VALUES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
+        <div className="space-y-1.5">
+          <label className="text-sm font-semibold text-slate-700">
+            유형 <span className="text-xs font-normal text-slate-400">— {getProgramTypeConfig(programType).description}</span>
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+            {PROGRAM_TYPE_CONFIG.map((c) => {
+              const active = programType === c.type;
+              return (
+                <button
+                  key={c.type}
+                  type="button"
+                  onClick={() => setProgramType(c.type)}
+                  disabled={submitting}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors disabled:opacity-50 ${
+                    active
+                      ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                      : `${c.color} text-slate-700 hover:opacity-80`
+                  }`}
+                >
+                  <span aria-hidden="true">{c.emoji}</span>
+                  <span className="truncate">{c.type}</span>
+                </button>
+              );
+            })}
           </div>
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-slate-700">상태</label>
             <select
@@ -198,7 +232,24 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
               ))}
             </select>
           </div>
+
+          <Input
+            type="number"
+            inputMode="numeric"
+            label="표시 순서"
+            value={displayOrder}
+            onChange={(e) => setDisplayOrder(e.target.value)}
+            disabled={submitting}
+            placeholder="0"
+            helperText="작은 숫자가 먼저 표시돼요. 같은 프로젝트 안에서 정렬용."
+          />
         </div>
+
+        <ProgramTemplateSelector
+          programType={programType}
+          selectedModules={modules}
+          onModulesChange={setModules}
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">

@@ -191,6 +191,12 @@ export interface Program {
   consortium_id?: string | null;
   name: string;
   type: ProgramType;
+  /** STEP-PROGRAM-TYPE — 13종 확장 유형 (programs.program_type) */
+  program_type?: string | null;
+  /** STEP-PROGRAM-TYPE — 표시 순서 (오름차순) */
+  display_order?: number | null;
+  /** STEP-PROGRAM-TYPE — 활성 모듈 ID 배열 (program_templates.modules 복사) */
+  modules?: string[] | null;
   status: ProgramStatus;
   start_date?: string | null;
   end_date?: string | null;
@@ -203,6 +209,19 @@ export interface Program {
   notice_files?: ProgramFile[] | null;
   /** V7 ④ 성과 목표 — 2026-05-08 추가 */
   goal_text?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── 프로그램 템플릿 (STEP-PROGRAM-TYPE / 2026-05-09 신규) ─
+export interface ProgramTemplate {
+  id: string;
+  name: string;
+  base_type: string;        // PROGRAM_TYPES 13종 중 하나
+  description?: string | null;
+  modules: string[];        // jsonb 배열 — MODULE_OPTIONS id 들
+  is_system: boolean;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
