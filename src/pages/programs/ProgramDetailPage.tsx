@@ -1,10 +1,10 @@
 // bal24 v2 — 프로그램 상세 페이지 (V7 EducationDetailV9 차용 / V2 표준)
-// 5탭: 개요 / 강사·교육생 / 출석·일지 / 결과·만족도 / 외부 공유
+// STEP-PROGRAM-MODULE-RENDER: programs.modules 배열 기반 탭 동적 렌더 + 미구현 placeholder.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen, FolderOpen,
+  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen, FolderOpen, Hourglass,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -23,23 +23,31 @@ import SurveyResultTab from './detail/SurveyResultTab';
 import ShareTab from './detail/ShareTab';
 import ReportBuilderTab from './detail/ReportBuilderTab';
 import ProgramFilesTab from './detail/ProgramFilesTab';
+import {
+  resolveVisibleTabs, SHARE_TAB_ALWAYS,
+  type TabKey, type VisibleTab,
+} from './programModuleConfig';
 
 type DetailProgram = Program & {
   project?: { id: string; name: string; status: string } | null;
 };
 
-type TabKey = 'overview' | 'curriculum' | 'staff' | 'attendance' | 'survey' | 'share' | 'report' | 'files';
+// 탭 → 아이콘 매핑 (programModuleConfig 의 TabKey 와 동기화)
+const TAB_ICON: Record<TabKey, LucideIcon> = {
+  overview:   Info,
+  curriculum: BookOpen,
+  staff:      Mic2,
+  attendance: ClipboardCheck,
+  survey:     FileText,
+  share:      Share2,
+  report:     FileBarChart,
+  files:      FolderOpen,
+};
 
-const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
-  { key: 'overview',   label: '개요',         Icon: Info },
-  { key: 'curriculum', label: '커리큘럼',     Icon: BookOpen },
-  { key: 'staff',      label: '강사·교육생', Icon: Mic2 },
-  { key: 'attendance', label: '출석·일지',   Icon: ClipboardCheck },
-  { key: 'survey',     label: '결과·만족도', Icon: FileText },
-  { key: 'share',      label: '외부 공유',   Icon: Share2 },
-  { key: 'report',     label: '결과보고서',  Icon: FileBarChart },
-  { key: 'files',      label: '파일',        Icon: FolderOpen },
-];
+function getTabIcon(tab: VisibleTab): LucideIcon {
+  if (tab.isPlaceholder) return Hourglass;
+  return TAB_ICON[tab.key as TabKey] ?? Info;
+}
 
 const SELECT_COLUMNS = '*, project:projects(id,name,status)';
 
@@ -67,7 +75,8 @@ export default function ProgramDetailPage() {
   const [program, setProgram] = useState<DetailProgram | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>('overview');
+  // 동적 탭 — placeholder 모듈 ID 도 받기 위해 string 으로 확장
+  const [tab, setTab] = useState<string>('overview');
 
   useEffect(() => {
     if (!id) return;
@@ -126,9 +135,27 @@ export default function ProgramDetailPage() {
     );
   }
 
+  // 동적 탭 — programs.modules 배열 기반 (STEP-PROGRAM-MODULE-RENDER)
+  const visibleTabs = useMemo<VisibleTab[]>(
+    () => resolveVisibleTabs(program?.modules ?? null),
+    [program?.modules],
+  );
+
+  // 현재 tab 이 visibleTabs(+ share)에 없으면 첫 가시 탭으로 fallback
+  useEffect(() => {
+    if (visibleTabs.length === 0) return;
+    const allKeys = [...visibleTabs.map((t) => t.key), 'share'];
+    if (!allKeys.includes(tab)) {
+      setTab(visibleTabs[0]?.key ?? 'overview');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleTabs]);
+
   if (!program) return <NotFound />;
 
   const programId = program.id;
+  const isPlaceholderActive = visibleTabs.some((t) => t.key === tab && t.isPlaceholder);
+  const activePlaceholderLabel = visibleTabs.find((t) => t.key === tab)?.label;
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -181,15 +208,16 @@ export default function ProgramDetailPage() {
         aria-label="프로그램 상세 탭"
         className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto"
       >
-        {TABS.map(({ key, label, Icon }) => {
-          const active = tab === key;
+        {visibleTabs.map((vt) => {
+          const active = tab === vt.key;
+          const Icon = getTabIcon(vt);
           return (
             <button
-              key={key}
+              key={vt.key}
               type="button"
               role="tab"
               aria-selected={active}
-              onClick={() => setTab(key)}
+              onClick={() => setTab(vt.key)}
               className={[
                 'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
                 active
@@ -198,10 +226,33 @@ export default function ProgramDetailPage() {
               ].join(' ')}
             >
               <Icon size={15} aria-hidden="true" />
-              {label}
+              {vt.label}
+              {vt.isPlaceholder && (
+                <span className="text-[10px] text-slate-400 font-normal">(준비 중)</span>
+              )}
             </button>
           );
         })}
+        {SHARE_TAB_ALWAYS && (() => {
+          const active = tab === 'share';
+          return (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab('share')}
+              className={[
+                'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
+                active
+                  ? 'text-violet-700 border-violet-600'
+                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
+              ].join(' ')}
+            >
+              <Share2 size={15} aria-hidden="true" />
+              외부 공유
+            </button>
+          );
+        })()}
       </nav>
 
       <div role="tabpanel">
@@ -215,6 +266,19 @@ export default function ProgramDetailPage() {
         {tab === 'share' && <ShareTab programId={programId} />}
         {tab === 'report' && <ReportBuilderTab programId={programId} />}
         {tab === 'files' && <ProgramFilesTab programId={programId} />}
+
+        {/* 미구현 모듈 placeholder (Q4-A) */}
+        {isPlaceholderActive && (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <Hourglass size={32} className="mb-3 text-slate-300" aria-hidden="true" />
+            <p className="text-sm font-bold text-slate-600">
+              ✦ {activePlaceholderLabel} 탭은 곧 추가될 예정이에요
+            </p>
+            <p className="text-xs mt-1">
+              현재는 모듈만 등록되어 있고 상세 화면이 준비 중입니다.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
