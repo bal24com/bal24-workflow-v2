@@ -16,18 +16,45 @@
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
-// ─── 환경변수 로드 (.env.capture 파일도 지원) ──────────────────
+// ─── 환경변수 로드 (.env.capture 파일도 지원, BOM·여러 경로·확장자 함정 대응) ──
 function loadDotEnv() {
-  const path = '.env.capture';
-  if (!existsSync(path)) return;
-  const text = readFileSync(path, 'utf8');
-  text.split('\n').forEach((line) => {
+  // Windows 메모장이 자동으로 .txt 붙이는 함정 + script 가 다른 cwd 에서 호출됐을 때 대비
+  const candidates = [
+    '.env.capture',
+    '.env.capture.txt',
+    join(process.cwd(), '.env.capture'),
+    resolve(import.meta.dirname ?? '.', '..', '.env.capture'),
+  ];
+  let used = '';
+  for (const p of candidates) {
+    if (existsSync(p)) { used = p; break; }
+  }
+  if (!used) {
+    console.log(`ℹ️  .env.capture 파일 없음 — 환경변수에서 직접 읽음`);
+    console.log(`   현재 작업 디렉토리: ${process.cwd()}`);
+    console.log(`   확인한 경로: ${candidates.join(', ')}`);
+    return;
+  }
+  console.log(`ℹ️  .env.capture 로드: ${used}`);
+  let text = readFileSync(used, 'utf8');
+  // UTF-8 BOM strip (메모장 기본 저장)
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  let loaded = 0;
+  text.split(/\r?\n/).forEach((line) => {
+    if (!line || line.trim().startsWith('#')) return;
     const m = line.match(/^([A-Z0-9_]+)\s*=\s*(.*?)\s*$/i);
-    if (!m) return;
-    if (!process.env[m[1]]) process.env[m[1]] = m[2];
+    if (!m) {
+      if (line.trim()) console.log(`   ⚠️ 파싱 실패: ${line}`);
+      return;
+    }
+    if (!process.env[m[1]]) {
+      process.env[m[1]] = m[2];
+      loaded += 1;
+    }
   });
+  console.log(`   → ${loaded} 개 변수 로드 완료`);
 }
 loadDotEnv();
 
