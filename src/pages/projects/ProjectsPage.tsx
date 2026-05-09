@@ -16,6 +16,7 @@ import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import { BADGE_BASE, PROJECT_STATUS_STYLE } from '../../utils/statusStyles';
 import EmptyState from '../../components/EmptyState';
+import PageHelpBanner from '../../components/PageHelpBanner';
 import ConsortiumFilterTabs, {
   type ConsortiumFilter,
   type ConsortiumOption,
@@ -243,6 +244,13 @@ export default function ProjectsPage() {
         <span aria-hidden="true">📁</span>
         프로젝트
       </h1>
+      <PageHelpBanner
+        lines={[
+          '✦ 단독 용역·사업 단위로 관리. 컨소시엄 사업은 좌측 메뉴 \"컨소시엄\"에서 별도 관리해요.',
+          '✦ 카드/리스트 뷰 + 상태 탭으로 진행 단계별 빠른 필터링',
+          '💡 카드 클릭 → 상세 페이지에서 태스크·프로그램·재무·결과보고서까지 한 번에',
+        ]}
+      />
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <StatusFilterTabs value={filter} onChange={setFilter} counts={counts} />

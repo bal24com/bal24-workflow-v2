@@ -24,6 +24,7 @@ import GreetingHeader from './components/GreetingHeader';
 import ProjectStagePanel from './components/ProjectStagePanel';
 import TaskAlertPanel from './components/TaskAlertPanel';
 import QuickActionsCard from './components/QuickActionsCard';
+import PageHelpBanner from '../../components/PageHelpBanner';
 
 type Tone = 'violet' | 'orange' | 'cyan' | 'emerald' | 'rose';
 
@@ -132,6 +133,15 @@ export default function DashboardPage() {
         <span aria-hidden="true">🏠</span>
         홈
       </h1>
+
+      <PageHelpBanner
+        title="홈에서 할 수 있는 것"
+        lines={[
+          '✦ 진행 중 프로젝트·태스크·재무 현황을 한 화면에서 확인',
+          '✦ 단계별 진행 패널 + 태스크 알림으로 오늘 할 일 즉시 파악',
+          '💡 우측 빠른 액션 카드로 자주 쓰는 등록·이동을 한 번에',
+        ]}
+      />
 
       <GreetingHeader />
 

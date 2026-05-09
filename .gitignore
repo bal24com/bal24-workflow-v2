@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# 스크린샷 캡처 결과 (scripts/capture-screens.mjs)
+screenshots/
+
 # 환경변수 (API 키 보호 — git에 절대 올리지 않음)
 .env
 .env.*

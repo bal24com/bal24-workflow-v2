@@ -21,6 +21,7 @@ import {
 } from './programStatus';
 import { PROGRAM_TYPE_STYLE, PROGRAM_STATUS_STYLE, BADGE_BASE } from '../../utils/statusStyles';
 import EmptyState from '../../components/EmptyState';
+import PageHelpBanner from '../../components/PageHelpBanner';
 import ConsortiumFilterTabs, {
   type ConsortiumFilter,
   type ConsortiumOption,
@@ -282,6 +283,13 @@ export default function ProgramsPage() {
         <span aria-hidden="true">🎓</span>
         프로그램
       </h1>
+      <PageHelpBanner
+        lines={[
+          '✦ 교육·캠프·행사·세미나·이벤트·워크숍 등 13종 유형 지원',
+          '✦ 유형별 표시 모듈을 골라 상세 탭 구성을 자동으로 맞춤화',
+          '💡 카드 클릭 → 상세에서 커리큘럼·강사·교육생·출석·멘토링·강사료·결과보고서까지 일괄 관리',
+        ]}
+      />
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1.5">
