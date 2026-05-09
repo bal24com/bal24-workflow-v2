@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen, FolderOpen, Hourglass, Users2, Handshake,
+  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen, FolderOpen, Hourglass, Users2, Handshake, Receipt,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -25,6 +25,7 @@ import ReportBuilderTab from './detail/ReportBuilderTab';
 import ProgramFilesTab from './detail/ProgramFilesTab';
 import AssignmentTab from './detail/AssignmentTab';
 import MentoringTab from './detail/MentoringTab';
+import StaffFeeTab from './detail/StaffFeeTab';
 import {
   resolveVisibleTabs, SHARE_TAB_ALWAYS,
   type TabKey, type VisibleTab,
@@ -46,6 +47,7 @@ const TAB_ICON: Record<TabKey, LucideIcon> = {
   report:     FileBarChart,
   files:      FolderOpen,
   mentoring:  Handshake,
+  staff_fee:  Receipt,
 };
 
 function getTabIcon(tab: VisibleTab): LucideIcon {
@@ -292,6 +294,7 @@ export default function ProgramDetailPage() {
         {tab === 'staff' && <StaffStudentsTab programId={programId} />}
         {tab === 'attendance' && <AttendanceLogTab programId={programId} />}
         {tab === 'mentoring' && <MentoringTab programId={programId} />}
+        {tab === 'staff_fee' && <StaffFeeTab programId={programId} />}
         {tab === 'survey' && <SurveyResultTab programId={programId} />}
         {tab === 'share' && <ShareTab programId={programId} />}
         {tab === 'report' && <ReportBuilderTab programId={programId} />}

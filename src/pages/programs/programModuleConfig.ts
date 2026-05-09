@@ -5,7 +5,7 @@
 export type TabKey =
   | 'overview' | 'curriculum' | 'staff' | 'attendance'
   | 'survey'   | 'files'      | 'report' | 'share'
-  | 'mentoring';
+  | 'mentoring' | 'staff_fee';
 
 /**
  * module ID → TabKey 매핑.
@@ -22,6 +22,7 @@ export const MODULE_TO_TAB: Record<string, TabKey | null> = {
   attendance:              'attendance',
   survey:                  'survey',
   mentoring:               'mentoring', // STEP-MENTORING: 실제 탭 구현 완료
+  staff_fee:               'staff_fee', // STEP-STAFF-FEE-TAX: 강사료 지급 기준 탭
   // 미구현 (placeholder 표시)
   domestic_travel:         null,
   flight:                  null,
@@ -91,6 +92,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   report:     '결과보고서',
   share:      '외부 공유',
   mentoring:  '멘토링',
+  staff_fee:  '지급 기준',
 };
 
 export function getTabLabel(key: TabKey): string {
@@ -112,7 +114,7 @@ export function resolveVisibleTabs(modules: string[] | null | undefined): Visibl
 
   // 고정 순서 — share 는 호출자가 별도 처리
   const FIXED_ORDER: TabKey[] = [
-    'overview', 'curriculum', 'staff', 'attendance', 'mentoring', 'survey', 'report', 'files',
+    'overview', 'curriculum', 'staff', 'attendance', 'mentoring', 'survey', 'staff_fee', 'report', 'files',
   ];
 
   const result: VisibleTab[] = [];
