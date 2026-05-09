@@ -12,6 +12,7 @@ import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
 import { RECEIPT_TYPE_VALUES } from '../../utils/accounting';
 import type { Receipt, ReceiptType } from '../../types/database';
+import { usePartnerProfile } from '../../hooks/usePartnerProfile';
 
 type ReceiptRow = Receipt & {
   expense?: { id: string; description: string; expense_date: string } | null;
@@ -66,19 +67,26 @@ function TypeFilterTabs({ value, onChange, counts }: {
 
 export default function ReceiptsPage() {
   const toast = useToast();
+  // STEP-PARTNER-RECEIPTS-FILTER — PARTNER 면 본인 회사(consortium_member_id) 증빙만
+  const { isPartner, consortiumMemberId, isLoading: partnerLoading } = usePartnerProfile();
   const [items, setItems] = useState<ReceiptRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TypeFilter>('전체');
   const [search, setSearch] = useState('');
 
   const fetchItems = useCallback(async () => {
+    if (isPartner && partnerLoading) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('receipts')
         .select(SELECT_COLUMNS)
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
+      if (isPartner && consortiumMemberId) {
+        query = query.eq('consortium_member_id', consortiumMemberId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       setItems((data ?? []) as ReceiptRow[]);
     } catch (err) {
@@ -88,7 +96,7 @@ export default function ReceiptsPage() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, isPartner, consortiumMemberId, partnerLoading]);
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
@@ -138,9 +146,15 @@ export default function ReceiptsPage() {
         />
       </div>
 
-      <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-900">
-        💡 신규 증빙은 <strong>지출 등록 시 자동 첨부</strong>돼요. 이 페이지는 모든 영수증을 한곳에서 보고·검색하는 용도예요.
-      </div>
+      {isPartner ? (
+        <div className="rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-xs text-orange-900">
+          🔒 <strong>담당 컨소시엄의 증빙만</strong> 표시돼요.
+        </div>
+      ) : (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-900">
+          💡 신규 증빙은 <strong>지출 등록 시 자동 첨부</strong>돼요. 이 페이지는 모든 영수증을 한곳에서 보고·검색하는 용도예요.
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted">
@@ -153,7 +167,7 @@ export default function ReceiptsPage() {
           title={search.trim() || filter !== '전체' ? '조건에 맞는 영수증이 없어요.' : '아직 등록된 영수증이 없어요.'}
           description={!search.trim() && filter === '전체' ? '지출 페이지에서 영수증을 등록해 주세요.' : undefined}
           action={
-            !search.trim() && filter === '전체' && (
+            !search.trim() && filter === '전체' && !isPartner && (
               <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => { window.location.href = '/expense'; }}>
                 지출 페이지로 이동
               </Button>

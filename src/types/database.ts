@@ -604,6 +604,8 @@ export interface Receipt {
   income_id?: string | null;
   project_id?: string | null;
   consortium_id?: string | null;
+  /** STEP-PARTNER-RECEIPTS-FILTER — PARTNER 본인 회사 증빙 필터링용 */
+  consortium_member_id?: string | null;
   file_url: string;
   file_name: string;
   file_size?: number | null;
