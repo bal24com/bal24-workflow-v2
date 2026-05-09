@@ -83,6 +83,7 @@ export default function ProgramDetailPage() {
   // 동적 탭 — placeholder 모듈 ID 도 받기 위해 string 으로 확장
   const [tab, setTab] = useState<string>('overview');
 
+  // 1) 데이터 fetch (훅 #1)
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -111,6 +112,23 @@ export default function ProgramDetailPage() {
     };
   }, [id, toast]);
 
+  // 2) 동적 탭 (훅 #2) — program?.modules 가 null/undefined 이어도 안전 (resolveVisibleTabs 내부 가드)
+  const visibleTabs = useMemo<VisibleTab[]>(
+    () => resolveVisibleTabs(program?.modules ?? null),
+    [program?.modules],
+  );
+
+  // 3) 탭 fallback (훅 #3) — visibleTabs 에 현재 tab 없으면 첫 가시 탭으로
+  useEffect(() => {
+    if (visibleTabs.length === 0) return;
+    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment'];
+    if (!allKeys.includes(tab)) {
+      setTab(visibleTabs[0]?.key ?? 'overview');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleTabs]);
+
+  // ⚠️ 모든 훅은 위에서 호출 완료 — 아래는 조기 반환만 허용 (Rules of Hooks)
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-slate-500">
@@ -139,22 +157,6 @@ export default function ProgramDetailPage() {
       </div>
     );
   }
-
-  // 동적 탭 — programs.modules 배열 기반 (STEP-PROGRAM-MODULE-RENDER)
-  const visibleTabs = useMemo<VisibleTab[]>(
-    () => resolveVisibleTabs(program?.modules ?? null),
-    [program?.modules],
-  );
-
-  // 현재 tab 이 visibleTabs(+ share, assignment)에 없으면 첫 가시 탭으로 fallback
-  useEffect(() => {
-    if (visibleTabs.length === 0) return;
-    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment'];
-    if (!allKeys.includes(tab)) {
-      setTab(visibleTabs[0]?.key ?? 'overview');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleTabs]);
 
   if (!program) return <NotFound />;
 
