@@ -159,6 +159,7 @@ export default function ExpenseFormModal({ open, ledgerType, onClose, onCreated 
 
       const validReceipts = receipts.filter((r) => r.fileUrl);
       if (validReceipts.length > 0 && created) {
+        // STEP-PARTNER-RECEIPTS-AUTOFILL — PARTNER 면 본인 회사 ID 자동 주입 (UI 비노출)
         const rows = validReceipts.map((r) => ({
           expense_id: created.id,
           project_id: form.projectId || null,
@@ -169,6 +170,9 @@ export default function ExpenseFormModal({ open, ledgerType, onClose, onCreated 
           receipt_type: r.receiptType,
           description: r.description.trim() || null,
           amount: r.amount.trim() ? Number(r.amount.replace(/,/g, '')) : null,
+          ...(isPartner && consortiumMemberId
+            ? { consortium_member_id: consortiumMemberId }
+            : {}),
         }));
         const { error: rErr } = await supabase.from('receipts').insert(rows);
         if (rErr) {
