@@ -2,7 +2,8 @@
 // KPI 6개 (수입 전월 변화율 포함) + 인사말 + 단계별 진행 + 태스크 알림 + 최근 지출 + 빠른 액션
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { usePartnerProfile } from '../../hooks/usePartnerProfile';
 import {
   Briefcase, GraduationCap, TrendingUp, Wallet,
   Calendar, AlertTriangle,
@@ -87,6 +88,8 @@ function KpiCard({ label, value, sub, Icon, tone, trend, rate, trendLabel, alert
 
 export default function DashboardPage() {
   const toast = useToast();
+  // STEP-PARTNER-SIDEBAR — PARTNER 는 전용 홈으로 redirect
+  const { isPartner, isLoading: partnerLoading } = usePartnerProfile();
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
   const [expenses, setExpenses] = useState<RecentExpense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +119,12 @@ export default function DashboardPage() {
     if (!kpis) return null;
     return computeChangeRate(kpis.thisMonthIncome, kpis.prevMonthIncome);
   }, [kpis]);
+
+  // STEP-PARTNER-SIDEBAR — PARTNER 로그인이면 /partner-home 으로 이동
+  // 훅 호출 모두 완료된 후의 조기 반환 (Rules of Hooks 준수)
+  if (!partnerLoading && isPartner) {
+    return <Navigate to="/partner-home" replace />;
+  }
 
   return (
     <div className="space-y-6 max-w-[1400px]">

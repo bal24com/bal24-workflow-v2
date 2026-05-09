@@ -31,6 +31,8 @@ import {
   type TabKey, type VisibleTab,
 } from './programModuleConfig';
 import { useUserProfile } from '../../hooks/useUserProfile';
+import { usePartnerProfile } from '../../hooks/usePartnerProfile';
+import PartnerReadOnlyBanner from '../../components/PartnerReadOnlyBanner';
 
 type DetailProgram = Program & {
   project?: { id: string; name: string; status: string } | null;
@@ -79,6 +81,7 @@ export default function ProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
   const { isPM } = useUserProfile();
+  const { isPartner, programIds: partnerProgramIds } = usePartnerProfile();
   const [program, setProgram] = useState<DetailProgram | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -165,9 +168,12 @@ export default function ProgramDetailPage() {
   const programId = program.id;
   const isPlaceholderActive = visibleTabs.some((t) => t.key === tab && t.isPlaceholder);
   const activePlaceholderLabel = visibleTabs.find((t) => t.key === tab)?.label;
+  // STEP-PARTNER-SIDEBAR — PARTNER 가 본인 담당 프로그램이 아닌 경우 읽기 전용 배너
+  const isPartnerReadOnly = isPartner && !partnerProgramIds.has(programId);
 
   return (
     <div className="space-y-5 max-w-[1400px]">
+      {isPartnerReadOnly && <PartnerReadOnlyBanner />}
       <div className="space-y-2">
         <Link
           to="/programs"

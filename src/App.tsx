@@ -50,6 +50,7 @@ import MentoringMentorPage from './pages/mentoring/MentoringMentorPage';
 import MentoringStudentPage from './pages/mentoring/MentoringStudentPage';
 import MentoringPartnerView from './pages/mentoring/MentoringPartnerView';
 import MyPage from './pages/mypage/MyPage';
+import PartnerHomePage from './pages/partner/PartnerHomePage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
@@ -118,6 +119,7 @@ export default function App() {
         >
           {/* 운영 */}
           <Route path="/home" element={<DashboardPage />} />
+          <Route path="/partner-home" element={<PartnerHomePage />} />
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
