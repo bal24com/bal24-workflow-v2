@@ -11,6 +11,8 @@ import { formatDateKo } from '../../lib/utils';
 import { useToast } from '../../contexts/ToastContext';
 import type { ActivityLog, ActivityLogType } from '../../types/database';
 import SignaturePad from './SignaturePad';
+import { usePMViewer } from '../../hooks/usePMViewer';
+import PMViewerBanner from '../../components/PMViewerBanner';
 
 const LOG_FILES_BUCKET = 'activity-logs';
 const MAX_FILES = 3;
@@ -71,6 +73,7 @@ interface LogWithToken extends ActivityLog {
 export default function LogWritePage() {
   const { token } = useParams<{ token: string }>();
   const toast = useToast();
+  const { isViewer, viewerName } = usePMViewer();
   const [log, setLog] = useState<LogWithToken | null>(null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>(EMPTY);
@@ -152,6 +155,10 @@ export default function LogWritePage() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!log) return;
+    if (isViewer) {
+      toast.warning('PM 뷰어 모드에서는 제출할 수 없어요.');
+      return;
+    }
 
     if (!form.authorName.trim() || !form.authorPhone.trim()) {
       toast.error('작성자 이름·연락처를 입력해 주세요.');
@@ -251,6 +258,7 @@ export default function LogWritePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {isViewer && <PMViewerBanner viewerName={viewerName} />}
       <header className="bg-gradient-to-br from-violet-600 to-violet-500 text-white">
         <div className="max-w-2xl mx-auto px-5 py-8">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold mb-3">
@@ -348,7 +356,7 @@ export default function LogWritePage() {
             <label className="cursor-pointer inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50">
               <Upload size={14} aria-hidden="true" />
               {uploading ? '업로드 중…' : '파일 추가'}
-              <input type="file" onChange={handleFileUpload} disabled={submitting || uploading || files.length >= MAX_FILES} className="hidden" />
+              <input type="file" onChange={handleFileUpload} disabled={submitting || uploading || isViewer || files.length >= MAX_FILES} className="hidden" />
             </label>
             {files.length > 0 && (
               <ul className="space-y-1.5">
@@ -369,7 +377,7 @@ export default function LogWritePage() {
             <SignaturePad onChange={setSignature} disabled={submitting} />
           </section>
 
-          <Button type="submit" variant="primary" loading={submitting} disabled={uploading} className="!w-full !py-3 text-base font-semibold">
+          <Button type="submit" variant="primary" loading={submitting} disabled={uploading || isViewer} className="!w-full !py-3 text-base font-semibold">
             일지 제출
           </Button>
         </form>

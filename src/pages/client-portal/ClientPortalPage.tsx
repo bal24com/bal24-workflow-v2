@@ -7,11 +7,14 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { PortalItem, ProjectPortal } from '../../types/database';
 import ClientPortalItem from './ClientPortalItem';
+import { usePMViewer } from '../../hooks/usePMViewer';
+import PMViewerBanner from '../../components/PMViewerBanner';
 
 type ScreenState = 'loading' | 'notfound' | 'closed' | 'expired' | 'ready';
 
 export default function ClientPortalPage() {
   const { token } = useParams<{ token: string }>();
+  const { isViewer, viewerName } = usePMViewer();
   const [screen, setScreen] = useState<ScreenState>('loading');
   const [portal, setPortal] = useState<ProjectPortal | null>(null);
   const [items, setItems] = useState<PortalItem[]>([]);
@@ -50,8 +53,10 @@ export default function ClientPortalPage() {
   const allRequiredDone = requiredItems.length > 0 && requiredDone === requiredItems.length;
 
   return (
-    <div className="min-h-screen bg-bg flex items-start justify-center p-4 sm:p-8">
-      <div className="w-full max-w-2xl space-y-4">
+    <div className="min-h-screen bg-bg">
+      {isViewer && <PMViewerBanner viewerName={viewerName} />}
+      <div className="flex items-start justify-center p-4 sm:p-8">
+        <div className="w-full max-w-2xl space-y-4">
         {screen === 'loading' && (
           <div className="bg-white rounded-card border border-[#EDE9FE] shadow-card p-8">
             <div className="flex flex-col items-center justify-center py-8 gap-2">
@@ -110,6 +115,7 @@ export default function ClientPortalPage() {
                     key={it.id}
                     item={it}
                     projectId={portal.project_id}
+                    readOnly={isViewer}
                     onCompleted={() => void load()}
                   />
                 ))}
@@ -131,6 +137,7 @@ export default function ClientPortalPage() {
             </p>
           </>
         )}
+        </div>
       </div>
     </div>
   );

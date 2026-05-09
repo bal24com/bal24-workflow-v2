@@ -19,6 +19,8 @@ interface Props {
   assignmentId: string;
   mentorName: string;
   session?: MentoringSession | null; // 있으면 수정, 없으면 신규
+  /** STEP-PM-VIEWER: PM/ADMIN 뷰어 모드 — 저장·삭제 비활성화 */
+  readOnly?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -27,7 +29,7 @@ const MAX_PHOTOS = 5;
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function MentoringSessionModal({
-  open, assignmentId, mentorName, session, onClose, onSaved,
+  open, assignmentId, mentorName, session, readOnly = false, onClose, onSaved,
 }: Props) {
   const { user } = useAuth();
   const toast = useToast();
@@ -167,13 +169,15 @@ export default function MentoringSessionModal({
       footer={
         <>
           {session && (
-            <Button variant="outline" onClick={handleDelete} disabled={submitting} leftIcon={<Trash2 size={14} />}>삭제</Button>
+            <Button variant="outline" onClick={handleDelete} disabled={submitting || readOnly} leftIcon={<Trash2 size={14} />}>삭제</Button>
           )}
           {session && (
             <Button variant="outline" onClick={handleDownload} disabled={submitting}>Word 다운로드</Button>
           )}
-          <Button variant="outline" onClick={onClose} disabled={submitting}>취소</Button>
-          <Button type="submit" form="mentoring-session-form" variant="primary" loading={submitting}>저장</Button>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>{readOnly ? '닫기' : '취소'}</Button>
+          {!readOnly && (
+            <Button type="submit" form="mentoring-session-form" variant="primary" loading={submitting}>저장</Button>
+          )}
         </>
       }
     >

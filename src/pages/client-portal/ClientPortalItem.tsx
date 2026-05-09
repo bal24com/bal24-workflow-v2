@@ -11,6 +11,8 @@ import ClientAutoDataView from './ClientAutoDataView';
 type Props = {
   item: PortalItem;
   projectId: string;
+  /** STEP-PM-VIEWER: PM/ADMIN 뷰어 모드 — 업로드·제출·동의 비활성화 */
+  readOnly?: boolean;
   /** 완료 후 새로고침 콜백 */
   onCompleted: () => void;
 };
@@ -23,7 +25,7 @@ function translateError(raw: string): string {
   return '처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }
 
-export default function ClientPortalItem({ item, projectId, onCompleted }: Props) {
+export default function ClientPortalItem({ item, projectId, readOnly = false, onCompleted }: Props) {
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
@@ -181,16 +183,19 @@ export default function ClientPortalItem({ item, projectId, onCompleted }: Props
       )}
 
       {item.item_type === 'file_upload' && (
-        <div onDragOver={onDragOver} onDragEnter={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+        <div onDragOver={onDragOver} onDragEnter={onDragOver} onDragLeave={readOnly ? undefined : onDragLeave} onDrop={readOnly ? undefined : onDrop}
           className={['rounded-xl border-2 border-dashed p-4 text-center transition-colors',
             dragActive ? 'border-primary bg-primary/5' : 'border-slate-200 bg-slate-50/40',
-            busy ? 'opacity-60' : ''].join(' ')}>
+            busy || readOnly ? 'opacity-60' : ''].join(' ')}>
           <Upload size={20} className="mx-auto text-slate-400 mb-1" />
           <p className="text-xs text-text">파일을 끌어다 놓거나 버튼을 눌러 선택해 주세요.</p>
-          <label className="inline-flex mt-2 items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200 cursor-pointer hover:bg-slate-50">
+          <label className={[
+            'inline-flex mt-2 items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200',
+            readOnly ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50',
+          ].join(' ')}>
             <FileIcon size={12} />
             파일 선택
-            <input type="file" hidden onChange={onPick} disabled={busy} />
+            <input type="file" hidden onChange={onPick} disabled={busy || readOnly} />
           </label>
           {busy && <p className="text-xs text-primary mt-2 inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" />업로드 중…</p>}
         </div>
@@ -198,11 +203,11 @@ export default function ClientPortalItem({ item, projectId, onCompleted }: Props
 
       {item.item_type === 'feedback' && !item.completed && (
         <div className="space-y-2">
-          <textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} disabled={busy}
+          <textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} disabled={busy || readOnly}
             placeholder="의견을 적어 주세요."
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 resize-none" />
-          <button type="button" onClick={() => void handleSubmitFeedback()} disabled={busy}
-            className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+          <button type="button" onClick={() => void handleSubmitFeedback()} disabled={busy || readOnly}
+            className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
             {busy ? <Loader2 size={14} className="animate-spin" /> : null}
             제출
           </button>
@@ -212,16 +217,16 @@ export default function ClientPortalItem({ item, projectId, onCompleted }: Props
       {item.item_type === 'approval' && !item.completed && (
         <div className="space-y-2 rounded-lg bg-slate-50 p-3">
           <p className="text-sm text-text">{item.approval_text ?? '본 내용에 동의합니다.'}</p>
-          <button type="button" onClick={() => void handleApproval()} disabled={busy}
-            className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+          <button type="button" onClick={() => void handleApproval()} disabled={busy || readOnly}
+            className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
             <Check size={14} />동의합니다
           </button>
         </div>
       )}
 
       {item.item_type === 'tax_invoice' && !item.completed && (
-        <button type="button" onClick={() => void handleApproval()} disabled={busy}
-          className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-secondary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50">
+        <button type="button" onClick={() => void handleApproval()} disabled={busy || readOnly}
+          className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-secondary text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
           {busy ? <Loader2 size={14} className="animate-spin" /> : null}
           세금계산서 발행 요청하기
         </button>

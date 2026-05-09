@@ -13,10 +13,13 @@ import { formatDuration, getMentorName, getMentorSpecialty } from '../../types/m
 import type {
   MentoringAssignment, MentoringFeedback,
 } from '../../types/mentoring';
+import { usePMViewer } from '../../hooks/usePMViewer';
+import PMViewerBanner from '../../components/PMViewerBanner';
 
 export default function MentoringStudentPage() {
   const { token } = useParams<{ token: string }>();
   const toast = useToast();
+  const { isViewer, viewerName } = usePMViewer();
   const [assignment, setAssignment] = useState<MentoringAssignment | null>(null);
   const [feedbacks, setFeedbacks] = useState<Record<string, MentoringFeedback[]>>({});
   const [menteeName, setMenteeName] = useState('');
@@ -116,8 +119,9 @@ export default function MentoringStudentPage() {
   const sessions = (assignment.sessions ?? []).filter((s) => !!s.submitted_at);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-50/40 to-orange-50/30 px-4 py-6 sm:py-10">
-      <div className="max-w-2xl mx-auto space-y-4">
+    <div className="min-h-screen bg-gradient-to-b from-violet-50/40 to-orange-50/30">
+      {isViewer && <PMViewerBanner viewerName={viewerName} />}
+      <div className="max-w-2xl mx-auto space-y-4 px-4 py-6 sm:py-10">
         <header className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">멘토링</p>
           <h1 className="mt-1 text-xl font-bold text-[#1E1B4B]">{mentorName} 멘토님</h1>
@@ -214,6 +218,7 @@ export default function MentoringStudentPage() {
                           size="sm"
                           onClick={() => void handleSubmit(s.id)}
                           loading={submitting === s.id}
+                          disabled={isViewer}
                           leftIcon={<Send size={12} />}
                         >
                           제출

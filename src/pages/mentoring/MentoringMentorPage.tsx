@@ -20,12 +20,15 @@ import type {
   MentoringAssignment, MentoringSession, MentoringTaxType,
 } from '../../types/mentoring';
 import MentoringSessionModal from '../programs/detail/MentoringSessionModal';
+import { usePMViewer } from '../../hooks/usePMViewer';
+import PMViewerBanner from '../../components/PMViewerBanner';
 
 const TAX_OPTIONS: MentoringTaxType[] = ['3.3%', '8.8%', '면세'];
 
 export default function MentoringMentorPage() {
   const { token } = useParams<{ token: string }>();
   const toast = useToast();
+  const { isViewer, viewerName } = usePMViewer();
   const [assignment, setAssignment] = useState<MentoringAssignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [taxEdit, setTaxEdit] = useState(false);
@@ -97,8 +100,9 @@ export default function MentoringMentorPage() {
   const pay = calcMentoringPay(assignment, completed);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-50/40 to-orange-50/30 px-4 py-6 sm:py-10">
-      <div className="max-w-3xl mx-auto space-y-4">
+    <div className="min-h-screen bg-gradient-to-b from-violet-50/40 to-orange-50/30">
+      {isViewer && <PMViewerBanner viewerName={viewerName} />}
+      <div className="max-w-3xl mx-auto space-y-4 px-4 py-6 sm:py-10">
         <header className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">멘토 보고서</p>
           <h1 className="mt-1 text-xl font-bold text-[#1E1B4B]">{mentorName} 멘토님</h1>
@@ -123,7 +127,7 @@ export default function MentoringMentorPage() {
                   변경 완료
                 </span>
               ) : (
-                <Button variant="outline" size="sm" onClick={() => setTaxEdit(true)}>변경하기</Button>
+                <Button variant="outline" size="sm" onClick={() => setTaxEdit(true)} disabled={isViewer}>변경하기</Button>
               )}
             </div>
           ) : (
@@ -150,7 +154,7 @@ export default function MentoringMentorPage() {
               </p>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setTaxEdit(false)} disabled={taxSaving}>취소</Button>
-                <Button variant="primary" size="sm" onClick={() => void handleSaveTax()} loading={taxSaving}>저장</Button>
+                <Button variant="primary" size="sm" onClick={() => void handleSaveTax()} loading={taxSaving} disabled={isViewer}>저장</Button>
               </div>
             </div>
           )}
@@ -179,7 +183,7 @@ export default function MentoringMentorPage() {
         <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-3">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-[#1E1B4B]">내가 작성한 보고서 ({assignment.sessions?.length ?? 0})</h2>
-            <Button variant="primary" size="sm" leftIcon={<Plus size={14} />} onClick={() => setSessionTarget('new')}>
+            <Button variant="primary" size="sm" leftIcon={<Plus size={14} />} onClick={() => setSessionTarget('new')} disabled={isViewer}>
               보고서 작성
             </Button>
           </div>
@@ -223,6 +227,7 @@ export default function MentoringMentorPage() {
           assignmentId={assignment.id}
           mentorName={mentorName}
           session={sessionTarget === 'new' ? null : sessionTarget}
+          readOnly={isViewer}
           onClose={() => setSessionTarget(null)}
           onSaved={() => { void reload(); setSessionTarget(null); }}
         />
