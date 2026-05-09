@@ -5,6 +5,7 @@ import { Card, CardContent } from '../../components/ui';
 import { formatDateKo } from '../../lib/utils';
 import { BADGE_BASE } from '../../utils/statusStyles';
 import type { MyPageProgram } from '../../types/mypage';
+import { PARTICIPATION_ROLE_LABEL, PARTICIPATION_ROLE_COLOR } from '../../types/mypage';
 
 interface Props {
   program: MyPageProgram;
@@ -28,6 +29,9 @@ export default function MyProgramCard({ program }: Props) {
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
             <span aria-hidden="true">{emoji}</span>
             <span className="font-semibold">{displayType}</span>
+            <span className={`${BADGE_BASE} ${PARTICIPATION_ROLE_COLOR[program.participation_role]}`}>
+              {PARTICIPATION_ROLE_LABEL[program.participation_role]}
+            </span>
           </div>
           <div className="flex items-center gap-1">
             {program.status && (

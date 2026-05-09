@@ -18,6 +18,8 @@ interface ProfileRow {
   name: string;
   role: string | null;
   my_token: string;
+  email: string | null;
+  consortium_member_id: string | null;
 }
 
 interface ProgramJoinRow {
@@ -59,7 +61,7 @@ interface MentoringMentorRow {
 export async function fetchMyProfile(token: string): Promise<MyPageProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, role, my_token')
+    .select('id, name, role, my_token, email, consortium_member_id')
     .eq('my_token', token)
     .maybeSingle();
   if (error) {
@@ -70,60 +72,137 @@ export async function fetchMyProfile(token: string): Promise<MyPageProfile | nul
 }
 
 /**
- * 사용자가 참여하는 프로그램 (현재는 멘토링 배정 기반).
- * 추후 participant_applications 등 다른 참여 경로 추가 가능.
+ * STEP-MYPAGE-EXPAND — 사용자 참여 프로그램 3출처 통합.
+ * 우선순위: pm > mentor > applicant (이미 등록된 program_id 는 덮어쓰지 않음).
+ *
+ * @param profileId          profiles.id
+ * @param profileEmail       profiles.email (participant_applications 매칭용)
+ * @param consortiumMemberId profiles.consortium_member_id (PM 배정 출처용)
+ *
+ * V2 보정: program_assignments 는 profile_id 가 아니라 consortium_member_id FK.
+ *          profiles.consortium_member_id 가 NULL 이면 PM 출처는 빈 결과.
  */
-export async function fetchMyPrograms(profileId: string): Promise<MyPageProgram[]> {
-  // 멘토 배정
-  const { data: mentorRows, error: mentorError } = await supabase
-    .from('mentoring_assignments')
-    .select(`
-      program:programs!program_id(
-        id, name, program_type, type, status, start_date, end_date, venue, entry_code
-      )
-    `)
-    .eq('mentor_profile_id', profileId);
-  if (mentorError) {
-    console.error('[mypage] 참여 프로그램(멘토) 조회 실패:', mentorError.message);
-  }
+export async function fetchMyPrograms(
+  profileId: string,
+  profileEmail: string | null,
+  consortiumMemberId: string | null,
+): Promise<MyPageProgram[]> {
+  const programMap = new Map<string, MyPageProgram>();
 
-  // 멘티 배정 (mentee_ids UUID[])
-  const { data: menteeRows, error: menteeError } = await supabase
-    .from('mentoring_assignments')
-    .select(`
-      program:programs!program_id(
-        id, name, program_type, type, status, start_date, end_date, venue, entry_code
-      )
-    `)
-    .contains('mentee_ids', [profileId]);
-  if (menteeError) {
-    console.error('[mypage] 참여 프로그램(멘티) 조회 실패:', menteeError.message);
-  }
-
-  type Row = { program: ProgramJoinRow | ProgramJoinRow[] | null };
-  const allRows: Row[] = [...((mentorRows ?? []) as Row[]), ...((menteeRows ?? []) as Row[])];
-
-  // 중복 program 제거
-  const seen = new Set<string>();
-  const result: MyPageProgram[] = [];
-  for (const row of allRows) {
-    const p = pickOne<ProgramJoinRow>(row.program);
-    if (!p || seen.has(p.id)) continue;
-    seen.add(p.id);
-    result.push({
-      id: p.id,
-      name: p.name,
-      program_type: p.program_type,
-      type: p.type,
-      status: p.status,
-      start_date: p.start_date,
-      end_date: p.end_date,
-      venue: p.venue,
-      entry_code: p.entry_code,
-      application_status: '승인',
+  // ── 출처 1: program_assignments (PM 배정) ──────────────────
+  // V2 실측: program_assignments 는 consortium_member_id FK.
+  // profiles.consortium_member_id → consortium_members.id ← program_assignments.consortium_member_id
+  if (consortiumMemberId) {
+    const { data: assignData, error: assignError } = await supabase
+      .from('program_assignments')
+      .select(`
+        program:programs!program_id(
+          id, name, program_type, type, status, start_date, end_date, venue, entry_code
+        )
+      `)
+      .eq('consortium_member_id', consortiumMemberId);
+    if (assignError) {
+      console.error('[mypage] PM 배정 프로그램 조회 실패:', assignError.message);
+    }
+    type Row = { program: ProgramJoinRow | ProgramJoinRow[] | null };
+    ((assignData ?? []) as Row[]).forEach((row) => {
+      const p = pickOne<ProgramJoinRow>(row.program);
+      if (!p?.id || programMap.has(p.id)) return;
+      programMap.set(p.id, {
+        id: p.id, name: p.name,
+        program_type: p.program_type, type: p.type,
+        status: p.status, start_date: p.start_date, end_date: p.end_date,
+        venue: p.venue, entry_code: p.entry_code,
+        application_status: null,
+        participation_role: 'pm',
+      });
     });
   }
-  return result;
+
+  // ── 출처 2: mentoring_assignments (멘토 배정 + 멘티) ───────
+  // mentor_profile_id 일치 OR mentee_ids 배열 포함
+  const [mentorRes, menteeRes] = await Promise.all([
+    supabase
+      .from('mentoring_assignments')
+      .select(`
+        program:programs!program_id(
+          id, name, program_type, type, status, start_date, end_date, venue, entry_code
+        )
+      `)
+      .eq('mentor_profile_id', profileId),
+    supabase
+      .from('mentoring_assignments')
+      .select(`
+        program:programs!program_id(
+          id, name, program_type, type, status, start_date, end_date, venue, entry_code
+        )
+      `)
+      .contains('mentee_ids', [profileId]),
+  ]);
+  if (mentorRes.error) {
+    console.error('[mypage] 멘토 배정 프로그램 조회 실패:', mentorRes.error.message);
+  }
+  if (menteeRes.error) {
+    console.error('[mypage] 멘티 배정 프로그램 조회 실패:', menteeRes.error.message);
+  }
+
+  type MentRow = { program: ProgramJoinRow | ProgramJoinRow[] | null };
+  const mentoringRows: MentRow[] = [
+    ...((mentorRes.data ?? []) as MentRow[]),
+    ...((menteeRes.data ?? []) as MentRow[]),
+  ];
+  mentoringRows.forEach((row) => {
+    const p = pickOne<ProgramJoinRow>(row.program);
+    if (!p?.id || programMap.has(p.id)) return; // pm 우선
+    programMap.set(p.id, {
+      id: p.id, name: p.name,
+      program_type: p.program_type, type: p.type,
+      status: p.status, start_date: p.start_date, end_date: p.end_date,
+      venue: p.venue, entry_code: p.entry_code,
+      application_status: '승인',
+      participation_role: 'mentor',
+    });
+  });
+
+  // ── 출처 3: participant_applications (모집 신청) ──────────
+  if (profileEmail) {
+    interface AppRow {
+      status: string | null;
+      program: ProgramJoinRow | ProgramJoinRow[] | null;
+    }
+    const { data: appData, error: appError } = await supabase
+      .from('participant_applications')
+      .select(`
+        status,
+        program:programs!program_id(
+          id, name, program_type, type, status, start_date, end_date, venue, entry_code
+        )
+      `)
+      .eq('email', profileEmail);
+    if (appError) {
+      console.error('[mypage] 모집 신청 프로그램 조회 실패:', appError.message);
+    }
+    ((appData ?? []) as AppRow[]).forEach((row) => {
+      const p = pickOne<ProgramJoinRow>(row.program);
+      if (!p?.id || programMap.has(p.id)) return; // pm/mentor 우선
+      programMap.set(p.id, {
+        id: p.id, name: p.name,
+        program_type: p.program_type, type: p.type,
+        status: p.status, start_date: p.start_date, end_date: p.end_date,
+        venue: p.venue, entry_code: p.entry_code,
+        application_status: row.status ?? null,
+        participation_role: 'applicant',
+      });
+    });
+  }
+
+  // ── start_date 내림차순 정렬 ──────────────────────────────
+  return Array.from(programMap.values()).sort((a, b) => {
+    if (!a.start_date && !b.start_date) return 0;
+    if (!a.start_date) return 1;
+    if (!b.start_date) return -1;
+    return b.start_date.localeCompare(a.start_date);
+  });
 }
 
 export async function fetchMyMentorings(profileId: string): Promise<MyPageMentoring[]> {

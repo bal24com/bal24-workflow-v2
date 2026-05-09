@@ -72,7 +72,7 @@ export default function MyPage() {
       }
       setProfile(p);
       const [pgs, mts, pending] = await Promise.all([
-        fetchMyPrograms(p.id),
+        fetchMyPrograms(p.id, p.email, p.consortium_member_id),
         fetchMyMentorings(p.id),
         countPendingFeedback(p.id, p.name),
       ]);
