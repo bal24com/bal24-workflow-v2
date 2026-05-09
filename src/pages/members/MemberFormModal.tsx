@@ -150,8 +150,19 @@ export default function MemberFormModal({ open, editTarget, onClose, onSaved }: 
           avatar_url: form.avatarUrl || null,
           updated_at: new Date().toISOString(),
         };
-        const { error } = await supabase.from('profiles').update(payload).eq('id', editTarget.id);
+        // RLS 정책으로 update 가 silent 실패하는 경우 감지 위해 .select() 추가
+        const { data, error } = await supabase
+          .from('profiles')
+          .update(payload)
+          .eq('id', editTarget.id)
+          .select('id');
         if (error) throw error;
+        if (!data || data.length === 0) {
+          // RLS UPDATE 정책 부재로 0 row affected
+          console.error('[members] update 0 row affected — RLS 정책 누락 추정. id=', editTarget.id);
+          setErrorMsg('수정 권한이 없거나 RLS 정책이 누락되어 저장되지 않았어요. 관리자에게 문의해 주세요.');
+          return;
+        }
       } else {
         const payload = {
           email: form.email.trim(),
