@@ -31,6 +31,17 @@ export const ROLE_BADGE: Record<Role, { bg: string; text: string }> = {
   MEMBER: { bg: 'bg-slate-100', text: 'text-slate-500' },
 };
 
+/** V2 보정: profiles.role 이 소문자('admin') 또는 대문자('ADMIN') 어느 쪽이든 안전 조회 */
+const ROLE_BADGE_FALLBACK = { bg: 'bg-slate-100', text: 'text-slate-500' };
+export function getRoleBadge(role: string | null | undefined): { bg: string; text: string } {
+  if (!role) return ROLE_BADGE_FALLBACK;
+  const upper = role.toString().toUpperCase() as Role;
+  return ROLE_BADGE[upper] ?? ROLE_BADGE_FALLBACK;
+}
+export function normalizeRole(role: string | null | undefined): string {
+  return (role ?? '').toString().toUpperCase();
+}
+
 function initial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
 }
@@ -103,7 +114,8 @@ export default function MembersPage() {
   const filtered = useMemo(() => {
     const k = keyword.trim().toLowerCase();
     return members.filter((m) => {
-      if (roleFilter !== 'ALL' && m.role !== roleFilter) return false;
+      // V2 보정: profiles.role 은 소문자 'admin' 등 → 비교 시 정규화
+      if (roleFilter !== 'ALL' && normalizeRole(m.role) !== roleFilter) return false;
       if (!k) return true;
       const hay = [m.name, m.department ?? '', m.position ?? ''].join(' ').toLowerCase();
       return hay.includes(k);
@@ -189,7 +201,8 @@ export default function MembersPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((m) => {
-            const tone = ROLE_BADGE[m.role];
+            const tone = getRoleBadge(m.role);
+            const roleLabel = normalizeRole(m.role) || '미정';
             return (
               <article
                 key={m.id}
@@ -220,7 +233,7 @@ export default function MembersPage() {
                     </span>
                   )}
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone.bg} ${tone.text}`}>
-                    {m.role}
+                    {roleLabel}
                   </span>
                 </div>
 
