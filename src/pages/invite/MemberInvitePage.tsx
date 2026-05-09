@@ -9,7 +9,8 @@ import { Loader2, ShieldAlert, CheckCircle2, Lock, Sparkles } from 'lucide-react
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { Button, Input } from '../../components/ui';
-import { ROLE_LABELS, isInvitationExpired } from '../members/memberInviteUtils';
+import { isInvitationExpired } from '../members/memberInviteUtils';
+import { ROLE_LABELS } from '../../constants/roles';
 import type { MemberInvitation } from '../../types/database';
 
 type ScreenState = 'loading' | 'invalid' | 'expired' | 'accepted' | 'ready';

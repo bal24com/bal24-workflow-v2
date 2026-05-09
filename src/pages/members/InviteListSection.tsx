@@ -8,8 +8,9 @@ import { useToast } from '../../contexts/ToastContext';
 import { copyToClipboard } from '../../lib/clipboard';
 import { formatDateKo } from '../../lib/utils';
 import {
-  ROLE_LABELS, INVITATION_STATUS_BADGE, buildInviteUrl, isInvitationExpired,
+  INVITATION_STATUS_BADGE, buildInviteUrl, isInvitationExpired,
 } from './memberInviteUtils';
+import { ROLE_LABELS } from '../../constants/roles';
 import type { MemberInvitation, MemberInvitationStatus } from '../../types/database';
 
 interface Props {

@@ -1,16 +1,10 @@
 // bal24 v2 — STEP-MEMBER-INVITE 공용 유틸 (라벨·배지·URL)
+// STEP-INVITE-UTILS-CLEANUP: ROLE_LABELS 는 constants/roles.ts 단일 출처에서 관리.
 
 import type { MemberInvitationStatus } from '../../types/database';
-
-/** 역할 한글 라벨 (소문자 role 값 → 한글 라벨) */
-export const ROLE_LABELS: Record<string, string> = {
-  admin:   '관리자',
-  pm:      'PM',
-  staff:   '직원',
-  finance: '재무',
-  partner: '파트너',
-  member:  '멤버',
-};
+// 기존 import { ROLE_LABELS } from '../members/memberInviteUtils' 호환을 위해
+// constants 의 정의를 그대로 re-export (점진적 마이그레이션용 — 추후 직접 import 권장)
+export { ROLE_LABELS } from '../../constants/roles';
 
 export const ROLE_OPTIONS_FOR_INVITE: { value: string; label: string }[] = [
   { value: 'staff',   label: '직원' },
