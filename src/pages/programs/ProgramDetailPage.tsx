@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen, FolderOpen, Hourglass,
+  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen, FolderOpen, Hourglass, Users2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -23,10 +23,12 @@ import SurveyResultTab from './detail/SurveyResultTab';
 import ShareTab from './detail/ShareTab';
 import ReportBuilderTab from './detail/ReportBuilderTab';
 import ProgramFilesTab from './detail/ProgramFilesTab';
+import AssignmentTab from './detail/AssignmentTab';
 import {
   resolveVisibleTabs, SHARE_TAB_ALWAYS,
   type TabKey, type VisibleTab,
 } from './programModuleConfig';
+import { useUserProfile } from '../../hooks/useUserProfile';
 
 type DetailProgram = Program & {
   project?: { id: string; name: string; status: string } | null;
@@ -72,6 +74,7 @@ function NotFound() {
 export default function ProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
+  const { isPM } = useUserProfile();
   const [program, setProgram] = useState<DetailProgram | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -141,10 +144,10 @@ export default function ProgramDetailPage() {
     [program?.modules],
   );
 
-  // 현재 tab 이 visibleTabs(+ share)에 없으면 첫 가시 탭으로 fallback
+  // 현재 tab 이 visibleTabs(+ share, assignment)에 없으면 첫 가시 탭으로 fallback
   useEffect(() => {
     if (visibleTabs.length === 0) return;
-    const allKeys = [...visibleTabs.map((t) => t.key), 'share'];
+    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment'];
     if (!allKeys.includes(tab)) {
       setTab(visibleTabs[0]?.key ?? 'overview');
     }
@@ -233,6 +236,28 @@ export default function ProgramDetailPage() {
             </button>
           );
         })}
+        {/* Q7-A: PM/ADMIN + 컨소시엄 연결 시만 배정 탭 표시 */}
+        {isPM && program.consortium_id && (() => {
+          const active = tab === 'assignment';
+          return (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab('assignment')}
+              className={[
+                'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
+                active
+                  ? 'text-violet-700 border-violet-600'
+                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
+              ].join(' ')}
+            >
+              <Users2 size={15} aria-hidden="true" />
+              배정
+            </button>
+          );
+        })()}
+
         {SHARE_TAB_ALWAYS && (() => {
           const active = tab === 'share';
           return (
@@ -266,6 +291,13 @@ export default function ProgramDetailPage() {
         {tab === 'share' && <ShareTab programId={programId} />}
         {tab === 'report' && <ReportBuilderTab programId={programId} />}
         {tab === 'files' && <ProgramFilesTab programId={programId} />}
+        {tab === 'assignment' && isPM && (
+          <AssignmentTab
+            programId={programId}
+            consortiumId={program.consortium_id ?? null}
+            isPM={isPM}
+          />
+        )}
 
         {/* 미구현 모듈 placeholder (Q4-A) */}
         {isPlaceholderActive && (

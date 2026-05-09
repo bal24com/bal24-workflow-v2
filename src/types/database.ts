@@ -51,6 +51,8 @@ export interface Profile {
   slogan?: string | null;
   joined_at?: string | null;
   is_active: boolean;
+  /** STEP-PROGRAM-ASSIGNMENT — MEMBER 의 소속 참여사 ID (consortium_members FK) */
+  consortium_member_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -209,6 +211,22 @@ export interface Program {
   notice_files?: ProgramFile[] | null;
   /** V7 ④ 성과 목표 — 2026-05-08 추가 */
   goal_text?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── 프로그램 담당사 배정 (STEP-PROGRAM-ASSIGNMENT / 2026-05-09 신규) ─
+export type AssignmentRole = 'lead' | 'support';
+
+export interface ProgramAssignment {
+  id: string;
+  program_id: string;
+  consortium_member_id: string;
+  role: AssignmentRole;
+  can_manage_participants: boolean;
+  can_manage_files: boolean;
+  can_view_finance: boolean;
   created_by?: string | null;
   created_at: string;
   updated_at: string;

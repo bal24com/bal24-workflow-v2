@@ -26,8 +26,10 @@ import ConsortiumFilterTabs, {
   type ConsortiumOption,
 } from '../../components/ConsortiumFilterTabs';
 import { useToast } from '../../contexts/ToastContext';
+import { useUserProfile } from '../../hooks/useUserProfile';
 import ProgramFormModal from './ProgramFormModal';
 import InvitationManagePanel from './InvitationManagePanel';
+import { useMemberProgramIds } from './useMemberProgramIds';
 
 type ViewMode = 'list' | 'card';
 type StatusFilter = ProgramStatus | '전체';
@@ -184,6 +186,10 @@ function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow)
 
 export default function ProgramsPage() {
   const toast = useToast();
+  const { profile, isMember, isPM } = useUserProfile();
+  const { programIds: myProgramIds } = useMemberProgramIds(
+    isMember ? profile?.consortium_member_id ?? null : null,
+  );
   const [programs, setPrograms] = useState<ProgramRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ViewMode>('list');
@@ -260,13 +266,15 @@ export default function ProgramsPage() {
 
   const visible = useMemo(() => {
     return programs.filter((p) => {
+      // STEP-PROGRAM-ASSIGNMENT (Q3-A) — MEMBER 는 본인 배정만 표시. PM/ADMIN 은 전체.
+      if (isMember && !isPM && !myProgramIds.includes(p.id)) return false;
       if (statusFilter !== '전체' && p.status !== statusFilter) return false;
       if (typeFilter !== '전체' && p.type !== typeFilter) return false;
       if (filterConsortiumId === 'none' && p.consortium_id) return false;
       if (filterConsortiumId && filterConsortiumId !== 'none' && p.consortium_id !== filterConsortiumId) return false;
       return true;
     });
-  }, [programs, statusFilter, typeFilter, filterConsortiumId]);
+  }, [programs, statusFilter, typeFilter, filterConsortiumId, isMember, isPM, myProgramIds]);
 
   return (
     <div className="space-y-5 max-w-[1400px]">
