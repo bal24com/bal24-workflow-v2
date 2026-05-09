@@ -598,6 +598,8 @@ export interface Expense {
   created_by?: string | null;
   /** STEP-PARTNER-EXPENSE-FILTER — PARTNER 본인 회사 지출 필터링용 */
   consortium_member_id?: string | null;
+  /** STEP-STAFF-FEE-EXPENSES-LINK — 강사료 자동 연동 출처 추적 */
+  staff_fee_id?: string | null;
   created_at: string;
   updated_at: string;
 }

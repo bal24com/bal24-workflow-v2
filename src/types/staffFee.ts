@@ -45,6 +45,8 @@ export interface StaffFee {
   payment_status: PaymentStatus;
   paid_at: string | null;
   note: string | null;
+  /** STEP-STAFF-FEE-EXPENSES-LINK — 자동 생성된 expenses row FK */
+  expense_id?: string | null;
   created_at: string;
   // join
   expert_name?: string | null;

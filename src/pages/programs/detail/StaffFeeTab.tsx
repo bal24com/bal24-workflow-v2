@@ -3,13 +3,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Plus, Pencil, Trash2, Receipt, Users2, AlertCircle,
+  Loader2, Plus, Pencil, Trash2, Receipt, Users2, AlertCircle, ExternalLink,
 } from 'lucide-react';
 import { Button, Card, CardContent } from '../../../components/ui';
 import EmptyState from '../../../components/EmptyState';
 import { useToast } from '../../../contexts/ToastContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import {
   fetchStaffFees, updatePaymentStatus, deleteStaffFee,
+  markStaffFeeAsPaid, cancelStaffFeePayment,
 } from './staffFeeUtils';
 import {
   FEE_TYPE_LABEL, TAX_TYPE_LABEL, PAYMENT_STATUS_BADGE, PAYMENT_STATUS_FLOW,
@@ -49,6 +51,7 @@ export default function StaffFeeTab({ programId }: Props) {
   const [fees, setFees] = useState<StaffFee[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalTarget, setModalTarget] = useState<StaffFee | null | 'new'>(null);
+  const { user } = useAuth();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -88,10 +91,41 @@ export default function StaffFeeTab({ programId }: Props) {
     };
   }, [fees]);
 
-  // 상태 다음 단계로 이동
+  // STEP-STAFF-FEE-EXPENSES-LINK — 상태 변경 분기 처리
+  // 신고완료 → 지급완료: expenses 자동 생성 (markStaffFeeAsPaid)
+  // 지급완료 → 미지급: expenses 삭제 + 롤백 (cancelStaffFeePayment)
+  // 그 외: 단순 상태 변경 (updatePaymentStatus)
   async function handleStatusFlow(fee: StaffFee) {
     const idx = PAYMENT_STATUS_FLOW.indexOf(fee.payment_status);
     const next = PAYMENT_STATUS_FLOW[(idx + 1) % PAYMENT_STATUS_FLOW.length];
+
+    // 지급완료 진입 → expenses 자동 생성
+    if (next === '지급완료') {
+      if (!window.confirm('지급 완료로 변경하면 지출 내역이 자동 등록돼요. 진행할까요?')) return;
+      const result = await markStaffFeeAsPaid(fee, user?.id ?? null);
+      if (!result.success) {
+        toast.error(result.error ?? '지급 처리에 실패했어요.');
+        return;
+      }
+      toast.success('지급 완료 처리됐어요. 지출 내역이 자동 등록됐어요.');
+      await refresh();
+      return;
+    }
+
+    // 지급완료 → 미지급 (사이클 회귀) → expenses 삭제 + 롤백
+    if (fee.payment_status === '지급완료' && next === '미지급') {
+      if (!window.confirm('지급을 취소하면 연동된 지출 내역도 삭제돼요. 진행할까요?')) return;
+      const result = await cancelStaffFeePayment(fee);
+      if (!result.success) {
+        toast.error(result.error ?? '지급 취소에 실패했어요.');
+        return;
+      }
+      toast.success('지급을 취소하고 지출 내역을 삭제했어요.');
+      await refresh();
+      return;
+    }
+
+    // 그 외: 단순 상태 변경
     const ok = await updatePaymentStatus(fee.id, next);
     if (!ok) {
       toast.error('상태 변경에 실패했어요.');
@@ -210,6 +244,16 @@ export default function StaffFeeTab({ programId }: Props) {
                       </div>
                       {f.paid_at && (
                         <p className="text-[10px] text-slate-400 text-right">지급일 {f.paid_at}</p>
+                      )}
+                      {f.expense_id && (
+                        <a
+                          href="/expense"
+                          className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full hover:bg-emerald-100 transition-colors"
+                          title="지출 페이지로 이동"
+                        >
+                          <ExternalLink size={10} aria-hidden="true" />
+                          지출 연동됨
+                        </a>
                       )}
                     </div>
 

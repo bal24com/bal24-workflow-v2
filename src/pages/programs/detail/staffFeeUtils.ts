@@ -104,3 +104,157 @@ export async function deleteStaffFee(id: string): Promise<boolean> {
   }
   return true;
 }
+
+// ── STEP-STAFF-FEE-EXPENSES-LINK ──────────────────────────
+// staffFee.tax_type → expenses.withholding_type 매핑
+const TAX_TO_WITHHOLDING: Record<TaxType, 'none' | 'business_3_3' | 'other_8_8'> = {
+  '3.3': 'business_3_3',
+  '8.8': 'other_8_8',
+  '면세': 'none',
+};
+
+interface ProgramRefRow {
+  id: string;
+  name: string | null;
+  project_id: string | null;
+  consortium_id: string | null;
+}
+
+interface MarkPaidResult {
+  success: boolean;
+  expenseId?: string;
+  error?: string;
+}
+
+/**
+ * 강사료 지급 완료 처리:
+ * 1. 중복 방지 (이미 expense_id 있으면 차단)
+ * 2. expenses INSERT — account_code 분기, withholding_type 매핑,
+ *    program 의 project_id/consortium_id 자동 채움
+ * 3. program_staff_fees: payment_status='지급완료', expense_id 역참조, paid_at
+ *
+ * ⚠ 원자성 한계: expenses 생성 후 fee 업데이트 실패 시 고아 레코드 발생 가능.
+ *    향후 STEP-STAFF-FEE-DB-TRIGGER 로 트랜잭션화 권장.
+ */
+export async function markStaffFeeAsPaid(
+  fee: StaffFee,
+  paidByUserId: string | null,
+): Promise<MarkPaidResult> {
+  // ① 중복 방지
+  if (fee.expense_id) {
+    return { success: false, error: '이미 지급 처리된 항목이에요.' };
+  }
+  if (fee.payment_status === '지급완료') {
+    return { success: false, error: '이미 지급 완료 상태예요.' };
+  }
+
+  // ② program 정보 fetch (project_id / consortium_id 자동 채움)
+  const { data: programData, error: programError } = await supabase
+    .from('programs')
+    .select('id, name, project_id, consortium_id')
+    .eq('id', fee.program_id)
+    .maybeSingle();
+  if (programError) {
+    console.error('[staff-fee] 프로그램 조회 실패:', programError.message);
+    return { success: false, error: '프로그램 정보를 불러오지 못했어요.' };
+  }
+  const program = (programData as ProgramRefRow | null) ?? null;
+
+  // ③ expenses 페이로드 구성
+  const isInternal = !!fee.profile_id;
+  const accountCode = isInternal ? 'EXPENSE_LABOR' : 'EXPENSE_LECTURE';
+  const ledgerType = program?.consortium_id ? 'consortium' : 'own';
+  const personName = fee.profile_name ?? fee.expert_name ?? '강사';
+  const today = new Date().toISOString().slice(0, 10);
+  const description = fee.description?.trim()
+    ? `${personName} · ${fee.description.trim()}`
+    : `${personName} 강사료${program?.name ? ` (${program.name})` : ''}`;
+
+  const { data: created, error: insertError } = await supabase
+    .from('expenses')
+    .insert({
+      ledger_type: ledgerType,
+      project_id: program?.project_id ?? null,
+      consortium_id: program?.consortium_id ?? null,
+      account_code: accountCode,
+      description,
+      gross_amount: fee.gross_amount,
+      withholding_type: TAX_TO_WITHHOLDING[fee.tax_type] ?? 'none',
+      expense_date: today,
+      paid_at: today,
+      paid_by: paidByUserId,
+      status: '출금완료',
+      memo: fee.note?.trim() || null,
+      staff_fee_id: fee.id,
+    })
+    .select('id')
+    .single();
+
+  if (insertError || !created) {
+    console.error('[staff-fee] expenses 생성 실패:', insertError?.message);
+    return { success: false, error: '지출 내역 생성 중 오류가 발생했어요.' };
+  }
+
+  const expenseId = (created as { id: string }).id;
+
+  // ④ fee 상태 업데이트 + expense_id 역참조
+  const { error: updateError } = await supabase
+    .from('program_staff_fees')
+    .update({
+      payment_status: '지급완료',
+      expense_id: expenseId,
+      paid_at: today,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', fee.id);
+
+  if (updateError) {
+    console.error('[staff-fee] 상태 업데이트 실패:', updateError.message);
+    // expenses 는 생성됐지만 fee 업데이트 실패 → 고아 레코드 안내
+    return {
+      success: false,
+      expenseId,
+      error: '지출은 생성됐지만 지급 상태 업데이트에 실패했어요. 관리자에게 문의해 주세요.',
+    };
+  }
+
+  return { success: true, expenseId };
+}
+
+/**
+ * 강사료 지급 취소:
+ * 1. expenses 삭제 (deleted_at = now()로 soft delete)
+ * 2. program_staff_fees: payment_status='미지급', expense_id=null, paid_at=null
+ */
+export async function cancelStaffFeePayment(fee: StaffFee): Promise<{ success: boolean; error?: string }> {
+  if (!fee.expense_id) {
+    return { success: false, error: '지급 처리되지 않은 항목이에요.' };
+  }
+
+  // ① expenses soft delete (deleted_at)
+  const { error: deleteError } = await supabase
+    .from('expenses')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', fee.expense_id);
+  if (deleteError) {
+    console.error('[staff-fee] expenses 삭제 실패:', deleteError.message);
+    return { success: false, error: '지출 내역 삭제 중 오류가 발생했어요.' };
+  }
+
+  // ② fee 롤백
+  const { error: rollbackError } = await supabase
+    .from('program_staff_fees')
+    .update({
+      payment_status: '미지급',
+      expense_id: null,
+      paid_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', fee.id);
+  if (rollbackError) {
+    console.error('[staff-fee] 롤백 실패:', rollbackError.message);
+    return { success: false, error: '지급 취소 처리 중 오류가 발생했어요.' };
+  }
+
+  return { success: true };
+}
