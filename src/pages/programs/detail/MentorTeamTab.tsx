@@ -29,12 +29,13 @@ interface MentorReportRow extends PerformanceReport {
   } | null;
 }
 
+// CLAUDE.md 디자인 시스템: 회색/바이올렛/주황/민트
 const STATUS_CLASS: Record<ReportStatus, string> = {
   draft:     'bg-slate-100 text-slate-700 border-slate-200',
-  submitted: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  submitted: 'bg-violet-50 text-violet-700 border-violet-200',
   reviewing: 'bg-amber-50 text-amber-700 border-amber-200',
-  approved:  'bg-emerald-50 text-emerald-700 border-emerald-200',
-  rejected:  'bg-rose-50 text-rose-700 border-rose-200',
+  approved:  'bg-cyan-50 text-cyan-700 border-cyan-200',
+  rejected:  'bg-orange-50 text-orange-700 border-orange-200',
 };
 
 const SELECT_COLUMNS = `

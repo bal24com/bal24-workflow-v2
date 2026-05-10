@@ -78,11 +78,12 @@ export default function PerformanceReportTab({ programId }: Props) {
               {application.applicant_name ?? '신청자'} · 작성·제출
             </p>
           </div>
+          {/* CLAUDE.md 디자인 시스템: 회색/바이올렛/주황/민트 */}
           <span className={[
             'text-[11px] font-semibold px-2 py-1 rounded-md border',
-            isApproved ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            : isSubmitted ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
-            : isRejected ? 'bg-rose-50 text-rose-700 border-rose-200'
+            isApproved ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+            : isSubmitted ? 'bg-violet-50 text-violet-700 border-violet-200'
+            : isRejected ? 'bg-orange-50 text-orange-700 border-orange-200'
             : 'bg-slate-100 text-slate-700 border-slate-200',
           ].join(' ')}>
             {REPORT_STATUS_LABELS[report.status]}
@@ -92,19 +93,19 @@ export default function PerformanceReportTab({ programId }: Props) {
 
       {/* 상태 안내 */}
       {isSubmitted && (
-        <div className="rounded-xl bg-cyan-50 border border-cyan-100 px-4 py-3 text-sm text-cyan-900 flex items-center gap-2">
+        <div className="rounded-xl bg-violet-50 border border-violet-100 px-4 py-3 text-sm text-violet-900 flex items-center gap-2">
           <CheckCircle2 size={16} aria-hidden="true" />
           제출 완료된 보고서예요. PM 검토 중이에요.
         </div>
       )}
       {isApproved && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm text-emerald-900 flex items-center gap-2">
+        <div className="rounded-xl bg-cyan-50 border border-cyan-100 px-4 py-3 text-sm text-cyan-900 flex items-center gap-2">
           <CheckCircle2 size={16} aria-hidden="true" />
           승인 완료된 보고서예요.
         </div>
       )}
       {isRejected && (
-        <div className="rounded-xl bg-rose-50 border border-rose-100 px-4 py-3 text-sm text-rose-900 space-y-1">
+        <div className="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3 text-sm text-orange-900 space-y-1">
           <p className="font-bold flex items-center gap-2">
             <AlertTriangle size={16} aria-hidden="true" />
             반려된 보고서예요. 사유를 확인하고 수정 후 재제출해 주세요.

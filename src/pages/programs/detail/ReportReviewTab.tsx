@@ -34,13 +34,13 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'draft',     label: REPORT_STATUS_LABELS.draft },
 ];
 
-// 상태 → CSS 클래스 (statusStyles 패턴)
+// 상태 → CSS 클래스 (CLAUDE.md 디자인 시스템: 회색/바이올렛/주황/민트)
 const STATUS_CLASS: Record<ReportStatus, string> = {
-  draft:     'bg-slate-100 text-slate-700 border-slate-200',
-  submitted: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-  reviewing: 'bg-amber-50 text-amber-700 border-amber-200',
-  approved:  'bg-emerald-50 text-emerald-700 border-emerald-200',
-  rejected:  'bg-rose-50 text-rose-700 border-rose-200',
+  draft:     'bg-slate-100 text-slate-700 border-slate-200',     // 회색
+  submitted: 'bg-violet-50 text-violet-700 border-violet-200',   // 바이올렛
+  reviewing: 'bg-amber-50 text-amber-700 border-amber-200',      // 검토중 (스펙 미언급, 유지)
+  approved:  'bg-cyan-50 text-cyan-700 border-cyan-200',         // 민트 (#06B6D4)
+  rejected:  'bg-orange-50 text-orange-700 border-orange-200',   // 주황
 };
 
 // 신청자 정보 join 결과 (PostgREST nested select)
