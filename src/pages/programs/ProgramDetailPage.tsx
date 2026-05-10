@@ -327,16 +327,14 @@ export default function ProgramDetailPage() {
 
       <div role="tabpanel">
         {tab === 'overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="space-y-4">
-              <ProgramOverviewCard program={program} />
-              <OverviewTab programId={programId} description={program.description ?? null} />
-            </div>
-            <div className="space-y-4">
+          <div className="space-y-4">
+            <ProgramOverviewCard program={program} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ProgramCurriculumSummaryCard programId={programId} />
               <ProgramParticipantSummaryCard programId={programId} />
-              <ProgramInstructorSummaryCard programId={programId} />
             </div>
+            <ProgramInstructorSummaryCard programId={programId} />
+            <OverviewTab programId={programId} description={program.description ?? null} />
           </div>
         )}
         {tab === 'curriculum' && <CurriculumTab programId={programId} programName={program?.name} />}

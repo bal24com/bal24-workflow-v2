@@ -10,7 +10,6 @@ import CurriculumRow from './curriculum/CurriculumRow';
 import SaveTemplateModal from './curriculum/SaveTemplateModal';
 import LoadTemplateModal from './curriculum/LoadTemplateModal';
 import AiCurriculumModal from './curriculum/AiCurriculumModal';
-import CurriculumAiDropZone from './curriculum/CurriculumAiDropZone';
 import InvitationManagePanel from '../InvitationManagePanel';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
 import type {
@@ -226,12 +225,6 @@ export default function CurriculumTab({ programId, programName }: Props) {
           </button>
         </div>
       </header>
-
-      <CurriculumAiDropZone
-        programId={programId}
-        lastSessionNo={items.length}
-        onSessionsInserted={() => void refresh()}
-      />
 
       {loading ? (
         <div className="flex justify-center py-10">

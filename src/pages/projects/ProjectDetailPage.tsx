@@ -3,17 +3,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, FileText, Info, Loader2, Users, FileBarChart, Link2, Wallet, BookOpen, FolderArchive } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Info, Loader2, Users, Link2, Wallet, BookOpen, FolderArchive } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Badge, Button } from '../../components/ui';
+import { Badge } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import type { Project } from '../../types/database';
-import { useAuth } from '../../contexts/AuthContext';
 import { statusToBadgeVariant } from './projectStatus';
 import OverviewTab from './detail/OverviewTab';
 import TasksTab from './detail/TasksTab';
 import MembersTab from './detail/MembersTab';
-import FilesTab from './detail/FilesTab';
 import PortalTab from './detail/PortalTab';
 import GrantLedgerTab from './detail/GrantLedgerTab';
 import ProjectProgramsTab from './detail/ProjectProgramsTab';
@@ -25,17 +23,16 @@ type DetailProject = Project & {
   pm?: { id: string; name: string } | null;
 };
 
-type TabKey = 'overview' | 'tasks' | 'members' | 'files' | 'portal' | 'grant' | 'programs' | 'docs';
+type TabKey = 'overview' | 'programs' | 'tasks' | 'grant' | 'docs' | 'members' | 'portal';
 
 const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'overview', label: '개요',     Icon: Info },
-  { key: 'tasks',    label: '태스크',   Icon: ClipboardList },
-  { key: 'members',  label: '참여인력', Icon: Users },
-  { key: 'files',    label: '파일',     Icon: FileText },
-  { key: 'grant',    label: '지원금',   Icon: Wallet },
-  { key: 'portal',   label: '포털',     Icon: Link2 },
   { key: 'programs', label: '프로그램', Icon: BookOpen },
+  { key: 'tasks',    label: '태스크',   Icon: ClipboardList },
+  { key: 'grant',    label: '지원금',   Icon: Wallet },
   { key: 'docs',     label: '문서',     Icon: FolderArchive },
+  { key: 'members',  label: '참여인력', Icon: Users },
+  { key: 'portal',   label: '포털',     Icon: Link2 },
 ];
 
 // projects → profiles FK가 두 개(pm_id, created_by) 있어 명시적 별칭 필요 (PGRST201 방지)
@@ -61,7 +58,6 @@ function NotFound() {
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
   const [project, setProject] = useState<DetailProject | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -143,11 +139,6 @@ export default function ProjectDetailPage() {
               {project.pm?.name && ` · 담당자 ${project.pm.name}`}
             </div>
           </div>
-          <Link to={`/projects/${project.id}/report`} className="shrink-0">
-            <Button variant="primary" size="sm" leftIcon={<FileBarChart size={14} />}>
-              결과보고서 작성
-            </Button>
-          </Link>
         </div>
       </div>
 
@@ -190,7 +181,6 @@ export default function ProjectDetailPage() {
         )}
         {tab === 'tasks' && <TasksTab projectId={projectId} />}
         {tab === 'members' && <MembersTab projectId={projectId} />}
-        {tab === 'files' && <FilesTab projectId={projectId} uploaderId={user?.id} />}
         {tab === 'grant' && <GrantLedgerTab projectId={projectId} />}
         {tab === 'portal' && <PortalTab projectId={projectId} clientId={project.client_id ?? null} />}
         {tab === 'programs' && <ProjectProgramsTab projectId={projectId} />}

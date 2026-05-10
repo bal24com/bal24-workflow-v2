@@ -5,6 +5,7 @@ import { Loader2, Upload, FileIcon, ExternalLink, Trash2 } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
 import { sanitizeFileName } from '../../../../components/files/sharedFilesUtils';
+import SharedFilesTab from '../../../../components/files/SharedFilesTab';
 import { formatDateKo } from '../../../../lib/utils';
 import type { ProjectDocument, ProjectDocStage } from '../../../../types/database';
 
@@ -135,21 +136,27 @@ export default function DocFilesSection({ projectId }: Props) {
           <Loader2 size={16} className="animate-spin mr-2" /> 불러오는 중…
         </div>
       ) : (
-        STAGES.map((sg) => (
-          <section key={sg.stage} className="space-y-2">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">{sg.label}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {sg.slots.map((slot) => (
-                <SlotCard key={slot.category} slot={slot}
-                  docs={docs.filter((d) => d.category === slot.category)}
-                  uploading={uploadingSlot === slot.category}
-                  onUpload={(f) => void handleUpload(slot, f)}
-                  onOpen={(d) => void handleOpen(d)}
-                  onDelete={(d) => void handleDelete(d)} />
-              ))}
-            </div>
+        <>
+          {STAGES.map((sg) => (
+            <section key={sg.stage} className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">{sg.label}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {sg.slots.map((slot) => (
+                  <SlotCard key={slot.category} slot={slot}
+                    docs={docs.filter((d) => d.category === slot.category)}
+                    uploading={uploadingSlot === slot.category}
+                    onUpload={(f) => void handleUpload(slot, f)}
+                    onOpen={(d) => void handleOpen(d)}
+                    onDelete={(d) => void handleDelete(d)} />
+                ))}
+              </div>
+            </section>
+          ))}
+          <section className="space-y-2 pt-2 border-t border-slate-100">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">기타 첨부</h3>
+            <SharedFilesTab bucket="project-files" fkColumn="project_id" fkValue={projectId} />
           </section>
-        ))
+        </>
       )}
     </div>
   );
