@@ -201,14 +201,19 @@ export default function CurriculumRow({
       </div>
 
       {/* 행2 — content textarea (항상 노출) */}
-      <div className="px-2 pb-2">
+      <div className="px-2 pb-1.5">
         <textarea value={draft.content ?? ''} rows={2}
           onChange={(e) => patchDraft('content', e.target.value || null)}
           placeholder="강의 내용·진행 방식 입력"
           className="w-full px-2 py-1.5 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 resize-none leading-relaxed" />
       </div>
 
-      {/* 펼침 영역 */}
+      {/* STEP-CURRICULUM-INLINE-ROLE — 행3: 인력 배정 (항상 노출, 4역할 콤보+검색) */}
+      <div className="px-2 pb-2">
+        <CurriculumRowStaffSection curriculumId={item.id} onChanged={onStaffChanged} />
+      </div>
+
+      {/* 펼침 영역 — 날짜·장소·저장 (선택) */}
       {open && (
         <div className="border-t border-violet-100/70 bg-violet-50/20 px-3 py-3 flex flex-col gap-2.5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -266,20 +271,16 @@ export default function CurriculumRow({
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold text-slate-600">매칭 인력 (5역할)</p>
-              {onRequestInstructor && (
-                <button type="button" onClick={onRequestInstructor}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-violet-100 text-violet-700 text-[11px] font-bold border border-violet-300 hover:bg-violet-200 transition-colors">
-                  <Send size={11} aria-hidden="true" />
-                  강사 요청
-                </button>
-              )}
+          {/* STEP-CURRICULUM-INLINE-ROLE — 강사 요청 (외부 초대) 버튼만 펼침에 유지 */}
+          {onRequestInstructor && (
+            <div className="flex justify-end">
+              <button type="button" onClick={onRequestInstructor}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-violet-100 text-violet-700 text-[11px] font-bold border border-violet-300 hover:bg-violet-200 transition-colors">
+                <Send size={11} aria-hidden="true" />
+                외부 강사 초대 요청
+              </button>
             </div>
-            {/* STEP-CURRICULUM-FULL — 5역할 인력 팝업 검색 섹션 */}
-            <CurriculumRowStaffSection curriculumId={item.id} onChanged={onStaffChanged} />
-          </div>
+          )}
         </div>
       )}
     </div>

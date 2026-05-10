@@ -124,56 +124,54 @@ export default function ProgramParticipantSummaryCard({ programId }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {/* AI 자동 추출 */}
-        <div className="rounded-xl bg-violet-50 border border-violet-200 p-3 space-y-2">
-          <div className="flex items-center gap-1.5">
-            <Sparkles size={12} className="text-violet-500" aria-hidden="true" />
-            <span className="text-xs font-bold text-violet-700">AI 자동 명단 추출</span>
-          </div>
-          <p className="text-[11px] text-violet-700/80">엑셀·CSV·PDF·이미지에서 명단 자동 인식.</p>
-          <input ref={inputRef} type="file" hidden accept=".xlsx,.csv,.pdf,.png,.jpg,.jpeg,.docx,.txt"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <button type="button" onClick={() => inputRef.current?.click()} disabled={extracting}
-            className="w-full border-2 border-dashed border-violet-200 rounded-lg p-3 text-center hover:bg-violet-100/50 transition-colors disabled:opacity-50">
-            <Upload size={14} className="mx-auto mb-1 text-violet-400" aria-hidden="true" />
-            <p className="text-[11px] text-slate-600">{file ? file.name : '클릭해서 파일 선택'}</p>
-          </button>
-          <button type="button" onClick={() => void handleAiExtract()} disabled={!file || extracting}
-            className="w-full py-1.5 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-40 inline-flex items-center justify-center gap-1">
-            {extracting ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <Sparkles size={12} aria-hidden="true" />}
-            {extracting ? '추출 중…' : 'AI로 명단 자동 추출'}
-          </button>
-        </div>
-
-        {/* 직접 입력 */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Pencil size={11} className="text-slate-400" aria-hidden="true" />
-            <span className="text-[11px] text-slate-500">직접 입력 (한 줄에 한 명. 이름,소속,전화,이메일)</span>
-          </div>
-          <textarea rows={3} value={manual} onChange={(e) => setManual(e.target.value)} disabled={adding}
-            placeholder="홍길동, 밸런스닷, 010-1234-5678, hong@test.com"
-            className="w-full text-xs rounded-lg border border-slate-200 bg-white px-2 py-1.5 focus:outline-none focus:border-violet-400 resize-none" />
-          <button type="button" onClick={() => void handleManualAdd()} disabled={!manual.trim() || adding}
-            className="px-3 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-700 disabled:opacity-40">
-            + 직접 등록
-          </button>
-        </div>
-
-        {/* 명단 미리보기 */}
+        {/* STEP-PARTICIPANT-CARD — 등록 명단이 있으면 입력 UI 숨김, 없으면 입력 UI 노출 */}
         {list.length === 0 ? (
-          <p className="text-xs text-slate-400 italic text-center py-2">사전 명단이 없어요.</p>
+          <>
+            <div className="rounded-xl bg-violet-50 border border-violet-200 p-3 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={12} className="text-violet-500" aria-hidden="true" />
+                <span className="text-xs font-bold text-violet-700">AI 자동 명단 추출</span>
+              </div>
+              <p className="text-[11px] text-violet-700/80">엑셀·CSV·PDF·이미지에서 명단 자동 인식.</p>
+              <input ref={inputRef} type="file" hidden accept=".xlsx,.csv,.pdf,.png,.jpg,.jpeg,.docx,.txt"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <button type="button" onClick={() => inputRef.current?.click()} disabled={extracting}
+                className="w-full border-2 border-dashed border-violet-200 rounded-lg p-3 text-center hover:bg-violet-100/50 transition-colors disabled:opacity-50">
+                <Upload size={14} className="mx-auto mb-1 text-violet-400" aria-hidden="true" />
+                <p className="text-[11px] text-slate-600">{file ? file.name : '클릭해서 파일 선택'}</p>
+              </button>
+              <button type="button" onClick={() => void handleAiExtract()} disabled={!file || extracting}
+                className="w-full py-1.5 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-40 inline-flex items-center justify-center gap-1">
+                {extracting ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <Sparkles size={12} aria-hidden="true" />}
+                {extracting ? '추출 중…' : 'AI로 명단 자동 추출'}
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Pencil size={11} className="text-slate-400" aria-hidden="true" />
+                <span className="text-[11px] text-slate-500">직접 입력 (한 줄에 한 명. 이름,소속,전화,이메일)</span>
+              </div>
+              <textarea rows={3} value={manual} onChange={(e) => setManual(e.target.value)} disabled={adding}
+                placeholder="홍길동, 밸런스닷, 010-1234-5678, hong@test.com"
+                className="w-full text-xs rounded-lg border border-slate-200 bg-white px-2 py-1.5 focus:outline-none focus:border-violet-400 resize-none" />
+              <button type="button" onClick={() => void handleManualAdd()} disabled={!manual.trim() || adding}
+                className="px-3 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-700 disabled:opacity-40">
+                + 직접 등록
+              </button>
+            </div>
+          </>
         ) : (
           <div className="text-xs">
-            {list.slice(0, 3).map((p) => (
+            {list.slice(0, 5).map((p) => (
               <div key={p.id} className="flex items-center justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-700">{p.name}</span>
                 <span className="text-slate-400">{PARTICIPANT_ROLE_LABEL[p.role]}</span>
               </div>
             ))}
-            {list.length > 3 && (
-              <p className="text-center text-violet-600 pt-1 text-[11px]">
-                +{list.length - 3}명 더 있어요 → [참여자] 탭에서 확인
+            {list.length > 5 && (
+              <p className="text-center text-violet-600 pt-1.5 text-[11px]">
+                +{list.length - 5}명 더 있어요 → [교육생] 탭에서 확인·추가
               </p>
             )}
           </div>

@@ -1,5 +1,6 @@
-// bal24 v2 — STEP-CURRICULUM-FULL 차시별 5역할 인력 섹션
-// 강사·멘토·FT·TA·운영진을 한 카드 안에서 팝업 검색으로 추가/삭제
+// bal24 v2 — 차시별 인력 섹션
+//   STEP-CURRICULUM-INLINE-ROLE (옵션 B) — 행2에 항상 노출, 4역할(강사·멘토·FT·TA),
+//   역할 콤보 + 검색 모달로 한 명씩 추가 / 배정된 인원만 태그로 노출
 
 import { useCallback, useEffect, useState } from 'react';
 import { Plus, X, Loader2 } from 'lucide-react';
@@ -22,7 +23,8 @@ interface Props {
   onChanged?: () => void;
 }
 
-const ROLES: CurriculumStaffRole[] = ['강사', '멘토', 'FT', 'TA', '운영진'];
+// 운영진 제외 4역할 (박경수님 요청 — 강사·멘토·FT·TA만)
+const ROLES: CurriculumStaffRole[] = ['강사', '멘토', 'FT', 'TA'];
 
 const ROLE_STYLE: Record<CurriculumStaffRole, string> = {
   강사:   'bg-violet-100 text-violet-700 border-violet-200',
@@ -49,7 +51,9 @@ export default function CurriculumRowStaffSection({ curriculumId, onChanged }: P
   const toast = useToast();
   const [rows, setRows] = useState<StaffRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalRole, setModalRole] = useState<CurriculumStaffRole | null>(null);
+  // 콤보로 역할 선택 후 검색 모달 → 한 명 추가
+  const [pickRole, setPickRole] = useState<CurriculumStaffRole>('강사');
+  const [modalOpen, setModalOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const { data, error } = await supabase.from('curriculum_staff')
@@ -119,41 +123,50 @@ export default function CurriculumRowStaffSection({ curriculumId, onChanged }: P
     );
   }
 
+  // 배정된 인력만 역할 그룹으로 묶음 (빈 역할은 노출 안 함)
+  const grouped = ROLES.map((role) => ({ role, list: rows.filter((r) => r.role === role) }))
+    .filter((g) => g.list.length > 0);
+
   return (
-    <div className="space-y-1.5">
-      {ROLES.map((role) => {
-        const list = rows.filter((r) => r.role === role);
-        return (
-          <div key={role} className="grid grid-cols-[60px_minmax(0,1fr)] items-start gap-2 py-1">
-            <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${ROLE_STYLE[role]}`}>
-              {role}
+    <div className="flex items-center gap-2 flex-wrap py-1">
+      {/* 배정된 인력 태그 — 역할별로 묶어서 표시 */}
+      {grouped.length > 0 ? grouped.map(({ role, list }) => (
+        <div key={role} className="inline-flex items-center gap-1 flex-wrap">
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${ROLE_STYLE[role]}`}>
+            {role}
+          </span>
+          {list.map((r) => (
+            <span key={r.id}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-white text-slate-700 border border-slate-200">
+              <span>{r.name}</span>
+              <span className="text-[9px] text-slate-400">{r.source === 'external' ? '전문가' : '팀원'}</span>
+              <button type="button" onClick={() => void handleRemove(r)} aria-label="배정 해제"
+                className="ml-0.5 opacity-60 hover:opacity-100"><X size={9} aria-hidden="true" /></button>
             </span>
-            <div className="flex flex-wrap items-center gap-1">
-              {list.map((r) => (
-                <span key={r.id}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-white text-slate-700 border border-slate-200">
-                  <span>{r.name}</span>
-                  <span className="text-[9px] text-slate-400">{r.source === 'external' ? '전문가' : '팀원'}</span>
-                  <button type="button" onClick={() => void handleRemove(r)}
-                    aria-label="배정 해제" className="ml-0.5 opacity-60 hover:opacity-100">
-                    <X size={9} aria-hidden="true" />
-                  </button>
-                </span>
-              ))}
-              <button type="button" onClick={() => setModalRole(role)}
-                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-dashed border-violet-300">
-                <Plus size={10} aria-hidden="true" /> {role} 검색
-              </button>
-            </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      )) : (
+        <span className="text-[11px] text-slate-400 italic">배정된 인력이 없어요.</span>
+      )}
+
+      {/* 콤보 + 추가 버튼 — 박경수님 옵션 B: 한 줄 컴팩트 UI */}
+      <div className="inline-flex items-center gap-1 ml-auto">
+        <select value={pickRole} onChange={(e) => setPickRole(e.target.value as CurriculumStaffRole)}
+          className="h-7 px-2 rounded-md border border-violet-200 bg-white text-[11px] font-semibold text-violet-700 focus:outline-none focus:border-violet-400">
+          {ROLES.map((r) => (<option key={r} value={r}>{r}</option>))}
+        </select>
+        <button type="button" onClick={() => setModalOpen(true)}
+          className="inline-flex items-center gap-0.5 h-7 px-2.5 rounded-md text-[11px] font-bold text-white bg-violet-600 hover:bg-violet-700">
+          <Plus size={10} aria-hidden="true" /> 검색·추가
+        </button>
+      </div>
+
       <StaffSearchModal
-        open={modalRole !== null}
-        onClose={() => setModalRole(null)}
-        role={modalRole ?? '강사'}
-        excludeIds={modalRole ? rows.filter((r) => r.role === modalRole).map((r) => r.sourceId) : []}
-        onSelect={(person) => modalRole && void handleSelect(modalRole, person)}
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        role={pickRole}
+        excludeIds={rows.filter((r) => r.role === pickRole).map((r) => r.sourceId)}
+        onSelect={(person) => void handleSelect(pickRole, person)}
       />
     </div>
   );

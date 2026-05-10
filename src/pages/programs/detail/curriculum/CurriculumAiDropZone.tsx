@@ -102,6 +102,8 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
       const rows = filtered.map((s, idx) => ({
         program_id: programId,
         session_no: lastSessionNo + idx + 1,
+        // STEP-CURRICULUM-FULL 안전망 — DB default 'planned' 의존하지 않고 명시
+        curriculum_type: 'planned',
         title: s.title.trim(),
         day_label: s.day_label?.trim() || null,
         start_time: s.start_time?.trim() || null,
@@ -110,7 +112,16 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
         instructor_name_raw: (s.instructor_names ?? []).join(', ') || null,
       }));
       const ins = await supabase.from('program_curriculum').insert(rows).select('id');
-      if (ins.error) throw ins.error;
+      if (ins.error) {
+        // 어떤 컬럼이 누락됐는지 정확히 안내 (마이그레이션 미적용 케이스)
+        const raw = ins.error.message.toLowerCase();
+        if (raw.includes('column') && raw.includes('does not exist')) {
+          const colMatch = ins.error.message.match(/'?([a-z_]+)'?\s+does not exist/i);
+          const col = colMatch?.[1] ?? '알 수 없는 컬럼';
+          throw new Error(`커리큘럼 테이블에 '${col}' 컬럼이 없어요. Supabase에서 마이그레이션을 실행해 주세요.`);
+        }
+        throw ins.error;
+      }
       const inserted = (ins.data ?? []) as { id: string }[];
 
       // 매칭된 강사·멘토 → curriculum_staff INSERT (역할별)
@@ -135,7 +146,8 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[curriculum-ai-drop] 차시 INSERT 실패:', raw);
-      toast.error('차시 등록에 실패했어요.');
+      // STEP-CURRICULUM-FULL — 마이그레이션 미적용 시 정확한 컬럼명 안내
+      toast.error(raw.includes('컬럼이 없어요') ? raw : '차시 등록에 실패했어요. (콘솔 로그 확인)');
     } finally {
       setSubmitting(false);
     }
