@@ -29,6 +29,7 @@ import StaffFeeTab from './detail/StaffFeeTab';
 import EvaluatorTab from './detail/EvaluatorTab';
 import ApplicationTab from './detail/ApplicationTab';
 import EvalReportTab from './detail/EvalReportTab';
+import ReportReviewTab from './detail/ReportReviewTab';
 import {
   resolveVisibleTabs, SHARE_TAB_ALWAYS,
   type TabKey, type VisibleTab,
@@ -61,6 +62,31 @@ const TAB_ICON: Record<TabKey, LucideIcon> = {
 function getTabIcon(tab: VisibleTab): LucideIcon {
   if (tab.isPlaceholder) return Hourglass;
   return TAB_ICON[tab.key as TabKey] ?? Info;
+}
+
+// 추가 탭 버튼 (조건부로 표시되는 탭들 — 배정/신청자/평가위원/평가결과/사업보고/외부공유)
+interface ExtraTabBtnProps {
+  active: boolean;
+  onClick: () => void;
+  icon: LucideIcon;
+  label: string;
+}
+function ExtraTabBtn({ active, onClick, icon: Icon, label }: ExtraTabBtnProps) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={[
+        'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
+        active ? 'text-violet-700 border-violet-600' : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
+      ].join(' ')}
+    >
+      <Icon size={15} aria-hidden="true" />
+      {label}
+    </button>
+  );
 }
 
 const SELECT_COLUMNS = '*, project:projects(id,name,status)';
@@ -132,7 +158,7 @@ export default function ProgramDetailPage() {
   // 3) 탭 fallback (훅 #3) — visibleTabs 에 현재 tab 없으면 첫 가시 탭으로
   useEffect(() => {
     if (visibleTabs.length === 0) return;
-    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications', 'eval_report'];
+    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications', 'eval_report', 'report_review'];
     if (!allKeys.includes(tab)) {
       setTab(visibleTabs[0]?.key ?? 'overview');
     }
@@ -255,113 +281,24 @@ export default function ProgramDetailPage() {
           );
         })}
         {/* Q7-A: PM/ADMIN + 컨소시엄 연결 시만 배정 탭 표시 */}
-        {isPM && program.consortium_id && (() => {
-          const active = tab === 'assignment';
-          return (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab('assignment')}
-              className={[
-                'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
-                active
-                  ? 'text-violet-700 border-violet-600'
-                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
-              ].join(' ')}
-            >
-              <Users2 size={15} aria-hidden="true" />
-              배정
-            </button>
-          );
-        })()}
-
+        {isPM && program.consortium_id && (
+          <ExtraTabBtn active={tab === 'assignment'} onClick={() => setTab('assignment')} icon={Users2} label="배정" />
+        )}
         {/* STEP-APPLICATION-MGMT — 신청자 탭 (항상 노출) */}
-        {(() => {
-          const active = tab === 'applications';
-          return (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab('applications')}
-              className={[
-                'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
-                active
-                  ? 'text-violet-700 border-violet-600'
-                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
-              ].join(' ')}
-            >
-              <Users2 size={15} aria-hidden="true" />
-              신청자
-            </button>
-          );
-        })()}
-
+        <ExtraTabBtn active={tab === 'applications'} onClick={() => setTab('applications')} icon={Users2} label="신청자" />
         {/* STEP-EVALUATION-SYSTEM — application_type='evaluation' 일 때만 평가위원 탭 */}
-        {program.application_type === 'evaluation' && (() => {
-          const active = tab === 'evaluator';
-          return (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab('evaluator')}
-              className={[
-                'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
-                active
-                  ? 'text-violet-700 border-violet-600'
-                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
-              ].join(' ')}
-            >
-              <Award size={15} aria-hidden="true" />
-              평가위원
-            </button>
-          );
-        })()}
-
+        {program.application_type === 'evaluation' && (
+          <ExtraTabBtn active={tab === 'evaluator'} onClick={() => setTab('evaluator')} icon={Award} label="평가위원" />
+        )}
         {/* STEP-EVAL-REPORT — application_type='evaluation' 일 때만 평가결과 탭 */}
-        {program.application_type === 'evaluation' && (() => {
-          const active = tab === 'eval_report';
-          return (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab('eval_report')}
-              className={[
-                'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
-                active
-                  ? 'text-violet-700 border-violet-600'
-                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
-              ].join(' ')}
-            >
-              <BarChart3 size={15} aria-hidden="true" />
-              평가결과
-            </button>
-          );
-        })()}
-
-        {SHARE_TAB_ALWAYS && (() => {
-          const active = tab === 'share';
-          return (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab('share')}
-              className={[
-                'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
-                active
-                  ? 'text-violet-700 border-violet-600'
-                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
-              ].join(' ')}
-            >
-              <Share2 size={15} aria-hidden="true" />
-              외부 공유
-            </button>
-          );
-        })()}
+        {program.application_type === 'evaluation' && (
+          <ExtraTabBtn active={tab === 'eval_report'} onClick={() => setTab('eval_report')} icon={BarChart3} label="평가결과" />
+        )}
+        {/* STEP-PM-REPORT-REVIEW — 사업보고 탭 (모든 프로그램에 노출) */}
+        <ExtraTabBtn active={tab === 'report_review'} onClick={() => setTab('report_review')} icon={FileBarChart} label="사업보고" />
+        {SHARE_TAB_ALWAYS && (
+          <ExtraTabBtn active={tab === 'share'} onClick={() => setTab('share')} icon={Share2} label="외부 공유" />
+        )}
       </nav>
 
       <div role="tabpanel">
@@ -376,6 +313,7 @@ export default function ProgramDetailPage() {
         {tab === 'evaluator' && <EvaluatorTab programId={programId} />}
         {tab === 'eval_report' && <EvalReportTab programId={programId} />}
         {tab === 'applications' && <ApplicationTab programId={programId} />}
+        {tab === 'report_review' && <ReportReviewTab programId={programId} />}
         {tab === 'survey' && <SurveyResultTab programId={programId} />}
         {tab === 'share' && <ShareTab programId={programId} />}
         {tab === 'report' && <ReportBuilderTab programId={programId} />}
