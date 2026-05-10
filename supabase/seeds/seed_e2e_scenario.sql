@@ -56,15 +56,15 @@ BEGIN
           '2026-03-27', '2027-01-23', 1200000000, v_admin_id,
           encode(gen_random_bytes(16),'hex'), 'operator', v_admin_id);
 
-  INSERT INTO programs (id, project_id, consortium_id, name, type, status,
+  INSERT INTO programs (id, project_id, consortium_id, name, type, program_type, status,
                          start_date, end_date, capacity, description, created_by)
   VALUES
     (v_program1a, v_project1, v_consortium1,
-     '프로그램_테스트_문화예술시장운영', '교육', '진행',
+     '프로그램_테스트_문화예술시장운영', '교육', 'education', '진행',
      '2026-04-01', '2026-12-30', 30,
      '문화예술시장 활성화 교육형 프로그램', v_admin_id),
     (v_program1b, v_project1, v_consortium1,
-     '프로그램_테스트_굿센터체험', '행사', '진행',
+     '프로그램_테스트_굿센터체험', '행사', 'event', '진행',
      '2026-06-01', '2026-11-30', 100,
      '굿센터 이벤트형 체험 프로그램', v_admin_id);
 
@@ -109,14 +109,14 @@ BEGIN
           '2026-04-15', 1500000, 'grant',
           '시드_인쇄소_부광인쇄', '123-45-67890', 'submitted', v_admin_id);
 
-  INSERT INTO activity_logs (id, program_id, project_id, log_type, title,
+  INSERT INTO activity_logs (id, action, program_id, project_id, log_type, title,
                               activity_date, start_time, end_time, duration_hours,
-                              location, attendee_count, content, created_by)
-  VALUES (gen_random_uuid(), v_program1a, v_project1, 'mentoring',
+                              location, attendee_count, content)
+  VALUES (gen_random_uuid(), 'log_create', v_program1a, v_project1, 'mentoring',
           '문화예술시장 1차 멘토링', '2026-04-20',
           '14:00:00', '17:00:00', 3,
           '진도군청 대회의실', 12,
-          '예술시장 운영 노하우 공유 및 부스 배치 1차 검토', v_admin_id);
+          '예술시장 운영 노하우 공유 및 부스 배치 1차 검토');
 
   INSERT INTO performance_reports (id, project_id, program_id, status,
                                      company_name, rep_name, manager_name,
@@ -154,10 +154,10 @@ BEGIN
           '2025-07-01', '2025-12-31', 50000000, v_admin_id,
           encode(gen_random_bytes(16),'hex'), 'operator', v_admin_id);
 
-  INSERT INTO programs (id, project_id, consortium_id, name, type, status,
+  INSERT INTO programs (id, project_id, consortium_id, name, type, program_type, status,
                          start_date, end_date, capacity, description, created_by)
   VALUES (v_program2, v_project2, v_consortium2,
-          '프로그램_테스트_관광상품개발오리엔테이션', '교육', '완료',
+          '프로그램_테스트_관광상품개발오리엔테이션', '교육', 'education', '완료',
           '2025-08-01', '2025-08-15', 40,
           '광주 관광상품 공모전 참가자 대상 OT', v_admin_id);
 
