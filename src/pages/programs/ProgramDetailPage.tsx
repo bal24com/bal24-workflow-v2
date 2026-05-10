@@ -21,6 +21,7 @@ import StaffStudentsTab from './detail/StaffStudentsTab';
 import AttendanceLogTab from './detail/AttendanceLogTab';
 import SurveyTab from './detail/SurveyTab';
 import ParticipantTab from './detail/ParticipantTab';
+import ProgramDeleteButton from './ProgramDeleteButton';
 import ProgramOverviewCard from './detail/overview/ProgramOverviewCard';
 import ProgramCurriculumSummaryCard from './detail/overview/ProgramCurriculumSummaryCard';
 import ProgramParticipantSummaryCard from './detail/overview/ProgramParticipantSummaryCard';
@@ -249,11 +250,14 @@ export default function ProgramDetailPage() {
               )}
             </div>
           </div>
-          <Link to={`/programs/${program.id}/edit`} className="shrink-0">
-            <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />}>
-              수정
-            </Button>
-          </Link>
+          <div className="shrink-0 flex items-center gap-2">
+            <Link to={`/programs/${program.id}/edit`}>
+              <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />}>
+                수정
+              </Button>
+            </Link>
+            {isStaff && <ProgramDeleteButton programId={program.id} programName={program.name} />}
+          </div>
         </div>
       </div>
 

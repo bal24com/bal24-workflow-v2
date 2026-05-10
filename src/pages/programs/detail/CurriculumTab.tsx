@@ -14,8 +14,10 @@ import CurriculumAiDropZone from './curriculum/CurriculumAiDropZone';
 import InvitationManagePanel from '../InvitationManagePanel';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
 import type {
-  CurriculumStaffRole, ProgramCurriculum,
+  CurriculumStaffRole, ProgramCurriculum, InvitationStatus,
 } from '../../../types/database';
+
+interface InvitationSummary { id: string; name: string; status: InvitationStatus; }
 import type { CurriculumSessionMeta } from './curriculum/curriculumTemplateUtils';
 
 interface Props {
@@ -36,6 +38,8 @@ export default function CurriculumTab({ programId, programName }: Props) {
   const [invitePanelOpen, setInvitePanelOpen] = useState(false);
   const [inviteCurriculumId, setInviteCurriculumId] = useState<string | null>(null);
   const [inviteSessionInfo, setInviteSessionInfo] = useState<string>('');
+  // STEP-CURRICULUM-INSTRUCTOR-FIX — 차시별 강사 초대 매핑
+  const [invitationMap, setInvitationMap] = useState<Map<string, InvitationSummary>>(new Map());
 
   function openInvite(curriculumId: string | null, title: string) {
     setInviteCurriculumId(curriculumId);
@@ -46,6 +50,16 @@ export default function CurriculumTab({ programId, programName }: Props) {
   const refresh = useCallback(async () => {
     const next = await fetchCurriculumBundle(programId);
     setItems(next);
+    // STEP-CURRICULUM-INSTRUCTOR-FIX — 차시별 강사 초대 매핑 갱신
+    const { data: invs, error: invErr } = await supabase
+      .from('instructor_invitations').select('id, name, status, curriculum_id')
+      .eq('program_id', programId);
+    if (invErr) console.error('[curriculum-tab] invitations 조회 실패:', invErr.message);
+    const map = new Map<string, InvitationSummary>();
+    for (const inv of (invs ?? []) as Array<InvitationSummary & { curriculum_id: string | null }>) {
+      if (inv.curriculum_id) map.set(inv.curriculum_id, { id: inv.id, name: inv.name, status: inv.status });
+    }
+    setInvitationMap(map);
   }, [programId]);
 
   useEffect(() => {
@@ -53,15 +67,12 @@ export default function CurriculumTab({ programId, programName }: Props) {
     let cancelled = false;
     setLoading(true);
     void (async () => {
-      const next = await fetchCurriculumBundle(programId);
+      await refresh();
       if (cancelled) return;
-      setItems(next);
       setLoading(false);
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [programId]);
+    return () => { cancelled = true; };
+  }, [programId, refresh]);
 
   async function addCurriculum() {
     const nextNo = items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0) + 1;
@@ -248,6 +259,7 @@ export default function CurriculumTab({ programId, programName }: Props) {
               <CurriculumRow
                 key={c.id}
                 item={c}
+                invitation={invitationMap.get(c.id) ?? null}
                 onSave={(patch) => saveCurriculum(c.id, patch)}
                 onDelete={() => removeCurriculum(c.id)}
                 onOpenMatch={(role) => setMatchTarget({ curriculumId: c.id, defaultRole: role })}
@@ -308,7 +320,10 @@ export default function CurriculumTab({ programId, programName }: Props) {
         programName={programName ?? '프로그램'}
         defaultCurriculumId={inviteCurriculumId}
         defaultSessionInfo={inviteSessionInfo}
-        onClose={() => { setInvitePanelOpen(false); setInviteCurriculumId(null); setInviteSessionInfo(''); }}
+        onClose={() => {
+          setInvitePanelOpen(false); setInviteCurriculumId(null); setInviteSessionInfo('');
+          void refresh();
+        }}
       />
     </div>
   );

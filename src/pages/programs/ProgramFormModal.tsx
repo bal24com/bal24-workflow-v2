@@ -14,6 +14,7 @@ import ProgramOrgFields, { EMPTY_ORG_VALUES, type ProgramOrgValues } from './Pro
 import ProgramVisibilityField, { type ProgramVisibility } from './ProgramVisibilityField';
 import ProgramAutofillSection from './ProgramAutofillSection';
 import ProgramDescriptionField from './ProgramDescriptionField';
+import PendingSessionsPreview from './PendingSessionsPreview';
 import ProgramTypeSelector from './ProgramTypeSelector';
 import { applyExtractedProgram, insertPendingSessions, type ExtractedProgram, type ExtractedProgramType, type ExtractedSession } from '../../lib/programAutoFill';
 import { useToast } from '../../contexts/ToastContext';
@@ -387,6 +388,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
         />
 
         <ProgramDescriptionField value={description} onChange={setDescription} disabled={submitting} />
+        <PendingSessionsPreview sessions={pendingSessions} onClear={() => setPendingSessions([])} />
         {errorMsg && (
           <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-2.5 text-sm text-danger">
             {errorMsg}

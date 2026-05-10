@@ -191,17 +191,20 @@ export async function insertPendingSessions(
   programId: string, sessions: ExtractedSession[],
 ): Promise<{ ok: boolean; error?: string }> {
   if (sessions.length === 0) return { ok: true };
-  const rows = sessions.map((s, idx) => ({
-    program_id: programId,
-    session_no: idx + 1,
-    title: s.title || `${idx + 1}차시`,
-    day_label: s.day_label ?? null,
-    start_time: s.start_time ?? null,
-    end_time: s.end_time ?? null,
-  }));
+  const rows = sessions.map((s, idx) => {
+    const row: Record<string, unknown> = {
+      program_id: programId,
+      session_no: idx + 1,
+      title: s.title?.trim() || `${idx + 1}차시`,
+    };
+    if (s.day_label?.trim())  row.day_label  = s.day_label.trim();
+    if (s.start_time?.trim()) row.start_time = s.start_time.trim();
+    if (s.end_time?.trim())   row.end_time   = s.end_time.trim();
+    return row;
+  });
   const { error } = await supabase.from('program_curriculum').insert(rows);
   if (error) {
-    console.error('[program-autofill] 차시 bulk INSERT 실패:', error.message);
+    console.error('[program-autofill] 차시 bulk INSERT 실패:', error.message, '| rows:', rows);
     return { ok: false, error: error.message };
   }
   return { ok: true };

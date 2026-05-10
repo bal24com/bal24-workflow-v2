@@ -93,6 +93,16 @@ export default function InvitationAddForm({
         invited_at: new Date().toISOString(),
       });
       if (error) throw error;
+      // STEP-CURRICULUM-INSTRUCTOR-FIX — 이메일 발송 (실패해도 INSERT는 성공)
+      if (email.trim()) {
+        await supabase.functions.invoke('send-notification', {
+          body: {
+            to: email.trim(),
+            subject: '[WorkFlow] 강사 초청',
+            message: inviteMessage.trim() || `${name.trim()}님, 강사로 초청드립니다.`,
+          },
+        }).catch((e) => console.error('[invite-add] 이메일 발송 실패:', e));
+      }
       onSubmitted();
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';

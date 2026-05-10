@@ -9,10 +9,14 @@ import {
 import DateTimePicker from '../../../../components/ui/DateTimePicker';
 import StaffMatchRow from './StaffMatchRow';
 import { computeDuration, padTime, trimTime, type CurriculumWithStaff } from './curriculumTabUtils';
-import type { ProgramCurriculum, CurriculumStaffRole } from '../../../../types/database';
+import type { ProgramCurriculum, CurriculumStaffRole, InvitationStatus } from '../../../../types/database';
+
+interface InvitationSummary { id: string; name: string; status: InvitationStatus; }
 
 interface Props {
   item: CurriculumWithStaff;
+  /** STEP-CURRICULUM-INSTRUCTOR-FIX — 차시별 외부 강사 초대 (instructor_invitations) */
+  invitation?: InvitationSummary | null;
   onSave: (patch: Partial<ProgramCurriculum>) => Promise<void>;
   onDelete: () => Promise<void>;
   onOpenMatch: (defaultRole: CurriculumStaffRole) => void;
@@ -25,6 +29,13 @@ interface Props {
   onDragOver: (e: React.DragEvent) => void;
   isDragging: boolean;
 }
+
+const INVITE_BADGE: Record<InvitationStatus, string> = {
+  '대기': 'bg-amber-100 text-amber-700',
+  '수락': 'bg-emerald-100 text-emerald-700',
+  '거절': 'bg-red-100 text-red-600',
+  '완료': 'bg-blue-100 text-blue-700',
+};
 
 interface Draft {
   session_no: number;
@@ -64,7 +75,7 @@ function isEqual(a: Draft, b: Draft): boolean {
 }
 
 export default function CurriculumRow({
-  item, onSave, onDelete, onOpenMatch, onDeleteStaff, onRequestInstructor,
+  item, invitation, onSave, onDelete, onOpenMatch, onDeleteStaff, onRequestInstructor,
   onDragStart, onDragEnter, onDragEnd, onDragOver, isDragging,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -178,7 +189,12 @@ export default function CurriculumRow({
         />
 
         <span className="truncate text-xs text-slate-600">
-          {firstInstructor ? (
+          {invitation ? (
+            <span className="inline-flex items-center gap-1">
+              <span className="font-semibold text-violet-700">{invitation.name}</span>
+              <span className={`text-[9px] px-1 py-0.5 rounded ${INVITE_BADGE[invitation.status]}`}>{invitation.status}</span>
+            </span>
+          ) : firstInstructor ? (
             <span className="inline-flex items-center gap-1">
               <span className="text-violet-600">🎤</span>
               {firstInstructor.name}
