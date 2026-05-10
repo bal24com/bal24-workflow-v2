@@ -1,16 +1,29 @@
 // bal24 v2 — SharedFilesTab 보조 순수 함수
 
-/** 파일명에서 위험 문자 치환 + 60자 제한 (Storage 호환) */
+/** 파일명에서 위험 문자 치환 + 60자 제한 (Storage 호환, ASCII 전용) */
 export function sanitizeFileName(name: string): string {
-  const cleaned = name.replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_');
-  if (cleaned.length <= 60) return cleaned;
-  // 확장자 보존하면서 자름
-  const dot = cleaned.lastIndexOf('.');
-  if (dot > 0 && dot > cleaned.length - 8) {
-    const base = cleaned.slice(0, 60 - (cleaned.length - dot));
-    return base + cleaned.slice(dot);
+  const dot = name.lastIndexOf('.');
+  const hasExt = dot > 0 && dot < name.length - 1;
+  const rawBase = hasExt ? name.slice(0, dot) : name;
+  const rawExt  = hasExt ? name.slice(dot + 1) : '';
+
+  let base = rawBase
+    .replace(/[-￿]+/g, '')   // 비ASCII (한글·이모지 등) 제거
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')   // 영숫자·_·- 외 → _
+    .replace(/([_-])\1+/g, '$1')         // 같은 문자 연속 → 1개로 압축
+    .replace(/^[_-]+|[_-]+$/g, '');      // 앞뒤 _ - 제거
+
+  if (!base) base = 'file';
+
+  const ext = rawExt.replace(/[^a-zA-Z0-9]+/g, '');
+
+  const result = ext ? `${base}.${ext}` : base;
+  if (result.length <= 60) return result;
+  if (ext) {
+    const allow = Math.max(1, 60 - ext.length - 1);
+    return `${base.slice(0, allow)}.${ext}`;
   }
-  return cleaned.slice(0, 60);
+  return result.slice(0, 60);
 }
 
 /** Storage·DB 에러 메시지를 한글 안내로 번역 */
