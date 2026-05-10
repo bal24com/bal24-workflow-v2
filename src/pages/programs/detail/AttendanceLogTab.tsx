@@ -13,6 +13,7 @@ import {
 } from './programDetailUtils';
 import SessionManagePanel from './attendance/SessionManagePanel';
 import CertificateIssuePanel from './attendance/CertificateIssuePanel';
+import AttendanceLinkSection from './attendance/AttendanceLinkSection';
 import type { ActivityLogType } from '../../../types/database';
 
 type SubTab = 'attendance' | 'log' | 'certificate';
@@ -65,9 +66,19 @@ export default function AttendanceLogTab({ programId }: { programId: string }) {
 
       {/* sub 본문 */}
       {sub === 'attendance' && (
-        <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
-          <SessionManagePanel programId={programId} />
-        </section>
+        <>
+          {/* STEP-CURRICULUM-ATTEND-SURVEY-FULL — 차시별 외부 출석 링크·파일 */}
+          <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-2">
+            <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
+              <ClipboardCheck size={16} className="text-violet-500" aria-hidden="true" />
+              차시별 출석 링크·파일
+            </h3>
+            <AttendanceLinkSection programId={programId} />
+          </section>
+          <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
+            <SessionManagePanel programId={programId} />
+          </section>
+        </>
       )}
 
       {sub === 'log' && <ActivityLogSection programId={programId} />}

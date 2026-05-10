@@ -94,20 +94,32 @@ export default function CurriculumTab({ programId, programName }: Props) {
   }, [programId, refresh]);
 
   async function addCurriculum() {
+    // STEP-CURRICULUM-ATTEND-SURVEY-FULL — 차시 등록 안정화
+    //   1) session_no = 현재 탭 max + 1 (gap 무시 — 단순·안전)
+    //   2) title 기본값 '' (사용자가 직접 입력) — 기존 "{N}차시" 자동값 제거
+    //   3) curriculum_type 명시 포함 (NOT NULL default 'planned' 안전망 + 명시)
+    //   4) 실패 시 toast.error 한글 + 컬럼/권한 분기 메시지
     const nextNo = items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0) + 1;
     const { data, error } = await supabase
       .from('program_curriculum')
       .insert({
         program_id: programId,
         session_no: nextNo,
-        title: `${nextNo}차시`,
         curriculum_type: curriculumType,
+        title: '',
+        content: '',
       })
       .select('*')
       .maybeSingle();
     if (error || !data) {
+      const raw = (error?.message ?? '').toLowerCase();
       console.error('[curriculum-tab] 차시 추가 실패:', error?.message);
-      toast.error('차시 추가에 실패했어요.');
+      const msg = raw.includes('column') && raw.includes('does not exist')
+        ? '커리큘럼 테이블 컬럼이 적용되지 않았어요. Supabase 마이그레이션 실행 필요.'
+        : raw.includes('row-level security') || raw.includes('permission denied')
+          ? '차시 추가 권한이 없어요. 관리자에게 문의해 주세요.'
+          : '차시 추가에 실패했어요. 다시 시도해 주세요.';
+      toast.error(msg);
       return;
     }
     setItems((prev) => [...prev, { ...(data as ProgramCurriculum), staff: [] }]);
@@ -123,27 +135,22 @@ export default function CurriculumTab({ programId, programName }: Props) {
         .eq('program_id', programId).eq('curriculum_type', 'planned').order('session_no');
       if (planned.error || !planned.data) {
         console.error('[curriculum-tab] planned 조회 실패:', planned.error?.message);
-        toast.error('제안 커리큘럼 조회에 실패했어요.');
-        return;
+        toast.error('제안 커리큘럼 조회에 실패했어요.'); return;
       }
       const rows = planned.data as ProgramCurriculum[];
       if (rows.length === 0) { toast.error('복사할 제안 차시가 없어요.'); return; }
       const insertRows = rows.map((r) => ({
-        program_id: programId,
-        session_no: r.session_no,
-        title: r.title,
-        content: r.content ?? null,
+        program_id: programId, session_no: r.session_no,
+        title: r.title, content: r.content ?? null,
         day_label: r.day_label ?? null,
-        start_time: r.start_time ?? null,
-        end_time: r.end_time ?? null,
+        start_time: r.start_time ?? null, end_time: r.end_time ?? null,
         instructor_name_raw: r.instructor_name_raw ?? null,
         curriculum_type: 'actual',
       }));
       const ins = await supabase.from('program_curriculum').insert(insertRows);
       if (ins.error) {
         console.error('[curriculum-tab] actual 복사 실패:', ins.error.message);
-        toast.error('실제 운영으로 복사에 실패했어요.');
-        return;
+        toast.error('실제 운영으로 복사에 실패했어요.'); return;
       }
       toast.success(`${rows.length}개 차시를 실제 운영으로 복사했습니다.`);
       void refresh();

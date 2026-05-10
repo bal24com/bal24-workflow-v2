@@ -39,7 +39,11 @@ type DetailProgram = Program & {
 // STEP-PROGRAM-TABS-CONSOLIDATE — 8 탭 단일 정의
 type TabKey = 'overview' | 'curriculum' | 'participants' | 'attendance' | 'instructor' | 'report' | 'grant' | 'settings';
 
-interface AuthCtx { isPM: boolean; isStaff: boolean; isMember: boolean; isPartner: boolean; }
+interface AuthCtx {
+  isPM: boolean; isStaff: boolean; isMember: boolean; isPartner: boolean;
+  /** STEP-CURRICULUM-ATTEND-SURVEY-FULL — 출석/만족도 데이터 존재 여부 */
+  hasAttendData: boolean; hasSurveyData: boolean;
+}
 
 interface TabDef {
   key: TabKey;
@@ -52,9 +56,12 @@ const TABS: TabDef[] = [
   { key: 'overview',     label: '개요',         Icon: Info },
   { key: 'curriculum',   label: '커리큘럼',     Icon: BookOpen,        hide: (c) => c.isMember || c.isPartner },
   { key: 'participants', label: '교육생',       Icon: Users2,          hide: (c) => c.isMember || c.isPartner },
-  { key: 'attendance',   label: '출석',         Icon: ClipboardCheck,  hide: (c) => c.isMember || c.isPartner },
+  // STEP-CURRICULUM-ATTEND-SURVEY-FULL — 출석/보고 탭은 데이터 없으면 비-PM에게 자동 숨김
+  { key: 'attendance',   label: '출석',         Icon: ClipboardCheck,
+    hide: (c) => c.isMember || c.isPartner || (!c.isPM && !c.hasAttendData) },
   { key: 'instructor',   label: '강사',         Icon: Mic2 },
-  { key: 'report',       label: '만족도·보고',  Icon: FileBarChart },
+  { key: 'report',       label: '만족도·보고',  Icon: FileBarChart,
+    hide: (c) => !c.isPM && !c.hasSurveyData && (c.isMember || c.isPartner) },
   { key: 'grant',        label: '지원금',       Icon: Award,           hide: (c) => !c.isPM },
   { key: 'settings',     label: '설정·공유',    Icon: Settings,        hide: (c) => !c.isPM },
 ];
@@ -88,6 +95,9 @@ export default function ProgramDetailPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
+  // STEP-CURRICULUM-ATTEND-SURVEY-FULL — 데이터 존재 여부 (탭 자동 숨김용)
+  const [hasAttendData, setHasAttendData] = useState(false);
+  const [hasSurveyData, setHasSurveyData] = useState(false);
 
   // 1) 데이터 fetch (훅 #1)
   useEffect(() => {
@@ -118,8 +128,30 @@ export default function ProgramDetailPage() {
     };
   }, [id, toast]);
 
+  // STEP-CURRICULUM-ATTEND-SURVEY-FULL — 출석·만족도 데이터 존재 여부 fetch
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    void (async () => {
+      const opt = { count: 'exact' as const, head: true };
+      const [s, c, sv] = await Promise.all([
+        supabase.from('attendance_sessions').select('id', opt).eq('program_id', id),
+        supabase.from('program_curriculum').select('id', opt).eq('program_id', id)
+          .or('attendance_link.not.is.null,attendance_file_url.not.is.null'),
+        supabase.from('satisfaction_surveys').select('id', opt).eq('program_id', id),
+      ]);
+      if (cancelled) return;
+      setHasAttendData((s.count ?? 0) > 0 || (c.count ?? 0) > 0);
+      setHasSurveyData((sv.count ?? 0) > 0);
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
+
   // STEP-PROGRAM-TABS-CONSOLIDATE — 권한별 보이는 탭 계산
-  const authCtx = useMemo<AuthCtx>(() => ({ isPM, isStaff, isMember, isPartner }), [isPM, isStaff, isMember, isPartner]);
+  const authCtx = useMemo<AuthCtx>(
+    () => ({ isPM, isStaff, isMember, isPartner, hasAttendData, hasSurveyData }),
+    [isPM, isStaff, isMember, isPartner, hasAttendData, hasSurveyData],
+  );
   const visibleTabs = useMemo(() => TABS.filter((t) => !t.hide || !t.hide(authCtx)), [authCtx]);
 
   // 탭 fallback — 현재 tab이 visibleTabs에 없으면 첫 가시 탭으로

@@ -335,7 +335,25 @@ export interface ProgramCurriculum {
   day_label?: string | null;
   /** STEP-CURRICULUM-INSTRUCTOR-MATCH — AI 추출 강사명 (인력풀 매칭 실패 원본) */
   instructor_name_raw?: string | null;
+  /** STEP-CURRICULUM-ATTEND-SURVEY-FULL — 차시별 외부 출석 링크 (구글폼 등) */
+  attendance_link?: string | null;
+  /** STEP-CURRICULUM-ATTEND-SURVEY-FULL — 차시별 출석부 스캔 파일 URL */
+  attendance_file_url?: string | null;
   created_at: string;
+}
+
+/** STEP-CURRICULUM-ATTEND-SURVEY-FULL — 만족도 설문 외부 파일 분석 결과 */
+export interface SatisfactionSurvey {
+  id: string;
+  program_id: string;
+  file_name?: string | null;
+  file_url?: string | null;
+  total_count: number;
+  avg_overall?: number | null;
+  summary_json: Record<string, number>;
+  comments: string[];
+  uploaded_at: string;
+  uploaded_by?: string | null;
 }
 
 export type CurriculumStaffRole = '강사' | 'FT' | '멘토' | 'TA' | '운영진';

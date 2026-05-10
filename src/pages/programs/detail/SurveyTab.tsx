@@ -5,6 +5,7 @@ import { Loader2, Star, Trash2, Save, MessageSquare } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import SurveyResultTab from './SurveyResultTab';
+import SurveyFileUploadSection from './SurveyFileUploadSection';
 import type {
   SurveyQuestion, SurveyResponse,
   SurveyQuestionType, SurveyQuestionPhase,
@@ -308,6 +309,9 @@ export default function SurveyTab({ programId, canEdit }: Props) {
           </div>
         )}
       </section>
+
+      {/* STEP-CURRICULUM-ATTEND-SURVEY-FULL — 외부 만족도 파일 업로드·분석 */}
+      <SurveyFileUploadSection programId={programId} />
 
       {/* 하단 — 기존 외부 폼 발송·통계 */}
       <SurveyResultTab programId={programId} />
