@@ -157,6 +157,8 @@ export interface Consortium {
   created_by?: string | null;
   created_at: string;
   updated_at: string;
+  /** STEP-DELETE-RESUME-FULL — soft-delete 휴지통 (30일 후 영구 삭제) */
+  deleted_at?: string | null;
 }
 
 export interface ConsortiumMember {
@@ -200,6 +202,8 @@ export interface Project {
   created_by?: string | null;
   created_at: string;
   updated_at: string;
+  /** STEP-DELETE-RESUME-FULL — soft-delete 휴지통 (30일 후 영구 삭제) */
+  deleted_at?: string | null;
 }
 
 export interface ProjectMember {

@@ -3,7 +3,8 @@
 
 import { supabase } from './supabase';
 
-export type SoftDeleteTable = 'clients' | 'staff_pool';
+// STEP-DELETE-RESUME-FULL — projects/consortiums 추가
+export type SoftDeleteTable = 'clients' | 'staff_pool' | 'projects' | 'consortiums';
 
 /** 삭제 (deleted_at = now) — 휴지통으로 이동 */
 export async function softDelete(table: SoftDeleteTable, id: string): Promise<string | null> {

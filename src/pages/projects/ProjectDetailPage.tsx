@@ -2,13 +2,16 @@
 // 탭: 개요 / 태스크 / 참여인력 / 파일
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Info, Loader2, Users, Link2, Wallet, BookOpen, FolderArchive } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, ClipboardList, Info, Loader2, Users, Link2, Wallet, BookOpen, FolderArchive, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Badge } from '../../components/ui';
+import { Badge, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import type { Project } from '../../types/database';
 import { statusToBadgeVariant } from './projectStatus';
+import { softDelete } from '../../lib/softDeleteUtils';
+import { useToast } from '../../contexts/ToastContext';
+import { useUserProfile } from '../../hooks/useUserProfile';
 import OverviewTab from './detail/OverviewTab';
 import TasksTab from './detail/TasksTab';
 import MembersTab from './detail/MembersTab';
@@ -58,10 +61,26 @@ function NotFound() {
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { isAdmin, isPM } = useUserProfile();
   const [project, setProject] = useState<DetailProject | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
+  const [deleting, setDeleting] = useState(false);
+
+  // STEP-DELETE-RESUME-FULL — soft-delete (휴지통 30일 보관, admin/PM만)
+  async function handleDeleteProject() {
+    if (!project) return;
+    if (!window.confirm(`"${project.name}" 프로젝트를 삭제할까요?\n연관된 프로그램·태스크는 유지되며 30일 후 완전 삭제됩니다.`)) return;
+    setDeleting(true);
+    const err = await softDelete('projects', project.id);
+    setDeleting(false);
+    if (err) { toast.error(err); return; }
+    toast.success('프로젝트를 휴지통으로 이동했어요.');
+    navigate('/projects');
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -139,6 +158,14 @@ export default function ProjectDetailPage() {
               {project.pm?.name && ` · 담당자 ${project.pm.name}`}
             </div>
           </div>
+          {/* STEP-DELETE-RESUME-FULL — 삭제 버튼 (admin/PM 전용) */}
+          {(isAdmin || isPM) && (
+            <Button variant="outline" leftIcon={<Trash2 size={14} />}
+              onClick={() => void handleDeleteProject()} disabled={deleting}
+              className="!border-rose-300 !text-rose-600 hover:!bg-rose-50">
+              {deleting ? '삭제 중…' : '삭제'}
+            </Button>
+          )}
         </div>
       </div>
 

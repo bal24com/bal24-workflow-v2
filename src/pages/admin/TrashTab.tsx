@@ -5,10 +5,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, RefreshCw, Trash2, Undo2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import { restoreRecord, permanentDelete, daysLeft, type SoftDeleteTable } from '../../lib/softDeleteUtils';
+import { restoreRecord, permanentDelete, daysLeft } from '../../lib/softDeleteUtils';
 import { formatDateKo } from '../../lib/utils';
 
-type Tab = 'clients' | 'staff_pool';
+// STEP-DELETE-RESUME-FULL — 4종 휴지통 (프로젝트·컨소시엄·고객사·전문가)
+type Tab = 'projects' | 'consortiums' | 'clients' | 'staff_pool';
 
 interface DeletedRow {
   id: string;
@@ -17,30 +18,54 @@ interface DeletedRow {
   deleted_at: string;
 }
 
+type CountMap = Record<Tab, number>;
+
 export default function TrashTab() {
   const toast = useToast();
-  const [tab, setTab] = useState<Tab>('clients');
+  const [tab, setTab] = useState<Tab>('projects');
   const [rows, setRows] = useState<DeletedRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [counts, setCounts] = useState({ clients: 0, staff_pool: 0 });
+  const [counts, setCounts] = useState<CountMap>({ projects: 0, consortiums: 0, clients: 0, staff_pool: 0 });
   const [actingId, setActingId] = useState<string | null>(null);
 
   const fetchRows = useCallback(async (target: Tab) => {
     setLoading(true);
-    const baseQ = (target === 'clients'
-      ? supabase.from('clients').select('id, name, department, deleted_at')
-      : supabase.from('staff_pool').select('id, name, organization, staff_type, deleted_at'))
-      .not('deleted_at', 'is', null)
-      .order('deleted_at', { ascending: false });
-    const { data, error } = await baseQ;
+    type ProjectRow    = { id: string; name: string; status: string | null; deleted_at: string };
+    type ConsortiumRow = { id: string; name: string; status: string | null; deleted_at: string };
+    type ClientRow     = { id: string; name: string; department: string | null; deleted_at: string };
+    type StaffRow      = { id: string; name: string; organization: string | null; staff_type: string | null; deleted_at: string };
+
+    let data: ProjectRow[] | ConsortiumRow[] | ClientRow[] | StaffRow[] | null = null;
+    let error: { message: string } | null = null;
+
+    if (target === 'projects') {
+      const r = await supabase.from('projects').select('id, name, status, deleted_at')
+        .not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+      data = r.data as ProjectRow[] | null; error = r.error;
+    } else if (target === 'consortiums') {
+      const r = await supabase.from('consortiums').select('id, name, status, deleted_at')
+        .not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+      data = r.data as ConsortiumRow[] | null; error = r.error;
+    } else if (target === 'clients') {
+      const r = await supabase.from('clients').select('id, name, department, deleted_at')
+        .not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+      data = r.data as ClientRow[] | null; error = r.error;
+    } else {
+      const r = await supabase.from('staff_pool').select('id, name, organization, staff_type, deleted_at')
+        .not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+      data = r.data as StaffRow[] | null; error = r.error;
+    }
+
     if (error) {
       console.error(`[trash:${target}]`, error.message);
       toast.error('휴지통을 불러오지 못했어요.');
       setRows([]); setLoading(false); return;
     }
-    type ClientRow = { id: string; name: string; department: string | null; deleted_at: string };
-    type StaffRow  = { id: string; name: string; organization: string | null; staff_type: string | null; deleted_at: string };
     const next: DeletedRow[] = (data ?? []).map((r) => {
+      if (target === 'projects' || target === 'consortiums') {
+        const row = r as ProjectRow | ConsortiumRow;
+        return { id: row.id, name: row.name ?? '?', meta: row.status ?? '상태 미지정', deleted_at: row.deleted_at };
+      }
       if (target === 'clients') {
         const row = r as ClientRow;
         return { id: row.id, name: row.name ?? '?', meta: row.department ?? '부서 미지정', deleted_at: row.deleted_at };
@@ -53,11 +78,17 @@ export default function TrashTab() {
   }, [toast]);
 
   const refreshCounts = useCallback(async () => {
-    const [c, s] = await Promise.all([
-      supabase.from('clients').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null),
-      supabase.from('staff_pool').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null),
+    const opt = { count: 'exact' as const, head: true };
+    const [p, k, c, s] = await Promise.all([
+      supabase.from('projects').select('id', opt).not('deleted_at', 'is', null),
+      supabase.from('consortiums').select('id', opt).not('deleted_at', 'is', null),
+      supabase.from('clients').select('id', opt).not('deleted_at', 'is', null),
+      supabase.from('staff_pool').select('id', opt).not('deleted_at', 'is', null),
     ]);
-    setCounts({ clients: c.count ?? 0, staff_pool: s.count ?? 0 });
+    setCounts({
+      projects: p.count ?? 0, consortiums: k.count ?? 0,
+      clients: c.count ?? 0, staff_pool: s.count ?? 0,
+    });
   }, []);
 
   useEffect(() => { void fetchRows(tab); }, [tab, fetchRows]);
@@ -65,7 +96,7 @@ export default function TrashTab() {
 
   async function handleRestore(id: string, name: string) {
     setActingId(id);
-    const err = await restoreRecord(tab as SoftDeleteTable, id);
+    const err = await restoreRecord(tab, id);
     setActingId(null);
     if (err) { toast.error(err); return; }
     toast.success(`${name}을(를) 복원했어요.`);
@@ -75,7 +106,7 @@ export default function TrashTab() {
   async function handlePurge(id: string, name: string) {
     if (!window.confirm(`"${name}"을(를) 완전히 삭제합니다. 복구가 불가능합니다. 계속할까요?`)) return;
     setActingId(id);
-    const err = await permanentDelete(tab as SoftDeleteTable, id);
+    const err = await permanentDelete(tab, id);
     setActingId(null);
     if (err) { toast.error(err); return; }
     toast.success('영구 삭제했어요.');
@@ -85,10 +116,12 @@ export default function TrashTab() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="inline-flex rounded-xl border border-violet-100 bg-white p-1 shadow-sm">
+        <div className="inline-flex rounded-xl border border-violet-100 bg-white p-1 shadow-sm flex-wrap">
           {([
-            { key: 'clients' as Tab, label: `고객사 (${counts.clients})` },
-            { key: 'staff_pool' as Tab, label: `전문가 (${counts.staff_pool})` },
+            { key: 'projects'    as Tab, label: `프로젝트 (${counts.projects})` },
+            { key: 'consortiums' as Tab, label: `컨소시엄 (${counts.consortiums})` },
+            { key: 'clients'     as Tab, label: `고객사 (${counts.clients})` },
+            { key: 'staff_pool'  as Tab, label: `전문가 (${counts.staff_pool})` },
           ]).map((t) => (
             <button key={t.key} type="button" onClick={() => setTab(t.key)}
               className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition ${
@@ -118,7 +151,9 @@ export default function TrashTab() {
             <thead className="bg-violet-50/40 text-[11px] uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="text-left px-3 py-2 font-bold">이름</th>
-                <th className="text-left px-3 py-2 font-bold">{tab === 'clients' ? '부서' : '소속·역할'}</th>
+                <th className="text-left px-3 py-2 font-bold">
+                  {tab === 'clients' ? '부서' : tab === 'staff_pool' ? '소속·역할' : '상태'}
+                </th>
                 <th className="text-left px-3 py-2 font-bold">삭제일</th>
                 <th className="text-center px-3 py-2 font-bold">남은 일수</th>
                 <th className="text-right px-3 py-2 font-bold">작업</th>

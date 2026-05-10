@@ -11,6 +11,10 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { Button } from '../../components/ui';
+import { Trash2 } from 'lucide-react';
+import { softDelete } from '../../lib/softDeleteUtils';
+import { useUserProfile } from '../../hooks/useUserProfile';
+import { useNavigate } from 'react-router-dom';
 import {
   CONSORTIUM_STATUS,
   MEMBER_TYPE_LABEL,
@@ -77,13 +81,28 @@ interface CountSummary {
 
 export default function ConsortiumDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const toast = useToast();
+  const { isAdmin } = useUserProfile();
   const [consortium, setConsortium] = useState<ConsortiumDetail | null>(null);
   const [members, setMembers] = useState<ConsortiumMember[]>([]);
   const [counts, setCounts] = useState<CountSummary>({ programs: 0, tasks: 0 });
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>('overview');
   const [editOpen, setEditOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // STEP-DELETE-RESUME-FULL — soft-delete (admin 전용)
+  async function handleDeleteConsortium() {
+    if (!consortium) return;
+    if (!window.confirm(`"${consortium.name}" 컨소시엄을 삭제할까요? 30일 후 자동으로 완전 삭제됩니다.`)) return;
+    setDeleting(true);
+    const err = await softDelete('consortiums', consortium.id);
+    setDeleting(false);
+    if (err) { toast.error(err); return; }
+    toast.success('컨소시엄을 휴지통으로 이동했어요.');
+    navigate('/consortium');
+  }
 
   const loadConsortium = useCallback(async () => {
     if (!id) return;
@@ -201,6 +220,14 @@ export default function ConsortiumDetailPage() {
               <Pencil size={14} className="mr-1" aria-hidden="true" />
               수정
             </Button>
+            {/* STEP-DELETE-RESUME-FULL — 컨소시엄 삭제 (admin 전용) */}
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={() => void handleDeleteConsortium()} disabled={deleting}
+                className="!border-rose-300 !text-rose-600 hover:!bg-rose-50">
+                <Trash2 size={14} className="mr-1" aria-hidden="true" />
+                {deleting ? '삭제 중…' : '삭제'}
+              </Button>
+            )}
           </div>
         </header>
 

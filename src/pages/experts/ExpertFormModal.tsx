@@ -47,18 +47,11 @@ const EMPTY: FormState = {
 
 function expertToForm(s: StaffPool): FormState {
   return {
-    name: s.name ?? '',
-    organization: s.organization ?? '',
-    position: s.position ?? '',
+    name: s.name ?? '', organization: s.organization ?? '', position: s.position ?? '',
     specialty: (s.specialty ?? []).join(', '),
-    phoneMobile: s.phone_mobile ?? '',
-    phoneOffice: s.phone_office ?? '',
-    email: s.email ?? '',
-    mainDuties: s.main_duties ?? '',
-    careerSummary: s.career_summary ?? '',
-    bankName: s.bank_name ?? '',
-    bankAccount: s.bank_account ?? '',
-    bankHolder: s.bank_holder ?? '',
+    phoneMobile: s.phone_mobile ?? '', phoneOffice: s.phone_office ?? '', email: s.email ?? '',
+    mainDuties: s.main_duties ?? '', careerSummary: s.career_summary ?? '',
+    bankName: s.bank_name ?? '', bankAccount: s.bank_account ?? '', bankHolder: s.bank_holder ?? '',
     idNumber: s.id_number ?? '',
   };
 }
@@ -100,6 +93,9 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
   const [educations, setEducations] = useState<EducationItem[]>([]);
   const [careers, setCareers] = useState<CareerItem[]>([]);
   const [certs, setCerts] = useState<CertItem[]>([]);
+  // STEP-DELETE-RESUME-FULL — 이력서 파일 업로드 (staff-files 버킷)
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeUploading, setResumeUploading] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -127,8 +123,27 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
       setStaffType(''); setResumeUrl('');
       setEducations([]); setCareers([]); setCerts([]);
     }
-    setNameError(null); setErrorMsg(null); setInfoMsg(null);
+    setResumeFile(null); setNameError(null); setErrorMsg(null); setInfoMsg(null);
   }, [open, expert]);
+
+  // STEP-DELETE-RESUME-FULL — 이력서 파일을 staff-files 버킷에 업로드 후 publicUrl 반환
+  async function uploadResumeIfNeeded(): Promise<string | null> {
+    if (!resumeFile) return resumeUrl || null;
+    if (resumeFile.size > 10 * 1024 * 1024) { setErrorMsg('이력서 파일 용량이 10MB를 초과해요.'); return null; }
+    setResumeUploading(true);
+    try {
+      const ext = resumeFile.name.includes('.') ? resumeFile.name.split('.').pop() : 'pdf';
+      const safeBase = resumeFile.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 60);
+      const path = `resumes/${Date.now()}_${safeBase}.${ext}`;
+      const up = await supabase.storage.from('staff-files').upload(path, resumeFile, { upsert: false, contentType: resumeFile.type || undefined });
+      if (up.error) {
+        console.error('[experts] 이력서 업로드 실패:', up.error.message);
+        setErrorMsg('이력서 업로드에 실패했어요. (staff-files 버킷이 생성되어 있는지 확인해 주세요)');
+        return null;
+      }
+      return supabase.storage.from('staff-files').getPublicUrl(path).data.publicUrl;
+    } finally { setResumeUploading(false); }
+  }
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -202,6 +217,10 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
 
     setSubmitting(true);
     try {
+      // STEP-DELETE-RESUME-FULL — 이력서 파일 우선 업로드. 실패 시 저장 중단.
+      const finalResumeUrl = await uploadResumeIfNeeded();
+      if (resumeFile && finalResumeUrl === null) { setSubmitting(false); return; }
+
       const specialtyArr = form.specialty
         .split(',')
         .map((s) => s.trim())
@@ -229,7 +248,8 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
         profile_image_url: photoUrl,
         // STEP-EXPERT-CRUD-FULL — 확장 필드
         staff_type: staffType || null,
-        resume_url: resumeUrl.trim() || null,
+        // STEP-DELETE-RESUME-FULL — 파일 업로드 결과 우선, 없으면 기존 URL 유지
+        resume_url: finalResumeUrl,
         education_history: eduClean,
         career_history: careerClean,
         certifications: certsClean,
@@ -345,7 +365,7 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
           />
         </section>
 
-        {/* STEP-EXPERT-CRUD-FULL — 주 역할 + 학력 + 경력 + 자격 + 이력서 URL */}
+        {/* STEP-EXPERT-CRUD-FULL + STEP-DELETE-RESUME-FULL — 주 역할 + 학력 + 경력 + 자격 + 이력서 파일 */}
         <ExpertFormExtSection
           staffType={staffType}
           resumeUrl={resumeUrl}
@@ -358,6 +378,9 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
           onEducations={setEducations}
           onCareers={setCareers}
           onCerts={setCerts}
+          resumeFile={resumeFile}
+          resumeUploading={resumeUploading}
+          onResumeFile={setResumeFile}
         />
 
         {infoMsg && (

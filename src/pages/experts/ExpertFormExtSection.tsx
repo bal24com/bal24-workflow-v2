@@ -1,7 +1,7 @@
 // bal24 v2 — STEP-EXPERT-CRUD-FULL 전문가 확장 필드 섹션
-// 학력·경력·자격증 동적 입력 + resume_url + staff_type select
+//   STEP-DELETE-RESUME-FULL — resume_url 텍스트 입력 → 파일 업로드(staff-files 버킷)로 교체
 
-import { Plus, X } from 'lucide-react';
+import { Plus, X, FileText } from 'lucide-react';
 import { Input } from '../../components/ui';
 import type { CareerItem, CertItem, EducationItem, StaffType } from '../../types/database';
 
@@ -19,6 +19,10 @@ interface Props {
   onEducations: (next: EducationItem[]) => void;
   onCareers: (next: CareerItem[]) => void;
   onCerts: (next: CertItem[]) => void;
+  /** STEP-DELETE-RESUME-FULL — 이력서 파일 업로드 (저장 시 staff-files 업로드 후 URL 갱신) */
+  resumeFile: File | null;
+  resumeUploading?: boolean;
+  onResumeFile: (f: File | null) => void;
 }
 
 const sectionH = 'text-xs font-bold text-slate-500 uppercase tracking-wide';
@@ -28,6 +32,7 @@ const rowWrap = 'grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_28px] gap-2 items-en
 export default function ExpertFormExtSection({
   staffType, resumeUrl, educations, careers, certs, disabled,
   onStaffType, onResumeUrl, onEducations, onCareers, onCerts,
+  resumeFile, resumeUploading, onResumeFile,
 }: Props) {
   return (
     <>
@@ -43,9 +48,35 @@ export default function ExpertFormExtSection({
               {STAFF_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}
             </select>
           </div>
-          <Input label="이력서 URL" value={resumeUrl} disabled={disabled}
-            onChange={(e) => onResumeUrl(e.target.value)} placeholder="https://…"
-            helperText="외부 PDF/Notion 링크 (선택)" />
+          {/* STEP-DELETE-RESUME-FULL — 이력서 파일 업로드 (PDF/DOC/DOCX) */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700">이력서 파일</label>
+            {resumeUrl && !resumeFile && (
+              <div className="flex items-center gap-2 text-xs">
+                <a href={resumeUrl} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-violet-600 hover:underline">
+                  <FileText size={12} aria-hidden="true" /> 현재 이력서 보기
+                </a>
+                <button type="button" disabled={disabled}
+                  onClick={() => onResumeUrl('')}
+                  className="text-rose-500 hover:text-rose-700 disabled:opacity-40">
+                  제거
+                </button>
+              </div>
+            )}
+            <input type="file" accept=".pdf,.doc,.docx" disabled={disabled}
+              onChange={(e) => onResumeFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-xs text-slate-500
+                file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-violet-300
+                file:text-xs file:text-violet-700 file:bg-violet-50
+                hover:file:bg-violet-100 file:cursor-pointer cursor-pointer disabled:opacity-50" />
+            {resumeFile && (
+              <p className="text-[11px] text-slate-500">
+                선택됨: {resumeFile.name}{resumeUploading && ' (업로드 중…)'}
+              </p>
+            )}
+            <p className="text-[10px] text-slate-400">PDF · DOC · DOCX · 최대 10MB</p>
+          </div>
         </div>
       </section>
 

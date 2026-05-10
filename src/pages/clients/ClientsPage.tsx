@@ -4,8 +4,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutGrid, List, Plus, Loader2, Search, Building2, Phone, Mail, Users,
-  Banknote, FileText, Briefcase, Eye, Pencil,
+  Banknote, FileText, Briefcase, Eye, Pencil, Trash2,
 } from 'lucide-react';
+import { softDelete } from '../../lib/softDeleteUtils';
 import {
   Button,
   Card,
@@ -49,9 +50,11 @@ function typeBadge(c: Client) {
 interface CardActions {
   onView: (c: ClientRow) => void;
   onEdit: (c: ClientRow) => void;
+  /** STEP-DELETE-RESUME-FULL — 카드/리스트 hover 삭제 */
+  onDelete: (c: ClientRow) => void;
 }
 
-function ClientGridCard({ c, onView, onEdit }: { c: ClientRow } & CardActions) {
+function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & CardActions) {
   const tone = typeBadge(c);
   const ceo = c.ceo_name ?? c.representative;
   const industry = [c.business_type, c.business_item].filter(Boolean).join(' · ');
@@ -59,7 +62,12 @@ function ClientGridCard({ c, onView, onEdit }: { c: ClientRow } & CardActions) {
   const primaryContact = c.contacts[0];
 
   return (
-    <Card className="hover:border-violet-200 hover:shadow-md transition h-full flex flex-col">
+    <Card className="group hover:border-violet-200 hover:shadow-md transition h-full flex flex-col relative">
+      <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(c); }}
+        aria-label="삭제"
+        className="absolute top-2 right-2 p-1.5 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500 bg-white border border-slate-200 opacity-0 group-hover:opacity-100 transition">
+        <Trash2 size={12} />
+      </button>
       <CardHeader>
         <div className="flex items-start gap-2">
           <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-violet-100 text-violet-600 shrink-0">
@@ -130,24 +138,8 @@ function ClientGridCard({ c, onView, onEdit }: { c: ClientRow } & CardActions) {
       </CardContent>
 
       <div className="flex items-center gap-2 px-5 pb-4">
-        <Button
-          variant="outline"
-          size="sm"
-          leftIcon={<Eye size={14} />}
-          onClick={() => onView(c)}
-          className="!flex-1"
-        >
-          내용보기
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          leftIcon={<Pencil size={14} />}
-          onClick={() => onEdit(c)}
-          className="!flex-1"
-        >
-          수정
-        </Button>
+        <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={() => onView(c)} className="!flex-1">내용보기</Button>
+        <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={() => onEdit(c)} className="!flex-1">수정</Button>
       </div>
     </Card>
   );
@@ -162,7 +154,7 @@ function Line({ icon, children }: { icon: React.ReactNode; children: React.React
   );
 }
 
-function ClientListRow({ c, onView, onEdit }: { c: ClientRow } & CardActions) {
+function ClientListRow({ c, onView, onEdit, onDelete }: { c: ClientRow } & CardActions) {
   const tone = typeBadge(c);
   const ceo = c.ceo_name ?? c.representative;
   return (
@@ -207,12 +199,12 @@ function ClientListRow({ c, onView, onEdit }: { c: ClientRow } & CardActions) {
         </div>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
-        <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={() => onView(c)}>
-          내용
-        </Button>
-        <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={() => onEdit(c)}>
-          수정
-        </Button>
+        <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={() => onView(c)}>내용</Button>
+        <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={() => onEdit(c)}>수정</Button>
+        <button type="button" onClick={() => onDelete(c)} aria-label="삭제"
+          className="p-1.5 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500 border border-rose-300">
+          <Trash2 size={12} />
+        </button>
       </div>
     </li>
   );
@@ -274,6 +266,15 @@ export default function ClientsPage() {
   const handleEdit = (c: ClientRow) => {
     setDetailTarget(null);
     setEditTarget(c);
+  };
+
+  // STEP-DELETE-RESUME-FULL — 카드/리스트 hover 삭제
+  const handleDelete = async (c: ClientRow) => {
+    if (!window.confirm(`"${c.name}"을(를) 삭제할까요? 30일 후 자동으로 완전 삭제됩니다. (관리자 휴지통에서 복원 가능)`)) return;
+    const err = await softDelete('clients', c.id);
+    if (err) { toast.error(err); return; }
+    toast.success('고객사를 휴지통으로 이동했어요.');
+    void fetchClients();
   };
 
   return (
@@ -345,13 +346,13 @@ export default function ClientsPage() {
       ) : view === 'card' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((c) => (
-            <ClientGridCard key={c.id} c={c} onView={handleView} onEdit={handleEdit} />
+            <ClientGridCard key={c.id} c={c} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
           ))}
         </div>
       ) : (
         <ul className="space-y-2">
           {visible.map((c) => (
-            <ClientListRow key={c.id} c={c} onView={handleView} onEdit={handleEdit} />
+            <ClientListRow key={c.id} c={c} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
           ))}
         </ul>
       )}

@@ -206,9 +206,11 @@ export default function ProjectsPage() {
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     try {
+      // STEP-DELETE-RESUME-FULL — 휴지통(deleted_at IS NOT NULL) 제외
       const { data, error } = await supabase
         .from('projects')
         .select(SELECT_COLUMNS)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
