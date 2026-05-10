@@ -7,14 +7,7 @@ import { Plus, Trash2, FileIcon, Upload, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ACTIVITY_FILES_BUCKET } from './activityLogTypes';
 import type { ActivityFile } from '../../types/database';
-
-function translateUploadError(raw: string): string {
-  const m = raw.toLowerCase();
-  if (m.includes('bucket not found')) return `파일 저장소(${ACTIVITY_FILES_BUCKET})가 없어요. Supabase에서 버킷을 먼저 만들어 주세요.`;
-  if (m.includes('payload too large')) return '파일 용량이 너무 커요.';
-  if (m.includes('row-level security')) return '파일을 올릴 권한이 없어요.';
-  return '파일 업로드 중 오류가 발생했어요.';
-}
+import { sanitizeFileName, translateUploadError } from '../../components/files/sharedFilesUtils';
 
 function fileSizeLabel(bytes?: number): string {
   if (bytes == null || bytes < 0) return '';
@@ -46,9 +39,8 @@ export default function ActivityFileSection({
     setUploadingName(file.name);
     setErrorMsg(null);
     try {
-      const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
-      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 60);
-      const path = `${pathPrefix || 'misc'}/${Date.now()}_${safeBase}${ext ? '.' + ext : ''}`;
+      const safeName = sanitizeFileName(file.name);
+      const path = `${pathPrefix || 'misc'}/${Date.now()}_${safeName}`;
       const { error } = await supabase.storage.from(ACTIVITY_FILES_BUCKET).upload(path, file, {
         upsert: false, contentType: file.type || undefined,
       });
@@ -57,8 +49,9 @@ export default function ActivityFileSection({
       onChange([...files, { url: pub.publicUrl, name: file.name, size: file.size }]);
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
-      console.error('[activity-log] 파일 업로드 실패:', raw);
-      setErrorMsg(translateUploadError(raw));
+      console.error('[FILE_UPLOAD_ERROR]', JSON.stringify(err, Object.getOwnPropertyNames(err ?? {})));
+      console.error('[activity-log] 파일 업로드 실패:', { bucket: ACTIVITY_FILES_BUCKET, pathPrefix, raw });
+      setErrorMsg(translateUploadError(raw, ACTIVITY_FILES_BUCKET));
     } finally {
       setUploading(false);
       setUploadingName(null);
