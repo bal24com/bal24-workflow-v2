@@ -72,39 +72,64 @@ export default function ConPortalPermissionModal({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!consortiumId || !member.id) {
+      toast.error('컨소시엄 또는 참여사 정보가 비어 있어요.');
+      return;
+    }
     setSubmitting(true);
     try {
-      // INSERT — 미존재 행만 추가하므로 onConflict 없음. 동일 member 중복 시 unique 제약이면 UPSERT.
-      // 안전을 위해 upsert(onConflict=member_id+consortium_id) 사용.
-      const { error } = await supabase
-        .from('consortium_portal_permissions')
-        .upsert(
-          {
-            consortium_id: consortiumId,
-            member_id: member.id,
-            ...perm,
-            is_active: true,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'consortium_id,member_id' },
-        );
-      if (error) {
-        console.error('[con-portal-modal] 저장 실패:', error.message);
-        // unique 제약이 다른 경우 일반 INSERT 로 fallback
-        const fallback = await supabase.from('consortium_portal_permissions').insert({
-          consortium_id: consortiumId,
-          member_id: member.id,
-          ...perm,
-          is_active: true,
-        });
-        if (fallback.error) {
-          console.error('[con-portal-modal] fallback INSERT 실패:', fallback.error.message);
-          toast.error('권한 저장 중 오류가 발생했어요.');
-          return;
-        }
+      // 1) INSERT 시도 (모달은 missingMembers 대상으로만 열리므로 신규 레코드가 정상 케이스)
+      const insertPayload = {
+        consortium_id: consortiumId,
+        member_id: member.id,
+        ...perm,
+        is_active: true,
+      };
+      let { error } = await supabase.from('consortium_portal_permissions').insert(insertPayload);
+
+      // 2) 23505 = unique 위반 (이미 행이 있는 케이스) → UPDATE 로 fallback
+      if (error?.code === '23505') {
+        const upd = await supabase
+          .from('consortium_portal_permissions')
+          .update({ ...perm, is_active: true, updated_at: new Date().toISOString() })
+          .eq('consortium_id', consortiumId)
+          .eq('member_id', member.id);
+        error = upd.error ?? null;
       }
-      // member.portal_enabled 동기화
-      await supabase.from('consortium_members').update({ portal_enabled: true }).eq('id', member.id);
+
+      if (error) {
+        const msg = error.message ?? '';
+        const code = (error as { code?: string }).code ?? '';
+        console.error('[con-portal-modal] 저장 실패:', code, msg, error);
+        const lower = msg.toLowerCase();
+        // 테이블 미존재
+        if (code === 'PGRST205' || lower.includes("could not find the table") || lower.includes('does not exist')) {
+          toast.error('포털 권한 테이블이 아직 없어요. 관리자에게 마이그레이션 적용을 요청해 주세요.');
+        }
+        // RLS 권한
+        else if (code === '42501' || lower.includes('row-level security') || lower.includes('permission denied')) {
+          toast.error('포털 권한 저장 권한이 없어요. ADMIN/PM 계정으로 다시 시도해 주세요.');
+        }
+        // CHECK 제약 (perm 값이 잘못된 경우)
+        else if (code === '23514' || lower.includes('check constraint')) {
+          toast.error('권한 값이 올바르지 않아요. 페이지를 새로고침 후 다시 시도해 주세요.');
+        }
+        // 그 외는 실제 메시지 노출 (디버깅용)
+        else {
+          toast.error(`권한 저장 실패: ${msg || '알 수 없는 오류'}`);
+        }
+        return;
+      }
+
+      // 3) member.portal_enabled 동기화 (실패해도 권한은 저장된 상태이므로 경고만)
+      const memberUpd = await supabase
+        .from('consortium_members')
+        .update({ portal_enabled: true })
+        .eq('id', member.id);
+      if (memberUpd.error) {
+        console.warn('[con-portal-modal] portal_enabled 동기화 실패:', memberUpd.error.message);
+      }
+
       toast.success('권한 설정을 저장했어요.');
       onSaved();
       onClose();
