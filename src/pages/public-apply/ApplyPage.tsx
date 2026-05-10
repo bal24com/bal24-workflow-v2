@@ -15,6 +15,9 @@ import PromoSection from './PromoSection';
 import {
   checkApplicationGate, checkDuplicateApplication, submitApplication,
 } from './applicationUtils';
+import {
+  useApplicationCapacity, getCapacityMessage,
+} from '../../hooks/useApplicationCapacity';
 
 interface FormState {
   name: string;
@@ -45,6 +48,9 @@ const EMPTY: FormState = {
 export default function ApplyPage() {
   const { programId } = useParams<{ programId: string }>();
   const toast = useToast();
+  // STEP-APPLICATION-CAPACITY — RPC 기반 정원 + 기간 체크
+  const { capacity, loading: capacityLoading, recheck: recheckCapacity } = useApplicationCapacity(programId ?? null);
+  const capacityMsg = getCapacityMessage(capacity);
   const [program, setProgram] = useState<Program | null>(null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>(EMPTY);
@@ -101,6 +107,13 @@ export default function ApplyPage() {
 
     setSubmitting(true);
     try {
+      // STEP-APPLICATION-CAPACITY — INSERT 직전 RPC 재확인 (race condition 방지)
+      const recheck = await recheckCapacity();
+      if (recheck && !recheck.ok) {
+        const msg = getCapacityMessage(recheck);
+        toast.error(msg ?? '신청할 수 없는 상태예요.');
+        return;
+      }
       // 중복 신청 차단 (이메일 입력했을 때만)
       if (form.email.trim()) {
         const dup = await checkDuplicateApplication(programId, form.email);
@@ -230,6 +243,20 @@ export default function ApplyPage() {
           <form onSubmit={handleSubmit} className="rounded-2xl border border-violet-100 bg-white p-5 sm:p-7 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-5" noValidate>
             <h2 className="text-lg font-bold text-[#1E1B4B]">신청서 작성</h2>
 
+            {/* STEP-APPLICATION-CAPACITY — 정원/기간 RPC 결과 배너 */}
+            {capacity && !capacity.ok && capacityMsg && (
+              <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 text-center">
+                <p className="text-sm font-semibold text-rose-700">{capacityMsg}</p>
+              </div>
+            )}
+            {capacity && capacity.ok && capacity.reason === 'available' && capacity.remaining != null && (
+              <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-2 text-center">
+                <p className="text-xs text-violet-700">
+                  현재 신청 <strong>{capacity.current ?? 0}명</strong> · 정원 <strong>{capacity.max}명</strong> · 남은 자리 <strong className="text-violet-900">{capacity.remaining}명</strong>
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input label="이름" required value={form.name} onChange={(e) => update('name', e.target.value)} disabled={submitting} placeholder="홍길동" />
               <Input type="tel" label="연락처" required value={form.phone} onChange={(e) => update('phone', e.target.value)} disabled={submitting} placeholder="010-0000-0000" />
@@ -300,8 +327,14 @@ export default function ApplyPage() {
               </span>
             </label>
 
-            <Button type="submit" variant="primary" loading={submitting} className="!w-full !py-3 text-base font-semibold">
-              신청하기
+            <Button
+              type="submit"
+              variant="primary"
+              loading={submitting}
+              disabled={capacityLoading || (capacity !== null && !capacity.ok)}
+              className="!w-full !py-3 text-base font-semibold"
+            >
+              {capacity && !capacity.ok ? '신청 불가' : '신청하기'}
             </Button>
           </form>
         )}

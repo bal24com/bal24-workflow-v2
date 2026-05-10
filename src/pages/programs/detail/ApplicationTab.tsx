@@ -42,6 +42,7 @@ export default function ApplicationTab({ programId }: Props) {
   const [items, setItems] = useState<ParticipantApplication[]>([]);
   const [scores, setScores] = useState<Map<string, { avg: number; count: number }>>(new Map());
   const [isEvaluation, setIsEvaluation] = useState(false);
+  const [maxApplicants, setMaxApplicants] = useState<number | null>(null);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -50,10 +51,11 @@ export default function ApplicationTab({ programId }: Props) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    // 1) 프로그램 application_type 확인
+    // 1) 프로그램 application_type + max_applicants 확인
     const { data: prog } = await supabase
-      .from('programs').select('application_type').eq('id', programId).maybeSingle();
+      .from('programs').select('application_type, max_applicants').eq('id', programId).maybeSingle();
     setIsEvaluation((prog?.application_type ?? 'open') === 'evaluation');
+    setMaxApplicants((prog?.max_applicants as number | null | undefined) ?? null);
     // 2) 신청자 + (평가형이면) 점수
     const list = await fetchApplications(programId);
     setItems(list);
@@ -149,6 +151,25 @@ export default function ApplicationTab({ programId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* STEP-APPLICATION-CAPACITY — 정원 현황 (max_applicants 있을 때만) */}
+      {maxApplicants && maxApplicants > 0 && (() => {
+        const validCount = items.filter((a) => a.status !== 'withdrawn' && a.status !== 'rejected').length;
+        const isFull = validCount >= maxApplicants;
+        return (
+          <div className="flex items-center gap-2 text-sm rounded-xl border border-violet-100 bg-violet-50/40 px-3 py-2">
+            <span className="text-slate-500">정원</span>
+            <span className="font-bold text-[#1E1B4B] tabular-nums">
+              {validCount} / {maxApplicants}명
+            </span>
+            {isFull ? (
+              <span className="text-[10px] font-semibold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full">마감</span>
+            ) : (
+              <span className="text-[10px] text-slate-500">남은 자리 {maxApplicants - validCount}명</span>
+            )}
+          </div>
+        );
+      })()}
+
       {/* 헤더 */}
       <header className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-base font-bold text-[#1E1B4B] flex items-center gap-1.5">
