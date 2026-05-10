@@ -21,6 +21,10 @@ import StaffStudentsTab from './detail/StaffStudentsTab';
 import AttendanceLogTab from './detail/AttendanceLogTab';
 import SurveyTab from './detail/SurveyTab';
 import ParticipantTab from './detail/ParticipantTab';
+import ProgramOverviewCard from './detail/overview/ProgramOverviewCard';
+import ProgramCurriculumSummaryCard from './detail/overview/ProgramCurriculumSummaryCard';
+import ProgramParticipantSummaryCard from './detail/overview/ProgramParticipantSummaryCard';
+import ProgramInstructorSummaryCard from './detail/overview/ProgramInstructorSummaryCard';
 import ShareTab from './detail/ShareTab';
 import ReportBuilderTab from './detail/ReportBuilderTab';
 import ProgramFilesTab from './detail/ProgramFilesTab';
@@ -319,7 +323,17 @@ export default function ProgramDetailPage() {
 
       <div role="tabpanel">
         {tab === 'overview' && (
-          <OverviewTab programId={programId} description={program.description ?? null} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <ProgramOverviewCard program={program} />
+              <OverviewTab programId={programId} description={program.description ?? null} />
+            </div>
+            <div className="space-y-4">
+              <ProgramCurriculumSummaryCard programId={programId} />
+              <ProgramParticipantSummaryCard programId={programId} />
+              <ProgramInstructorSummaryCard programId={programId} />
+            </div>
+          </div>
         )}
         {tab === 'curriculum' && <CurriculumTab programId={programId} programName={program?.name} />}
         {tab === 'staff' && <StaffStudentsTab programId={programId} />}

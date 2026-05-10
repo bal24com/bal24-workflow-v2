@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LayoutGrid, List, Plus, Loader2, UserPlus, FolderUp } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, UserPlus, FolderUp, Building2, Users, MapPin, Calendar } from 'lucide-react';
 import {
   Button,
   Card,
@@ -40,38 +40,47 @@ type TypeFilter = ProgramType | '전체';
 
 type ProgramRow = Program & {
   project?: { id: string; name: string } | null;
+  participants_count?: { count: number }[] | null;
+  sessions_count?: { count: number }[] | null;
 };
 
 // consortium join은 일부 환경에서 400 유발 → 선제 제거. consortium_id 는 '*' 로 수신되어 필터 로직 그대로 작동.
-const SELECT_COLUMNS = '*, project:projects(id,name)';
+// STEP-PROGRAM-DASHBOARD — count join 추가 (참여자·차시)
+const SELECT_COLUMNS = '*, project:projects(id,name), participants_count:program_participants(count), sessions_count:program_curriculum(count)';
+
+function programCount(arr?: { count: number }[] | null): number {
+  return arr?.[0]?.count ?? 0;
+}
 
 function ProgramMeta({ p }: { p: ProgramRow }) {
+  const orgLine = [p.client_org, p.department].filter(Boolean).join(' · ');
+  const targetLine = p.target_audience
+    ? `${p.target_audience}${p.max_participants ? ` · 정원 ${p.max_participants}명` : ''}`
+    : null;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-      <span>
-        프로젝트{' '}
-        <span className="text-slate-700 font-medium">{p.project?.name ?? '미연결'}</span>
-      </span>
+    <div className="space-y-1 text-xs text-slate-600">
+      {orgLine && (
+        <div className="flex items-center gap-1.5"><Building2 size={11} className="text-slate-400 shrink-0" aria-hidden="true" /><span className="truncate">{orgLine}</span></div>
+      )}
+      {targetLine && (
+        <div className="flex items-center gap-1.5"><Users size={11} className="text-slate-400 shrink-0" aria-hidden="true" /><span className="truncate">{targetLine}</span></div>
+      )}
       {(p.start_date || p.end_date) && (
-        <>
-          <span aria-hidden="true">·</span>
-          <span>
-            {formatDateKo(p.start_date) || '미정'} ~ {formatDateKo(p.end_date) || '미정'}
-          </span>
-        </>
+        <div className="flex items-center gap-1.5"><Calendar size={11} className="text-slate-400 shrink-0" aria-hidden="true" /><span>{formatDateKo(p.start_date) || '미정'} ~ {formatDateKo(p.end_date) || '미정'}</span></div>
       )}
       {p.venue && (
-        <>
-          <span aria-hidden="true">·</span>
-          <span>{p.venue}</span>
-        </>
+        <div className="flex items-center gap-1.5"><MapPin size={11} className="text-slate-400 shrink-0" aria-hidden="true" /><span className="truncate">{p.venue}</span></div>
       )}
-      {p.capacity != null && (
-        <>
-          <span aria-hidden="true">·</span>
-          <span>정원 {p.capacity}명</span>
-        </>
-      )}
+    </div>
+  );
+}
+
+function ProgramStats({ p }: { p: ProgramRow }) {
+  return (
+    <div className="flex gap-3 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+      <span>참여 <strong className="text-slate-700">{programCount(p.participants_count)}</strong>명</span>
+      <span>차시 <strong className="text-slate-700">{programCount(p.sessions_count)}</strong>개</span>
+      {p.project && <span>· {p.project.name}</span>}
     </div>
   );
 }
@@ -97,13 +106,14 @@ function ProgramListItem({ p, onInvite }: { p: ProgramRow; onInvite: (p: Program
   return (
     <li className="bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition">
       <Link to={`/programs/${p.id}`} className="flex items-start gap-3 p-4">
-        <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex-1 min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
             <span className={`${BADGE_BASE} ${PROGRAM_STATUS_STYLE[p.status]}`}>{p.status}</span>
             <span className={`${BADGE_BASE} ${PROGRAM_TYPE_STYLE[p.type]}`}>{p.type}</span>
           </div>
           <ProgramMeta p={p} />
+          <ProgramStats p={p} />
         </div>
         <InviteButton onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInvite(p); }} />
       </Link>
@@ -127,9 +137,10 @@ function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow)
         <CardContent className="space-y-2">
           <ProgramMeta p={p} />
           {p.description && (
-            <p className="text-xs text-muted line-clamp-2">{p.description}</p>
+            <p className="text-xs text-slate-500 line-clamp-2 pt-2 border-t border-slate-100">{p.description}</p>
           )}
-          <div className="pt-2 border-t border-slate-100 flex justify-end">
+          <ProgramStats p={p} />
+          <div className="flex justify-end">
             <InviteButton onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInvite(p); }} />
           </div>
         </CardContent>

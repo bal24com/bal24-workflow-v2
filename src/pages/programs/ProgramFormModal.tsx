@@ -13,8 +13,13 @@ import ProgramApplicationFields, { validateApplication } from './ProgramApplicat
 import ProgramOrgFields, { EMPTY_ORG_VALUES, type ProgramOrgValues } from './ProgramOrgFields';
 import ProgramVisibilityField, { type ProgramVisibility } from './ProgramVisibilityField';
 import ProgramAutofillSection from './ProgramAutofillSection';
+import ProgramDescriptionField from './ProgramDescriptionField';
 import ProgramTypeSelector from './ProgramTypeSelector';
-import { applyExtractedProgram, type ExtractedProgram, type ExtractedProgramType } from '../../lib/programAutoFill';
+import {
+  applyExtractedProgram, insertPendingSessions,
+  type ExtractedProgram, type ExtractedProgramType, type ExtractedSession,
+} from '../../lib/programAutoFill';
+import { useToast } from '../../contexts/ToastContext';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
 
 /** program_type(14종 영문) → 기존 programs.type(4종 한글) 매핑 — type 컬럼 NOT NULL 호환용 */
@@ -34,6 +39,7 @@ type Props = {
 };
 
 export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [programType, setProgramType] = useState<ExtendedProgramType>('education');
   const [status, setStatus] = useState<ProgramStatus>('준비');
@@ -48,6 +54,8 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   const [description, setDescription] = useState('');
   // STEP-PROGRAM-BUNDLE — 기관·부서·교육대상·정원 (분리 컴포넌트)
   const [orgValues, setOrgValues] = useState<ProgramOrgValues>(EMPTY_ORG_VALUES);
+  // STEP-PROGRAM-DASHBOARD — AI 추출 차시 (저장 시 program_curriculum bulk INSERT)
+  const [pendingSessions, setPendingSessions] = useState<ExtractedSession[]>([]);
   const [visibility, setVisibility] = useState<ProgramVisibility>('internal');
   // STEP-PROGRAM-CREATION-WIZARD — 신청·지원금 6 필드
   const [applicationType, setApplicationType] = useState<'open' | 'evaluation'>('open');
@@ -112,6 +120,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     setCapacity('');
     setDescription('');
     setOrgValues(EMPTY_ORG_VALUES);
+    setPendingSessions([]);
     setVisibility('internal');
     setApplicationType('open');
     setApplicationStartDate('');
@@ -132,6 +141,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
       targetAudience:  patch.target_audience   ?? p.targetAudience,
       maxParticipants: patch.max_participants != null ? String(patch.max_participants) : p.maxParticipants,
     })),
+    setPendingSessions,
   });
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -166,7 +176,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
       const parsedMaxParticipants = orgValues.maxParticipants.trim()
         ? Number(orgValues.maxParticipants.replace(/,/g, ''))
         : null;
-      const { error } = await supabase.from('programs').insert({
+      const { data: createdProgram, error } = await supabase.from('programs').insert({
         project_id: projectId || null,
         consortium_id: consortiumId || null,
         name: name.trim(),
@@ -193,9 +203,18 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
         max_applicants: applicationType === 'evaluation' ? parsedMaxApplicants : null,
         grant_enabled: grantEnabled,
         grant_budget: parsedGrantBudget,
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // STEP-PROGRAM-DASHBOARD — AI 추출 차시 자동 등록
+      if (pendingSessions.length > 0 && createdProgram?.id) {
+        const r = await insertPendingSessions(createdProgram.id, pendingSessions);
+        if (!r.ok) toast.error('프로그램은 등록됐지만 차시 자동 등록에 실패했어요. 직접 추가해 주세요.');
+        else toast.success(`프로그램과 차시 ${pendingSessions.length}개가 등록됐어요.`);
+      } else {
+        toast.success('프로그램이 등록됐어요.');
+      }
 
       onCreated();
       onClose();
@@ -359,33 +378,16 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
 
         {/* STEP-PROGRAM-CREATION-WIZARD — 신청·지원금 (별도 컴포넌트) */}
         <ProgramApplicationFields
-          applicationType={applicationType}
-          setApplicationType={setApplicationType}
-          applicationStartDate={applicationStartDate}
-          setApplicationStartDate={setApplicationStartDate}
-          applicationEndDate={applicationEndDate}
-          setApplicationEndDate={setApplicationEndDate}
-          maxApplicants={maxApplicants}
-          setMaxApplicants={setMaxApplicants}
-          grantEnabled={grantEnabled}
-          setGrantEnabled={setGrantEnabled}
-          grantBudget={grantBudget}
-          setGrantBudget={setGrantBudget}
+          applicationType={applicationType} setApplicationType={setApplicationType}
+          applicationStartDate={applicationStartDate} setApplicationStartDate={setApplicationStartDate}
+          applicationEndDate={applicationEndDate} setApplicationEndDate={setApplicationEndDate}
+          maxApplicants={maxApplicants} setMaxApplicants={setMaxApplicants}
+          grantEnabled={grantEnabled} setGrantEnabled={setGrantEnabled}
+          grantBudget={grantBudget} setGrantBudget={setGrantBudget}
           submitting={submitting}
         />
 
-        <div className="space-y-1.5">
-          <label htmlFor="program-desc" className="text-sm font-semibold text-slate-700">설명</label>
-          <textarea
-            id="program-desc"
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={submitting}
-            placeholder="프로그램 개요·목표·진행 방식 등"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 resize-none"
-          />
-        </div>
+        <ProgramDescriptionField value={description} onChange={setDescription} disabled={submitting} />
         {errorMsg && (
           <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-2.5 text-sm text-danger">
             {errorMsg}

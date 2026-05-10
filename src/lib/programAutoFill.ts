@@ -3,6 +3,7 @@
 
 import { callAi, callAiWithFile } from './aiClient';
 import { fileToText, classifyFile } from './fileToText';
+import { supabase } from './supabase';
 
 export type ExtractedProgramType = 'education' | 'mentoring' | 'event' | 'report';
 
@@ -160,6 +161,8 @@ export interface ProgramAutoFillTarget {
   setVenue: (v: string) => void;
   setProgramType: (v: ExtractedProgramType) => void;
   setOrg: (patch: { client_org?: string; department?: string; target_audience?: string; max_participants?: number }) => void;
+  /** STEP-PROGRAM-DASHBOARD — AI 추출 차시 보관 (저장 시 program_curriculum bulk INSERT) */
+  setPendingSessions?: (sessions: ExtractedSession[]) => void;
 }
 
 export function applyExtractedProgram(prog: ExtractedProgram, target: ProgramAutoFillTarget): number {
@@ -176,5 +179,30 @@ export function applyExtractedProgram(prog: ExtractedProgram, target: ProgramAut
   if (prog.target_audience)    { orgPatch.target_audience = prog.target_audience;   count += 1; }
   if (prog.max_participants != null) { orgPatch.max_participants = prog.max_participants; count += 1; }
   if (Object.keys(orgPatch).length > 0) target.setOrg(orgPatch);
+  if (prog.sessions && prog.sessions.length > 0) {
+    target.setPendingSessions?.(prog.sessions);
+    count += prog.sessions.length;
+  }
   return count;
+}
+
+/** STEP-PROGRAM-DASHBOARD — AI 추출 차시를 program_curriculum 에 bulk INSERT */
+export async function insertPendingSessions(
+  programId: string, sessions: ExtractedSession[],
+): Promise<{ ok: boolean; error?: string }> {
+  if (sessions.length === 0) return { ok: true };
+  const rows = sessions.map((s, idx) => ({
+    program_id: programId,
+    session_no: idx + 1,
+    title: s.title || `${idx + 1}차시`,
+    day_label: s.day_label ?? null,
+    start_time: s.start_time ?? null,
+    end_time: s.end_time ?? null,
+  }));
+  const { error } = await supabase.from('program_curriculum').insert(rows);
+  if (error) {
+    console.error('[program-autofill] 차시 bulk INSERT 실패:', error.message);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
 }

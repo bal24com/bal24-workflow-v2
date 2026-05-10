@@ -16,6 +16,7 @@ export default function ProgramAutofillSection({ onApply, disabled }: Props) {
   const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [running, setRunning] = useState(false);
+  const [extractedSessions, setExtractedSessions] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleRun() {
@@ -24,10 +25,14 @@ export default function ProgramAutofillSection({ onApply, disabled }: Props) {
     try {
       const prog = await extractProgramFromFile(file);
       const count = onApply(prog);
-      if (count > 0) {
-        toast.success(`${count}개 항목을 자동으로 채웠어요.`);
-      } else {
+      const sessionCount = prog.sessions?.length ?? 0;
+      setExtractedSessions(sessionCount);
+      if (count === 0) {
         toast.error('자동채우기에 실패했어요. 직접 입력해 주세요.');
+      } else if (sessionCount > 0) {
+        toast.success(`${count - sessionCount}개 항목과 차시 ${sessionCount}개를 채웠어요. 저장 시 함께 등록돼요.`);
+      } else {
+        toast.success(`${count}개 항목을 자동으로 채웠어요.`);
       }
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
@@ -83,6 +88,15 @@ export default function ProgramAutofillSection({ onApply, disabled }: Props) {
           {running ? '문서 분석 중…' : 'AI 자동채우기'}
         </button>
       </div>
+
+      {extractedSessions > 0 && (
+        <div className="flex items-center gap-1.5 pt-1">
+          <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-semibold">
+            📋 차시 {extractedSessions}개 자동 추출됨
+          </span>
+          <span className="text-xs text-slate-500">저장 시 함께 등록돼요</span>
+        </div>
+      )}
     </section>
   );
 }

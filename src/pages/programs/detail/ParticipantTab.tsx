@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Plus, Loader2, Copy, Trash2, CheckCircle2, FileUp, Search,
+  Plus, Loader2, Copy, Trash2, CheckCircle2, FileUp, Search, FileText,
 } from 'lucide-react';
 import { Modal, Button, Input } from '../../../components/ui';
+import ParticipantDocImportModal from './ParticipantDocImportModal';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import {
@@ -37,6 +38,7 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [docOpen, setDocOpen] = useState(false);
   const [form, setForm] = useState<AddForm>(EMPTY_FORM);
   const [adding, setAdding] = useState(false);
   const [csvText, setCsvText] = useState('');
@@ -201,6 +203,9 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
               <Button variant="outline" size="sm" leftIcon={<FileUp size={14} />} onClick={() => setBulkOpen(true)}>
                 CSV 일괄 등록
               </Button>
+              <Button variant="outline" size="sm" leftIcon={<FileText size={14} />} onClick={() => setDocOpen(true)}>
+                문서로 등록
+              </Button>
             </>
           )}
         </div>
@@ -332,6 +337,13 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
           )}
         </div>
       </Modal>
+
+      <ParticipantDocImportModal
+        open={docOpen}
+        programId={programId}
+        onSuccess={() => void reload()}
+        onClose={() => setDocOpen(false)}
+      />
     </div>
   );
 }
