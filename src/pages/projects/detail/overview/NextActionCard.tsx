@@ -10,7 +10,7 @@ import type { ProjectStatus } from '../../../../types/database';
 const STAGE_TIPS: Record<ProjectStatus, string[]> = {
   제안: [
     '계약 전 영업·제안서 작성 단계',
-    '거래처 정보·담당자 등록 (고객사 메뉴)',
+    '주관기관 정보·담당자 등록 (고객사 메뉴)',
     '제안서·견적서 초안 준비',
     '담당자(PM)·참여 인력 가배정',
   ],

@@ -198,7 +198,7 @@ export default function ConFinanceTab({ consortiumId, totalBudget, members }: Pr
                 <tr>
                   <th className="text-left px-3 py-2 font-semibold">날짜</th>
                   <th className="text-left px-3 py-2 font-semibold">계정과목</th>
-                  <th className="text-left px-3 py-2 font-semibold">거래처</th>
+                  <th className="text-left px-3 py-2 font-semibold">주관기관</th>
                   <th className="text-right px-3 py-2 font-semibold">금액</th>
                   <th className="text-left px-3 py-2 font-semibold">비고</th>
                 </tr>

@@ -268,7 +268,7 @@ function ExpenditureSection({
               <tr>
                 <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">지출일</th>
                 <th className="text-left px-3 py-2.5 font-semibold">항목명</th>
-                <th className="text-left px-3 py-2.5 font-semibold">거래처</th>
+                <th className="text-left px-3 py-2.5 font-semibold">주관기관</th>
                 <th className="text-center px-3 py-2.5 font-semibold">구분</th>
                 <th className="text-right px-3 py-2.5 font-semibold">금액</th>
                 <th className="text-center px-3 py-2.5 font-semibold">서류</th>

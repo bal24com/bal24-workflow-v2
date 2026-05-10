@@ -257,8 +257,8 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               >
                 <option value="client">고객사</option>
-                <option value="vendor">거래처</option>
-                <option value="both">고객사 + 거래처</option>
+                <option value="vendor">주관기관</option>
+                <option value="both">고객사 + 주관기관</option>
               </select>
             </div>
           </div>

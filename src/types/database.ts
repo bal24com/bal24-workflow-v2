@@ -61,7 +61,7 @@ export interface Profile {
   updated_at: string;
 }
 
-// ─── 거래처 ───────────────────────────────────────────
+// ─── 주관기관 ───────────────────────────────────────────
 export interface Client {
   id: string;
   name: string;

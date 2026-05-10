@@ -94,10 +94,10 @@ export function translateClientError(raw: string, ctx: 'upload' | 'insert' | 'co
     return '담당자 테이블이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.';
   }
   if (m.includes('column') && m.includes('does not exist')) {
-    return '거래처 테이블 컬럼이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.';
+    return '주관기관 테이블 컬럼이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.';
   }
   if (m.includes('row-level security') || m.includes('permission denied')) return '저장 권한이 없어요. 관리자에게 문의해 주세요.';
   return ctx === 'contact'
     ? '담당자 저장 중 오류가 발생했어요. (고객사는 등록되었어요)'
-    : '거래처 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
+    : '주관기관 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }

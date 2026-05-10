@@ -45,7 +45,7 @@ export default function AuditExpenditureCard({ index, exp, comment, onCommentCha
           </div>
           <p className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
             <span>지출일 <span className="font-semibold text-[#1E1B4B] tabular-nums">{formatDateKo(exp.expenditure_date)}</span></span>
-            {exp.vendor_name && <span>거래처 <span className="font-semibold text-[#1E1B4B]">{exp.vendor_name}</span></span>}
+            {exp.vendor_name && <span>주관기관 <span className="font-semibold text-[#1E1B4B]">{exp.vendor_name}</span></span>}
             {exp.account_code && <span>비목 <span className="font-semibold text-[#1E1B4B]">{exp.account_code}</span></span>}
           </p>
         </div>

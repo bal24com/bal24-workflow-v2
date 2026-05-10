@@ -28,8 +28,8 @@ interface Props {
 
 const TYPE_BADGE: Record<string, { bg: string; text: string; label: string }> = {
   client: { bg: 'bg-violet-100', text: 'text-violet-700', label: '고객사' },
-  vendor: { bg: 'bg-orange-100', text: 'text-orange-700', label: '거래처' },
-  both: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: '고객·거래처' },
+  vendor: { bg: 'bg-orange-100', text: 'text-orange-700', label: '주관기관' },
+  both: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: '고객·주관기관' },
 };
 
 function formatBusinessNumber(raw?: string | null): string {

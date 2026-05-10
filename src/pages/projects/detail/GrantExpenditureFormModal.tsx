@@ -1,5 +1,5 @@
 // bal24 v2 — STEP-GRANT-LEDGER 지출증빙 등록/수정 모달
-// 기본정보·거래처·증빙서류 6종(필수 3 + 선택 3) 업로드.
+// 기본정보·주관기관·증빙서류 6종(필수 3 + 선택 3) 업로드.
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
@@ -51,7 +51,7 @@ export default function GrantExpenditureFormModal({
   const [accountCode, setAccountCode] = useState('');
   const [notes, setNotes] = useState('');
 
-  // 거래처
+  // 주관기관
   const [vendorName, setVendorName] = useState('');
   const [vendorBizRegNo, setVendorBizRegNo] = useState('');
   const [vendorRepName, setVendorRepName] = useState('');
@@ -213,11 +213,11 @@ export default function GrantExpenditureFormModal({
           </div>
         </section>
 
-        {/* 거래처 */}
+        {/* 주관기관 */}
         <section className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">거래처</h3>
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">주관기관</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="거래처명" value={vendorName} onChange={(e) => setVendorName(e.target.value)} disabled={submitting} />
+            <Input label="주관기관명" value={vendorName} onChange={(e) => setVendorName(e.target.value)} disabled={submitting} />
             <Input label="사업자등록번호" value={vendorBizRegNo} onChange={(e) => setVendorBizRegNo(e.target.value)} disabled={submitting} placeholder="000-00-00000" />
             <Input label="대표자명" value={vendorRepName} onChange={(e) => setVendorRepName(e.target.value)} disabled={submitting} />
             <Input label="주소" value={vendorAddress} onChange={(e) => setVendorAddress(e.target.value)} disabled={submitting} />

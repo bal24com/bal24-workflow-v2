@@ -1,5 +1,5 @@
 // bal24 v2 — 좌측 사이드바 (STEP-MENU-RESTRUCTURE)
-// 다크 슬레이트(#0F172A) 배경. 5그룹 구조로 재편 — 홈/사업/거래처·인력/재무/도구.
+// 다크 슬레이트(#0F172A) 배경. 5그룹 구조로 재편 — 홈/사업/주관기관·인력/재무/도구.
 // PARTNER 는 3그룹(홈/사업/도구), MEMBER 는 1그룹(내 사업).
 
 import { NavLink } from 'react-router-dom';
@@ -53,7 +53,7 @@ const SECTIONS: MenuSection[] = [
     ],
   },
   {
-    heading: '거래처·인력',
+    heading: '주관기관·인력',
     items: [
       { to: '/clients', label: '고객사', Icon: Briefcase },
       { to: '/experts', label: '전문가', Icon: Users },
