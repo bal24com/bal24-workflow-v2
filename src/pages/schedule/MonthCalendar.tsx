@@ -2,13 +2,15 @@
 // 6주 × 7일 grid, 오늘 강조, 다일 이벤트 시작일 텍스트 / 이후 빈 바, 공휴일 라벨
 
 import { useMemo } from 'react';
+import { Pin } from 'lucide-react';
 import { eventsOnDate, type UnifiedEvent } from './scheduleUtils';
-import { getHoliday } from '../../utils/holidays';
 
 interface Props {
   year: number;
   month: number; // 1-12
   events: UnifiedEvent[];
+  /** 정적 + DB 휴일 통합 Map (date → name) */
+  holidayMap: Map<string, string>;
   /** 빈 셀 클릭 — 신규 등록 (date pre-fill) */
   onCellClick?: (date: string) => void;
   /** 이벤트 클릭 — 분기 처리 (custom 수정 / 그 외 원본 페이지) */
@@ -84,7 +86,7 @@ function eventBorderRadius(event: UnifiedEvent, cellDate: string): string {
   return '';
 }
 
-export default function MonthCalendar({ year, month, events, onCellClick, onEventClick }: Props) {
+export default function MonthCalendar({ year, month, events, holidayMap, onCellClick, onEventClick }: Props) {
   const cells = useMemo(() => buildGrid(year, month), [year, month]);
   const todayIso = useMemo(() => {
     const d = new Date();
@@ -94,13 +96,12 @@ export default function MonthCalendar({ year, month, events, onCellClick, onEven
   return (
     <div className="rounded-2xl border border-violet-100 bg-white shadow-[0_4px_16px_rgba(124,58,237,0.06)] overflow-hidden">
       {/* 요일 헤더 */}
-      <div className="grid grid-cols-7 border-b border-slate-100">
+      <div className="grid grid-cols-7 border-b border-slate-100 bg-[#FFEDD8]">
         {WEEKDAYS.map((w, idx) => (
           <div
             key={w}
-            className={`px-3 py-2 text-center text-xs font-semibold ${
-              idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-sky-600' : 'text-slate-600'
-            }`}
+            className="px-3 py-2 text-center text-xs font-semibold"
+            style={{ color: idx === 0 ? '#F43F5E' : idx === 6 ? '#3B82F6' : '#374151' }}
           >
             {w}
           </div>
@@ -114,16 +115,21 @@ export default function MonthCalendar({ year, month, events, onCellClick, onEven
           const dayOfWeek = new Date(`${cell.date}T00:00:00`).getDay();
           const isToday = cell.date === todayIso;
           const cellEvents = eventsOnDate(events, cell.date);
-          const holidayName = getHoliday(cell.date);
+          const holidayName = holidayMap.get(cell.date) ?? null;
+          const isHoliday = Boolean(holidayName);
           // 빨간색: 일요일·공휴일 / 파란색: 토요일
-          const isRed = dayOfWeek === 0 || Boolean(holidayName);
+          const isRed = dayOfWeek === 0 || isHoliday;
           const isBlue = dayOfWeek === 6;
 
           return (
             <div
               key={cell.date}
               className={`relative flex flex-col gap-1 px-1.5 py-1.5 cursor-pointer transition-colors ${
-                cell.inMonth ? 'bg-white hover:bg-violet-50/40' : 'bg-slate-50/50 hover:bg-slate-100'
+                !cell.inMonth
+                  ? 'bg-slate-50/50 hover:bg-slate-100'
+                  : isHoliday
+                    ? 'bg-[#FEE2E2] hover:bg-rose-200/60'
+                    : 'bg-white hover:bg-violet-50/40'
               }`}
               onClick={(e) => {
                 if ((e.target as HTMLElement).closest('[data-event-chip]')) return;
@@ -137,21 +143,26 @@ export default function MonthCalendar({ year, month, events, onCellClick, onEven
                   className={
                     isToday
                       ? 'inline-flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-[11px] font-bold text-white'
-                      : `text-xs font-semibold ${
-                          !cell.inMonth
-                            ? 'text-slate-300'
+                      : 'text-xs font-semibold'
+                  }
+                  style={
+                    isToday
+                      ? undefined
+                      : {
+                          color: !cell.inMonth
+                            ? '#CBD5E1'
                             : isRed
-                              ? 'text-rose-500'
+                              ? '#F43F5E'
                               : isBlue
-                                ? 'text-sky-600'
-                                : 'text-slate-700'
-                        }`
+                                ? '#3B82F6'
+                                : '#374151',
+                        }
                   }
                 >
                   {dayNum}
                 </span>
                 {holidayName && cell.inMonth && (
-                  <span className="text-[10px] font-medium text-rose-500 truncate">{holidayName}</span>
+                  <span className="text-[10px] font-medium text-rose-600 truncate">{holidayName}</span>
                 )}
               </div>
 
@@ -169,12 +180,12 @@ export default function MonthCalendar({ year, month, events, onCellClick, onEven
                         e.stopPropagation();
                         onEventClick?.(event);
                       }}
-                      className={`${radius} truncate px-1.5 py-0.5 text-left text-[11px] font-medium text-white hover:opacity-90 transition-opacity ${
+                      className={`${radius} inline-flex items-center gap-1 truncate px-1.5 py-0.5 text-left text-[11px] font-medium text-white hover:opacity-90 transition-opacity bg-gradient-to-r from-emerald-400 to-blue-400 ${
                         isContinuation ? '-mx-1.5 px-1.5' : ''
                       }`}
-                      style={{ backgroundColor: event.color }}
                       title={event.title}
                     >
+                      {!isContinuation && <Pin size={10} className="shrink-0" aria-hidden="true" />}
                       {label || ' '}
                     </button>
                   );

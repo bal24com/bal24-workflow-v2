@@ -2,12 +2,15 @@
 // 7일 헤더 + allDay 이벤트 행 + 시간축(0~23h) + 시간 이벤트 블록
 
 import { useMemo } from 'react';
+import { Pin } from 'lucide-react';
 import { weekRange, type UnifiedEvent } from './scheduleUtils';
 
 interface Props {
   /** 주의 기준 일자 */
   baseDate: Date;
   events: UnifiedEvent[];
+  /** 정적 + DB 휴일 통합 Map (date → name) */
+  holidayMap: Map<string, string>;
   onEventClick?: (event: UnifiedEvent) => void;
   onCellClick?: (date: string, hour: number) => void;
 }
@@ -43,7 +46,7 @@ function positionEvent(event: UnifiedEvent): PositionedEvent {
   return { ...event, topPx, heightPx };
 }
 
-export default function WeekCalendar({ baseDate, events, onEventClick, onCellClick }: Props) {
+export default function WeekCalendar({ baseDate, events, holidayMap, onEventClick, onCellClick }: Props) {
   const { days } = useMemo(() => weekRange(baseDate), [baseDate]);
   const todayIso = useMemo(() => isoDate(new Date()), []);
 
@@ -88,29 +91,36 @@ export default function WeekCalendar({ baseDate, events, onEventClick, onCellCli
   return (
     <div className="rounded-2xl border border-violet-100 bg-white shadow-[0_4px_16px_rgba(124,58,237,0.06)] overflow-hidden">
       {/* 헤더 — 요일 + 날짜 */}
-      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-slate-100">
+      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-slate-100 bg-[#FFEDD8]">
         <div />
         {days.map((day, idx) => {
-          const isTodayCol = isoDate(day) === todayIso;
+          const dayIso = isoDate(day);
+          const isTodayCol = dayIso === todayIso;
+          const holidayName = holidayMap.get(dayIso) ?? null;
+          const isHoliday = Boolean(holidayName);
+          const weekdayColor = idx === 0 || isHoliday ? '#F43F5E' : idx === 6 ? '#3B82F6' : '#374151';
           return (
             <div
-              key={isoDate(day)}
-              className={`px-2 py-2 text-center ${isTodayCol ? 'bg-violet-50' : ''}`}
+              key={dayIso}
+              className={`px-2 py-2 text-center ${
+                isTodayCol ? 'bg-violet-50' : isHoliday ? 'bg-[#FEE2E2]' : ''
+              }`}
             >
               <div
-                className={`text-[10px] font-semibold ${
-                  idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-sky-600' : 'text-slate-500'
-                }`}
+                className="text-[10px] font-semibold"
+                style={{ color: weekdayColor }}
               >
                 {WEEKDAYS[idx]}
               </div>
               <div
-                className={`mt-0.5 text-sm font-bold ${
-                  isTodayCol ? 'text-violet-700' : 'text-[#1E1B4B]'
-                }`}
+                className="mt-0.5 text-sm font-bold"
+                style={{ color: isTodayCol ? '#6D28D9' : isHoliday ? '#F43F5E' : '#1E1B4B' }}
               >
                 {day.getDate()}
               </div>
+              {holidayName && (
+                <div className="text-[9px] font-medium text-rose-600 truncate">{holidayName}</div>
+              )}
             </div>
           );
         })}
@@ -131,11 +141,11 @@ export default function WeekCalendar({ baseDate, events, onEventClick, onCellCli
                   key={`${event.id}-${dayIso}`}
                   type="button"
                   onClick={() => onEventClick?.(event)}
-                  className="block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium text-white hover:opacity-90 transition-opacity"
-                  style={{ backgroundColor: event.color }}
+                  className="flex w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium text-white hover:opacity-90 transition-opacity bg-gradient-to-r from-emerald-400 to-blue-400"
                   title={event.title}
                 >
-                  {event.title}
+                  <Pin size={10} className="shrink-0" aria-hidden="true" />
+                  <span className="truncate">{event.title}</span>
                 </button>
               ))}
             </div>
@@ -186,15 +196,17 @@ export default function WeekCalendar({ baseDate, events, onEventClick, onCellCli
                     e.stopPropagation();
                     onEventClick?.(event);
                   }}
-                  className="absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-left text-[11px] font-medium text-white shadow-sm hover:opacity-90 transition-opacity overflow-hidden"
+                  className="absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-left text-[11px] font-medium text-white shadow-sm hover:opacity-90 transition-opacity overflow-hidden bg-gradient-to-r from-emerald-400 to-blue-400"
                   style={{
                     top: `${event.topPx}px`,
                     height: `${event.heightPx}px`,
-                    backgroundColor: event.color,
                   }}
                   title={event.title}
                 >
-                  <div className="truncate font-semibold">{event.title}</div>
+                  <div className="flex items-center gap-1 truncate font-semibold">
+                    <Pin size={10} className="shrink-0" aria-hidden="true" />
+                    <span className="truncate">{event.title}</span>
+                  </div>
                   {event.startTime && (
                     <div className="truncate text-[10px] opacity-90">
                       {event.startTime}

@@ -1,7 +1,7 @@
 // bal24 v2 — 일정 등록·수정 모달 (STEP 17)
 // schedule_events 테이블 INSERT / UPDATE / DELETE 처리
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Modal, Button, Input } from '../../components/ui';
@@ -34,6 +34,7 @@ interface ProjectOption {
 interface ProgramOption {
   id: string;
   name: string;
+  project_id: string | null;
 }
 
 interface Props {
@@ -127,6 +128,12 @@ export default function ScheduleEventModal({
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setForm((p) => ({ ...p, [k]: v }));
   };
+
+  // 프로젝트 선택 시 연결된 프로그램만 필터. 미선택 시 전체 노출.
+  const filteredPrograms = useMemo(() => {
+    if (!form.projectId) return programs;
+    return programs.filter((p) => p.project_id === form.projectId);
+  }, [programs, form.projectId]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -323,7 +330,10 @@ export default function ScheduleEventModal({
             <label className="text-sm font-semibold text-slate-700">연결 프로젝트 (선택)</label>
             <select
               value={form.projectId}
-              onChange={(e) => update('projectId', e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((p) => ({ ...p, projectId: v, programId: '' }));
+              }}
               disabled={busy}
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             >
@@ -345,7 +355,7 @@ export default function ScheduleEventModal({
               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             >
               <option value="">— 없음 —</option>
-              {programs.map((p) => (
+              {filteredPrograms.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>

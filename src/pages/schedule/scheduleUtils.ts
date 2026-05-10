@@ -17,7 +17,6 @@ export function isMissingTableError(message: string | null | undefined): boolean
 }
 
 export type EventSource =
-  | 'project'
   | 'task'
   | 'program'
   | 'attendance'
@@ -47,9 +46,8 @@ export interface UnifiedEvent {
   description?: string | null;
 }
 
-// 컬러 매핑 (박경수님 명세: 프로젝트 violet / 프로그램 emerald / 개인 slate / 기본 orange)
+// 컬러 매핑 (이벤트 바는 그라데이션 통일이라 SOURCE_COLOR 사용처는 필터 칩 아이콘 정도로 축소)
 export const SOURCE_COLOR: Record<EventSource, string> = {
-  project: '#7C3AED',     // violet (프로젝트)
   program: '#10B981',     // emerald (프로그램·교육)
   custom: '#64748B',      // slate (개인 일정)
   task: '#F97316',        // orange (기본·태스크)
@@ -57,7 +55,6 @@ export const SOURCE_COLOR: Record<EventSource, string> = {
 };
 
 export const SOURCE_LABEL: Record<EventSource, string> = {
-  project: '프로젝트',
   task: '태스크',
   program: '프로그램',
   attendance: '출석',
@@ -65,7 +62,6 @@ export const SOURCE_LABEL: Record<EventSource, string> = {
 };
 
 export const SOURCE_EMOJI: Record<EventSource, string> = {
-  project: '📁',
   task: '✅',
   program: '🎓',
   attendance: '📋',
@@ -117,17 +113,8 @@ function dDayBadge(dueIso: string): string {
 export async function fetchMonthEvents(year: number, month: number): Promise<UnifiedEvent[]> {
   const { startDate, endDate } = monthRange(year, month);
 
-  const [projects, tasks, programs, sessions, customs] = await Promise.all([
-    // 1) 진행 중·정산 프로젝트 (월과 기간이 겹치는 것)
-    supabase
-      .from('projects')
-      .select('id, name, start_date, end_date, status')
-      .in('status', ['진행', '정산'])
-      .not('start_date', 'is', null)
-      .not('end_date', 'is', null)
-      .lte('start_date', endDate)
-      .gte('end_date', startDate),
-    // 2) 태스크 마감일 (완료 제외)
+  const [tasks, programs, sessions, customs] = await Promise.all([
+    // 1) 태스크 마감일 (완료 제외)
     supabase
       .from('tasks')
       .select('id, project_id, title, due_date, status')
@@ -135,7 +122,7 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       .gte('due_date', startDate)
       .lte('due_date', endDate)
       .neq('status', '완료'),
-    // 3) 프로그램 기간
+    // 2) 프로그램 기간
     supabase
       .from('programs')
       .select('id, name, start_date, end_date')
@@ -143,13 +130,13 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       .not('end_date', 'is', null)
       .lte('start_date', endDate)
       .gte('end_date', startDate),
-    // 4) 출석 세션
+    // 3) 출석 세션
     supabase
       .from('attendance_sessions')
       .select('id, title, session_date, start_time, end_time, program_id')
       .gte('session_date', startDate)
       .lte('session_date', endDate),
-    // 5) 수동 등록 일정
+    // 4) 수동 등록 일정
     supabase
       .from('schedule_events')
       .select('*')
@@ -157,7 +144,6 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       .lte('event_date', endDate),
   ]);
 
-  if (projects.error) console.error('[schedule] projects 조회 실패:', projects.error.message);
   if (tasks.error) console.error('[schedule] tasks 조회 실패:', tasks.error.message);
   if (programs.error) console.error('[schedule] programs 조회 실패:', programs.error.message);
   if (sessions.error) console.error('[schedule] attendance_sessions 조회 실패:', sessions.error.message);
@@ -167,21 +153,6 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
   }
 
   const events: UnifiedEvent[] = [];
-
-  for (const p of projects.data ?? []) {
-    if (!p.start_date || !p.end_date) continue;
-    events.push({
-      id: `project-${p.id}`,
-      title: p.name,
-      date: p.start_date,
-      endDate: p.end_date,
-      allDay: true,
-      source: 'project',
-      color: SOURCE_COLOR.project,
-      relatedId: p.id,
-      relatedType: 'project',
-    });
-  }
 
   for (const t of tasks.data ?? []) {
     if (!t.due_date) continue;

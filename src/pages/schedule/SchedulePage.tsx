@@ -3,10 +3,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Plus, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Loader2, CalendarDays } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import type { ScheduleEvent } from '../../types/database';
+import { useUserProfile } from '../../hooks/useUserProfile';
+import { fetchDbHolidays, buildHolidayMap } from '../../utils/holidays';
 import {
   fetchMonthEvents,
   weekRange,
@@ -20,10 +22,11 @@ import MonthCalendar from './MonthCalendar';
 import WeekCalendar from './WeekCalendar';
 import ScheduleEventCard from './ScheduleEventCard';
 import ScheduleEventModal from './ScheduleEventModal';
+import HolidayManageModal from './HolidayManageModal';
 
 type ViewMode = 'month' | 'week' | 'list';
 
-const ALL_SOURCES: EventSource[] = ['project', 'task', 'program', 'attendance', 'custom'];
+const ALL_SOURCES: EventSource[] = ['task', 'program', 'attendance', 'custom'];
 
 interface ProjectOption {
   id: string;
@@ -33,10 +36,12 @@ interface ProjectOption {
 interface ProgramOption {
   id: string;
   name: string;
+  project_id: string | null;
 }
 
 export default function SchedulePage() {
   const navigate = useNavigate();
+  const { isPM } = useUserProfile();
   const today = useMemo(() => new Date(), []);
 
   const [view, setView] = useState<ViewMode>('month');
@@ -55,19 +60,31 @@ export default function SchedulePage() {
   const [modalDefaultDate, setModalDefaultDate] = useState<string | undefined>(undefined);
   const [modalEditTarget, setModalEditTarget] = useState<ScheduleEvent | null>(null);
 
+  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [holidayMap, setHolidayMap] = useState<Map<string, string>>(() => buildHolidayMap([]));
+
+  const reloadHolidays = useCallback(async () => {
+    const db = await fetchDbHolidays();
+    setHolidayMap(buildHolidayMap(db));
+  }, []);
+
+  useEffect(() => {
+    void reloadHolidays();
+  }, [reloadHolidays]);
+
   // 프로젝트·프로그램 옵션 한 번만 로드
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const [pRes, gRes] = await Promise.all([
         supabase.from('projects').select('id, name').order('created_at', { ascending: false }),
-        supabase.from('programs').select('id, name').order('created_at', { ascending: false }),
+        supabase.from('programs').select('id, name, project_id').order('created_at', { ascending: false }),
       ]);
       if (cancelled) return;
       if (pRes.error) console.error('[schedule] projects 옵션 조회 실패:', pRes.error.message);
       if (gRes.error) console.error('[schedule] programs 옵션 조회 실패:', gRes.error.message);
       setProjects(pRes.data ?? []);
-      setPrograms(gRes.data ?? []);
+      setPrograms((gRes.data ?? []) as ProgramOption[]);
     })();
     return () => {
       cancelled = true;
@@ -172,9 +189,6 @@ export default function SchedulePage() {
 
   const handleEventClick = (event: UnifiedEvent) => {
     switch (event.source) {
-      case 'project':
-        if (event.relatedId) navigate(`/projects/${event.relatedId}`);
-        break;
       case 'task':
         // task의 relatedId 는 project_id 로 매핑됨 (없으면 task id)
         if (event.relatedId) navigate(`/projects/${event.relatedId}`);
@@ -228,6 +242,12 @@ export default function SchedulePage() {
             ))}
           </div>
 
+          {isPM && (
+            <Button variant="outline" onClick={() => setHolidayModalOpen(true)}>
+              <CalendarDays size={16} className="mr-1.5" aria-hidden="true" />
+              휴일 관리
+            </Button>
+          )}
           <Button variant="primary" onClick={() => openCreate()}>
             <Plus size={16} className="mr-1.5" aria-hidden="true" />
             일정 추가
@@ -294,6 +314,7 @@ export default function SchedulePage() {
           year={year}
           month={month}
           events={filteredEvents}
+          holidayMap={holidayMap}
           onCellClick={(date) => openCreate(date)}
           onEventClick={handleEventClick}
         />
@@ -301,6 +322,7 @@ export default function SchedulePage() {
         <WeekCalendar
           baseDate={weekBase}
           events={filteredEvents}
+          holidayMap={holidayMap}
           onEventClick={handleEventClick}
           onCellClick={(date) => openCreate(date)}
         />
@@ -328,6 +350,12 @@ export default function SchedulePage() {
         onSaved={() => {
           void reload();
         }}
+      />
+
+      <HolidayManageModal
+        open={holidayModalOpen}
+        onClose={() => setHolidayModalOpen(false)}
+        onChanged={() => void reloadHolidays()}
       />
     </div>
   );
