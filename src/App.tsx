@@ -53,6 +53,7 @@ import MyPage from './pages/mypage/MyPage';
 import PartnerHomePage from './pages/partner/PartnerHomePage';
 import MemberInvitePage from './pages/invite/MemberInvitePage';
 import EvaluatePage from './pages/evaluate/EvaluatePage';
+import MyReportPage from './pages/my-report/MyReportPage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
@@ -169,6 +170,9 @@ export default function App() {
 
           {/* 멘토링 — PARTNER 본인 배정 뷰 (STEP-MENTORING) */}
           <Route path="/mentoring" element={<MentoringPartnerView />} />
+
+          {/* MEMBER 사업보고 (STEP-MEMBER-INVITE-REPORT placeholder) */}
+          <Route path="/my-report" element={<MyReportPage />} />
 
           {/* 기타 */}
           <Route path="/members" element={<MembersPage />} />

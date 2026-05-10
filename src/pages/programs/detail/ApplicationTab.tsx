@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, CheckCircle2, XCircle, Clock, Trophy, Users2,
+  Loader2, CheckCircle2, XCircle, Clock, Trophy, Users2, UserPlus, Mail,
 } from 'lucide-react';
 import { Button } from '../../../components/ui';
 import EmptyState from '../../../components/EmptyState';
@@ -43,6 +43,9 @@ export default function ApplicationTab({ programId }: Props) {
   const [scores, setScores] = useState<Map<string, { avg: number; count: number }>>(new Map());
   const [isEvaluation, setIsEvaluation] = useState(false);
   const [maxApplicants, setMaxApplicants] = useState<number | null>(null);
+  // STEP-MEMBER-INVITE-REPORT — 합격자 MEMBER 초대 상태 관리
+  const [invitedEmails, setInvitedEmails] = useState<Set<string>>(new Set());
+  const [invitingId, setInvitingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -64,6 +67,21 @@ export default function ApplicationTab({ programId }: Props) {
       setScores(map);
     } else {
       setScores(new Map());
+    }
+    // STEP-MEMBER-INVITE-REPORT — 합격자 이메일로 member_invitations 일괄 조회
+    const acceptedEmails = list
+      .filter((a) => a.status === 'accepted' && !!a.email)
+      .map((a) => (a.email as string).toLowerCase());
+    if (acceptedEmails.length > 0) {
+      const { data: invs, error: invErr } = await supabase
+        .from('member_invitations')
+        .select('email')
+        .in('email', acceptedEmails)
+        .is('deleted_at', null);
+      if (invErr) console.error('[member-invite] 초대 목록 조회 실패:', invErr.message);
+      setInvitedEmails(new Set(((invs ?? []) as { email: string }[]).map((r) => r.email.toLowerCase())));
+    } else {
+      setInvitedEmails(new Set());
     }
     setSelectedIds(new Set());
     setLoading(false);
@@ -115,6 +133,69 @@ export default function ApplicationTab({ programId }: Props) {
       return next;
     });
   };
+
+  // STEP-MEMBER-INVITE-REPORT — 합격자 MEMBER 초대
+  async function inviteAsMember(app: ParticipantApplication) {
+    if (!app.email) {
+      toast.error('신청 시 이메일이 입력되지 않아 초대할 수 없어요.');
+      return;
+    }
+    const email = app.email.trim().toLowerCase();
+    setInvitingId(app.id);
+    try {
+      // 1) 중복 확인
+      const { data: existing, error: existErr } = await supabase
+        .from('member_invitations')
+        .select('id, status')
+        .eq('email', email)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (existErr) {
+        console.error('[member-invite] 중복 확인 실패:', existErr.message);
+        toast.error('초대 확인 중 오류가 발생했어요.');
+        return;
+      }
+      if (existing) {
+        toast.error('이미 초대가 발송된 이메일이에요.');
+        setInvitedEmails((p) => new Set(p).add(email));
+        return;
+      }
+      // 2) member_invitations INSERT
+      const { data: inv, error: invErr } = await supabase
+        .from('member_invitations')
+        .insert({
+          email,
+          role: 'member',
+          invited_by: user?.id ?? null,
+        })
+        .select('id, token')
+        .single();
+      if (invErr || !inv) {
+        const m = invErr?.message?.toLowerCase() ?? '';
+        console.error('[member-invite] INSERT 실패:', invErr?.message);
+        if (m.includes('row-level security') || m.includes('permission')) {
+          toast.error('초대 권한이 없어요. ADMIN 만 초대할 수 있어요.');
+        } else {
+          toast.error('초대 생성 중 오류가 발생했어요.');
+        }
+        return;
+      }
+      // 3) Edge Function — invitation_id 만 전달 (V2 send-invite 시그니처)
+      const row = inv as { id: string; token: string };
+      const { error: fnErr } = await supabase.functions.invoke('send-invite', {
+        body: { invitation_id: row.id },
+      });
+      if (fnErr) {
+        console.error('[member-invite] 이메일 발송 실패:', fnErr.message);
+        toast.warning(`초대는 등록됐지만 이메일 발송이 실패했어요. 직접 링크를 복사해 전달하세요: ${window.location.origin}/invite/member/${row.token}`);
+      } else {
+        toast.success(`${app.name}님께 초대 이메일을 발송했어요.`);
+      }
+      setInvitedEmails((p) => new Set(p).add(email));
+    } finally {
+      setInvitingId(null);
+    }
+  }
 
   async function handleSingleStatus(app: ParticipantApplication, next: ParticipantStatus) {
     setActing(true);
@@ -262,7 +343,7 @@ export default function ApplicationTab({ programId }: Props) {
                         {PARTICIPANT_STATUS_LABELS[a.status]}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-right space-x-1">
+                    <td className="px-3 py-2.5 text-right space-x-1 whitespace-nowrap">
                       {a.status === 'applied' && (
                         <button type="button" onClick={() => void handleSingleStatus(a, 'reviewing')} disabled={acting}
                           className="text-[11px] px-2 py-1 rounded-md bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50">검토 시작</button>
@@ -274,6 +355,22 @@ export default function ApplicationTab({ programId }: Props) {
                           <button type="button" onClick={() => void handleSingleStatus(a, 'rejected')} disabled={acting}
                             className="text-[11px] px-2 py-1 rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-50">탈락</button>
                         </>
+                      )}
+                      {a.status === 'accepted' && a.email && (
+                        invitedEmails.has(a.email.toLowerCase()) ? (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 px-1.5 py-0.5 rounded-md">
+                            <Mail size={10} aria-hidden="true" />
+                            초대완료
+                          </span>
+                        ) : (
+                          <button type="button"
+                            onClick={() => void inviteAsMember(a)}
+                            disabled={invitingId !== null}
+                            className="inline-flex items-center gap-0.5 text-[11px] px-2 py-1 rounded-md border border-violet-200 text-violet-700 hover:bg-violet-50 disabled:opacity-50">
+                            {invitingId === a.id ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : <UserPlus size={11} aria-hidden="true" />}
+                            MEMBER 초대
+                          </button>
+                        )
                       )}
                     </td>
                   </tr>
