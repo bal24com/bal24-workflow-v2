@@ -3,7 +3,16 @@
 
 import { useMemo } from 'react';
 import { Pin } from 'lucide-react';
-import { eventsOnDate, type UnifiedEvent } from './scheduleUtils';
+import { eventsOnDate, type EventSource, type UnifiedEvent } from './scheduleUtils';
+
+// STEP-UX-FIXES — source별 이벤트 바 색상 (project=indigo 배경 / 그 외 단색)
+const SOURCE_BAR_CLASS: Record<EventSource, string> = {
+  project:    'bg-indigo-100 text-indigo-800 border border-indigo-200 hover:bg-indigo-200',
+  program:    'bg-emerald-500 text-white hover:bg-emerald-600',
+  task:       'bg-orange-500 text-white hover:bg-orange-600',
+  attendance: 'bg-amber-500 text-white hover:bg-amber-600',
+  custom:     'bg-slate-500 text-white hover:bg-slate-600',
+};
 
 interface Props {
   year: number;
@@ -180,7 +189,7 @@ export default function MonthCalendar({ year, month, events, holidayMap, onCellC
                         e.stopPropagation();
                         onEventClick?.(event);
                       }}
-                      className={`${radius} inline-flex items-center gap-1 truncate px-1.5 py-0.5 text-left text-[11px] font-medium text-white hover:opacity-90 transition-opacity bg-gradient-to-r from-emerald-400 to-blue-400 ${
+                      className={`${radius} ${SOURCE_BAR_CLASS[event.source] ?? SOURCE_BAR_CLASS.custom} inline-flex items-center gap-1 truncate px-1.5 min-h-[20px] text-left text-[11px] font-medium hover:shadow-sm transition-all ${
                         isContinuation ? '-mx-1.5 px-1.5' : ''
                       }`}
                       title={event.title}

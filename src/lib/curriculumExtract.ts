@@ -60,8 +60,10 @@ function safeParse(raw: string): ExtractedSession[] {
 /** 문서 → 커리큘럼 차시 배열 (PDF/이미지 멀티모달, 그 외 fileToText) */
 export async function extractSessionsFromDocument(file: File): Promise<ExtractedSession[]> {
   const kind = classifyFile(file);
+  // STEP-UX-FIXES — PDF·이미지·unknown 모두 멀티모달 경로(callAiWithFile)로
+  const isMultimodal = kind === 'pdf' || kind === 'image' || kind === 'unknown';
   try {
-    if (kind !== 'unknown') {
+    if (!isMultimodal) {
       const doc = await fileToText(file);
       if (!doc?.text) return [];
       const trimmed = trimText(doc.text);

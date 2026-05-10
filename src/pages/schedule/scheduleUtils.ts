@@ -17,6 +17,7 @@ export function isMissingTableError(message: string | null | undefined): boolean
 }
 
 export type EventSource =
+  | 'project'    // STEP-UX-FIXES — 프로젝트 기간 (배경 바)
   | 'task'
   | 'program'
   | 'attendance'
@@ -48,13 +49,15 @@ export interface UnifiedEvent {
 
 // 컬러 매핑 (이벤트 바는 그라데이션 통일이라 SOURCE_COLOR 사용처는 필터 칩 아이콘 정도로 축소)
 export const SOURCE_COLOR: Record<EventSource, string> = {
+  project: '#6366F1',     // indigo (프로젝트 기간 배경 바)
   program: '#10B981',     // emerald (프로그램·교육)
   custom: '#64748B',      // slate (개인 일정)
   task: '#F97316',        // orange (기본·태스크)
-  attendance: '#F59E0B',  // amber (출석 — orange 계열 약간 차별)
+  attendance: '#F59E0B',  // amber (출석)
 };
 
 export const SOURCE_LABEL: Record<EventSource, string> = {
+  project: '프로젝트',
   task: '태스크',
   program: '프로그램',
   attendance: '출석',
@@ -62,9 +65,10 @@ export const SOURCE_LABEL: Record<EventSource, string> = {
 };
 
 export const SOURCE_EMOJI: Record<EventSource, string> = {
+  project: '📋',
   task: '✅',
   program: '🎓',
-  attendance: '📋',
+  attendance: '📍',
   custom: '📌',
 };
 
@@ -113,7 +117,15 @@ function dDayBadge(dueIso: string): string {
 export async function fetchMonthEvents(year: number, month: number): Promise<UnifiedEvent[]> {
   const { startDate, endDate } = monthRange(year, month);
 
-  const [tasks, programs, sessions, customs] = await Promise.all([
+  const [projects, tasks, programs, sessions, customs] = await Promise.all([
+    // 0) 프로젝트 기간 (STEP-UX-FIXES — 배경 바로 표시)
+    supabase
+      .from('projects')
+      .select('id, name, start_date, end_date')
+      .not('start_date', 'is', null)
+      .not('end_date', 'is', null)
+      .lte('start_date', endDate)
+      .gte('end_date', startDate),
     // 1) 태스크 마감일 (완료 제외)
     supabase
       .from('tasks')
@@ -144,6 +156,7 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       .lte('event_date', endDate),
   ]);
 
+  if (projects.error) console.error('[schedule] projects 조회 실패:', projects.error.message);
   if (tasks.error) console.error('[schedule] tasks 조회 실패:', tasks.error.message);
   if (programs.error) console.error('[schedule] programs 조회 실패:', programs.error.message);
   if (sessions.error) console.error('[schedule] attendance_sessions 조회 실패:', sessions.error.message);
@@ -153,6 +166,21 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
   }
 
   const events: UnifiedEvent[] = [];
+
+  for (const p of projects.data ?? []) {
+    if (!p.start_date || !p.end_date) continue;
+    events.push({
+      id: `project-${p.id}`,
+      title: p.name,
+      date: p.start_date,
+      endDate: p.end_date,
+      allDay: true,
+      source: 'project',
+      color: SOURCE_COLOR.project,
+      relatedId: p.id,
+      relatedType: 'project',
+    });
+  }
 
   for (const t of tasks.data ?? []) {
     if (!t.due_date) continue;

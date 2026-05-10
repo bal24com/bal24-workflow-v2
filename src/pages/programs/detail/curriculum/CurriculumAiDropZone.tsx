@@ -26,7 +26,7 @@ interface DraftSession extends ExtractedSession {
   mentorMatches: Record<string, MatchedInstructor>;
 }
 
-const ACCEPT = '.pdf,.docx,.pptx,.png,.jpg,.jpeg,.xlsx,.csv,.txt';
+const ACCEPT = '.pdf,.docx,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.webp';
 
 function emptyDraft(s: ExtractedSession): DraftSession {
   return {
@@ -172,7 +172,7 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
             ) : (
               <>
                 <p className="text-xs text-slate-700 font-semibold">파일을 여기에 드래그하면 AI가 차시 + 강사·멘토 자동 추출</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">클릭해서 파일 선택도 가능 · PDF·이미지·DOCX·XLSX 지원</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">PDF • DOCX • XLSX • CSV • TXT • 이미지 지원</p>
               </>
             )}
           </div>

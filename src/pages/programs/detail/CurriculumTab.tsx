@@ -10,6 +10,7 @@ import CurriculumRow from './curriculum/CurriculumRow';
 import SaveTemplateModal from './curriculum/SaveTemplateModal';
 import LoadTemplateModal from './curriculum/LoadTemplateModal';
 import AiCurriculumModal from './curriculum/AiCurriculumModal';
+import CurriculumAiDropZone from './curriculum/CurriculumAiDropZone';
 import CurriculumStaffSection from './curriculum/CurriculumStaffSection';
 import InvitationManagePanel from '../InvitationManagePanel';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
@@ -232,13 +233,20 @@ export default function CurriculumTab({ programId, programName }: Props) {
         </div>
       </header>
 
+      {/* STEP-UX-FIXES — AI 드롭존 최상단 (PDF·이미지·DOCX·XLSX 등) */}
+      <CurriculumAiDropZone
+        programId={programId}
+        lastSessionNo={items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0)}
+        onSessionsInserted={() => void refresh()}
+      />
+
       {loading ? (
         <div className="flex justify-center py-10">
           <Loader2 className="animate-spin text-violet-400" size={20} aria-hidden="true" />
         </div>
       ) : items.length === 0 ? (
         <p className="text-sm text-slate-400 italic text-center py-8">
-          등록된 차시가 없어요. "차시 추가"로 시작하세요.
+          등록된 차시가 없어요. 위 드롭존에서 AI 추출을 시작하거나 "차시 추가" 버튼을 눌러 주세요.
         </p>
       ) : (
         <>

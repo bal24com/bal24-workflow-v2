@@ -21,12 +21,13 @@ import {
 import MonthCalendar from './MonthCalendar';
 import WeekCalendar from './WeekCalendar';
 import ScheduleEventCard from './ScheduleEventCard';
+import ScheduleEventList from './ScheduleEventList';
 import ScheduleEventModal from './ScheduleEventModal';
 import HolidayManageModal from './HolidayManageModal';
 
 type ViewMode = 'month' | 'week' | 'list';
 
-const ALL_SOURCES: EventSource[] = ['task', 'program', 'attendance', 'custom'];
+const ALL_SOURCES: EventSource[] = ['project', 'program', 'task', 'attendance', 'custom'];
 
 interface ProjectOption {
   id: string;
@@ -189,12 +190,17 @@ export default function SchedulePage() {
 
   const handleEventClick = (event: UnifiedEvent) => {
     switch (event.source) {
+      case 'project':
+        // STEP-UX-FIXES — 프로젝트 바 클릭 → 해당 프로젝트 상세
+        if (event.relatedId) navigate(`/projects/${event.relatedId}`);
+        break;
       case 'task':
         // task의 relatedId 는 project_id 로 매핑됨 (없으면 task id)
         if (event.relatedId) navigate(`/projects/${event.relatedId}`);
         break;
       case 'program':
-        navigate('/programs');
+        if (event.relatedId) navigate(`/programs/${event.relatedId}`);
+        else navigate('/programs');
         break;
       case 'attendance':
         if (event.relatedId) navigate(`/attendance/${event.relatedId}`);
@@ -262,20 +268,20 @@ export default function SchedulePage() {
             type="button"
             onClick={handlePrev}
             aria-label="이전"
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700 transition-colors"
+            className="rounded-lg p-2 text-slate-500 hover:bg-violet-50 hover:text-violet-700 transition-colors"
           >
-            <ChevronLeft size={20} aria-hidden="true" />
+            <ChevronLeft size={24} aria-hidden="true" />
           </button>
-          <div className="text-base font-bold text-[#1E1B4B] min-w-[180px] text-center">
+          <div className="text-lg font-bold text-[#1E1B4B] min-w-[200px] text-center">
             {headerTitle}
           </div>
           <button
             type="button"
             onClick={handleNext}
             aria-label="다음"
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700 transition-colors"
+            className="rounded-lg p-2 text-slate-500 hover:bg-violet-50 hover:text-violet-700 transition-colors"
           >
-            <ChevronRight size={20} aria-hidden="true" />
+            <ChevronRight size={24} aria-hidden="true" />
           </button>
           <Button variant="outline" onClick={handleToday} className="ml-1">
             오늘
@@ -310,14 +316,23 @@ export default function SchedulePage() {
           <Loader2 className="animate-spin text-violet-400" size={28} aria-hidden="true" />
         </div>
       ) : view === 'month' ? (
-        <MonthCalendar
-          year={year}
-          month={month}
-          events={filteredEvents}
-          holidayMap={holidayMap}
-          onCellClick={(date) => openCreate(date)}
-          onEventClick={handleEventClick}
-        />
+        <>
+          <MonthCalendar
+            year={year}
+            month={month}
+            events={filteredEvents}
+            holidayMap={holidayMap}
+            onCellClick={(date) => openCreate(date)}
+            onEventClick={handleEventClick}
+          />
+          {/* STEP-UX-FIXES — 달력 하단 텍스트 일정 리스트 */}
+          <ScheduleEventList
+            year={year}
+            month={month}
+            events={filteredEvents}
+            onEventClick={handleEventClick}
+          />
+        </>
       ) : view === 'week' ? (
         <WeekCalendar
           baseDate={weekBase}

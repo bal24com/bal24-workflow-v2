@@ -4,7 +4,8 @@
 
 import * as XLSXModule from 'xlsx';
 
-export type FileTextSource = 'xlsx' | 'csv' | 'docx' | 'text' | 'unknown';
+/** STEP-UX-FIXES — 'pdf'/'image' 분류 추가 (멀티모달 라우팅 명시화) */
+export type FileTextSource = 'xlsx' | 'csv' | 'docx' | 'text' | 'pdf' | 'image' | 'unknown';
 
 export interface ExtractedDoc {
   source: FileTextSource;
@@ -23,6 +24,9 @@ export function classifyFile(file: File): FileTextSource {
   if (/\.csv$|\.tsv$/.test(n) || t === 'text/csv') return 'csv';
   if (/\.docx?$/.test(n) || t.includes('wordprocessing')) return 'docx';
   if (/\.txt$|\.md$/.test(n) || t.startsWith('text/')) return 'text';
+  // STEP-UX-FIXES — PDF·이미지 명시 분류 (callAiWithFile 멀티모달 경로용)
+  if (/\.pdf$/.test(n) || t === 'application/pdf') return 'pdf';
+  if (/\.(png|jpe?g|webp|gif)$/.test(n) || t.startsWith('image/')) return 'image';
   return 'unknown';
 }
 

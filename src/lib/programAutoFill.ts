@@ -113,8 +113,9 @@ export async function extractBulkPrograms(fileText: string): Promise<ExtractedPr
 
 /** File → 자동 분기 (DOCX/CSV/XLSX/TEXT = fileToText, PDF/이미지 = 멀티모달) */
 export async function extractProgramFromFile(file: File): Promise<ExtractedProgram> {
+  // STEP-UX-FIXES — PDF·이미지는 멀티모달 경로(callAiWithFile)로
   const kind = classifyFile(file);
-  if (kind !== 'unknown') {
+  if (kind !== 'unknown' && kind !== 'pdf' && kind !== 'image') {
     const doc = await fileToText(file);
     return doc?.text ? extractProgramFromDocument(doc.text) : {};
   }
@@ -136,8 +137,9 @@ export async function extractProgramFromFile(file: File): Promise<ExtractedProgr
 
 /** File → 다중 추출 자동 분기 */
 export async function extractBulkProgramsFromFile(file: File): Promise<ExtractedProgram[]> {
+  // STEP-UX-FIXES — PDF·이미지는 멀티모달 경로(callAiWithFile)로
   const kind = classifyFile(file);
-  if (kind !== 'unknown') {
+  if (kind !== 'unknown' && kind !== 'pdf' && kind !== 'image') {
     const doc = await fileToText(file);
     return doc?.text ? extractBulkPrograms(doc.text) : [];
   }
