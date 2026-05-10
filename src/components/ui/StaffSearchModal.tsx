@@ -8,7 +8,8 @@ import { supabase } from '../../lib/supabase';
 import type { CurriculumStaffRole } from '../../types/database';
 
 export interface SelectedPerson {
-  sourceType: 'staff_pool' | 'profile';
+  /** 'manual' = 등록되지 않은 이름 직접 추가 (예: AI 추출 결과 미매칭 강사) */
+  sourceType: 'staff_pool' | 'profile' | 'manual';
   id: string;
   name: string;
   organization?: string;
@@ -21,6 +22,8 @@ interface Props {
   onSelect: (person: SelectedPerson) => void;
   role: CurriculumStaffRole;
   excludeIds?: string[];
+  /** 미매칭 이름 직접 추가 허용 (AI 추출 미리보기 등) */
+  allowManual?: boolean;
 }
 
 type Tab = 'staff_pool' | 'profile';
@@ -34,8 +37,7 @@ interface SearchRow {
 }
 
 const ROLE_DESC: Record<CurriculumStaffRole, string> = {
-  강사: '강의를 담당할 인력', 멘토: '멘토링을 담당할 인력', FT: '퍼실리테이터(FT) 인력',
-  TA: '교육 보조(TA) 인력', 운영진: '운영·진행 담당 인력',
+  강사: '강의를 담당할 인력', 멘토: '멘토링을 담당할 인력', FT: '퍼실리테이터(FT) 인력', TA: '교육 보조(TA) 인력', 운영진: '운영·진행 담당 인력',
 };
 
 async function searchStaffPool(q: string): Promise<SearchRow[]> {
@@ -62,7 +64,7 @@ async function searchProfiles(q: string): Promise<SearchRow[]> {
   return (r.data ?? []) as SearchRow[];
 }
 
-export default function StaffSearchModal({ open, onClose, onSelect, role, excludeIds = [] }: Props) {
+export default function StaffSearchModal({ open, onClose, onSelect, role, excludeIds = [], allowManual = false }: Props) {
   const [tab, setTab] = useState<Tab>('staff_pool');
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -124,7 +126,16 @@ export default function StaffSearchModal({ open, onClose, onSelect, role, exclud
               <Loader2 size={14} className="animate-spin mr-1.5" /> 검색 중…
             </div>
           ) : rows.length === 0 ? (
-            <p className="text-xs text-slate-400 italic text-center py-8">{query ? '검색 결과가 없어요.' : '등록된 인력이 없어요.'}</p>
+            <div className="text-center py-6 space-y-2">
+              <p className="text-xs text-slate-400 italic">{query ? '검색 결과가 없어요.' : '등록된 인력이 없어요.'}</p>
+              {allowManual && query.trim() && (
+                <button type="button"
+                  onClick={() => { onSelect({ sourceType: 'manual', id: '', name: query.trim() }); onClose(); }}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200">
+                  <UserPlus size={11} aria-hidden="true" /> "{query.trim()}" 직접 추가 (미등록)
+                </button>
+              )}
+            </div>
           ) : (
             <ul className="divide-y divide-slate-100">
               {rows.map((r) => {
@@ -154,6 +165,15 @@ export default function StaffSearchModal({ open, onClose, onSelect, role, exclud
             </ul>
           )}
         </div>
+        {allowManual && query.trim() && rows.length > 0 && (
+          <div className="border-t border-slate-100 pt-2">
+            <button type="button"
+              onClick={() => { onSelect({ sourceType: 'manual', id: '', name: query.trim() }); onClose(); }}
+              className="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-300">
+              <UserPlus size={11} aria-hidden="true" /> 위 결과 대신 "{query.trim()}" 직접 추가
+            </button>
+          </div>
+        )}
       </div>
     </Modal>
   );

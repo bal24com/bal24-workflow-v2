@@ -209,10 +209,10 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
                     placeholder="차시명" className="rounded border border-slate-200 px-1.5 py-1 font-semibold focus:outline-none focus:border-violet-400" />
                   <InstructorMentorCell names={s.instructor_names ?? []} matches={s.instructorMatches}
                     onChange={(names, m) => patchDraft(idx, { instructor_names: names, instructorMatches: m })}
-                    placeholder="강사" />
+                    placeholder="강사" role="강사" />
                   <InstructorMentorCell names={s.mentor_names ?? []} matches={s.mentorMatches}
                     onChange={(names, m) => patchDraft(idx, { mentor_names: names, mentorMatches: m })}
-                    placeholder="멘토" />
+                    placeholder="멘토" role="멘토" />
                   <button type="button" onClick={() => patchDraft(idx, { expanded: !s.expanded })} aria-label="상세 펼침"
                     className="p-1 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-600">
                     {s.expanded ? <ChevronDown size={11} aria-hidden="true" /> : <ChevronRight size={11} aria-hidden="true" />}
@@ -222,17 +222,18 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
                     <Trash2 size={11} aria-hidden="true" />
                   </button>
                 </div>
+                {/* 행2 — content (강의 내용·진행 방식). AI가 추출한 본문 항상 표시·편집 */}
+                <textarea rows={2} value={s.content ?? ''} onChange={(e) => patchDraft(idx, { content: e.target.value })}
+                  placeholder="강의 내용·진행 방식 (AI 추출 결과 또는 직접 입력)"
+                  className="mt-1.5 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs focus:outline-none focus:border-violet-400 resize-none" />
                 {s.expanded && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 px-2 py-2 rounded-lg bg-slate-50/60">
+                  <div className="grid grid-cols-2 gap-2 mt-1.5 px-2 py-2 rounded-lg bg-slate-50/60">
                     <input type="text" value={s.start_time ?? ''} onChange={(e) => patchDraft(idx, { start_time: e.target.value })}
                       placeholder="시작 09:00"
                       className="rounded border border-slate-200 bg-white px-2 py-1 focus:outline-none focus:border-violet-400" />
                     <input type="text" value={s.end_time ?? ''} onChange={(e) => patchDraft(idx, { end_time: e.target.value })}
                       placeholder="종료 11:00"
                       className="rounded border border-slate-200 bg-white px-2 py-1 focus:outline-none focus:border-violet-400" />
-                    <textarea rows={2} value={s.content ?? ''} onChange={(e) => patchDraft(idx, { content: e.target.value })}
-                      placeholder="강의 내용·진행 방식"
-                      className="sm:col-span-2 rounded border border-slate-200 bg-white px-2 py-1 focus:outline-none focus:border-violet-400 resize-none" />
                   </div>
                 )}
               </li>

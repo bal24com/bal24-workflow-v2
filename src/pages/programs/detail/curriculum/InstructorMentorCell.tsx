@@ -1,19 +1,30 @@
 // bal24 v2 — 차시 행 강사·멘토 다중 태그 셀 (CurriculumAiDropZone V-1 분리)
+//   STEP-UX-FIXES — [+ 강사/멘토] 클릭 시 StaffSearchModal로 인력풀 검색·선택
+//   미등록 이름은 모달의 "직접 추가"로 manual 태그로 추가 가능
 
 import { useState } from 'react';
 import { CheckCircle2, AlertTriangle, Plus, X } from 'lucide-react';
-import { matchInstructorByName, type MatchedInstructor } from '../../../../lib/instructorMatch';
+import StaffSearchModal, { type SelectedPerson } from '../../../../components/ui/StaffSearchModal';
+import type { MatchedInstructor } from '../../../../lib/instructorMatch';
+import type { CurriculumStaffRole } from '../../../../types/database';
 
 interface Props {
   names: string[];
   matches: Record<string, MatchedInstructor>;
   onChange: (names: string[], matches: Record<string, MatchedInstructor>) => void;
   placeholder: string;
+  /** '강사' | '멘토' 등 — StaffSearchModal에 전달 */
+  role?: CurriculumStaffRole;
 }
 
-export default function InstructorMentorCell({ names, matches, onChange, placeholder }: Props) {
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState('');
+function personToMatch(p: SelectedPerson): MatchedInstructor {
+  if (p.sourceType === 'staff_pool') return { staff_pool_id: p.id, matched_name: p.name, source: 'staff_pool' };
+  if (p.sourceType === 'profile')    return { profile_id: p.id,    matched_name: p.name, source: 'profile' };
+  return { source: 'none' }; // manual — 미매칭 (rose 태그)
+}
+
+export default function InstructorMentorCell({ names, matches, onChange, placeholder, role }: Props) {
+  const [modalOpen, setModalOpen] = useState(false);
 
   function removeAt(idx: number) {
     const next = names.filter((_, i) => i !== idx);
@@ -22,14 +33,18 @@ export default function InstructorMentorCell({ names, matches, onChange, placeho
     onChange(next, m);
   }
 
-  async function commitDraft() {
-    const v = draft.trim();
-    setDraft('');
-    setAdding(false);
+  function handleSelect(p: SelectedPerson) {
+    const v = p.name.trim();
     if (!v || names.includes(v)) return;
-    const m = v === '전체' ? ({ source: 'none' } as MatchedInstructor) : await matchInstructorByName(v);
+    const m = v === '전체' ? ({ source: 'none' } as MatchedInstructor) : personToMatch(p);
     onChange([...names, v], { ...matches, [v]: m });
   }
+
+  const excludeIds = names
+    .map((n) => matches[n])
+    .filter((m): m is MatchedInstructor => Boolean(m))
+    .map((m) => m.staff_pool_id ?? m.profile_id ?? '')
+    .filter(Boolean);
 
   return (
     <div className="flex items-center flex-wrap gap-1">
@@ -59,19 +74,18 @@ export default function InstructorMentorCell({ names, matches, onChange, placeho
           </span>
         );
       })}
-      {adding ? (
-        <input type="text" value={draft} autoFocus
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void commitDraft(); } if (e.key === 'Escape') { setDraft(''); setAdding(false); } }}
-          onBlur={() => void commitDraft()}
-          placeholder={placeholder}
-          className="rounded border border-violet-300 px-1.5 py-0.5 text-[10px] w-24 focus:outline-none focus:border-violet-500" />
-      ) : (
-        <button type="button" onClick={() => setAdding(true)} aria-label="추가"
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] text-violet-600 hover:bg-violet-50 border border-dashed border-violet-300">
-          <Plus size={9} aria-hidden="true" /> {placeholder}
-        </button>
-      )}
+      <button type="button" onClick={() => setModalOpen(true)} aria-label={`${placeholder} 추가`}
+        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] text-violet-600 hover:bg-violet-50 border border-dashed border-violet-300">
+        <Plus size={9} aria-hidden="true" /> {placeholder}
+      </button>
+      <StaffSearchModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSelect={handleSelect}
+        role={role ?? (placeholder === '멘토' ? '멘토' : '강사')}
+        excludeIds={excludeIds}
+        allowManual
+      />
     </div>
   );
 }
