@@ -64,12 +64,15 @@ export const EXPENSE_STATUS_STYLE: Record<ExpenseStatus, string> = {
   반려: 'bg-rose-50 text-rose-500 border-rose-200',
 };
 
-// ─── 강사 초대 상태 ────────────────────────────
+// ─── 강사 초대 상태 (STEP-INVITE-APPROVE-PART1) ────
+//   대기: 초대 발송 후 미응답 / 제출: 강사 응답 완료, 담당자 승인 대기
+//   수락: 담당자 승인 완료 / 거절: 강사 거절 / 교체됨: 관리자 교체 처리
 export const INVITATION_STATUS_STYLE: Record<InvitationStatus, string> = {
-  대기: 'bg-slate-100 text-slate-400 border-slate-300',
-  수락: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  거절: 'bg-rose-50 text-rose-500 border-rose-200',
-  완료: 'bg-violet-50 text-violet-600 border-violet-200',
+  대기:   'bg-amber-50 text-amber-700 border-amber-200',
+  제출:   'bg-blue-50 text-blue-700 border-blue-200',
+  수락:   'bg-emerald-50 text-emerald-600 border-emerald-200',
+  거절:   'bg-red-50 text-red-600 border-red-200',
+  교체됨: 'bg-slate-100 text-slate-500 border-slate-300',
 };
 
 // ─── 컨소시엄 상태 ──────────────────────────────

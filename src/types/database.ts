@@ -6,7 +6,8 @@ export type ProjectStatus = '제안' | '진행' | '정산' | '종료';
 export type TaskStatus = '인식' | '실행' | '검토' | '완료';
 export type SettlementStatus = '미지급' | '부분지급' | '지급완료';
 export type EducationStatus = '준비' | '진행' | '완료';
-export type InvitationStatus = '대기' | '수락' | '거절' | '완료';
+/** STEP-INVITE-APPROVE-PART1 — '제출'(강사 응답 완료, 담당자 승인 대기) + '교체됨' 추가 */
+export type InvitationStatus = '대기' | '제출' | '수락' | '거절' | '교체됨';
 
 /** STEP-MEMBER-INVITE — 팀원 이메일 초대 상태 (instructor_invitations 와 별개) */
 export type MemberInvitationStatus = 'pending' | 'accepted' | 'expired';

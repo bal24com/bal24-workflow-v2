@@ -31,10 +31,11 @@ interface Props {
 }
 
 const INVITE_BADGE: Record<InvitationStatus, string> = {
-  '대기': 'bg-amber-100 text-amber-700',
-  '수락': 'bg-emerald-100 text-emerald-700',
-  '거절': 'bg-red-100 text-red-600',
-  '완료': 'bg-blue-100 text-blue-700',
+  '대기':   'bg-amber-100 text-amber-700',
+  '제출':   'bg-blue-100 text-blue-700',
+  '수락':   'bg-emerald-100 text-emerald-700',
+  '거절':   'bg-red-100 text-red-600',
+  '교체됨': 'bg-slate-100 text-slate-600',
 };
 
 interface Draft {

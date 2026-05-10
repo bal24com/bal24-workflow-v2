@@ -22,7 +22,7 @@ export function formatRole(role?: InvitationRole | null): string {
 export const ROLE_VALUES: InvitationRole[] = ['instructor', 'ta', 'mentor', 'facilitator'];
 
 export const STATUS_LABEL: Record<InvitationStatus, string> = {
-  '대기': '대기중', '수락': '수락', '거절': '거절', '완료': '완료',
+  '대기': '대기중', '제출': '승인 대기', '수락': '수락', '거절': '거절', '교체됨': '교체됨',
 };
 
 export function fileSizeLabel(bytes?: number | null): string {

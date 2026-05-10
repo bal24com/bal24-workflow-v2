@@ -1,7 +1,7 @@
 // bal24 v2 — 커리큘럼 강사·멘토 배정 현황 카드 (STEP-CURRICULUM-INSTRUCTOR-VIEW)
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Mail, AlertTriangle, UserPlus, X, Loader2 } from 'lucide-react';
+import { CheckCircle2, Mail, AlertTriangle, UserPlus, X, Loader2, Inbox } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
 import { trimTime } from './curriculumTabUtils';
@@ -109,10 +109,15 @@ export default function CurriculumStaffSection({ programId, refreshKey, onReques
     void refresh();
   }
 
-  // 요약 카운트
-  const assigned = rows.reduce((n, r) => n + r.staff.length, 0);
-  const requested = rows.reduce((n, r) => n + r.invitations.filter((i) => i.status === '대기').length, 0);
-  const unassigned = rows.filter((r) => r.staff.length === 0 && (r.raw?.trim() || r.invitations.length === 0)).length;
+  // 요약 카운트 (STEP-INVITE-APPROVE-PART1 — '제출' 신규)
+  const assigned   = rows.reduce((n, r) => n + r.staff.length, 0);
+  const submitted  = rows.reduce((n, r) => n + r.invitations.filter((i) => i.status === '제출').length, 0);
+  const requested  = rows.reduce((n, r) => n + r.invitations.filter((i) => i.status === '대기').length, 0);
+  const unassigned = rows.filter((r) =>
+    r.staff.length === 0
+    && r.invitations.filter((i) => i.status === '대기' || i.status === '제출').length === 0
+    && (r.raw?.trim() || r.invitations.length === 0)
+  ).length;
 
   return (
     <section className="rounded-2xl border border-violet-100 bg-white p-4 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-3">
@@ -123,9 +128,10 @@ export default function CurriculumStaffSection({ programId, refreshKey, onReques
         </div>
         <div className="flex items-center gap-1.5 text-[11px] font-bold flex-wrap">
           {([
-            [CheckCircle2, '배정', assigned, 'bg-emerald-50 text-emerald-700 border-emerald-200'],
-            [Mail, '요청중', requested, 'bg-amber-50 text-amber-700 border-amber-200'],
-            [AlertTriangle, '미배정', unassigned, 'bg-rose-50 text-rose-700 border-rose-200'],
+            [CheckCircle2,   '배정',     assigned,   'bg-emerald-50 text-emerald-700 border-emerald-200'],
+            [Inbox,          '승인 대기', submitted,  'bg-blue-50 text-blue-700 border-blue-200'],
+            [Mail,           '요청중',   requested,  'bg-amber-50 text-amber-700 border-amber-200'],
+            [AlertTriangle,  '미배정',   unassigned, 'bg-rose-50 text-rose-700 border-rose-200'],
           ] as const).map(([Ic, label, n, cls]) => (
             <span key={label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${cls}`}>
               <Ic size={11} aria-hidden="true" /> {label} {n}
@@ -144,7 +150,9 @@ export default function CurriculumStaffSection({ programId, refreshKey, onReques
         <ul className="space-y-2">
           {rows.map((s) => {
             const meta = metaLabel(s, ' / ');
-            const pendingInvs = s.invitations.filter((i) => i.status === '대기');
+            const submittedInvs = s.invitations.filter((i) => i.status === '제출');
+            const pendingInvs   = s.invitations.filter((i) => i.status === '대기');
+            const hasOpenInv = submittedInvs.length + pendingInvs.length > 0;
             const isUnassigned = s.staff.length === 0;
             return (
               <li key={s.id} className="rounded-xl border border-slate-100 bg-slate-50/40 p-3">
@@ -155,7 +163,7 @@ export default function CurriculumStaffSection({ programId, refreshKey, onReques
                     </p>
                     {meta && <p className="text-[10px] text-slate-400 mt-0.5">{meta}</p>}
                   </div>
-                  {isUnassigned && (
+                  {isUnassigned && !hasOpenInv && (
                     <button type="button" onClick={() => onRequestInstructor(s.id, sessionInfoText(s))}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200">
                       <UserPlus size={11} aria-hidden="true" /> 강사 요청
@@ -174,6 +182,13 @@ export default function CurriculumStaffSection({ programId, refreshKey, onReques
                         className="ml-0.5 opacity-60 hover:opacity-100"><X size={9} aria-hidden="true" /></button>
                     </span>
                   ))}
+                  {submittedInvs.map((i) => (
+                    <span key={i.id}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                      <Inbox size={10} aria-hidden="true" /><span>{i.name}</span>
+                      <span className="text-blue-500/70">· 승인 대기</span>
+                    </span>
+                  ))}
                   {pendingInvs.map((i) => (
                     <span key={i.id}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
@@ -181,7 +196,7 @@ export default function CurriculumStaffSection({ programId, refreshKey, onReques
                       <span className="text-amber-500/70">· 요청중</span>
                     </span>
                   ))}
-                  {isUnassigned && pendingInvs.length === 0 && (
+                  {isUnassigned && !hasOpenInv && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
                       <AlertTriangle size={10} aria-hidden="true" /> 미배정{s.raw?.trim() ? ` — ${s.raw}` : ''}
                     </span>

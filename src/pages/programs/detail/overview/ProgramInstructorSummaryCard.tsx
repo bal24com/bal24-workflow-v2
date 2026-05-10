@@ -18,14 +18,15 @@ interface InvitationRow {
 }
 
 const STATUS_CLASS: Record<InvitationStatus, string> = {
-  '대기': 'bg-amber-100 text-amber-700',
-  '수락': 'bg-emerald-100 text-emerald-700',
-  '거절': 'bg-red-100 text-red-600',
-  '완료': 'bg-blue-100 text-blue-700',
+  '대기':   'bg-amber-100 text-amber-700',
+  '제출':   'bg-blue-100 text-blue-700',
+  '수락':   'bg-emerald-100 text-emerald-700',
+  '거절':   'bg-red-100 text-red-600',
+  '교체됨': 'bg-slate-100 text-slate-600',
 };
 
 const STATUS_LABEL: Record<InvitationStatus, string> = {
-  '대기': '발송 대기', '수락': '수락', '거절': '거절', '완료': '완료',
+  '대기': '발송 대기', '제출': '승인 대기', '수락': '수락', '거절': '거절', '교체됨': '교체됨',
 };
 
 export default function ProgramInstructorSummaryCard({ programId }: Props) {

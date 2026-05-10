@@ -97,10 +97,11 @@ export default function InvitationManagePanel({
     if (defaultCurriculumId || defaultSessionInfo || defaultMessage) setAddExpanded(true);
   }, [open, defaultCurriculumId, defaultSessionInfo, defaultMessage]);
 
-  // 통계 계산
+  // 통계 계산 (STEP-INVITE-APPROVE-PART1 — '제출' 추가)
   const stats = {
     total: invitations.length,
     pending: invitations.filter((i) => i.status === '대기').length,
+    submitted: invitations.filter((i) => i.status === '제출').length,
     accepted: invitations.filter((i) => i.status === '수락').length,
     rejected: invitations.filter((i) => i.status === '거절').length,
   };
@@ -169,10 +170,11 @@ export default function InvitationManagePanel({
         </header>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* STEP-INSTRUCTOR-INVITE-A — 통계 바 */}
+          {/* STEP-INSTRUCTOR-INVITE-A — 통계 바 (PART1: '제출' 추가) */}
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <span className="text-slate-600">총 <strong className="text-slate-800">{stats.total}</strong>명</span>
-            <span className="text-amber-600">대기 <strong>{stats.pending}</strong></span>
+            <span className="text-amber-700">대기 <strong>{stats.pending}</strong></span>
+            <span className="text-blue-700">승인 대기 <strong>{stats.submitted}</strong></span>
             <span className="text-emerald-600">수락 <strong>{stats.accepted}</strong></span>
             <span className="text-red-600">거절 <strong>{stats.rejected}</strong></span>
           </div>
@@ -256,6 +258,21 @@ export default function InvitationManagePanel({
                         className="inline-flex items-center gap-1 px-2 py-1 rounded text-primary hover:bg-primary/5">
                         <Copy size={11} />{copiedId === inv.id ? '복사됨!' : '초대 링크'}
                       </button>
+                    )}
+                    {/* STEP-INVITE-APPROVE-PART1 — '제출' 행 전용 placeholder (PART2에서 활성화) */}
+                    {inv.status === '제출' && (
+                      <>
+                        <button type="button" disabled
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-400 bg-slate-50 cursor-not-allowed ml-auto"
+                          title="다음 업데이트(PART2)에서 활성화">
+                          ✓ 승인 (다음 업데이트)
+                        </button>
+                        <button type="button" disabled
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-400 bg-slate-50 cursor-not-allowed"
+                          title="다음 업데이트(PART2)에서 활성화">
+                          ✗ 반려
+                        </button>
+                      </>
                     )}
                     {(inv.status === '수락' || inv.status === '거절') && (
                       <button type="button" onClick={() => void handleReplace(inv)}

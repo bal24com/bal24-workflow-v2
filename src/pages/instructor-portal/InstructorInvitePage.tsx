@@ -53,7 +53,9 @@ export default function InstructorInvitePage() {
           .from('instructor_profiles').select('submitted').eq('invitation_id', i.id).maybeSingle();
         if (cancelled) return;
         if (prof?.submitted)        setScreen('done_accept');
-        else if (i.status === '수락') setScreen('profile');
+        // STEP-INVITE-APPROVE-PART1 — '제출' = 강사 응답 후 프로필 입력 단계
+        // 과거 데이터 호환을 위해 '수락'도 동일 처리 (담당자 승인 후엔 어차피 prof.submitted=true)
+        else if (i.status === '제출' || i.status === '수락') setScreen('profile');
         else if (i.status === '거절') setScreen('done_reject');
         else                          setScreen('ready');
       } catch (err) {
@@ -71,16 +73,18 @@ export default function InstructorInvitePage() {
     setSubmitting(true);
     setErrorMsg(null);
     try {
+      // STEP-INVITE-APPROVE-PART1 — '제출' = 강사가 정보 제출 완료, 담당자 승인 대기
+      // '수락'은 담당자가 [승인] 버튼 클릭 시에만 설정됨 (PART2)
       const { error } = await supabase
         .from('instructor_invitations')
-        .update({ status: '수락', responded_at: new Date().toISOString() })
+        .update({ status: '제출', responded_at: new Date().toISOString() })
         .eq('id', inv.id);
       if (error) throw error;
       setScreen('profile');
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
-      console.error('[invite] 수락 처리 실패:', raw);
-      setErrorMsg('수락 처리 중 오류가 발생했어요.');
+      console.error('[invite] 제출 처리 실패:', raw);
+      setErrorMsg('제출 처리 중 오류가 발생했어요.');
     } finally {
       setSubmitting(false);
     }
@@ -129,8 +133,8 @@ export default function InstructorInvitePage() {
         {screen === 'done_accept' && (
           <div className="bg-white rounded-card border border-[#EDE9FE] shadow-card p-8 text-center space-y-3">
             <CheckCircle2 size={48} className="mx-auto text-success" />
-            <h1 className="text-xl font-bold text-text">수락이 완료되었습니다.</h1>
-            <p className="text-sm text-muted">함께해 주셔서 감사합니다!</p>
+            <h1 className="text-xl font-bold text-text">정보를 제출했습니다.</h1>
+            <p className="text-sm text-muted">담당자 검토 후 확정 안내드립니다.</p>
           </div>
         )}
 

@@ -94,10 +94,11 @@ export function formTypeLabel(t: FormType): string {
 }
 
 const INVITATION_STATUS_LABEL: Record<InvitationStatus, string> = {
-  대기: '대기',
-  수락: '수락',
-  거절: '거절',
-  완료: '완료',
+  대기:   '대기',
+  제출:   '승인 대기',
+  수락:   '수락',
+  거절:   '거절',
+  교체됨: '교체됨',
 };
 export function invitationStatusLabel(s: InvitationStatus): string {
   return INVITATION_STATUS_LABEL[s] ?? s;

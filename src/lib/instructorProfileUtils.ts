@@ -131,13 +131,14 @@ export async function searchInstructorPool(query: string): Promise<InstructorPoo
   }
 }
 
-/** 초대 상태 → 배지 라벨·className */
+/** 초대 상태 → 배지 라벨·className (STEP-INVITE-APPROVE-PART1) */
 export function getInviteStatusBadge(status: InvitationStatus): { label: string; className: string } {
   switch (status) {
-    case '대기': return { label: '대기 중', className: 'bg-amber-100 text-amber-800' };
-    case '수락': return { label: '수락',    className: 'bg-emerald-100 text-emerald-800' };
-    case '거절': return { label: '거절',    className: 'bg-red-100 text-red-700' };
-    case '완료': return { label: '완료',    className: 'bg-blue-100 text-blue-700' };
-    default:     return { label: '대기 중', className: 'bg-gray-100 text-gray-600' };
+    case '대기':   return { label: '대기 중',   className: 'bg-amber-100 text-amber-800' };
+    case '제출':   return { label: '승인 대기', className: 'bg-blue-100 text-blue-700' };
+    case '수락':   return { label: '수락',      className: 'bg-emerald-100 text-emerald-800' };
+    case '거절':   return { label: '거절',      className: 'bg-red-100 text-red-700' };
+    case '교체됨': return { label: '교체됨',    className: 'bg-slate-100 text-slate-600' };
+    default:       return { label: '대기 중',   className: 'bg-gray-100 text-gray-600' };
   }
 }
