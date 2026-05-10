@@ -13,6 +13,8 @@ export interface ExtractedSession {
   end_time?: string;
   title: string;
   instructor_name?: string;
+  /** STEP-CURRICULUM-INSTRUCTOR-MATCH — 강의 내용·진행 방식 */
+  content?: string;
 }
 
 export interface ExtractedProgram {

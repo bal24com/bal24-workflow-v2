@@ -5,8 +5,8 @@ import { fileToText, classifyFile } from './fileToText';
 import type { ExtractedSession } from './programAutoFill';
 
 const SYSTEM_PROMPT = `문서에서 커리큘럼 차시 목록을 JSON 배열로만 반환합니다.
-각 항목. title(필수), day_label("1일차" 같은 표시), start_time(HH:MM), end_time(HH:MM), instructor_name(강사명).
-없는 항목=null. JSON 배열만 반환. 최대 100개.`;
+각 항목. title(필수, 차시 제목), day_label("1일차" 같은 표시), start_time(HH:MM), end_time(HH:MM), instructor_name(강사명), content(강의 내용·진행 방식 200자 이내).
+없는 항목=null. 추측 금지. JSON 배열만 반환. 최대 100개.`;
 
 const TEXT_LIMIT = 5000;
 

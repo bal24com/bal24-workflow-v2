@@ -304,6 +304,8 @@ export interface ProgramCurriculum {
   venue?: string | null;
   /** STEP-PROGRAM-BUNDLE — 일자 라벨 ("1일차" / "5월 7일" 등 자유 입력) */
   day_label?: string | null;
+  /** STEP-CURRICULUM-INSTRUCTOR-MATCH — AI 추출 강사명 (인력풀 매칭 실패 원본) */
+  instructor_name_raw?: string | null;
   created_at: string;
 }
 
