@@ -30,18 +30,14 @@ function toLegacyType(pt: ExtendedProgramType): ProgramType {
 type ProjectOption = Pick<Project, 'id' | 'name'>;
 type ConsortiumOption = { id: string; name: string };
 
-type Props = {
-  open: boolean;
-  onClose: () => void;
-  onCreated: () => void;
-};
+type Props = { open: boolean; onClose: () => void; onCreated: () => void; defaultProjectId?: string };
 
-export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
+export default function ProgramFormModal({ open, onClose, onCreated, defaultProjectId }: Props) {
   const toast = useToast();
   const [name, setName] = useState('');
   const [programType, setProgramType] = useState<ExtendedProgramType>('education');
   const [status, setStatus] = useState<ProgramStatus>('준비');
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(defaultProjectId ?? '');
   const [consortiumId, setConsortiumId] = useState('');
   const [displayOrder, setDisplayOrder] = useState('0');
   const [modules, setModules] = useState<string[]>([]);
@@ -108,7 +104,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     setName('');
     setProgramType('education');
     setStatus('준비');
-    setProjectId('');
+    setProjectId(defaultProjectId ?? '');
     setConsortiumId('');
     setDisplayOrder('0');
     setModules([]);

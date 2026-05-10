@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, FileText, Info, Loader2, Users, FileBarChart, Link2, Wallet } from 'lucide-react';
+import { ArrowLeft, ClipboardList, FileText, Info, Loader2, Users, FileBarChart, Link2, Wallet, BookOpen, FolderArchive } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Badge, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
@@ -16,6 +16,8 @@ import MembersTab from './detail/MembersTab';
 import FilesTab from './detail/FilesTab';
 import PortalTab from './detail/PortalTab';
 import GrantLedgerTab from './detail/GrantLedgerTab';
+import ProjectProgramsTab from './detail/ProjectProgramsTab';
+import ProjectDocsTab from './detail/ProjectDocsTab';
 import StageProgressBar from './detail/StageProgressBar';
 
 type DetailProject = Project & {
@@ -23,7 +25,7 @@ type DetailProject = Project & {
   pm?: { id: string; name: string } | null;
 };
 
-type TabKey = 'overview' | 'tasks' | 'members' | 'files' | 'portal' | 'grant';
+type TabKey = 'overview' | 'tasks' | 'members' | 'files' | 'portal' | 'grant' | 'programs' | 'docs';
 
 const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'overview', label: '개요',     Icon: Info },
@@ -32,6 +34,8 @@ const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'files',    label: '파일',     Icon: FileText },
   { key: 'grant',    label: '지원금',   Icon: Wallet },
   { key: 'portal',   label: '포털',     Icon: Link2 },
+  { key: 'programs', label: '프로그램', Icon: BookOpen },
+  { key: 'docs',     label: '문서',     Icon: FolderArchive },
 ];
 
 // projects → profiles FK가 두 개(pm_id, created_by) 있어 명시적 별칭 필요 (PGRST201 방지)
@@ -189,6 +193,8 @@ export default function ProjectDetailPage() {
         {tab === 'files' && <FilesTab projectId={projectId} uploaderId={user?.id} />}
         {tab === 'grant' && <GrantLedgerTab projectId={projectId} />}
         {tab === 'portal' && <PortalTab projectId={projectId} clientId={project.client_id ?? null} />}
+        {tab === 'programs' && <ProjectProgramsTab projectId={projectId} />}
+        {tab === 'docs'     && <ProjectDocsTab    projectId={projectId} />}
       </div>
     </div>
   );

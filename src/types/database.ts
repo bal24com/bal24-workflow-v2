@@ -1081,6 +1081,48 @@ export interface MemberInvitation {
   deleted_at?: string | null;
 }
 
+// ─── STEP-PROJECT-RESTRUCTURE 프로젝트 문서·결과보고서 ────
+export type ProjectDocType = 'estimate' | 'operation_plan' | 'deliverable' | 'photo' | 'other';
+export type ProjectDocStage = 'sales' | 'active' | 'wrap';
+
+export interface ProjectDocument {
+  id: string;
+  project_id: string;
+  doc_type: ProjectDocType;
+  doc_stage: ProjectDocStage;
+  file_name: string;
+  file_url: string;
+  file_size?: number | null;
+  description?: string | null;
+  category?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  deleted_at?: string | null;
+}
+
+export type FinalReportSectionType =
+  | 'text' | 'auto_participants' | 'auto_attendance' | 'auto_expenses' | 'photo_gallery';
+
+export interface FinalReportSection {
+  id: string;
+  project_id: string;
+  title: string;
+  content?: string | null;
+  section_type: FinalReportSectionType;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FinalReportPhoto {
+  id: string;
+  section_id: string;
+  file_url: string;
+  caption?: string | null;
+  display_order: number;
+  created_at: string;
+}
+
 // ─── STEP-PARTICIPANT-PORTAL 참여자 통합 토큰 ─────────────
 export type ParticipantRole = 'participant' | 'mentor' | 'client' | 'ta' | 'observer';
 export type ParticipantStatus = 'active' | 'inactive' | 'completed';
