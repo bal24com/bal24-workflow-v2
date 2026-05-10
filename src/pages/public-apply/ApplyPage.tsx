@@ -5,13 +5,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
-import { Loader2, GraduationCap, Calendar, MapPin, Users, CheckCircle2 } from 'lucide-react';
+import { Loader2, GraduationCap, Calendar, MapPin, Users, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
 import { useToast } from '../../contexts/ToastContext';
 import type { Program } from '../../types/database';
 import PromoSection from './PromoSection';
+import {
+  checkApplicationGate, checkDuplicateApplication, submitApplication,
+} from './applicationUtils';
 
 interface FormState {
   name: string;
@@ -76,6 +79,13 @@ export default function ApplyPage() {
     e.preventDefault();
     if (!program || !programId) return;
 
+    // STEP-APPLICATION-FORM — 신청 가능 여부 사전 차단
+    const gate = checkApplicationGate(program);
+    if (gate.kind !== 'ok') {
+      toast.error(gate.message);
+      return;
+    }
+
     if (!form.name.trim()) {
       toast.error('이름을 입력해 주세요.');
       return;
@@ -91,33 +101,32 @@ export default function ApplyPage() {
 
     setSubmitting(true);
     try {
-      const payload = {
-        program_id: programId,
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim() || null,
-        birth_year: form.birthYear || null,
-        gender: form.gender || null,
-        address: form.address.trim() || null,
-        organization: form.organization.trim() || null,
-        motivation: form.motivation.trim() || null,
-        experience: form.experience.trim() || null,
-        privacy_agreed: true,
-        privacy_agreed_at: new Date().toISOString(),
-      };
-      const { error } = await supabase.from('participant_applications').insert(payload);
-      if (error) throw error;
-      toast.success('신청이 접수되었어요.');
-      setSubmitted(true);
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[apply] 신청 저장 실패:', raw);
-      const m = raw.toLowerCase();
-      if (m.includes('duplicate') || m.includes('unique')) {
-        toast.error('이미 같은 연락처로 신청하신 기록이 있어요.');
-      } else {
-        toast.error('신청 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.');
+      // 중복 신청 차단 (이메일 입력했을 때만)
+      if (form.email.trim()) {
+        const dup = await checkDuplicateApplication(programId, form.email);
+        if (dup.duplicate) {
+          toast.error('이미 같은 이메일로 신청하셨어요.');
+          return;
+        }
       }
+      const result = await submitApplication({
+        programId,
+        name: form.name,
+        phone: form.phone,
+        email: form.email,
+        birthYear: form.birthYear,
+        gender: form.gender,
+        address: form.address,
+        organization: form.organization,
+        motivation: form.motivation,
+        experience: form.experience,
+      });
+      if (!result.success) {
+        toast.error(result.error ?? '신청 중 오류가 발생했어요.');
+        return;
+      }
+      toast.success('신청이 완료됐어요! 검토 후 연락드릴게요.');
+      setSubmitted(true);
     } finally {
       setSubmitting(false);
     }
@@ -157,7 +166,12 @@ export default function ApplyPage() {
     );
   }
 
-  const closed = program.status === '완료' || program.status === '취소';
+  // STEP-APPLICATION-FORM — 신청 가능 여부 (게이트 통합)
+  const gate = checkApplicationGate(program);
+  const closed = gate.kind !== 'ok';
+  const applicationPeriod = (program.application_start_date || program.application_end_date)
+    ? `신청 ${formatDateKo(program.application_start_date) || '시작 미정'} ~ ${formatDateKo(program.application_end_date) || '마감 미정'}`
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -188,6 +202,12 @@ export default function ApplyPage() {
                 정원 {program.capacity}명
               </span>
             )}
+            {applicationPeriod && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
+                <Calendar size={12} aria-hidden="true" />
+                {applicationPeriod}
+              </span>
+            )}
           </div>
           {program.description && (
             <p className="mt-4 text-sm opacity-95 whitespace-pre-wrap leading-relaxed max-w-2xl">
@@ -202,8 +222,9 @@ export default function ApplyPage() {
         <PromoSection program={program} />
 
         {closed ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
-            <p className="text-sm font-semibold text-amber-800">모집이 종료된 프로그램이에요.</p>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center space-y-2">
+            <ShieldAlert className="mx-auto text-amber-500" size={28} aria-hidden="true" />
+            <p className="text-sm font-semibold text-amber-800">{gate.message}</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="rounded-2xl border border-violet-100 bg-white p-5 sm:p-7 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-5" noValidate>
