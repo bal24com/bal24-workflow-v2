@@ -127,7 +127,7 @@ export default function LogWritePage() {
     setUploading(true);
     try {
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
-      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 50);
+      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 50);
       const path = `${token}/${Date.now()}_${safeBase}${ext ? '.' + ext : ''}`;
       const { error } = await supabase.storage
         .from(LOG_FILES_BUCKET)

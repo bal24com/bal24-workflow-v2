@@ -14,7 +14,7 @@ export async function fetchMentoringAssignments(
     .select(`
       *,
       mentor_pool:staff_pool!mentor_pool_id(id, name, specialty),
-      mentor_profile:profiles!mentor_profile_id(id, name, specialty),
+      mentor_profile:profiles!mentor_profile_id(id, name),
       sessions:mentoring_sessions(*)
     `)
     .eq('program_id', programId)
@@ -35,7 +35,7 @@ export async function fetchAssignmentByMentorToken(
     .select(`
       *,
       mentor_pool:staff_pool!mentor_pool_id(id, name, specialty),
-      mentor_profile:profiles!mentor_profile_id(id, name, specialty),
+      mentor_profile:profiles!mentor_profile_id(id, name),
       sessions:mentoring_sessions(*)
     `)
     .eq('mentor_access_token', token)
@@ -56,7 +56,7 @@ export async function fetchAssignmentByMenteeToken(
     .select(`
       *,
       mentor_pool:staff_pool!mentor_pool_id(id, name, specialty),
-      mentor_profile:profiles!mentor_profile_id(id, name, specialty),
+      mentor_profile:profiles!mentor_profile_id(id, name),
       sessions:mentoring_sessions(*)
     `)
     .eq('mentee_access_token', token)
@@ -76,7 +76,7 @@ export async function fetchMyMentorAssignments(
     .from('mentoring_assignments')
     .select(`
       *,
-      mentor_profile:profiles!mentor_profile_id(id, name, specialty),
+      mentor_profile:profiles!mentor_profile_id(id, name),
       sessions:mentoring_sessions(*),
       program:programs(id, name, status)
     `)
@@ -92,7 +92,7 @@ export async function fetchMyMentorAssignments(
 /** Storage 사진 업로드 — 단일 파일 → publicUrl */
 export async function uploadMentoringPhoto(file: File, assignmentId: string): Promise<string | null> {
   const ext = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
-  const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 40);
+  const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 40);
   const path = `${assignmentId}/${Date.now()}_${safeBase}.${ext}`;
   const { error } = await supabase.storage.from(MENTORING_BUCKET).upload(path, file, {
     cacheControl: '3600',
@@ -115,7 +115,7 @@ export function countCompletedSessions(sessions: MentoringSession[] | null | und
 
 /** 간단한 HTML → Word 다운로드 (Blob, application/msword) */
 export function downloadSessionAsWord(session: MentoringSession, mentorName: string): void {
-  const safeTitle = (session.title || '멘토링보고서').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 40);
+  const safeTitle = (session.title || '멘토링보고서').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 40);
   const photos = (session.photo_urls ?? [])
     .map((u) => `<img src="${u}" style="max-width:600px;margin:6px 0;" />`)
     .join('');

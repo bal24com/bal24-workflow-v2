@@ -133,7 +133,7 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
     setResumeUploading(true);
     try {
       const ext = resumeFile.name.includes('.') ? resumeFile.name.split('.').pop() : 'pdf';
-      const safeBase = resumeFile.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 60);
+      const safeBase = resumeFile.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 60);
       const path = `resumes/${Date.now()}_${safeBase}.${ext}`;
       const up = await supabase.storage.from('staff-files').upload(path, resumeFile, { upsert: false, contentType: resumeFile.type || undefined });
       if (up.error) {
@@ -154,7 +154,7 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
     setErrorMsg(null);
     try {
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
-      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 60);
+      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 60);
       const path = `profiles/${Date.now()}_${safeBase}${ext ? '.' + ext : ''}`;
       const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { upsert: false, contentType: file.type || undefined });
       if (error) throw error;

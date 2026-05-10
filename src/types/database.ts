@@ -354,6 +354,11 @@ export interface SatisfactionSurvey {
   comments: string[];
   uploaded_at: string;
   uploaded_by?: string | null;
+  /** STEP-SURVEY-AI — AI 항목별 분석 (Record<문항, 인사이트>) */
+  ai_per_question?: Record<string, string>;
+  /** STEP-SURVEY-AI — AI 전체 분석 요약 */
+  ai_overall?: string | null;
+  ai_analyzed_at?: string | null;
 }
 
 export type CurriculumStaffRole = '강사' | 'FT' | '멘토' | 'TA' | '운영진';

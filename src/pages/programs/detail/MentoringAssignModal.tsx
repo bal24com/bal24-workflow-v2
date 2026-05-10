@@ -45,7 +45,7 @@ export default function MentoringAssignModal({ open, programId, onClose, onSaved
     void (async () => {
       const [poolRes, profRes] = await Promise.all([
         supabase.from('staff_pool').select('id, name, specialty').order('name'),
-        supabase.from('profiles').select('id, name, specialty').eq('is_active', true).order('name'),
+        supabase.from('profiles').select('id, name').eq('is_active', true).order('name'),
       ]);
       if (cancelled) return;
       if (poolRes.error) console.error('[mentoring] 외부 멘토 조회 실패:', poolRes.error.message);

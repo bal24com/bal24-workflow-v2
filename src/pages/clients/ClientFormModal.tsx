@@ -111,7 +111,7 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
     setErrorMsg(null);
     try {
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
-      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 60);
+      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 60);
       const path = `business_licenses/${Date.now()}_${safeBase}${ext ? '.' + ext : ''}`;
       const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { upsert: false, contentType: file.type || undefined });
       if (error) throw error;

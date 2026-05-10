@@ -49,7 +49,7 @@ export default function InvitationFileSection({
     setErrorMsg(null);
     try {
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
-      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 60);
+      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 60);
       const path = `${pathPrefix}/${invitationId}/${Date.now()}_${safeBase}${ext ? '.' + ext : ''}`;
       const { error } = await supabase.storage.from(INSTRUCTOR_FILES_BUCKET).upload(path, file, {
         upsert: false, contentType: file.type || undefined,

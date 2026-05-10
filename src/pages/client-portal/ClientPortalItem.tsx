@@ -86,7 +86,7 @@ export default function ClientPortalItem({ item, projectId, readOnly = false, on
     setErrorMsg(null);
     try {
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
-      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 60);
+      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 60);
       const path = `responses/${item.portal_id}/${Date.now()}_${safeBase}${ext ? '.' + ext : ''}`;
       const { error } = await supabase.storage.from(PORTAL_FILES_BUCKET).upload(path, file, {
         upsert: false, contentType: file.type || undefined,

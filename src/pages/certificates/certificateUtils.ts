@@ -128,7 +128,7 @@ export async function uploadCertificatePDF(
 // ─── 직인 이미지 업로드 ────────────────────────────
 export async function uploadSealImage(file: File): Promise<string> {
   const ext = file.name.includes('.') ? file.name.split('.').pop() : 'png';
-  const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 40);
+  const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 40);
   const path = `seals/${Date.now()}_${safeBase}.${ext}`;
   const { error } = await supabase.storage
     .from(STORAGE_BUCKET)

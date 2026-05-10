@@ -53,9 +53,10 @@ export default function SurveyFileUploadSection({ programId }: Props) {
       if (rows.length === 0) { toast.error('응답 데이터가 없어요.'); return; }
 
       // 2) Storage 업로드 (원본 보관)
-      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 60);
-      const ext = file.name.includes('.') ? file.name.split('.').pop() : 'xlsx';
-      const path = `surveys/${programId}/${Date.now()}_${safeBase}.${ext}`;
+      // STEP-SURVEY-FIX — Supabase Storage 키는 ASCII만 허용 → 한글·공백·특수문자 모두 '_'로 (file_name엔 원본 보관)
+      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 40) || 'survey';
+      const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'xlsx')!.replace(/[^a-z]/gi, '').toLowerCase();
+      const path = `surveys/${programId}/${Date.now()}_${safeBase}.${ext || 'xlsx'}`;
       const up = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type || undefined });
       if (up.error) {
         console.error('[survey-file] 업로드 실패:', up.error.message);
@@ -119,7 +120,11 @@ export default function SurveyFileUploadSection({ programId }: Props) {
         </p>
       ) : (
         <div className="space-y-2.5">
-          {items.map((s) => (<SurveyResultCard key={s.id} survey={s} onDelete={() => void handleDelete(s)} />))}
+          {items.map((s) => (
+            <SurveyResultCard key={s.id} survey={s}
+              onDelete={() => void handleDelete(s)}
+              onAnalyzed={() => void refresh()} />
+          ))}
         </div>
       )}
     </section>

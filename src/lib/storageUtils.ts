@@ -167,8 +167,8 @@ export function isAllowedMimeType(file: File, allowedTypes: string[]): boolean {
   return allowedTypes.includes(file.type);
 }
 
-/** 안전한 파일 경로용 베이스 이름 (한글·영숫자·점·하이픈만). */
+/** 안전한 파일 경로용 베이스 이름 (Supabase Storage 키는 ASCII만 허용 — 한글·공백·특수문자 '_'로). */
 export function safeFileBase(name: string, maxLength = 60): string {
   const noExt = name.replace(/\.[^.]+$/, '');
-  return noExt.replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, maxLength);
+  return noExt.replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, maxLength) || 'file';
 }

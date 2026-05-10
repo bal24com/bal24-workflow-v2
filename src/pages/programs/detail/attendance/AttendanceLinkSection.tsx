@@ -67,9 +67,10 @@ export default function AttendanceLinkSection({ programId }: Props) {
     if (file.size > 10 * 1024 * 1024) { toast.error('파일 용량이 10MB를 초과해요.'); return; }
     setUploadingId(row.id);
     try {
-      const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
-      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^\w가-힣ㄱ-ㅎㅏ-ㅣ.-]+/g, '_').slice(0, 60);
-      const path = `${programId}/${row.id}/${Date.now()}_${safeBase}.${ext}`;
+      // STEP-SURVEY-FIX — Supabase Storage 키 ASCII 강제 (한글 키 거부)
+      const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'bin')!.replace(/[^a-z]/gi, '').toLowerCase();
+      const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 40) || 'file';
+      const path = `${programId}/${row.id}/${Date.now()}_${safeBase}.${ext || 'bin'}`;
       const up = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type || undefined });
       if (up.error) { console.error('[attend-link] 업로드 실패:', up.error.message); toast.error('파일 업로드 실패 (attendance-files 버킷 생성 확인)'); return; }
       const url = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
