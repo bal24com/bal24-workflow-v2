@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, FileBarChart, Eye, ClipboardCheck,
+  Loader2, FileBarChart, Eye, ClipboardCheck, Link2,
 } from 'lucide-react';
 import EmptyState from '../../../components/EmptyState';
 import { useToast } from '../../../contexts/ToastContext';
@@ -112,6 +112,18 @@ export default function ReportReviewTab({ programId }: Props) {
 
     setLoading(false);
   }, [programId, toast]);
+
+  // 감사 포털 링크 복사
+  async function copyAuditLink(auditToken: string) {
+    const url = `${window.location.origin}/audit/${auditToken}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('감사 링크를 클립보드에 복사했어요.');
+    } catch (err) {
+      console.error('[report-review] 클립보드 복사 실패:', err instanceof Error ? err.message : '');
+      toast.error('링크 복사에 실패했어요. 직접 복사해 주세요.');
+    }
+  }
 
   // 멘토 배정/해제
   async function assignMentor(reportId: string, mentorId: string | null) {
@@ -350,6 +362,14 @@ export default function ReportReviewTab({ programId }: Props) {
                         <Eye size={11} aria-hidden="true" />
                         {isProcessed ? '열람' : '검토'}
                       </button>
+                      {r.audit_token && (
+                        <button type="button" onClick={() => void copyAuditLink(r.audit_token as string)}
+                          title={r.audit_submitted_at ? '감사 완료됨 (재발송용)' : '감사 링크 복사'}
+                          className="inline-flex items-center gap-0.5 text-[11px] px-2 py-1 rounded-md border border-cyan-200 text-cyan-700 hover:bg-cyan-50">
+                          <Link2 size={11} aria-hidden="true" />
+                          감사링크
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

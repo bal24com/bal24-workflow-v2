@@ -54,6 +54,7 @@ import PartnerHomePage from './pages/partner/PartnerHomePage';
 import MemberInvitePage from './pages/invite/MemberInvitePage';
 import EvaluatePage from './pages/evaluate/EvaluatePage';
 import MyReportPage from './pages/my-report/MyReportPage';
+import AuditPortalPage from './pages/audit/AuditPortalPage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
@@ -105,6 +106,7 @@ export default function App() {
         <Route path="/my/:token" element={<MyPage />} />
         <Route path="/invite/member/:token" element={<MemberInvitePage />} />
         <Route path="/evaluate/:token" element={<EvaluatePage />} />
+        <Route path="/audit/:token" element={<AuditPortalPage />} />
 
         <Route
           path="/login"
