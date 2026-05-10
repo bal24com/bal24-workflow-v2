@@ -9,7 +9,6 @@ import Layout from './components/layout/Layout';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import ProjectsPage from './pages/projects/ProjectsPage';
 import ProjectDetailPage from './pages/projects/ProjectDetailPage';
-import ProgramsPage from './pages/programs/ProgramsPage';
 import ClientsPage from './pages/clients/ClientsPage';
 import ExpertsPage from './pages/experts/ExpertsPage';
 import ConsortiumPage from './pages/consortium/ConsortiumPage';
@@ -25,7 +24,6 @@ import PortalManagePage from './pages/portal/PortalManagePage';
 import PortalTemplatePage from './pages/portal/templates/PortalTemplatePage';
 import SchedulePage from './pages/schedule/SchedulePage';
 import MembersPage from './pages/members/MembersPage';
-import SharesPage from './pages/shares/SharesPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AiPage from './pages/ai/AiPage';
 import ApplicationPage from './pages/applications/ApplicationPage';
@@ -151,12 +149,14 @@ export default function App() {
               <Route path="/consortium" element={<ConsortiumPage />} />
               <Route path="/consortium/:id" element={<ConsortiumDetailPage />} />
               <Route path="/consortiums" element={<Navigate to="/consortium" replace />} />
-              <Route path="/programs" element={<ProgramsPage />} />
+              {/* STEP-MENU-RESTRUCTURE — /programs 리스트는 /projects 로 통합 (북마크 호환) */}
+              <Route path="/programs" element={<Navigate to="/projects" replace />} />
               <Route path="/programs/:id" element={<ProgramDetailPage />} />
               <Route path="/programs/:id/edit" element={<ProgramEditPage />} />
               <Route path="/clients" element={<ClientsPage />} />
               <Route path="/experts" element={<ExpertsPage />} />
-              <Route path="/shares" element={<SharesPage />} />
+              {/* STEP-MENU-RESTRUCTURE — /shares 메뉴 제거 (북마크 호환 redirect) */}
+              <Route path="/shares" element={<Navigate to="/home" replace />} />
 
               {/* 재무 */}
               <Route path="/income" element={<IncomePage />} />
@@ -172,8 +172,9 @@ export default function App() {
               {/* 수료증·강의확인서 (STEP 11-C) */}
               <Route path="/certificates" element={<CertificatePage />} />
 
-              {/* 통합 일지 (STEP 11-D) */}
+              {/* 통합 일지 (STEP 11-D) — /logs alias (STEP-MENU-RESTRUCTURE) */}
               <Route path="/activity-logs" element={<ActivityLogsPage />} />
+              <Route path="/logs" element={<ActivityLogsPage />} />
 
               {/* 외부 공개 폼 관리 (STEP 11-E) */}
               <Route path="/forms" element={<FormManagePage />} />

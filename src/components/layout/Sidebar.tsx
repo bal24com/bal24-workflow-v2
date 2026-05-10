@@ -1,31 +1,23 @@
-// bal24 v2 — 좌측 사이드바
-// 다크 슬레이트(#0F172A) 배경, 14개 메뉴 + 섹션 구분 (운영 / 재무 / 기타)
+// bal24 v2 — 좌측 사이드바 (STEP-MENU-RESTRUCTURE)
+// 다크 슬레이트(#0F172A) 배경. 5그룹 구조로 재편 — 홈/사업/거래처·인력/재무/도구.
+// PARTNER 는 3그룹(홈/사업/도구), MEMBER 는 1그룹(내 사업).
 
 import { NavLink } from 'react-router-dom';
 import {
-  Home,
+  LayoutDashboard,
   CalendarDays,
-  Briefcase,
-  Users2,
-  GraduationCap,
+  FolderKanban,
   Building2,
-  UserStar,
-  Share2,
-  CheckSquare,
-  Award,
-  BookOpen,
-  ClipboardList,
-  UserCheck,
-  Megaphone,
-  Link as LinkIcon,
+  Briefcase,
+  Users,
+  UserCog,
   TrendingUp,
   TrendingDown,
   Receipt,
-  CreditCard,
-  FileBarChart,
-  Users,
+  BarChart3,
+  BookOpen,
   Sparkles,
-  LayoutGrid,
+  Home,
   ExternalLink,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -44,64 +36,80 @@ type MenuSection = {
   items: MenuItem[];
 };
 
-// PARTNER 전용 사이드바 — 2개 메뉴 + 마이페이지 링크 (Q1, Q5)
-const PARTNER_SECTIONS: MenuSection[] = [
+// SECTIONS — admin / pm / staff / finance 공용 (5그룹)
+const SECTIONS: MenuSection[] = [
   {
-    heading: '내 작업',
+    heading: '홈',
     items: [
-      { to: '/partner-home', label: '내 프로그램', Icon: LayoutGrid },
-      { to: '/expense',      label: '내 정산',     Icon: Receipt },
+      { to: '/home',     label: '대시보드', Icon: LayoutDashboard },
+      { to: '/schedule', label: '일정',     Icon: CalendarDays },
+    ],
+  },
+  {
+    heading: '사업',
+    items: [
+      { to: '/projects',   label: '프로젝트', Icon: FolderKanban },
+      { to: '/consortium', label: '컨소시엄', Icon: Building2 },
+    ],
+  },
+  {
+    heading: '거래처·인력',
+    items: [
+      { to: '/clients', label: '고객사', Icon: Briefcase },
+      { to: '/experts', label: '전문가', Icon: Users },
+      { to: '/members', label: '팀원',   Icon: UserCog },
+    ],
+  },
+  {
+    heading: '재무',
+    items: [
+      { to: '/income',   label: '수입',   Icon: TrendingUp },
+      { to: '/expense',  label: '지출',   Icon: TrendingDown },
+      { to: '/receipts', label: '증빙',   Icon: Receipt },
+      { to: '/reports',  label: '리포트', Icon: BarChart3 },
+    ],
+  },
+  {
+    heading: '도구',
+    items: [
+      { to: '/logs', label: '일지', Icon: BookOpen },
+      { to: '/ai',   label: 'AI',   Icon: Sparkles },
     ],
   },
 ];
 
-// STEP-MEMBER-REPORT-PORTAL — MEMBER 전용 사이드바 (홈 + 사업보고)
+// PARTNER 사이드바 (3그룹 — 홈/사업/도구)
+const PARTNER_SECTIONS: MenuSection[] = [
+  {
+    heading: '홈',
+    items: [
+      { to: '/home',     label: '대시보드', Icon: LayoutDashboard },
+      { to: '/schedule', label: '일정',     Icon: CalendarDays },
+    ],
+  },
+  {
+    heading: '사업',
+    items: [
+      { to: '/projects',   label: '프로젝트', Icon: FolderKanban },
+      { to: '/consortium', label: '컨소시엄', Icon: Building2 },
+    ],
+  },
+  {
+    heading: '도구',
+    items: [
+      { to: '/logs', label: '일지', Icon: BookOpen },
+      { to: '/ai',   label: 'AI',   Icon: Sparkles },
+    ],
+  },
+];
+
+// STEP-MEMBER-REPORT-PORTAL — MEMBER 전용 사이드바 (변경 없음)
 const MEMBER_SECTIONS: MenuSection[] = [
   {
     heading: '내 사업',
     items: [
       { to: '/home',      label: '홈',       Icon: Home },
       { to: '/my-report', label: '사업보고', Icon: BookOpen },
-    ],
-  },
-];
-
-const SECTIONS: MenuSection[] = [
-  {
-    heading: '운영',
-    items: [
-      { to: '/home',        label: '홈',       Icon: Home },
-      { to: '/schedule',    label: '일정',     Icon: CalendarDays },
-      { to: '/projects',    label: '프로젝트', Icon: Briefcase },
-      { to: '/consortium',  label: '컨소시엄', Icon: Users2 },
-      { to: '/programs',    label: '프로그램', Icon: GraduationCap },
-      { to: '/clients',     label: '고객사',   Icon: Building2 },
-      { to: '/experts',     label: '전문가',   Icon: UserStar },
-      { to: '/shares',      label: '공유',     Icon: Share2 },
-      { to: '/attendance',  label: '출석체크', Icon: CheckSquare },
-      { to: '/certificates', label: '수료증',  Icon: Award },
-      { to: '/activity-logs', label: '일지',   Icon: BookOpen },
-      { to: '/forms',         label: '폼 관리', Icon: ClipboardList },
-      { to: '/applications',  label: '교육생 신청', Icon: UserCheck },
-      { to: '/recruit-manage',label: '모집 공고',   Icon: Megaphone },
-      { to: '/portals',       label: '포털',    Icon: LinkIcon },
-    ],
-  },
-  {
-    heading: '재무',
-    items: [
-      { to: '/income',      label: '수입',   Icon: TrendingUp },
-      { to: '/expense',     label: '지출',   Icon: TrendingDown },
-      { to: '/receipts',    label: '증빙',   Icon: Receipt },
-      { to: '/settlements', label: '정산',   Icon: CreditCard },
-      { to: '/reports',     label: '리포트', Icon: FileBarChart },
-    ],
-  },
-  {
-    heading: '기타',
-    items: [
-      { to: '/members', label: '팀원', Icon: Users },
-      { to: '/ai',   label: 'AI',   Icon: Sparkles },
     ],
   },
 ];
