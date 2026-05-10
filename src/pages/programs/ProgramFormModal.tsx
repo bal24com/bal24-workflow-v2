@@ -15,10 +15,7 @@ import ProgramVisibilityField, { type ProgramVisibility } from './ProgramVisibil
 import ProgramAutofillSection from './ProgramAutofillSection';
 import ProgramDescriptionField from './ProgramDescriptionField';
 import ProgramTypeSelector from './ProgramTypeSelector';
-import {
-  applyExtractedProgram, insertPendingSessions,
-  type ExtractedProgram, type ExtractedProgramType, type ExtractedSession,
-} from '../../lib/programAutoFill';
+import { applyExtractedProgram, insertPendingSessions, type ExtractedProgram, type ExtractedProgramType, type ExtractedSession } from '../../lib/programAutoFill';
 import { useToast } from '../../contexts/ToastContext';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
 
@@ -207,9 +204,11 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
 
       if (error) throw error;
 
-      // STEP-PROGRAM-DASHBOARD — AI 추출 차시 자동 등록
+      // STEP-CURRICULUM-AI-INLINE — 디버그 로그 (박경수님 콘솔 확인용)
+      console.log('[program-form] pendingSessions=', pendingSessions, '| length=', pendingSessions.length, '| programId=', createdProgram?.id);
       if (pendingSessions.length > 0 && createdProgram?.id) {
         const r = await insertPendingSessions(createdProgram.id, pendingSessions);
+        console.log('[program-form] insertPendingSessions 결과:', r);
         if (!r.ok) toast.error('프로그램은 등록됐지만 차시 자동 등록에 실패했어요. 직접 추가해 주세요.');
         else toast.success(`프로그램과 차시 ${pendingSessions.length}개가 등록됐어요.`);
       } else {
