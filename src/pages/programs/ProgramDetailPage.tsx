@@ -30,6 +30,7 @@ import EvaluatorTab from './detail/EvaluatorTab';
 import ApplicationTab from './detail/ApplicationTab';
 import EvalReportTab from './detail/EvalReportTab';
 import ReportReviewTab from './detail/ReportReviewTab';
+import MentorTeamTab from './detail/MentorTeamTab';
 import {
   resolveVisibleTabs, SHARE_TAB_ALWAYS,
   type TabKey, type VisibleTab,
@@ -158,7 +159,7 @@ export default function ProgramDetailPage() {
   // 3) 탭 fallback (훅 #3) — visibleTabs 에 현재 tab 없으면 첫 가시 탭으로
   useEffect(() => {
     if (visibleTabs.length === 0) return;
-    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications', 'eval_report', 'report_review'];
+    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications', 'eval_report', 'report_review', 'mentor_team'];
     if (!allKeys.includes(tab)) {
       setTab(visibleTabs[0]?.key ?? 'overview');
     }
@@ -294,8 +295,14 @@ export default function ProgramDetailPage() {
         {program.application_type === 'evaluation' && (
           <ExtraTabBtn active={tab === 'eval_report'} onClick={() => setTab('eval_report')} icon={BarChart3} label="평가결과" />
         )}
-        {/* STEP-PM-REPORT-REVIEW — 사업보고 탭 (모든 프로그램에 노출) */}
-        <ExtraTabBtn active={tab === 'report_review'} onClick={() => setTab('report_review')} icon={FileBarChart} label="사업보고" />
+        {/* STEP-PM-REPORT-REVIEW — 사업보고 탭 (PM/ADMIN 용 — PARTNER 는 담당팀 탭으로 대체) */}
+        {!isPartner && (
+          <ExtraTabBtn active={tab === 'report_review'} onClick={() => setTab('report_review')} icon={FileBarChart} label="사업보고" />
+        )}
+        {/* STEP-MENTOR-TEAM-VIEW — PARTNER(멘토) 담당팀 탭 */}
+        {isPartner && (
+          <ExtraTabBtn active={tab === 'mentor_team'} onClick={() => setTab('mentor_team')} icon={Handshake} label="담당팀" />
+        )}
         {SHARE_TAB_ALWAYS && (
           <ExtraTabBtn active={tab === 'share'} onClick={() => setTab('share')} icon={Share2} label="외부 공유" />
         )}
@@ -313,7 +320,8 @@ export default function ProgramDetailPage() {
         {tab === 'evaluator' && <EvaluatorTab programId={programId} />}
         {tab === 'eval_report' && <EvalReportTab programId={programId} />}
         {tab === 'applications' && <ApplicationTab programId={programId} />}
-        {tab === 'report_review' && <ReportReviewTab programId={programId} />}
+        {tab === 'report_review' && !isPartner && <ReportReviewTab programId={programId} />}
+        {tab === 'mentor_team' && isPartner && <MentorTeamTab programId={programId} />}
         {tab === 'survey' && <SurveyResultTab programId={programId} />}
         {tab === 'share' && <ShareTab programId={programId} />}
         {tab === 'report' && <ReportBuilderTab programId={programId} />}

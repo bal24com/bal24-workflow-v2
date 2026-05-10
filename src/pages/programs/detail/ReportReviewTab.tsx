@@ -57,6 +57,12 @@ const SELECT_COLUMNS = `
   )
 `;
 
+// PARTNER(멘토) 후보 — 드롭다운에서 사용
+interface PartnerOption {
+  id: string;
+  name: string | null;
+}
+
 export default function ReportReviewTab({ programId }: Props) {
   const toast = useToast();
   const { user } = useAuth();
@@ -65,15 +71,24 @@ export default function ReportReviewTab({ programId }: Props) {
   const [filter, setFilter] = useState<FilterTab>('all');
   const [acting, setActing] = useState(false);
   const [target, setTarget] = useState<ReportRow | null>(null);
+  const [partners, setPartners] = useState<PartnerOption[]>([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('performance_reports')
-      .select(SELECT_COLUMNS)
-      .eq('program_id', programId)
-      .order('submitted_at', { ascending: false, nullsFirst: false });
+    const [reportsRes, partnersRes] = await Promise.all([
+      supabase
+        .from('performance_reports')
+        .select(SELECT_COLUMNS)
+        .eq('program_id', programId)
+        .order('submitted_at', { ascending: false, nullsFirst: false }),
+      supabase
+        .from('profiles')
+        .select('id, name')
+        .eq('role', 'partner')
+        .order('name', { ascending: true }),
+    ]);
 
+    const { data, error } = reportsRes;
     if (error) {
       const msg = error.message?.toLowerCase() ?? '';
       // 테이블 미존재(PGRST205) — 빈 목록으로 처리
@@ -87,8 +102,33 @@ export default function ReportReviewTab({ programId }: Props) {
     } else {
       setItems((data ?? []) as ReportRow[]);
     }
+
+    if (partnersRes.error) {
+      console.error('[report-review] 멘토 후보 조회 실패:', partnersRes.error.message);
+      setPartners([]);
+    } else {
+      setPartners((partnersRes.data ?? []) as PartnerOption[]);
+    }
+
     setLoading(false);
   }, [programId, toast]);
+
+  // 멘토 배정/해제
+  async function assignMentor(reportId: string, mentorId: string | null) {
+    setActing(true);
+    const { error } = await supabase
+      .from('performance_reports')
+      .update({ mentor_id: mentorId, updated_at: new Date().toISOString() })
+      .eq('id', reportId);
+    setActing(false);
+    if (error) {
+      console.error('[report-review] 멘토 배정 실패:', error.message);
+      toast.error('멘토 배정 중 오류가 발생했어요.');
+      return;
+    }
+    toast.success(mentorId ? '멘토를 배정했어요.' : '멘토 배정을 해제했어요.');
+    await refresh();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -244,6 +284,7 @@ export default function ReportReviewTab({ programId }: Props) {
                 <th className="text-center px-3 py-2.5 font-semibold">상태</th>
                 <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">집행액</th>
                 <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">사진</th>
+                <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">멘토</th>
                 <th className="text-right px-3 py-2.5 font-semibold">액션</th>
               </tr>
             </thead>
@@ -277,6 +318,19 @@ export default function ReportReviewTab({ programId }: Props) {
                     </td>
                     <td className="px-3 py-2.5 text-center text-xs text-slate-500 tabular-nums">
                       {photoCount > 0 ? `${photoCount}장` : <span className="text-slate-300">-</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs">
+                      <select
+                        value={r.mentor_id ?? ''}
+                        onChange={(e) => void assignMentor(r.id, e.target.value || null)}
+                        disabled={acting}
+                        className="text-[11px] rounded-md border border-slate-200 bg-white px-1.5 py-1 text-slate-700 focus:border-violet-300 focus:ring-1 focus:ring-violet-200 disabled:opacity-50"
+                      >
+                        <option value="">미배정</option>
+                        {partners.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name ?? p.id.slice(0, 8)}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-3 py-2.5 text-right space-x-1 whitespace-nowrap">
                       {r.status === 'submitted' && (
