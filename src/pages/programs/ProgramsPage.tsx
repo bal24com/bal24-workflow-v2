@@ -187,8 +187,7 @@ function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow)
 
 export default function ProgramsPage() {
   const toast = useToast();
-  // STEP-ROLE-NORMALIZE — isMember 의미 변경 (role==='member')
-  // 컨소시엄 참여기관 필터링에는 hasConsortiumMembership 사용
+  // STEP-ROLE-NORMALIZE — 컨소시엄 참여기관 필터링에는 hasConsortiumMembership 사용
   const { profile, hasConsortiumMembership, isPM } = useUserProfile();
   const { programIds: myProgramIds } = useMemberProgramIds(
     hasConsortiumMembership ? profile?.consortium_member_id ?? null : null,
@@ -206,42 +205,28 @@ export default function ProgramsPage() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { data, error } = await supabase
-        .from('consortiums')
-        .select('id, name')
-        .in('status', ['구성중', '진행'])
-        .order('name', { ascending: true });
+      const { data, error } = await supabase.from('consortiums').select('id, name').in('status', ['구성중', '진행']).order('name', { ascending: true });
       if (cancelled) return;
-      if (error) {
-        console.error('[programs] 컨소시엄 조회 실패:', error.message);
-        return;
-      }
+      if (error) { console.error('[programs] 컨소시엄 조회 실패:', error.message); return; }
       setConsortiums((data as ConsortiumOption[] | null) ?? []);
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const fetchPrograms = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('programs')
-        .select(SELECT_COLUMNS)
-        .order('created_at', { ascending: false });
-
+      const { data, error } = await supabase.from('programs').select(SELECT_COLUMNS).order('created_at', { ascending: false });
       if (error) throw error;
       setPrograms((data ?? []) as ProgramRow[]);
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[programs] 목록 조회 실패:', raw);
       const m = raw.toLowerCase();
-      if (m.includes("could not find the table 'public.programs'") || m.includes('pgrst205')) {
-        toast.error('프로그램 테이블이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.');
-      } else {
-        toast.error('프로그램 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
-      }
+      const missing = m.includes("could not find the table 'public.programs'") || m.includes('pgrst205');
+      toast.error(missing
+        ? '프로그램 테이블이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.'
+        : '프로그램 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setLoading(false);
     }
@@ -269,8 +254,7 @@ export default function ProgramsPage() {
 
   const visible = useMemo(() => {
     return programs.filter((p) => {
-      // STEP-PROGRAM-ASSIGNMENT (Q3-A) — 컨소시엄 참여기관 사용자는 본인 배정만 표시. PM/ADMIN 은 전체.
-      // STEP-ROLE-NORMALIZE — isMember(role) 가 아닌 hasConsortiumMembership(컨소시엄 매핑) 으로 교체
+      // Q3-A: 컨소시엄 참여기관 사용자는 본인 배정만 표시. PM/ADMIN 은 전체.
       if (hasConsortiumMembership && !isPM && !myProgramIds.includes(p.id)) return false;
       if (statusFilter !== '전체' && p.status !== statusFilter) return false;
       if (typeFilter !== '전체' && p.type !== typeFilter) return false;
