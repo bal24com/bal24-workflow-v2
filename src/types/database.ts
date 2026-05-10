@@ -1021,6 +1021,39 @@ export interface ScheduleEvent {
   updated_at: string;
 }
 
+// ─── STEP-EVALUATION-SYSTEM 평가위원 + 점수 ───────────────────
+export type EvaluatorStatus = 'invited' | 'accepted' | 'completed' | 'declined';
+export type EvaluatorFeeType = '3.3' | '8.8' | '면세';
+
+export interface ProgramEvaluator {
+  id: string;
+  program_id: string;
+  staff_pool_id: string;
+  eval_token: string;
+  fee_amount: number;
+  fee_type: EvaluatorFeeType;
+  status: EvaluatorStatus;
+  invited_at: string;
+  accepted_at?: string | null;
+  completed_at?: string | null;
+  note?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvaluationScore {
+  id: string;
+  program_evaluator_id: string;
+  application_id: string;
+  category: string;
+  score: number;
+  max_score: number;
+  comment?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─── STEP-MEMBER-INVITE 팀원 이메일 초대 ──────────────────────
 export interface MemberInvitation {
   id: string;
