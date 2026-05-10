@@ -5,7 +5,7 @@
 export type TabKey =
   | 'overview' | 'curriculum' | 'staff' | 'attendance'
   | 'survey'   | 'files'      | 'report' | 'share'
-  | 'mentoring' | 'staff_fee' | 'evaluator' | 'applications';
+  | 'mentoring' | 'staff_fee' | 'evaluator' | 'applications' | 'eval_report';
 
 /**
  * module ID → TabKey 매핑.
@@ -95,6 +95,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   staff_fee:    '지급 기준',
   evaluator:    '평가위원',
   applications: '신청자',
+  eval_report:  '평가결과',
 };
 
 export function getTabLabel(key: TabKey): string {

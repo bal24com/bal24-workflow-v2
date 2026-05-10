@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen, FolderOpen, Hourglass, Users2, Handshake, Receipt, Award,
+  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen, FolderOpen, Hourglass, Users2, Handshake, Receipt, Award, BarChart3,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -28,6 +28,7 @@ import MentoringTab from './detail/MentoringTab';
 import StaffFeeTab from './detail/StaffFeeTab';
 import EvaluatorTab from './detail/EvaluatorTab';
 import ApplicationTab from './detail/ApplicationTab';
+import EvalReportTab from './detail/EvalReportTab';
 import {
   resolveVisibleTabs, SHARE_TAB_ALWAYS,
   type TabKey, type VisibleTab,
@@ -54,6 +55,7 @@ const TAB_ICON: Record<TabKey, LucideIcon> = {
   staff_fee:    Receipt,
   evaluator:    Award,
   applications: Users2,
+  eval_report:  BarChart3,
 };
 
 function getTabIcon(tab: VisibleTab): LucideIcon {
@@ -130,7 +132,7 @@ export default function ProgramDetailPage() {
   // 3) 탭 fallback (훅 #3) — visibleTabs 에 현재 tab 없으면 첫 가시 탭으로
   useEffect(() => {
     if (visibleTabs.length === 0) return;
-    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications'];
+    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications', 'eval_report'];
     if (!allKeys.includes(tab)) {
       setTab(visibleTabs[0]?.key ?? 'overview');
     }
@@ -318,6 +320,28 @@ export default function ProgramDetailPage() {
           );
         })()}
 
+        {/* STEP-EVAL-REPORT — application_type='evaluation' 일 때만 평가결과 탭 */}
+        {program.application_type === 'evaluation' && (() => {
+          const active = tab === 'eval_report';
+          return (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab('eval_report')}
+              className={[
+                'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
+                active
+                  ? 'text-violet-700 border-violet-600'
+                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
+              ].join(' ')}
+            >
+              <BarChart3 size={15} aria-hidden="true" />
+              평가결과
+            </button>
+          );
+        })()}
+
         {SHARE_TAB_ALWAYS && (() => {
           const active = tab === 'share';
           return (
@@ -350,6 +374,7 @@ export default function ProgramDetailPage() {
         {tab === 'mentoring' && <MentoringTab programId={programId} />}
         {tab === 'staff_fee' && <StaffFeeTab programId={programId} />}
         {tab === 'evaluator' && <EvaluatorTab programId={programId} />}
+        {tab === 'eval_report' && <EvalReportTab programId={programId} />}
         {tab === 'applications' && <ApplicationTab programId={programId} />}
         {tab === 'survey' && <SurveyResultTab programId={programId} />}
         {tab === 'share' && <ShareTab programId={programId} />}
