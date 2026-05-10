@@ -7,10 +7,10 @@ import { CheckCircle2, Loader2, Calendar, MapPin, User } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatRole } from './invitationUtils';
 import { formatDateKo } from '../../lib/utils';
-import type { InstructorInvitation, InvitationFile } from '../../types/database';
-import InvitationFileSection from './InvitationFileSection';
+import InstructorProfileForm from './InstructorProfileForm';
+import type { InstructorInvitation } from '../../types/database';
 
-type ScreenState = 'loading' | 'notfound' | 'expired' | 'ready' | 'accept' | 'reject' | 'done_accept' | 'done_reject';
+type ScreenState = 'loading' | 'notfound' | 'expired' | 'ready' | 'profile' | 'reject' | 'done_accept' | 'done_reject';
 
 type ProgramInfo = { id: string; name: string; start_date?: string | null; end_date?: string | null; venue?: string | null };
 
@@ -19,8 +19,6 @@ export default function InstructorInvitePage() {
   const [screen, setScreen] = useState<ScreenState>('loading');
   const [inv, setInv] = useState<InstructorInvitation | null>(null);
   const [program, setProgram] = useState<ProgramInfo | null>(null);
-  const [profileFiles, setProfileFiles] = useState<InvitationFile[]>([]);
-  const [materials, setMaterials] = useState<InvitationFile[]>([]);
   const [rejectReason, setRejectReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -42,8 +40,6 @@ export default function InstructorInvitePage() {
         if (!data) { setScreen('notfound'); return; }
         const i = data as InstructorInvitation;
         setInv(i);
-        setProfileFiles(i.profile_files ?? []);
-        setMaterials(i.materials ?? []);
 
         // program info 조회
         if (i.program_id) {
@@ -52,11 +48,14 @@ export default function InstructorInvitePage() {
           if (!cancelled && p) setProgram(p as ProgramInfo);
         }
 
-        if (i.responded_at) {
-          setScreen(i.status === '거절' ? 'done_reject' : 'done_accept');
-        } else {
-          setScreen('ready');
-        }
+        // 이미 프로필 제출됐는지 확인 → 단계 분기
+        const { data: prof } = await supabase
+          .from('instructor_profiles').select('submitted').eq('invitation_id', i.id).maybeSingle();
+        if (cancelled) return;
+        if (prof?.submitted)        setScreen('done_accept');
+        else if (i.status === '수락') setScreen('profile');
+        else if (i.status === '거절') setScreen('done_reject');
+        else                          setScreen('ready');
       } catch (err) {
         if (cancelled) return;
         const raw = err instanceof Error ? err.message : '';
@@ -66,15 +65,6 @@ export default function InstructorInvitePage() {
     })();
     return () => { cancelled = true; };
   }, [token]);
-
-  const handleSaveFiles = async () => {
-    if (!inv) return;
-    const { error } = await supabase
-      .from('instructor_invitations')
-      .update({ profile_files: profileFiles, materials })
-      .eq('id', inv.id);
-    if (error) console.error('[invite] 자료 저장 실패:', error.message);
-  };
 
   const handleAccept = async () => {
     if (!inv) return;
@@ -86,23 +76,11 @@ export default function InstructorInvitePage() {
         .update({ status: '수락', responded_at: new Date().toISOString() })
         .eq('id', inv.id);
       if (error) throw error;
-      setScreen('accept');
+      setScreen('profile');
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[invite] 수락 처리 실패:', raw);
       setErrorMsg('수락 처리 중 오류가 발생했어요.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleCompleteAccept = async () => {
-    if (!inv) return;
-    setSubmitting(true);
-    setErrorMsg(null);
-    try {
-      await handleSaveFiles();
-      setScreen('done_accept');
     } finally {
       setSubmitting(false);
     }
@@ -164,7 +142,7 @@ export default function InstructorInvitePage() {
           </div>
         )}
 
-        {(screen === 'ready' || screen === 'accept' || screen === 'reject') && inv && (
+        {(screen === 'ready' || screen === 'profile' || screen === 'reject') && inv && (
           <>
             <header className="bg-white rounded-card border border-[#EDE9FE] shadow-card p-6 space-y-3">
               <div className="text-xs font-semibold text-primary">초대장</div>
@@ -206,36 +184,8 @@ export default function InstructorInvitePage() {
               </div>
             )}
 
-            {screen === 'accept' && (
-              <div className="bg-white rounded-card border border-[#EDE9FE] shadow-card p-6 space-y-5">
-                <p className="text-sm text-success font-semibold">✅ 수락 처리되었습니다. 자료를 업로드하시면 더 매끄러운 운영이 가능해요. (선택)</p>
-                <InvitationFileSection
-                  title="프로필 자료"
-                  description="이력서·명함·프로필 사진 등"
-                  pathPrefix="profiles"
-                  invitationId={inv.id}
-                  files={profileFiles}
-                  onChange={setProfileFiles}
-                  maxSizeMB={20}
-                  accept="image/*,application/pdf,.docx,.hwp"
-                  disabled={submitting}
-                />
-                <InvitationFileSection
-                  title="강의 교안"
-                  description="PPT·PDF·이미지·문서 등 (최대 50MB)"
-                  pathPrefix="materials"
-                  invitationId={inv.id}
-                  files={materials}
-                  onChange={setMaterials}
-                  maxSizeMB={50}
-                  disabled={submitting}
-                />
-                {errorMsg && (<div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-2.5 text-sm text-danger">{errorMsg}</div>)}
-                <button type="button" onClick={() => void handleCompleteAccept()} disabled={submitting}
-                  className="w-full rounded-xl py-3 text-sm font-bold text-white bg-primary hover:opacity-90 disabled:opacity-60 transition">
-                  {submitting ? '저장 중…' : '완료'}
-                </button>
-              </div>
+            {screen === 'profile' && (
+              <InstructorProfileForm invitation={inv} onSubmitted={() => setScreen('done_accept')} />
             )}
 
             {screen === 'reject' && (

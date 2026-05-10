@@ -1081,6 +1081,46 @@ export interface MemberInvitation {
   deleted_at?: string | null;
 }
 
+// ─── STEP-INSTRUCTOR-INVITE-A 강사 자기 입력 프로필 ───────
+export interface InstructorCareerEntry {
+  [key: string]: string | undefined;
+  org?: string;
+  role?: string;
+  period?: string;
+}
+
+export interface InstructorAwardEntry {
+  [key: string]: string | undefined;
+  name?: string;
+  year?: string;
+}
+
+export interface InstructorProfile {
+  id: string;
+  invitation_id: string;
+  profile_id?: string | null;
+  real_name: string;
+  phone?: string | null;
+  email?: string | null;
+  id_number?: string | null;
+  bio?: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  bank_holder?: string | null;
+  career_json: InstructorCareerEntry[];
+  awards_json: InstructorAwardEntry[];
+  photo_url?: string | null;
+  bankbook_url?: string | null;
+  id_card_url?: string | null;
+  lecture_file_url?: string | null;
+  privacy_agreed: boolean;
+  privacy_agreed_at?: string | null;
+  submitted: boolean;
+  submitted_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─── STEP-SURVEY 만족도 문항·응답 ─────────────────────────
 export type SurveyQuestionType = 'star' | 'text';
 export type SurveyQuestionPhase = 'pre' | 'post' | 'both';

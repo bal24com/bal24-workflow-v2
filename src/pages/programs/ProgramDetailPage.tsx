@@ -318,7 +318,7 @@ export default function ProgramDetailPage() {
         {tab === 'overview' && (
           <OverviewTab programId={programId} description={program.description ?? null} />
         )}
-        {tab === 'curriculum' && <CurriculumTab programId={programId} />}
+        {tab === 'curriculum' && <CurriculumTab programId={programId} programName={program?.name} />}
         {tab === 'staff' && <StaffStudentsTab programId={programId} />}
         {tab === 'attendance' && <AttendanceLogTab programId={programId} />}
         {tab === 'mentoring' && <MentoringTab programId={programId} />}

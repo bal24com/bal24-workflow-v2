@@ -4,17 +4,18 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   X, Plus, Loader2, Copy, RefreshCw, FileIcon, ExternalLink,
 } from 'lucide-react';
-import { Button, Input } from '../../components/ui';
+import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import {
-  ROLE_VALUES, STATUS_LABEL, formatRole, getInvitationUrl,
+  STATUS_LABEL, formatRole, getInvitationUrl,
   fileSizeLabel, extractStoragePath, INSTRUCTOR_FILES_BUCKET,
 } from '../instructor-portal/invitationUtils';
+import InvitationAddForm from './InvitationAddForm';
 import { formatDateKo } from '../../lib/utils';
 import { copyToClipboard } from '../../lib/clipboard';
 import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../utils/statusStyles';
 import type {
-  InstructorInvitation, InvitationFile, InvitationRole, StaffPool,
+  InstructorInvitation, InvitationFile, StaffPool,
 } from '../../types/database';
 
 type Props = {
@@ -22,6 +23,9 @@ type Props = {
   programId: string;
   programName: string;
   onClose: () => void;
+  /** STEP-INSTRUCTOR-INVITE-A — CurriculumTab에서 차시 지정 진입 시 폼 미리 채움 */
+  defaultCurriculumId?: string | null;
+  defaultSessionInfo?: string;
 };
 
 
@@ -31,22 +35,16 @@ function translateError(raw: string): string {
   return '처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }
 
-export default function InvitationManagePanel({ open, programId, programName, onClose }: Props) {
+export default function InvitationManagePanel({
+  open, programId, programName, onClose, defaultCurriculumId, defaultSessionInfo,
+}: Props) {
   const [invitations, setInvitations] = useState<InstructorInvitation[]>([]);
   const [experts, setExperts] = useState<Pick<StaffPool, 'id' | 'name' | 'phone' | 'email'>[]>([]);
+  const [submittedMap, setSubmittedMap] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [addExpanded, setAddExpanded] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  // 신규 초대 폼
-  const [newExpertId, setNewExpertId] = useState('');
-  const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState<InvitationRole>('instructor');
-  const [newNotes, setNewNotes] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [savingNew, setSavingNew] = useState(false);
 
   // 신호 파일 (단일 파일 다운로드)
   const [openingUrl, setOpeningUrl] = useState<string | null>(null);
@@ -64,8 +62,22 @@ export default function InvitationManagePanel({ open, programId, programName, on
       ]);
       if (invR.error) throw invR.error;
       if (expR.error) console.error('[invite-manage] staff 조회 실패:', expR.error.message);
-      setInvitations((invR.data ?? []) as InstructorInvitation[]);
+      const invs = (invR.data ?? []) as InstructorInvitation[];
+      setInvitations(invs);
       setExperts(expR.data ?? []);
+
+      // STEP-INSTRUCTOR-INVITE-A — instructor_profiles.submitted 매핑 (배지용)
+      if (invs.length > 0) {
+        const ids = invs.map((i) => i.id);
+        const { data: profs, error: profErr } = await supabase
+          .from('instructor_profiles').select('invitation_id, submitted').in('invitation_id', ids);
+        if (profErr) console.error('[invite-manage] profile 조회 실패:', profErr.message);
+        const map = new Map<string, boolean>();
+        for (const p of profs ?? []) map.set(p.invitation_id, Boolean(p.submitted));
+        setSubmittedMap(map);
+      } else {
+        setSubmittedMap(new Map());
+      }
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[invite-manage] 조회 실패:', raw);
@@ -77,48 +89,20 @@ export default function InvitationManagePanel({ open, programId, programName, on
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
-  const onPickExpert = (id: string) => {
-    setNewExpertId(id);
-    if (!id) return;
-    const e = experts.find((x) => x.id === id);
-    if (e) {
-      if (!newName.trim()) setNewName(e.name);
-      if (!newPhone.trim() && e.phone) setNewPhone(e.phone);
-      if (!newEmail.trim() && e.email) setNewEmail(e.email);
-    }
+  // STEP-INSTRUCTOR-INVITE-A — 차시 지정 진입 시 폼 자동 펼침
+  useEffect(() => {
+    if (!open) return;
+    if (defaultCurriculumId || defaultSessionInfo) setAddExpanded(true);
+  }, [open, defaultCurriculumId, defaultSessionInfo]);
+
+  // 통계 계산
+  const stats = {
+    total: invitations.length,
+    pending: invitations.filter((i) => i.status === '대기').length,
+    accepted: invitations.filter((i) => i.status === '수락').length,
+    rejected: invitations.filter((i) => i.status === '거절').length,
   };
 
-  const handleAddInvitation = async (replacementFor?: string) => {
-    if (!newName.trim()) { setErrorMsg('강사 이름을 입력해 주세요.'); return; }
-    setSavingNew(true);
-    setErrorMsg(null);
-    try {
-      const { error } = await supabase.from('instructor_invitations').insert({
-        program_id: programId,
-        expert_id: newExpertId || null,
-        staff_pool_id: newExpertId || null,
-        name: newName.trim(),
-        phone: newPhone.trim() || null,
-        email: newEmail.trim() || null,
-        role: newRole,
-        notes: newNotes.trim() || null,
-        status: '대기',
-        invited_at: new Date().toISOString(),
-        replacement_for: replacementFor ?? null,
-      });
-      if (error) throw error;
-      setNewExpertId(''); setNewName(''); setNewPhone(''); setNewEmail('');
-      setNewRole('instructor'); setNewNotes('');
-      setAddExpanded(false);
-      await fetchData();
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[invite-manage] 추가 실패:', raw);
-      setErrorMsg(translateError(raw));
-    } finally {
-      setSavingNew(false);
-    }
-  };
 
   const handleCopyLink = async (token: string, id: string) => {
     const ok = await copyToClipboard(getInvitationUrl(token));
@@ -139,8 +123,6 @@ export default function InvitationManagePanel({ open, programId, programName, on
         .eq('id', inv.id);
       if (error) throw error;
       setAddExpanded(true);
-      // 새 초대 폼에 replacement_for 저장 (간단히 notes에 표시)
-      setNewNotes(`(${inv.name} 강사 교체)`);
       await fetchData();
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
@@ -185,43 +167,27 @@ export default function InvitationManagePanel({ open, programId, programName, on
         </header>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* STEP-INSTRUCTOR-INVITE-A — 통계 바 */}
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <span className="text-slate-600">총 <strong className="text-slate-800">{stats.total}</strong>명</span>
+            <span className="text-amber-600">대기 <strong>{stats.pending}</strong></span>
+            <span className="text-emerald-600">수락 <strong>{stats.accepted}</strong></span>
+            <span className="text-red-600">거절 <strong>{stats.rejected}</strong></span>
+          </div>
+
           {errorMsg && (
             <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-3 text-sm text-danger">{errorMsg}</div>
           )}
 
           {addExpanded ? (
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
-              <h3 className="text-sm font-bold text-primary">새 강사 초대</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-sm font-semibold text-slate-700">전문가 풀에서 선택 (선택)</label>
-                  <select value={newExpertId} onChange={(e) => onPickExpert(e.target.value)} disabled={savingNew}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                    <option value="">직접 입력</option>
-                    {experts.map((e) => (<option key={e.id} value={e.id}>{e.name}</option>))}
-                  </select>
-                </div>
-                <Input label="이름" required value={newName} onChange={(e) => setNewName(e.target.value)} disabled={savingNew} />
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-slate-700">역할</label>
-                  <select value={newRole} onChange={(e) => setNewRole(e.target.value as InvitationRole)} disabled={savingNew}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-                    {ROLE_VALUES.map((r) => (<option key={r} value={r}>{formatRole(r)}</option>))}
-                  </select>
-                </div>
-                <Input label="전화" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} disabled={savingNew} />
-                <Input label="이메일" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} disabled={savingNew} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">메모 (강사에게 보일 메시지)</label>
-                <textarea rows={2} value={newNotes} onChange={(e) => setNewNotes(e.target.value)} disabled={savingNew}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 resize-none" />
-              </div>
-              <div className="flex items-center justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setAddExpanded(false)} disabled={savingNew}>취소</Button>
-                <Button variant="primary" size="sm" loading={savingNew} onClick={() => void handleAddInvitation()}>초대 만들기</Button>
-              </div>
-            </div>
+            <InvitationAddForm
+              programId={programId}
+              experts={experts}
+              defaultCurriculumId={defaultCurriculumId}
+              defaultSessionInfo={defaultSessionInfo}
+              onSubmitted={() => { setAddExpanded(false); void fetchData(); }}
+              onCancel={() => setAddExpanded(false)}
+            />
           ) : (
             <Button variant="primary" size="sm" leftIcon={<Plus size={14} />} onClick={() => setAddExpanded(true)}>
               초대 추가
@@ -245,6 +211,9 @@ export default function InvitationManagePanel({ open, programId, programName, on
                         <span className="text-sm font-bold text-text truncate">{inv.name}</span>
                         <span className={`${BADGE_BASE} ${INVITATION_STATUS_STYLE[inv.status]}`}>{STATUS_LABEL[inv.status]}</span>
                         <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{formatRole(inv.role)}</span>
+                        {submittedMap.get(inv.id) && (
+                          <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">프로필 완료</span>
+                        )}
                       </div>
                       <div className="text-[11px] text-muted mt-0.5">
                         초대 {formatDateKo(inv.invited_at)}

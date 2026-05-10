@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import {
-  ChevronDown, ChevronRight, GripVertical, Trash2, UserPlus, Users, Save, RotateCcw,
+  ChevronDown, ChevronRight, GripVertical, Trash2, UserPlus, Users, Save, RotateCcw, Send,
 } from 'lucide-react';
 import DateTimePicker from '../../../../components/ui/DateTimePicker';
 import StaffMatchRow from './StaffMatchRow';
@@ -17,6 +17,8 @@ interface Props {
   onDelete: () => Promise<void>;
   onOpenMatch: (defaultRole: CurriculumStaffRole) => void;
   onDeleteStaff: (staffId: string) => Promise<void>;
+  /** STEP-INSTRUCTOR-INVITE-A — 외부 강사 초대 패널 진입 */
+  onRequestInstructor?: () => void;
   onDragStart: () => void;
   onDragEnter: () => void;
   onDragEnd: () => void;
@@ -62,7 +64,7 @@ function isEqual(a: Draft, b: Draft): boolean {
 }
 
 export default function CurriculumRow({
-  item, onSave, onDelete, onOpenMatch, onDeleteStaff,
+  item, onSave, onDelete, onOpenMatch, onDeleteStaff, onRequestInstructor,
   onDragStart, onDragEnter, onDragEnd, onDragOver, isDragging,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -297,6 +299,16 @@ export default function CurriculumRow({
                   <Users size={11} aria-hidden="true" />
                   멘토 추가
                 </button>
+                {onRequestInstructor && (
+                  <button
+                    type="button"
+                    onClick={onRequestInstructor}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-violet-100 text-violet-700 text-[11px] font-bold border border-violet-300 hover:bg-violet-200 transition-colors"
+                  >
+                    <Send size={11} aria-hidden="true" />
+                    강사 요청
+                  </button>
+                )}
               </div>
             </div>
 

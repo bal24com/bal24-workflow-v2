@@ -2,7 +2,7 @@
 // 테이블형 차시 + DateTimePicker + 매칭 모달 + 드래그 정렬.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Sparkles, Upload, Save, Download } from 'lucide-react';
+import { Loader2, Plus, Sparkles, Upload, Save, Download, UserPlus } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 import { supabase } from '../../../lib/supabase';
 import StaffMatchModal from './curriculum/StaffMatchModal';
@@ -10,6 +10,7 @@ import CurriculumRow from './curriculum/CurriculumRow';
 import SaveTemplateModal from './curriculum/SaveTemplateModal';
 import LoadTemplateModal from './curriculum/LoadTemplateModal';
 import AiCurriculumModal from './curriculum/AiCurriculumModal';
+import InvitationManagePanel from '../InvitationManagePanel';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
 import type {
   CurriculumStaffRole, ProgramCurriculum,
@@ -18,9 +19,10 @@ import type { CurriculumSessionMeta } from './curriculum/curriculumTemplateUtils
 
 interface Props {
   programId: string;
+  programName?: string;
 }
 
-export default function CurriculumTab({ programId }: Props) {
+export default function CurriculumTab({ programId, programName }: Props) {
   const toast = useToast();
   const [items, setItems] = useState<CurriculumWithStaff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +31,16 @@ export default function CurriculumTab({ programId }: Props) {
   const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [loadTplOpen, setLoadTplOpen] = useState(false);
   const [aiCurriculumOpen, setAiCurriculumOpen] = useState(false);
+  // STEP-INSTRUCTOR-INVITE-A — 강사 초대 패널
+  const [invitePanelOpen, setInvitePanelOpen] = useState(false);
+  const [inviteCurriculumId, setInviteCurriculumId] = useState<string | null>(null);
+  const [inviteSessionInfo, setInviteSessionInfo] = useState<string>('');
+
+  function openInvite(curriculumId: string | null, title: string) {
+    setInviteCurriculumId(curriculumId);
+    setInviteSessionInfo(title);
+    setInvitePanelOpen(true);
+  }
 
   const refresh = useCallback(async () => {
     const next = await fetchCurriculumBundle(programId);
@@ -186,6 +198,14 @@ export default function CurriculumTab({ programId }: Props) {
           </button>
           <button
             type="button"
+            onClick={() => openInvite(null, '')}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-200 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
+          >
+            <UserPlus size={12} aria-hidden="true" />
+            강사 현황
+          </button>
+          <button
+            type="button"
             onClick={() => void addCurriculum()}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors"
           >
@@ -225,6 +245,7 @@ export default function CurriculumTab({ programId }: Props) {
                 onDelete={() => removeCurriculum(c.id)}
                 onOpenMatch={(role) => setMatchTarget({ curriculumId: c.id, defaultRole: role })}
                 onDeleteStaff={removeStaff}
+                onRequestInstructor={() => openInvite(c.id, `${c.session_no}차시 — ${c.title}`)}
                 onDragStart={() => setDragId(c.id)}
                 onDragEnter={() => handleDragEnter(c.id)}
                 onDragEnd={() => void handleDragEnd()}
@@ -272,6 +293,15 @@ export default function CurriculumTab({ programId }: Props) {
         programId={programId}
         nextSessionNo={items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0) + 1}
         onSaved={() => void refresh()}
+      />
+
+      <InvitationManagePanel
+        open={invitePanelOpen}
+        programId={programId}
+        programName={programName ?? '프로그램'}
+        defaultCurriculumId={inviteCurriculumId}
+        defaultSessionInfo={inviteSessionInfo}
+        onClose={() => { setInvitePanelOpen(false); setInviteCurriculumId(null); setInviteSessionInfo(''); }}
       />
     </div>
   );
