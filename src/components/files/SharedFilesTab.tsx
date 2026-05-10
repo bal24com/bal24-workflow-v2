@@ -87,6 +87,7 @@ export default function SharedFilesTab({ bucket, fkColumn, fkValue }: Props) {
       setUploadingName(file.name);
       setErrorMsg(null);
       try {
+        if (!fkValue) throw new Error(`업로드 대상 ID가 없어요 (${fkColumn})`);
         const safeName = sanitizeFileName(file.name);
         const path = `${fkValue}/${Date.now()}_${safeName}`;
 
@@ -108,7 +109,8 @@ export default function SharedFilesTab({ bucket, fkColumn, fkValue }: Props) {
         await loadFiles();
       } catch (err) {
         const raw = err instanceof Error ? err.message : '';
-        console.error('[shared-files] 업로드 실패:', raw);
+        console.error('[FILE_UPLOAD_ERROR]', JSON.stringify(err, Object.getOwnPropertyNames(err ?? {})));
+        console.error('[shared-files] 업로드 실패:', { bucket, fkColumn, fkValue, raw });
         setErrorMsg(translateUploadError(raw, bucket));
       } finally {
         if (lastUidRef.current === uid) {
