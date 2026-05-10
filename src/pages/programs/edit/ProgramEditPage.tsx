@@ -22,6 +22,7 @@ import GoalCard from './cards/GoalCard';
 import OutcomeLinkCard from './cards/OutcomeLinkCard';
 import SurveyLinkCard from './cards/SurveyLinkCard';
 import ClassificationCard from './cards/ClassificationCard';
+import ApplicationCard from './cards/ApplicationCard';
 import type { Program } from '../../../types/database';
 
 export default function ProgramEditPage() {
@@ -145,6 +146,7 @@ export default function ProgramEditPage() {
         <ScheduleCard form={form} onChange={update} errorField={error?.field} />
         <NoticeCard form={form} onChange={update} />
         <GoalCard form={form} onChange={update} />
+        <ApplicationCard form={form} onChange={update} errorField={error?.field} />
         <OutcomeLinkCard programId={id} />
         <SurveyLinkCard />
         <ClassificationCard />

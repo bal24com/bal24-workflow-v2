@@ -7,6 +7,7 @@ import type {
 } from '../../../types/database';
 
 export type ProgramVisibility = 'private' | 'internal' | 'public';
+export type ApplicationType = 'open' | 'evaluation';
 
 export interface ProgramEditForm {
   name: string;
@@ -23,6 +24,16 @@ export interface ProgramEditForm {
   goal_text: string;
   /** STEP-PROGRAM-EDIT-VISIBILITY — 가시성 (private/internal/public) */
   visibility: ProgramVisibility;
+  /** STEP-PROGRAM-CREATION-WIZARD — 신청 방식 (open/evaluation) */
+  application_type: ApplicationType;
+  /** evaluation 일 때만 의미 있음 */
+  application_start_date: string;
+  application_end_date: string;
+  max_applicants: string; // 문자열 입력 → 저장 시 숫자 변환
+  /** 지원금 관리 사용 여부 */
+  grant_enabled: boolean;
+  /** grant_enabled=true 일 때만 의미 있음. 문자열 입력 → 저장 시 숫자 변환 */
+  grant_budget: string;
 }
 
 export function emptyForm(): ProgramEditForm {
@@ -40,6 +51,12 @@ export function emptyForm(): ProgramEditForm {
     notice_files: [],
     goal_text: '',
     visibility: 'internal',
+    application_type: 'open',
+    application_start_date: '',
+    application_end_date: '',
+    max_applicants: '',
+    grant_enabled: false,
+    grant_budget: '',
   };
 }
 
@@ -58,6 +75,12 @@ export function programToForm(p: Program): ProgramEditForm {
     notice_files: p.notice_files ?? [],
     goal_text: p.goal_text ?? '',
     visibility: (p.visibility ?? 'internal') as ProgramVisibility,
+    application_type: (p.application_type ?? 'open') as ApplicationType,
+    application_start_date: p.application_start_date ?? '',
+    application_end_date: p.application_end_date ?? '',
+    max_applicants: p.max_applicants != null ? String(p.max_applicants) : '',
+    grant_enabled: !!p.grant_enabled,
+    grant_budget: p.grant_budget != null ? String(p.grant_budget) : '',
   };
 }
 
@@ -75,11 +98,37 @@ export function validateForm(f: ProgramEditForm): FormError | null {
     const n = Number(f.capacity.replace(/,/g, ''));
     if (Number.isNaN(n) || n < 0) return { field: 'capacity', message: '정원은 0 이상의 숫자여야 해요.' };
   }
+  // STEP-PROGRAM-CREATION-WIZARD — 평가형 선발: 신청 기간·정원 검증
+  if (f.application_type === 'evaluation') {
+    if (
+      f.application_start_date && f.application_end_date &&
+      f.application_start_date > f.application_end_date
+    ) {
+      return { field: 'application_end_date', message: '신청 종료일이 시작일보다 빠를 수 없어요.' };
+    }
+    if (f.max_applicants.trim()) {
+      const n = Number(f.max_applicants.replace(/,/g, ''));
+      if (Number.isNaN(n) || n < 0) {
+        return { field: 'max_applicants', message: '선발 인원은 0 이상의 숫자여야 해요.' };
+      }
+    }
+  }
+  if (f.grant_enabled && f.grant_budget.trim()) {
+    const n = Number(f.grant_budget.replace(/,/g, ''));
+    if (Number.isNaN(n) || n < 0) {
+      return { field: 'grant_budget', message: '지원금 예산은 0 이상의 숫자여야 해요.' };
+    }
+  }
   return null;
 }
 
 export async function saveProgram(programId: string, f: ProgramEditForm): Promise<void> {
   const capacity = f.capacity.trim() ? Number(f.capacity.replace(/,/g, '')) : null;
+
+  const maxApplicants = f.max_applicants.trim() ? Number(f.max_applicants.replace(/,/g, '')) : null;
+  const grantBudget = f.grant_enabled && f.grant_budget.trim()
+    ? Number(f.grant_budget.replace(/,/g, ''))
+    : 0;
 
   const { error } = await supabase
     .from('programs')
@@ -97,6 +146,13 @@ export async function saveProgram(programId: string, f: ProgramEditForm): Promis
       notice_files: f.notice_files.length > 0 ? f.notice_files : null,
       goal_text: f.goal_text.trim() || null,
       visibility: f.visibility,
+      // STEP-PROGRAM-CREATION-WIZARD — 신청·지원금 6 필드
+      application_type: f.application_type,
+      application_start_date: f.application_type === 'evaluation' ? (f.application_start_date || null) : null,
+      application_end_date: f.application_type === 'evaluation' ? (f.application_end_date || null) : null,
+      max_applicants: f.application_type === 'evaluation' ? maxApplicants : null,
+      grant_enabled: f.grant_enabled,
+      grant_budget: grantBudget,
       updated_at: new Date().toISOString(),
     })
     .eq('id', programId);

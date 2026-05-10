@@ -7,11 +7,10 @@ import type { FormEvent } from 'react';
 import { Modal, Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { PROGRAM_STATUS_VALUES } from './programStatus';
-import {
-  PROGRAM_TYPE_CONFIG, getProgramTypeConfig,
-  type ExtendedProgramType,
-} from './programTypeConfig';
+import type { ExtendedProgramType } from './programTypeConfig';
 import ProgramTemplateSelector from './detail/ProgramTemplateSelector';
+import ProgramApplicationFields from './ProgramApplicationFields';
+import ProgramTypeSelector from './ProgramTypeSelector';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
 
 /** program_type(14종 영문) → 기존 programs.type(4종 한글) 매핑 — type 컬럼 NOT NULL 호환용 */
@@ -51,6 +50,13 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   const [capacity, setCapacity] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<Visibility>('internal');
+  // STEP-PROGRAM-CREATION-WIZARD — 신청·지원금 6 필드
+  const [applicationType, setApplicationType] = useState<'open' | 'evaluation'>('open');
+  const [applicationStartDate, setApplicationStartDate] = useState('');
+  const [applicationEndDate, setApplicationEndDate] = useState('');
+  const [maxApplicants, setMaxApplicants] = useState('');
+  const [grantEnabled, setGrantEnabled] = useState(false);
+  const [grantBudget, setGrantBudget] = useState('');
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
@@ -107,6 +113,12 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     setCapacity('');
     setDescription('');
     setVisibility('internal');
+    setApplicationType('open');
+    setApplicationStartDate('');
+    setApplicationEndDate('');
+    setMaxApplicants('');
+    setGrantEnabled(false);
+    setGrantBudget('');
     setNameError(null);
     setErrorMsg(null);
   }, [open]);
@@ -131,6 +143,24 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
       return;
     }
 
+    // STEP-PROGRAM-CREATION-WIZARD — 평가형 신청 기간·정원 검증
+    if (applicationType === 'evaluation') {
+      if (applicationStartDate && applicationEndDate && applicationStartDate > applicationEndDate) {
+        setErrorMsg('신청 종료일이 시작일보다 빠를 수 없어요.');
+        return;
+      }
+    }
+    const parsedMaxApplicants = maxApplicants.trim() ? Number(maxApplicants.replace(/,/g, '')) : null;
+    if (parsedMaxApplicants !== null && (Number.isNaN(parsedMaxApplicants) || parsedMaxApplicants < 0)) {
+      setErrorMsg('선발 인원은 0 이상의 숫자로 입력해 주세요.');
+      return;
+    }
+    const parsedGrantBudget = grantEnabled && grantBudget.trim() ? Number(grantBudget.replace(/,/g, '')) : 0;
+    if (grantEnabled && (Number.isNaN(parsedGrantBudget) || parsedGrantBudget < 0)) {
+      setErrorMsg('지원금 예산은 0 이상의 숫자로 입력해 주세요.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const orderNum = displayOrder.trim() ? Number(displayOrder.replace(/,/g, '')) : 0;
@@ -139,7 +169,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
         consortium_id: consortiumId || null,
         name: name.trim(),
         type: toLegacyType(programType),  // 4종 enum 호환
-        program_type: programType,        // STEP-PROGRAM-TYPE 13종
+        program_type: programType,        // STEP-PROGRAM-TYPE 14종 영문
         display_order: Number.isFinite(orderNum) ? orderNum : 0,
         modules,                           // jsonb 배열
         status,
@@ -149,6 +179,13 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
         venue: venue.trim() || null,
         capacity: parsedCapacity,
         description: description.trim() || null,
+        // STEP-PROGRAM-CREATION-WIZARD 신청·지원금
+        application_type: applicationType,
+        application_start_date: applicationType === 'evaluation' ? (applicationStartDate || null) : null,
+        application_end_date: applicationType === 'evaluation' ? (applicationEndDate || null) : null,
+        max_applicants: applicationType === 'evaluation' ? parsedMaxApplicants : null,
+        grant_enabled: grantEnabled,
+        grant_budget: parsedGrantBudget,
       });
 
       if (error) throw error;
@@ -201,32 +238,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
           placeholder="예) 2026 상반기 리더십 캠프"
         />
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-slate-700">
-            유형 <span className="text-xs font-normal text-slate-400">— {getProgramTypeConfig(programType).description}</span>
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-            {PROGRAM_TYPE_CONFIG.map((c) => {
-              const active = programType === c.type;
-              return (
-                <button
-                  key={c.type}
-                  type="button"
-                  onClick={() => setProgramType(c.type)}
-                  disabled={submitting}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors disabled:opacity-50 ${
-                    active
-                      ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
-                      : `${c.color} text-slate-700 hover:opacity-80`
-                  }`}
-                >
-                  <span aria-hidden="true">{c.emoji}</span>
-                  <span className="truncate">{c.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <ProgramTypeSelector value={programType} onChange={setProgramType} disabled={submitting} />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
@@ -348,6 +360,23 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
           </select>
         </div>
 
+        {/* STEP-PROGRAM-CREATION-WIZARD — 신청·지원금 (별도 컴포넌트) */}
+        <ProgramApplicationFields
+          applicationType={applicationType}
+          setApplicationType={setApplicationType}
+          applicationStartDate={applicationStartDate}
+          setApplicationStartDate={setApplicationStartDate}
+          applicationEndDate={applicationEndDate}
+          setApplicationEndDate={setApplicationEndDate}
+          maxApplicants={maxApplicants}
+          setMaxApplicants={setMaxApplicants}
+          grantEnabled={grantEnabled}
+          setGrantEnabled={setGrantEnabled}
+          grantBudget={grantBudget}
+          setGrantBudget={setGrantBudget}
+          submitting={submitting}
+        />
+
         <div className="space-y-1.5">
           <label htmlFor="program-desc" className="text-sm font-semibold text-slate-700">설명</label>
           <textarea
@@ -360,7 +389,6 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 resize-none"
           />
         </div>
-
         {errorMsg && (
           <div role="alert" className="rounded-xl bg-danger/10 border border-danger/20 px-4 py-2.5 text-sm text-danger">
             {errorMsg}
