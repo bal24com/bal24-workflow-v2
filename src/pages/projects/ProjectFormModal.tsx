@@ -12,6 +12,10 @@ import type {
   ProjectStatus,
   ProjectType,
 } from '../../types/database';
+import {
+  OUR_ROLE_VALUES, OUR_ROLE_LABELS, OUR_ROLE_DESCRIPTIONS,
+  type OurRole,
+} from '../../constants/projectRoles';
 
 const PROJECT_TYPES: ProjectType[] = ['교육', '컨설팅', '이벤트'];
 
@@ -36,6 +40,8 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
   const [pmId, setPmId] = useState('');
   const [consortiumId, setConsortiumId] = useState('');
   const [description, setDescription] = useState('');
+  // STEP-PROJECT-ROLE-UNIFIED-TS — 자사 수행 역할
+  const [ourRole, setOurRole] = useState<OurRole>('operator');
 
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
@@ -97,6 +103,7 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
     setPmId('');
     setConsortiumId('');
     setDescription('');
+    setOurRole('operator');
     setErrorMsg(null);
     setNameError(null);
   }, [open]);
@@ -134,6 +141,7 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
         client_id: clientId || null,
         pm_id: pmId || null,
         consortium_id: consortiumId || null,
+        our_role: ourRole,
       });
 
       if (error) throw error;
@@ -274,21 +282,43 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-slate-700">
-            컨소시엄 <span className="text-xs font-normal text-slate-400">(선택)</span>
-          </label>
-          <select
-            value={consortiumId}
-            onChange={(e) => setConsortiumId(e.target.value)}
-            disabled={submitting || loadingRefs}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-          >
-            <option value="">연결 안 함 (자체 사업)</option>
-            {consortiums.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700">
+              컨소시엄 <span className="text-xs font-normal text-slate-400">(선택)</span>
+            </label>
+            <select
+              value={consortiumId}
+              onChange={(e) => setConsortiumId(e.target.value)}
+              disabled={submitting || loadingRefs}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+            >
+              <option value="">연결 안 함 (자체 사업)</option>
+              {consortiums.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* STEP-PROJECT-ROLE-UNIFIED-TS — 자사 수행 역할 */}
+          <div className="space-y-1.5">
+            <label htmlFor="project-our-role" className="text-sm font-semibold text-slate-700">
+              수행 역할
+            </label>
+            <select
+              id="project-our-role"
+              value={ourRole}
+              onChange={(e) => setOurRole(e.target.value as OurRole)}
+              disabled={submitting}
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+            >
+              {OUR_ROLE_VALUES.map((r) => (
+                <option key={r} value={r}>
+                  {OUR_ROLE_LABELS[r]} ({OUR_ROLE_DESCRIPTIONS[r]})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="space-y-1.5">

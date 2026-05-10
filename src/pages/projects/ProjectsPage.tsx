@@ -15,6 +15,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import { BADGE_BASE, PROJECT_STATUS_STYLE } from '../../utils/statusStyles';
+import { getOurRoleLabel, getOurRoleBadgeTone } from '../../constants/projectRoles';
 import EmptyState from '../../components/EmptyState';
 import PageHelpBanner from '../../components/PageHelpBanner';
 import ConsortiumFilterTabs, {
@@ -123,6 +124,11 @@ function ProjectListItem({ p }: { p: ProjectRow }) {
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
             <span className={`${BADGE_BASE} ${PROJECT_STATUS_STYLE[p.status]}`}>{p.status}</span>
+            {p.our_role && (
+              <span className={`${BADGE_BASE} ${getOurRoleBadgeTone(p.our_role)}`}>
+                {getOurRoleLabel(p.our_role)}
+              </span>
+            )}
             {p.type?.map((t) => (
               <span key={t} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                 {t}
@@ -143,7 +149,14 @@ function ProjectCard({ p }: { p: ProjectRow }) {
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="truncate">{p.name}</CardTitle>
-            <span className={`${BADGE_BASE} ${PROJECT_STATUS_STYLE[p.status]}`}>{p.status}</span>
+            <div className="flex items-center gap-1 shrink-0">
+              {p.our_role && (
+                <span className={`${BADGE_BASE} ${getOurRoleBadgeTone(p.our_role)}`}>
+                  {getOurRoleLabel(p.our_role)}
+                </span>
+              )}
+              <span className={`${BADGE_BASE} ${PROJECT_STATUS_STYLE[p.status]}`}>{p.status}</span>
+            </div>
           </div>
           <CardDescription>
             {p.type?.join(' · ') ?? '유형 미지정'}

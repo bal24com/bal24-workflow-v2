@@ -171,6 +171,8 @@ export interface Project {
   description?: string | null;
   pm_id?: string | null;
   client_access_token: string;
+  /** STEP-PROJECT-ROLE-UNIFIED-TS — 자사 수행 역할 (운영사/참여사) */
+  our_role?: 'operator' | 'member' | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
