@@ -19,7 +19,7 @@ import OverviewTab from './detail/OverviewTab';
 import CurriculumTab from './detail/CurriculumTab';
 import StaffStudentsTab from './detail/StaffStudentsTab';
 import AttendanceLogTab from './detail/AttendanceLogTab';
-import SurveyResultTab from './detail/SurveyResultTab';
+import SurveyTab from './detail/SurveyTab';
 import ShareTab from './detail/ShareTab';
 import ReportBuilderTab from './detail/ReportBuilderTab';
 import ProgramFilesTab from './detail/ProgramFilesTab';
@@ -114,7 +114,7 @@ function NotFound() {
 export default function ProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
-  const { isPM, isMember } = useUserProfile();
+  const { isPM, isStaff, isMember } = useUserProfile();
   const { isPartner, programIds: partnerProgramIds } = usePartnerProfile();
   const [program, setProgram] = useState<DetailProgram | null>(null);
   const [loading, setLoading] = useState(true);
@@ -329,7 +329,7 @@ export default function ProgramDetailPage() {
         {tab === 'report_review' && !isPartner && !isMember && <ReportReviewTab programId={programId} />}
         {tab === 'mentor_team' && isPartner && <MentorTeamTab programId={programId} />}
         {tab === 'my_report' && isMember && <PerformanceReportTab programId={programId} />}
-        {tab === 'survey' && <SurveyResultTab programId={programId} />}
+        {tab === 'survey' && <SurveyTab programId={programId} canEdit={isStaff} />}
         {tab === 'share' && <ShareTab programId={programId} />}
         {tab === 'report' && <ReportBuilderTab programId={programId} />}
         {tab === 'files' && <ProgramFilesTab programId={programId} />}

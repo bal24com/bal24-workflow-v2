@@ -1081,6 +1081,33 @@ export interface MemberInvitation {
   deleted_at?: string | null;
 }
 
+// ─── STEP-SURVEY 만족도 문항·응답 ─────────────────────────
+export type SurveyQuestionType = 'star' | 'text';
+export type SurveyQuestionPhase = 'pre' | 'post' | 'both';
+export type SurveyResponsePhase = 'pre' | 'post';
+
+export interface SurveyQuestion {
+  id: string;
+  program_id: string;
+  order_index: number;
+  question_text: string;
+  question_type: SurveyQuestionType;
+  phase: SurveyQuestionPhase;
+  created_at: string;
+}
+
+export interface SurveyResponse {
+  id: string;
+  program_id: string;
+  question_id: string;
+  respondent_token?: string | null;
+  respondent_id?: string | null;
+  answer_score?: number | null;
+  answer_text?: string | null;
+  phase: SurveyResponsePhase;
+  created_at: string;
+}
+
 export type MemberRequestStatus = 'pending' | 'approved' | 'rejected';
 
 export interface MemberRequest {
