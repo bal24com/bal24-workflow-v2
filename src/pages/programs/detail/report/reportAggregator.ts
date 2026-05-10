@@ -127,10 +127,14 @@ async function aggregateAttendance(programId: string): Promise<string> {
 }
 
 async function aggregateCurriculum(programId: string): Promise<string> {
+  // STEP-CURRICULUM-FULL — programs.report_curriculum_type 기준으로 planned/actual 선택
+  const progRes = await supabase.from('programs').select('report_curriculum_type').eq('id', programId).maybeSingle();
+  const curriculumType = (progRes.data as { report_curriculum_type?: 'planned' | 'actual' } | null)?.report_curriculum_type ?? 'planned';
   const curRes = await supabase
     .from('program_curriculum')
     .select('id, session_no, title, session_date, duration, venue')
     .eq('program_id', programId)
+    .eq('curriculum_type', curriculumType)
     .order('session_no', { ascending: true });
   if (curRes.error) logErr('curriculum', curRes.error.message);
   const rows = (curRes.data as Pick<

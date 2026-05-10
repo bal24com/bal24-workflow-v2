@@ -2,10 +2,10 @@
 // 테이블형 차시 + DateTimePicker + 매칭 모달 + 드래그 정렬.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Sparkles, Upload, Save, Download, UserPlus } from 'lucide-react';
+import { Loader2, Plus, Sparkles, Upload, Save, Download, UserPlus, Copy } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 import { supabase } from '../../../lib/supabase';
-import StaffMatchModal from './curriculum/StaffMatchModal';
+import SubToggle from './SubToggle';
 import CurriculumRow from './curriculum/CurriculumRow';
 import SaveTemplateModal from './curriculum/SaveTemplateModal';
 import LoadTemplateModal from './curriculum/LoadTemplateModal';
@@ -15,7 +15,7 @@ import CurriculumStaffSection from './curriculum/CurriculumStaffSection';
 import InvitationManagePanel from '../InvitationManagePanel';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
 import type {
-  CurriculumStaffRole, ProgramCurriculum, InvitationStatus,
+  CurriculumType, ProgramCurriculum, InvitationStatus,
 } from '../../../types/database';
 
 interface InvitationSummary { id: string; name: string; status: InvitationStatus; }
@@ -30,8 +30,11 @@ export default function CurriculumTab({ programId, programName }: Props) {
   const toast = useToast();
   const [items, setItems] = useState<CurriculumWithStaff[]>([]);
   const [loading, setLoading] = useState(true);
-  const [matchTarget, setMatchTarget] = useState<{ curriculumId: string; defaultRole: CurriculumStaffRole } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  // STEP-CURRICULUM-FULL — 제안/실제 운영 토글 + 카운트
+  const [curriculumType, setCurriculumType] = useState<CurriculumType>('planned');
+  const [counts, setCounts] = useState({ planned: 0, actual: 0 });
+  const [copying, setCopying] = useState(false);
   const [saveTplOpen, setSaveTplOpen] = useState(false);
   const [loadTplOpen, setLoadTplOpen] = useState(false);
   const [aiCurriculumOpen, setAiCurriculumOpen] = useState(false);
@@ -53,7 +56,7 @@ export default function CurriculumTab({ programId, programName }: Props) {
   }
 
   const refresh = useCallback(async () => {
-    const next = await fetchCurriculumBundle(programId);
+    const next = await fetchCurriculumBundle(programId, curriculumType);
     setItems(next);
     // STEP-CURRICULUM-INSTRUCTOR-FIX — 차시별 강사 초대 매핑 갱신
     const { data: invs, error: invErr } = await supabase
@@ -66,7 +69,17 @@ export default function CurriculumTab({ programId, programName }: Props) {
     }
     setInvitationMap(map);
     setStaffSectionKey((k) => k + 1);
-  }, [programId]);
+    // STEP-CURRICULUM-FULL — 양 탭 카운트 동기 갱신
+    const cnt = await supabase.from('program_curriculum').select('curriculum_type', { count: 'exact', head: false })
+      .eq('program_id', programId);
+    if (!cnt.error && cnt.data) {
+      const types = (cnt.data as Array<{ curriculum_type: CurriculumType }>);
+      setCounts({
+        planned: types.filter((r) => (r.curriculum_type ?? 'planned') === 'planned').length,
+        actual:  types.filter((r) => r.curriculum_type === 'actual').length,
+      });
+    }
+  }, [programId, curriculumType]);
 
   useEffect(() => {
     if (!programId) return;
@@ -88,6 +101,7 @@ export default function CurriculumTab({ programId, programName }: Props) {
         program_id: programId,
         session_no: nextNo,
         title: `${nextNo}차시`,
+        curriculum_type: curriculumType,
       })
       .select('*')
       .maybeSingle();
@@ -97,7 +111,62 @@ export default function CurriculumTab({ programId, programName }: Props) {
       return;
     }
     setItems((prev) => [...prev, { ...(data as ProgramCurriculum), staff: [] }]);
+    void refresh();
     toast.success('차시를 추가했어요.');
+  }
+
+  // STEP-CURRICULUM-FULL — 제안 → 실제 운영 복사 (curriculum_staff 제외)
+  async function copyPlannedToActual() {
+    setCopying(true);
+    try {
+      const planned = await supabase.from('program_curriculum').select('*')
+        .eq('program_id', programId).eq('curriculum_type', 'planned').order('session_no');
+      if (planned.error || !planned.data) {
+        console.error('[curriculum-tab] planned 조회 실패:', planned.error?.message);
+        toast.error('제안 커리큘럼 조회에 실패했어요.');
+        return;
+      }
+      const rows = planned.data as ProgramCurriculum[];
+      if (rows.length === 0) { toast.error('복사할 제안 차시가 없어요.'); return; }
+      const insertRows = rows.map((r) => ({
+        program_id: programId,
+        session_no: r.session_no,
+        title: r.title,
+        content: r.content ?? null,
+        day_label: r.day_label ?? null,
+        start_time: r.start_time ?? null,
+        end_time: r.end_time ?? null,
+        instructor_name_raw: r.instructor_name_raw ?? null,
+        curriculum_type: 'actual',
+      }));
+      const ins = await supabase.from('program_curriculum').insert(insertRows);
+      if (ins.error) {
+        console.error('[curriculum-tab] actual 복사 실패:', ins.error.message);
+        toast.error('실제 운영으로 복사에 실패했어요.');
+        return;
+      }
+      toast.success(`${rows.length}개 차시를 실제 운영으로 복사했습니다.`);
+      void refresh();
+    } finally {
+      setCopying(false);
+    }
+  }
+
+  // STEP-CURRICULUM-FULL — actual 탭에서 ↑↓로 인접 row session_no swap
+  async function swapWith(idx: number, dir: 'up' | 'down') {
+    const j = dir === 'up' ? idx - 1 : idx + 1;
+    if (j < 0 || j >= items.length) return;
+    const a = items[idx]; const b = items[j];
+    const aNew = b.session_no; const bNew = a.session_no;
+    // 임시 unique 충돌 회피: 두 단계 update (a → -tmp, b → aNew, a → bNew)
+    const tmp = -Math.abs(a.session_no) - 100000;
+    const r1 = await supabase.from('program_curriculum').update({ session_no: tmp }).eq('id', a.id);
+    if (r1.error) { console.error('[curriculum-tab] swap-1 실패:', r1.error.message); toast.error('순서 변경 실패'); return; }
+    const r2 = await supabase.from('program_curriculum').update({ session_no: bNew }).eq('id', b.id);
+    if (r2.error) { console.error('[curriculum-tab] swap-2 실패:', r2.error.message); toast.error('순서 변경 실패'); return; }
+    const r3 = await supabase.from('program_curriculum').update({ session_no: aNew }).eq('id', a.id);
+    if (r3.error) { console.error('[curriculum-tab] swap-3 실패:', r3.error.message); toast.error('순서 변경 실패'); return; }
+    void refresh();
   }
 
   async function saveCurriculum(id: string, patch: Partial<ProgramCurriculum>) {
@@ -121,18 +190,6 @@ export default function CurriculumTab({ programId, programName }: Props) {
     }
     setItems((prev) => prev.filter((c) => c.id !== id));
     toast.success('차시를 삭제했어요.');
-  }
-
-  async function removeStaff(staffId: string) {
-    if (!window.confirm('이 매칭 인력을 삭제할까요?')) return;
-    const { error } = await supabase.from('curriculum_staff').delete().eq('id', staffId);
-    if (error) {
-      console.error('[curriculum-tab] 매칭 인력 삭제 실패:', error.message);
-      toast.error('인력 삭제에 실패했어요.');
-      return;
-    }
-    void refresh();
-    toast.success('매칭 인력을 삭제했어요.');
   }
 
   async function persistOrder(reordered: CurriculumWithStaff[]) {
@@ -181,97 +238,93 @@ export default function CurriculumTab({ programId, programName }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setLoadTplOpen(true)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
-          >
-            <Download size={12} aria-hidden="true" />
-            템플릿 가져오기
-          </button>
-          <button
-            type="button"
-            onClick={() => setSaveTplOpen(true)}
-            disabled={items.length === 0}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <Save size={12} aria-hidden="true" />
-            템플릿으로 저장
-          </button>
-          <button
-            type="button"
-            onClick={() => setAiCurriculumOpen(true)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
-          >
-            <Upload size={12} aria-hidden="true" />
-            새 파일
-          </button>
-          <button
-            type="button"
-            onClick={() => setAiCurriculumOpen(true)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-violet-50/40 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors"
-          >
-            <Sparkles size={12} aria-hidden="true" />
-            AI 생성
-          </button>
-          <button
-            type="button"
-            onClick={() => openInvite(null, '')}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-200 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
-          >
-            <UserPlus size={12} aria-hidden="true" />
-            강사 현황
-          </button>
-          <button
-            type="button"
-            onClick={() => void addCurriculum()}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors"
-          >
-            <Plus size={12} aria-hidden="true" />
-            차시 추가
+          {([
+            { onClick: () => setLoadTplOpen(true), Icon: Download, label: '템플릿 가져오기' },
+            { onClick: () => setSaveTplOpen(true), Icon: Save, label: '템플릿으로 저장', disabled: items.length === 0 },
+            { onClick: () => setAiCurriculumOpen(true), Icon: Upload, label: '새 파일' },
+            { onClick: () => setAiCurriculumOpen(true), Icon: Sparkles, label: 'AI 생성', accent: true },
+            { onClick: () => openInvite(null, ''), Icon: UserPlus, label: '강사 현황' },
+          ]).map((b, i) => (
+            <button key={i} type="button" onClick={b.onClick} disabled={b.disabled}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 ${b.accent ? 'bg-violet-50/40 hover:bg-violet-100' : 'bg-white hover:bg-violet-50'} text-xs font-semibold text-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}>
+              <b.Icon size={12} aria-hidden="true" />
+              {b.label}
+            </button>
+          ))}
+          <button type="button" onClick={() => void addCurriculum()}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors">
+            <Plus size={12} aria-hidden="true" /> 차시 추가
           </button>
         </div>
       </header>
 
-      {/* STEP-UX-FIXES — AI 드롭존 최상단 (PDF·이미지·DOCX·XLSX 등) */}
-      <CurriculumAiDropZone
-        programId={programId}
-        lastSessionNo={items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0)}
-        onSessionsInserted={() => void refresh()}
+      {/* STEP-CURRICULUM-FULL — 제안/실제 운영 토글 */}
+      <SubToggle
+        items={[
+          { key: 'planned', label: `📋 제안 (${counts.planned}차시)` },
+          { key: 'actual',  label: `⚡ 실제 운영 (${counts.actual}차시)` },
+        ]}
+        active={curriculumType}
+        onChange={(k) => setCurriculumType(k as CurriculumType)}
       />
+
+      {/* AI 드롭존 — planned 탭에만 노출 */}
+      {curriculumType === 'planned' && (
+        <CurriculumAiDropZone
+          programId={programId}
+          lastSessionNo={items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0)}
+          onSessionsInserted={() => void refresh()}
+        />
+      )}
 
       {loading ? (
         <div className="flex justify-center py-10">
           <Loader2 className="animate-spin text-violet-400" size={20} aria-hidden="true" />
         </div>
       ) : items.length === 0 ? (
-        <p className="text-sm text-slate-400 italic text-center py-8">
-          등록된 차시가 없어요. 위 드롭존에서 AI 추출을 시작하거나 "차시 추가" 버튼을 눌러 주세요.
-        </p>
+        <div className="text-center py-8 space-y-3">
+          <p className="text-sm text-slate-400 italic">
+            {curriculumType === 'actual'
+              ? '실제 운영 차시가 없어요. 제안 커리큘럼에서 복사해서 시작할 수 있어요.'
+              : '등록된 차시가 없어요. 위 드롭존에서 AI 추출을 시작하거나 "차시 추가" 버튼을 눌러 주세요.'}
+          </p>
+          {curriculumType === 'actual' && counts.planned > 0 && (
+            <button type="button" onClick={() => void copyPlannedToActual()} disabled={copying}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50">
+              {copying ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} aria-hidden="true" />}
+              제안 커리큘럼에서 복사하기 ({counts.planned}차시)
+            </button>
+          )}
+        </div>
       ) : (
         <>
-          <div className="grid grid-cols-[28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(140px,180px)_28px_28px] items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className="grid grid-cols-[28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             <span aria-hidden="true" />
             <span className="text-center">#</span>
             <span>일자</span>
             <span>시작</span>
             <span>종료</span>
             <span>주제·차시명</span>
-            <span>강사</span>
+            <span>초대</span>
+            <span aria-hidden="true" />
             <span aria-hidden="true" />
             <span aria-hidden="true" />
           </div>
           <div className="flex flex-col gap-1.5">
-            {items.map((c) => (
+            {items.map((c, idx) => (
               <CurriculumRow
                 key={c.id}
                 item={c}
                 invitation={invitationMap.get(c.id) ?? null}
                 onSave={(patch) => saveCurriculum(c.id, patch)}
                 onDelete={() => removeCurriculum(c.id)}
-                onOpenMatch={(role) => setMatchTarget({ curriculumId: c.id, defaultRole: role })}
-                onDeleteStaff={removeStaff}
+                onStaffChanged={() => setStaffSectionKey((k) => k + 1)}
                 onRequestInstructor={() => openInvite(c.id, `${c.session_no}차시 — ${c.title}`)}
+                canReorder={curriculumType === 'actual'}
+                onMoveUp={() => void swapWith(idx, 'up')}
+                onMoveDown={() => void swapWith(idx, 'down')}
+                isFirst={idx === 0}
+                isLast={idx === items.length - 1}
                 onDragStart={() => setDragId(c.id)}
                 onDragEnter={() => handleDragEnter(c.id)}
                 onDragEnd={() => void handleDragEnd()}
@@ -289,14 +342,6 @@ export default function CurriculumTab({ programId, programName }: Props) {
         programId={programId}
         refreshKey={staffSectionKey}
         onRequestInstructor={(cid, info) => openInvite(cid, info)}
-      />
-
-      <StaffMatchModal
-        open={matchTarget !== null}
-        onClose={() => setMatchTarget(null)}
-        curriculumId={matchTarget?.curriculumId ?? ''}
-        defaultRole={matchTarget?.defaultRole}
-        onAdded={() => void refresh()}
       />
 
       <SaveTemplateModal

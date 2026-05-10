@@ -1,15 +1,15 @@
 // bal24 v2 — 커리큘럼 단일 차시 행 (V7 테이블형)
-// 헤더: 일차·시작·종료·주제·강사 / 펼침: 강사 추가·멘토 추가·설명·매칭 정보.
+// STEP-CURRICULUM-FULL — 2행 레이아웃 (행1 헤더 + 행2 content) + 펼침 시 5역할 인력 섹션
 // draft state 사용 — onChange는 draft만, [저장] 버튼 클릭 시에만 DB UPDATE.
 
 import { useEffect, useState } from 'react';
 import {
-  ChevronDown, ChevronRight, GripVertical, Trash2, UserPlus, Users, Save, RotateCcw, Send,
+  ChevronDown, ChevronRight, GripVertical, Trash2, Save, RotateCcw, Send, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import DateTimePicker from '../../../../components/ui/DateTimePicker';
-import StaffMatchRow from './StaffMatchRow';
+import CurriculumRowStaffSection from './CurriculumRowStaffSection';
 import { computeDuration, padTime, trimTime, type CurriculumWithStaff } from './curriculumTabUtils';
-import type { ProgramCurriculum, CurriculumStaffRole, InvitationStatus } from '../../../../types/database';
+import type { ProgramCurriculum, InvitationStatus } from '../../../../types/database';
 
 interface InvitationSummary { id: string; name: string; status: InvitationStatus; }
 
@@ -19,10 +19,16 @@ interface Props {
   invitation?: InvitationSummary | null;
   onSave: (patch: Partial<ProgramCurriculum>) => Promise<void>;
   onDelete: () => Promise<void>;
-  onOpenMatch: (defaultRole: CurriculumStaffRole) => void;
-  onDeleteStaff: (staffId: string) => Promise<void>;
   /** STEP-INSTRUCTOR-INVITE-A — 외부 강사 초대 패널 진입 */
   onRequestInstructor?: () => void;
+  /** STEP-CURRICULUM-FULL — 인력 변경 시 부모(CurriculumStaffSection) 갱신 */
+  onStaffChanged?: () => void;
+  /** STEP-CURRICULUM-FULL — 'actual' 탭에서만 ↑↓ 순서 조정 노출 */
+  canReorder?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
   onDragStart: () => void;
   onDragEnter: () => void;
   onDragEnd: () => void;
@@ -76,7 +82,8 @@ function isEqual(a: Draft, b: Draft): boolean {
 }
 
 export default function CurriculumRow({
-  item, invitation, onSave, onDelete, onOpenMatch, onDeleteStaff, onRequestInstructor,
+  item, invitation, onSave, onDelete, onRequestInstructor, onStaffChanged,
+  canReorder, onMoveUp, onMoveDown, isFirst, isLast,
   onDragStart, onDragEnter, onDragEnd, onDragOver, isDragging,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -90,8 +97,6 @@ export default function CurriculumRow({
 
   const baseline = toDraft(item);
   const dirty = !isEqual(draft, baseline);
-
-  const firstInstructor = item.staff.find((s) => s.role === '강사' || s.role === 'FT');
 
   function patchDraft<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -141,91 +146,66 @@ export default function CurriculumRow({
             : 'border-violet-100'
       } bg-white overflow-hidden transition-colors`}
     >
-      {/* 테이블 행 */}
-      <div className="grid grid-cols-[28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(140px,180px)_28px_28px] items-center gap-2 px-2 py-2">
-        <button
-          type="button"
-          aria-label="순서 변경 핸들"
-          className="cursor-grab active:cursor-grabbing inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:bg-slate-100"
-        >
+      {/* 행1 — 헤더 (번호·일차·시간·주제·invitation·↑↓·펼침·삭제) */}
+      <div className="grid grid-cols-[28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-2">
+        <button type="button" aria-label="순서 변경 핸들"
+          className="cursor-grab active:cursor-grabbing inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:bg-slate-100">
           <GripVertical size={13} aria-hidden="true" />
         </button>
-
-        <input
-          type="number"
-          min={1}
-          value={draft.session_no}
+        <input type="number" min={1} value={draft.session_no}
           onChange={(e) => patchDraft('session_no', Number(e.target.value) || draft.session_no)}
-          className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs text-center tabular-nums focus:outline-none focus:border-violet-400"
-        />
-
-        <input
-          type="text"
-          value={draft.day_label ?? ''}
+          className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs text-center tabular-nums focus:outline-none focus:border-violet-400" />
+        <input type="text" value={draft.day_label ?? ''}
           onChange={(e) => patchDraft('day_label', e.target.value || null)}
           placeholder="1일차"
-          className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400"
-        />
-
-        <DateTimePicker
-          mode="time"
-          value={draft.start_time}
-          onChange={(v) => patchDraft('start_time', v)}
-          placeholder="시작"
-        />
-
-        <DateTimePicker
-          mode="time"
-          value={draft.end_time}
-          onChange={(v) => patchDraft('end_time', v)}
-          placeholder="종료"
-        />
-
-        <input
-          type="text"
-          value={draft.title}
+          className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400" />
+        <DateTimePicker mode="time" value={draft.start_time}
+          onChange={(v) => patchDraft('start_time', v)} placeholder="시작" />
+        <DateTimePicker mode="time" value={draft.end_time}
+          onChange={(v) => patchDraft('end_time', v)} placeholder="종료" />
+        <input type="text" value={draft.title}
           onChange={(e) => patchDraft('title', e.target.value)}
           placeholder="주제·차시명"
-          className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400"
-        />
-
-        <span className="truncate text-xs text-slate-600">
+          className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400" />
+        <span className="truncate text-[11px]">
           {invitation ? (
             <span className="inline-flex items-center gap-1">
-              <span className="font-semibold text-violet-700">{invitation.name}</span>
+              <span className="font-semibold text-slate-700 truncate">{invitation.name}</span>
               <span className={`text-[9px] px-1 py-0.5 rounded ${INVITE_BADGE[invitation.status]}`}>{invitation.status}</span>
             </span>
-          ) : firstInstructor ? (
-            <span className="inline-flex items-center gap-1">
-              <span className="text-violet-600">🎤</span>
-              {firstInstructor.name}
-              {item.staff.length > 1 && (
-                <span className="text-[10px] text-slate-400 ml-1">+{item.staff.length - 1}</span>
-              )}
-            </span>
           ) : (
-            <span className="text-slate-400 italic">강사 미지정</span>
+            <span className="text-slate-300 italic">초대 없음</span>
           )}
         </span>
-
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-label={open ? '접기' : '펼치기'}
-          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-violet-600 hover:bg-violet-50"
-        >
+        {/* STEP-CURRICULUM-FULL — actual에서만 ↑↓ 노출 */}
+        {canReorder ? (
+          <span className="inline-flex items-center">
+            <button type="button" onClick={onMoveUp} disabled={isFirst} aria-label="위로"
+              className="inline-flex items-center justify-center w-6 h-6 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30">
+              <ArrowUp size={11} aria-hidden="true" />
+            </button>
+            <button type="button" onClick={onMoveDown} disabled={isLast} aria-label="아래로"
+              className="inline-flex items-center justify-center w-6 h-6 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30">
+              <ArrowDown size={11} aria-hidden="true" />
+            </button>
+          </span>
+        ) : <span aria-hidden="true" />}
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-label={open ? '접기' : '펼치기'}
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-violet-600 hover:bg-violet-50">
           {open ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
         </button>
-
-        <button
-          type="button"
-          onClick={() => void onDelete()}
-          aria-label="차시 삭제"
-          title="차시 삭제"
-          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500"
-        >
+        <button type="button" onClick={() => void onDelete()} aria-label="차시 삭제" title="차시 삭제"
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500">
           <Trash2 size={12} aria-hidden="true" />
         </button>
+      </div>
+
+      {/* 행2 — content textarea (항상 노출) */}
+      <div className="px-2 pb-2">
+        <textarea value={draft.content ?? ''} rows={2}
+          onChange={(e) => patchDraft('content', e.target.value || null)}
+          placeholder="강의 내용·진행 방식 입력"
+          className="w-full px-2 py-1.5 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 resize-none leading-relaxed" />
       </div>
 
       {/* 펼침 영역 */}
@@ -251,16 +231,6 @@ export default function CurriculumRow({
                 className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400"
               />
             </div>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-slate-500">설명</label>
-            <textarea
-              value={draft.content ?? ''}
-              onChange={(e) => patchDraft('content', e.target.value || null)}
-              placeholder="차시 내용·진행 방식 등"
-              className="px-2 py-1.5 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 min-h-[64px] leading-relaxed"
-            />
           </div>
 
           <div className="flex items-center justify-between gap-2 pt-2 border-t border-violet-100/70">
@@ -298,44 +268,17 @@ export default function CurriculumRow({
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold text-slate-600">매칭 인력 ({item.staff.length})</p>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onOpenMatch('강사')}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-violet-50 text-violet-700 text-[11px] font-bold border border-violet-200 hover:bg-violet-100 transition-colors"
-                >
-                  <UserPlus size={11} aria-hidden="true" />
-                  강사 추가
+              <p className="text-[11px] font-bold text-slate-600">매칭 인력 (5역할)</p>
+              {onRequestInstructor && (
+                <button type="button" onClick={onRequestInstructor}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-violet-100 text-violet-700 text-[11px] font-bold border border-violet-300 hover:bg-violet-200 transition-colors">
+                  <Send size={11} aria-hidden="true" />
+                  강사 요청
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenMatch('멘토')}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-orange-50 text-orange-700 text-[11px] font-bold border border-orange-200 hover:bg-orange-100 transition-colors"
-                >
-                  <Users size={11} aria-hidden="true" />
-                  멘토 추가
-                </button>
-                {onRequestInstructor && (
-                  <button
-                    type="button"
-                    onClick={onRequestInstructor}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-violet-100 text-violet-700 text-[11px] font-bold border border-violet-300 hover:bg-violet-200 transition-colors"
-                  >
-                    <Send size={11} aria-hidden="true" />
-                    강사 요청
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-
-            {item.staff.length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic">매칭된 인력이 없어요.</p>
-            ) : (
-              item.staff.map((row) => (
-                <StaffMatchRow key={row.id} row={row} onDelete={() => void onDeleteStaff(row.id)} />
-              ))
-            )}
+            {/* STEP-CURRICULUM-FULL — 5역할 인력 팝업 검색 섹션 */}
+            <CurriculumRowStaffSection curriculumId={item.id} onChanged={onStaffChanged} />
           </div>
         </div>
       )}

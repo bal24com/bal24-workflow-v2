@@ -252,6 +252,8 @@ export interface Program {
   notice?: string | null;
   /** V7 ③-1 공지 첨부 — 2026-05-08 추가 */
   notice_files?: ProgramFile[] | null;
+  /** STEP-CURRICULUM-FULL — 결과보고서에서 어느 커리큘럼 버전을 사용할지 */
+  report_curriculum_type?: CurriculumType;
   /** V7 ④ 성과 목표 — 2026-05-08 추가 */
   goal_text?: string | null;
   created_by?: string | null;
@@ -289,12 +291,17 @@ export interface ProgramTemplate {
 }
 
 // ─── 프로그램 커리큘럼 (V7 ⑥ 카드 / 2026-05-08 신규) ─────
+/** STEP-CURRICULUM-FULL — 제안(최초)/실제 운영(조정) 이중 커리큘럼 */
+export type CurriculumType = 'planned' | 'actual';
+
 export interface ProgramCurriculum {
   id: string;
   program_id: string;
   session_no: number;
   title: string;
   content?: string | null;
+  /** STEP-CURRICULUM-FULL — 'planned'(제안, 기본값) / 'actual'(실제 운영) */
+  curriculum_type?: CurriculumType;
   session_date?: string | null;
   /** 분 단위 — 자동 계산 또는 수동 입력 fallback */
   duration?: number | null;

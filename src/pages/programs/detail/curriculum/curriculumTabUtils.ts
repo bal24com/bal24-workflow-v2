@@ -28,11 +28,15 @@ function pickOne<T>(v: T | T[] | null): T | null {
   return v;
 }
 
-export async function fetchCurriculumBundle(programId: string): Promise<CurriculumWithStaff[]> {
+export async function fetchCurriculumBundle(
+  programId: string,
+  curriculumType: 'planned' | 'actual' = 'planned',
+): Promise<CurriculumWithStaff[]> {
   const curRes = await supabase
     .from('program_curriculum')
     .select('*')
     .eq('program_id', programId)
+    .eq('curriculum_type', curriculumType)
     .order('session_no', { ascending: true });
 
   if (curRes.error) {

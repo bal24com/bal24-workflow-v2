@@ -1,12 +1,13 @@
 // bal24 v2 — 결과보고서 빌더 · 단일 섹션 카드
 // 체크박스(표시/숨김) + 드래그 핸들 + AI 버튼(placeholder) + 본문 편집.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   GripVertical, Sparkles, Trash2, Check, X, RefreshCw, Loader2,
 } from 'lucide-react';
 import { useToast } from '../../../../contexts/ToastContext';
-import type { ReportSection } from '../../../../types/database';
+import { supabase } from '../../../../lib/supabase';
+import type { CurriculumType, ReportSection } from '../../../../types/database';
 import { aggregateSection, type AutoSectionKey } from './reportAggregator';
 import { textareaClass } from '../../edit/cards/CardShell';
 
@@ -37,6 +38,32 @@ export default function ReportSectionCard({
 
   const isAuto = section.section_type === 'auto';
   const isVisible = section.is_visible;
+  const isCurriculumSection = section.section_key === 'curriculum';
+
+  // STEP-CURRICULUM-FULL — 결과보고서 커리큘럼 섹션에서 planned/actual 선택
+  const [reportType, setReportType] = useState<CurriculumType>('planned');
+  useEffect(() => {
+    if (!isCurriculumSection) return;
+    let cancelled = false;
+    void (async () => {
+      const r = await supabase.from('programs').select('report_curriculum_type').eq('id', programId).maybeSingle();
+      if (cancelled) return;
+      const t = (r.data as { report_curriculum_type?: CurriculumType } | null)?.report_curriculum_type;
+      if (t) setReportType(t);
+    })();
+    return () => { cancelled = true; };
+  }, [isCurriculumSection, programId]);
+
+  async function changeReportType(next: CurriculumType) {
+    setReportType(next);
+    const { error } = await supabase.from('programs').update({ report_curriculum_type: next }).eq('id', programId);
+    if (error) {
+      console.error('[report-section] report_curriculum_type 저장 실패:', error.message);
+      toast.error('선택을 저장하지 못했어요.');
+      return;
+    }
+    toast.success(next === 'planned' ? '제안 커리큘럼으로 표시합니다.' : '실제 운영 커리큘럼으로 표시합니다.');
+  }
 
   async function handleAggregate() {
     if (!isAuto) return;
@@ -150,6 +177,23 @@ export default function ReportSectionCard({
           </button>
         )}
       </header>
+
+      {/* STEP-CURRICULUM-FULL — 커리큘럼 섹션에서 planned/actual 라디오 선택 */}
+      {isCurriculumSection && (
+        <div className="flex items-center gap-3 text-xs px-1">
+          <span className="font-bold text-slate-500">📋 표시할 커리큘럼:</span>
+          {(['planned', 'actual'] as CurriculumType[]).map((t) => (
+            <label key={t} className="inline-flex items-center gap-1 cursor-pointer">
+              <input type="radio" name={`rct-${section.id}`} checked={reportType === t}
+                onChange={() => void changeReportType(t)}
+                className="accent-violet-600" />
+              <span className={reportType === t ? 'font-bold text-violet-700' : 'text-slate-600'}>
+                {t === 'planned' ? '제안' : '실제 운영'}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {editing ? (
