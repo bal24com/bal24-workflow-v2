@@ -97,7 +97,8 @@ export async function submitApplication(p: ApplicationPayload): Promise<SubmitRe
     experience: p.experience.trim() || null,
     privacy_agreed: true,
     privacy_agreed_at: new Date().toISOString(),
-    status: 'pending',
+    // V2 실측 CHECK: 'applied' | 'reviewing' | 'accepted' | 'rejected' | 'withdrawn' | 'completed'
+    status: 'applied',
   });
   if (error) {
     const m = error.message.toLowerCase();
