@@ -1081,6 +1081,28 @@ export interface MemberInvitation {
   deleted_at?: string | null;
 }
 
+// ─── STEP-PARTICIPANT-PORTAL 참여자 통합 토큰 ─────────────
+export type ParticipantRole = 'participant' | 'mentor' | 'client' | 'ta' | 'observer';
+export type ParticipantStatus = 'active' | 'inactive' | 'completed';
+
+export interface ProgramParticipant {
+  id: string;
+  program_id: string;
+  profile_id?: string | null;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role: ParticipantRole;
+  access_token: string;
+  token_expires_at?: string | null;
+  status: ParticipantStatus;
+  completed_at?: string | null;
+  memo?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ─── STEP-INSTRUCTOR-INVITE-A 강사 자기 입력 프로필 ───────
 export interface InstructorCareerEntry {
   [key: string]: string | undefined;

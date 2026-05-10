@@ -20,6 +20,7 @@ import CurriculumTab from './detail/CurriculumTab';
 import StaffStudentsTab from './detail/StaffStudentsTab';
 import AttendanceLogTab from './detail/AttendanceLogTab';
 import SurveyTab from './detail/SurveyTab';
+import ParticipantTab from './detail/ParticipantTab';
 import ShareTab from './detail/ShareTab';
 import ReportBuilderTab from './detail/ReportBuilderTab';
 import ProgramFilesTab from './detail/ProgramFilesTab';
@@ -288,6 +289,8 @@ export default function ProgramDetailPage() {
         )}
         {/* STEP-APPLICATION-MGMT — 신청자 탭 (항상 노출) */}
         <ExtraTabBtn active={tab === 'applications'} onClick={() => setTab('applications')} icon={Users2} label="신청자" />
+        {/* STEP-PARTICIPANT-PORTAL — 참여자 통합 토큰 탭 */}
+        <ExtraTabBtn active={tab === 'participants'} onClick={() => setTab('participants')} icon={Users2} label="참여자" />
         {/* STEP-EVALUATION-SYSTEM — application_type='evaluation' 일 때만 평가위원 탭 */}
         {program.application_type === 'evaluation' && (
           <ExtraTabBtn active={tab === 'evaluator'} onClick={() => setTab('evaluator')} icon={Award} label="평가위원" />
@@ -330,6 +333,7 @@ export default function ProgramDetailPage() {
         {tab === 'mentor_team' && isPartner && <MentorTeamTab programId={programId} />}
         {tab === 'my_report' && isMember && <PerformanceReportTab programId={programId} />}
         {tab === 'survey' && <SurveyTab programId={programId} canEdit={isStaff} />}
+        {tab === 'participants' && <ParticipantTab programId={programId} programName={program?.name ?? ''} canEdit={isStaff} />}
         {tab === 'share' && <ShareTab programId={programId} />}
         {tab === 'report' && <ReportBuilderTab programId={programId} />}
         {tab === 'files' && <ProgramFilesTab programId={programId} />}

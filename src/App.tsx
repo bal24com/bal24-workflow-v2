@@ -49,6 +49,7 @@ const CheckInPage           = lazy(() => import('./pages/attendance-checkin/Chec
 const PublicFormPage        = lazy(() => import('./pages/public-form/PublicFormPage'));
 const ClientPortalPage      = lazy(() => import('./pages/client-portal/ClientPortalPage'));
 const InstructorInvitePage  = lazy(() => import('./pages/instructor-portal/InstructorInvitePage'));
+const ParticipantPortalPage = lazy(() => import('./pages/public-participant/ParticipantPortalPage'));
 const CurriculumInvitePage  = lazy(() => import('./pages/curriculum-invite/CurriculumInvitePage'));
 const ApplyPage             = lazy(() => import('./pages/public-apply/ApplyPage'));
 const RecruitApplyPage      = lazy(() => import('./pages/public-recruit/RecruitApplyPage'));
@@ -109,6 +110,7 @@ export default function App() {
             <Route path="/form/:token" element={<PublicFormPage />} />
             <Route path="/portal/:token" element={<ClientPortalPage />} />
             <Route path="/invitation/:token" element={<InstructorInvitePage />} />
+            <Route path="/participant/:token" element={<ParticipantPortalPage />} />
             <Route path="/curriculum-invite/:token" element={<CurriculumInvitePage />} />
             <Route path="/apply/:programId" element={<ApplyPage />} />
             <Route path="/recruit/:token" element={<RecruitApplyPage />} />
