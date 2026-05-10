@@ -53,7 +53,11 @@ export interface UseMyReportResult {
   refresh: () => Promise<void>;
 }
 
-export function useMyReport(): UseMyReportResult {
+/**
+ * @param programId - 선택. 지정 시 해당 프로그램에 대한 본인 보고서만 조회
+ *                   (프로그램 상세 탭 진입용). 미지정 시 가장 최근 합격 신청 1건.
+ */
+export function useMyReport(programId?: string): UseMyReportResult {
   const { user } = useAuth();
   const toast = useToast();
   const [loading, setLoading] = useState(true);
@@ -78,18 +82,21 @@ export function useMyReport(): UseMyReportResult {
       return;
     }
 
-    // 2) 합격 신청 조회 (가장 최근 1건)
-    const { data: appRow, error: appErr } = await supabase
+    // 2) 합격 신청 조회 — programId 지정 시 해당 프로그램, 미지정 시 가장 최근 1건
+    let q = supabase
       .from('participant_applications')
       .select(`
         id, name, program_id, email, status, created_at,
         program:programs!program_id(id, name, project_id)
       `)
       .eq('email', email)
-      .eq('status', 'accepted')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .eq('status', 'accepted');
+    if (programId) {
+      q = q.eq('program_id', programId);
+    } else {
+      q = q.order('created_at', { ascending: false }).limit(1);
+    }
+    const { data: appRow, error: appErr } = await q.maybeSingle();
 
     if (appErr) {
       console.error('[my-report] 신청 조회 실패:', appErr.message);
@@ -183,7 +190,7 @@ export function useMyReport(): UseMyReportResult {
     setTargets(initialTargets);
     setExpItems(initialExp);
     setLoading(false);
-  }, [user, toast]);
+  }, [user, toast, programId]);
 
   useEffect(() => {
     let cancelled = false;

@@ -31,6 +31,7 @@ import ApplicationTab from './detail/ApplicationTab';
 import EvalReportTab from './detail/EvalReportTab';
 import ReportReviewTab from './detail/ReportReviewTab';
 import MentorTeamTab from './detail/MentorTeamTab';
+import PerformanceReportTab from './detail/PerformanceReportTab';
 import {
   resolveVisibleTabs, SHARE_TAB_ALWAYS,
   type TabKey, type VisibleTab,
@@ -113,7 +114,7 @@ function NotFound() {
 export default function ProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
-  const { isPM } = useUserProfile();
+  const { isPM, isMember } = useUserProfile();
   const { isPartner, programIds: partnerProgramIds } = usePartnerProfile();
   const [program, setProgram] = useState<DetailProgram | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,7 +160,7 @@ export default function ProgramDetailPage() {
   // 3) 탭 fallback (훅 #3) — visibleTabs 에 현재 tab 없으면 첫 가시 탭으로
   useEffect(() => {
     if (visibleTabs.length === 0) return;
-    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications', 'eval_report', 'report_review', 'mentor_team'];
+    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications', 'eval_report', 'report_review', 'mentor_team', 'my_report'];
     if (!allKeys.includes(tab)) {
       setTab(visibleTabs[0]?.key ?? 'overview');
     }
@@ -296,8 +297,13 @@ export default function ProgramDetailPage() {
           <ExtraTabBtn active={tab === 'eval_report'} onClick={() => setTab('eval_report')} icon={BarChart3} label="평가결과" />
         )}
         {/* STEP-PM-REPORT-REVIEW — 사업보고 탭 (PM/ADMIN 용 — PARTNER 는 담당팀 탭으로 대체) */}
-        {!isPartner && (
+        {/* PM/ADMIN/STAFF — 검수 탭 (isMember 도 isPartner 도 아닌 경우) */}
+        {!isPartner && !isMember && (
           <ExtraTabBtn active={tab === 'report_review'} onClick={() => setTab('report_review')} icon={FileBarChart} label="사업보고" />
+        )}
+        {/* MEMBER — 본인 작성 탭 */}
+        {isMember && (
+          <ExtraTabBtn active={tab === 'my_report'} onClick={() => setTab('my_report')} icon={FileBarChart} label="사업보고" />
         )}
         {/* STEP-MENTOR-TEAM-VIEW — PARTNER(멘토) 담당팀 탭 */}
         {isPartner && (
@@ -320,8 +326,9 @@ export default function ProgramDetailPage() {
         {tab === 'evaluator' && <EvaluatorTab programId={programId} />}
         {tab === 'eval_report' && <EvalReportTab programId={programId} />}
         {tab === 'applications' && <ApplicationTab programId={programId} />}
-        {tab === 'report_review' && !isPartner && <ReportReviewTab programId={programId} />}
+        {tab === 'report_review' && !isPartner && !isMember && <ReportReviewTab programId={programId} />}
         {tab === 'mentor_team' && isPartner && <MentorTeamTab programId={programId} />}
+        {tab === 'my_report' && isMember && <PerformanceReportTab programId={programId} />}
         {tab === 'survey' && <SurveyResultTab programId={programId} />}
         {tab === 'share' && <ShareTab programId={programId} />}
         {tab === 'report' && <ReportBuilderTab programId={programId} />}
