@@ -141,6 +141,14 @@ export default function ExpensesPage() {
         <span aria-hidden="true">💸</span>
         지출
       </h1>
+
+      {/* STEP-PARTNER-EXPENSE-LOCK — PARTNER 자사 데이터만 노출 안내 */}
+      {isPartner && (
+        <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-2.5 text-xs text-violet-900">
+          🔒 <strong>내 참여사 데이터만 표시 중</strong>이에요. 신규 지출은 자사로 자동 귀속돼요.
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <LedgerTabs value={ledger} onChange={setLedger} counts={counts} />
         <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setModalOpen(true)}>신규 등록</Button>

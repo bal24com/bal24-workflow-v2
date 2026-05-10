@@ -84,6 +84,26 @@ export default function ExpenseFormModal({ open, ledgerType, onClose, onCreated 
   const [loadingRefs, setLoadingRefs] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // STEP-PARTNER-EXPENSE-LOCK — 자사 참여사명 표시용 (PARTNER 만 fetch)
+  const [partnerOrgName, setPartnerOrgName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !isPartner || !consortiumMemberId) { setPartnerOrgName(null); return; }
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('consortium_members')
+        .select('clients!consortium_members_client_id_fkey(name)')
+        .eq('id', consortiumMemberId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) { console.error('[expenses] 자사 참여사명 조회 실패:', error.message); return; }
+      const c = (data as { clients?: { name?: string } | { name?: string }[] | null } | null)?.clients;
+      const name = Array.isArray(c) ? c[0]?.name : c?.name;
+      setPartnerOrgName(name ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [open, isPartner, consortiumMemberId]);
 
   useEffect(() => {
     if (!open) return;
@@ -210,6 +230,15 @@ export default function ExpenseFormModal({ open, ledgerType, onClose, onCreated 
       }
     >
       <form id="expense-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {/* STEP-PARTNER-EXPENSE-LOCK — PARTNER 는 자사 참여사 자동 고정 (read-only) */}
+        {isPartner && (
+          <div className="rounded-xl border border-violet-100 bg-violet-50/40 px-4 py-3 flex items-center gap-2">
+            <span className="text-[10px] font-bold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">참여사 (자동)</span>
+            <span className="text-sm font-bold text-[#1E1B4B] truncate flex-1">{partnerOrgName ?? '내 참여사'}</span>
+            <span className="text-[10px] text-slate-500">🔒 자사로 자동 귀속</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-slate-700">계정과목</label>
