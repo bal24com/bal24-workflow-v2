@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, FileText, Info, Loader2, Mic2, Share2, Pencil, FileBarChart, BookOpen, FolderOpen, Hourglass, Users2, Handshake, Receipt, Award, BarChart3,
+  ArrowLeft, ClipboardCheck, Info, Loader2, Mic2, Pencil, FileBarChart, BookOpen, Users2, Award, Settings,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -17,31 +17,17 @@ import {
 import type { Program } from '../../types/database';
 import OverviewTab from './detail/OverviewTab';
 import CurriculumTab from './detail/CurriculumTab';
-import StaffStudentsTab from './detail/StaffStudentsTab';
 import AttendanceLogTab from './detail/AttendanceLogTab';
-import SurveyTab from './detail/SurveyTab';
-import ParticipantTab from './detail/ParticipantTab';
 import ProgramDeleteButton from './ProgramDeleteButton';
 import ProgramOverviewCard from './detail/overview/ProgramOverviewCard';
 import ProgramCurriculumSummaryCard from './detail/overview/ProgramCurriculumSummaryCard';
 import ProgramParticipantSummaryCard from './detail/overview/ProgramParticipantSummaryCard';
 import ProgramInstructorSummaryCard from './detail/overview/ProgramInstructorSummaryCard';
-import ShareTab from './detail/ShareTab';
-import ReportBuilderTab from './detail/ReportBuilderTab';
-import ProgramFilesTab from './detail/ProgramFilesTab';
-import AssignmentTab from './detail/AssignmentTab';
-import MentoringTab from './detail/MentoringTab';
-import StaffFeeTab from './detail/StaffFeeTab';
-import EvaluatorTab from './detail/EvaluatorTab';
-import ApplicationTab from './detail/ApplicationTab';
-import EvalReportTab from './detail/EvalReportTab';
-import ReportReviewTab from './detail/ReportReviewTab';
-import MentorTeamTab from './detail/MentorTeamTab';
-import PerformanceReportTab from './detail/PerformanceReportTab';
-import {
-  resolveVisibleTabs, SHARE_TAB_ALWAYS,
-  type TabKey, type VisibleTab,
-} from './programModuleConfig';
+import ParticipantManageTab from './detail/ParticipantManageTab';
+import InstructorManageTab from './detail/InstructorManageTab';
+import ReportManageTab from './detail/ReportManageTab';
+import GrantManageTab from './detail/GrantManageTab';
+import SettingsShareTab from './detail/SettingsShareTab';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { usePartnerProfile } from '../../hooks/usePartnerProfile';
 import PartnerReadOnlyBanner from '../../components/PartnerReadOnlyBanner';
@@ -50,52 +36,28 @@ type DetailProgram = Program & {
   project?: { id: string; name: string; status: string } | null;
 };
 
-// 탭 → 아이콘 매핑 (programModuleConfig 의 TabKey 와 동기화)
-const TAB_ICON: Record<TabKey, LucideIcon> = {
-  overview:   Info,
-  curriculum: BookOpen,
-  staff:      Mic2,
-  attendance: ClipboardCheck,
-  survey:     FileText,
-  share:      Share2,
-  report:     FileBarChart,
-  files:      FolderOpen,
-  mentoring:  Handshake,
-  staff_fee:    Receipt,
-  evaluator:    Award,
-  applications: Users2,
-  eval_report:  BarChart3,
-};
+// STEP-PROGRAM-TABS-CONSOLIDATE — 8 탭 단일 정의
+type TabKey = 'overview' | 'curriculum' | 'participants' | 'attendance' | 'instructor' | 'report' | 'grant' | 'settings';
 
-function getTabIcon(tab: VisibleTab): LucideIcon {
-  if (tab.isPlaceholder) return Hourglass;
-  return TAB_ICON[tab.key as TabKey] ?? Info;
-}
+interface AuthCtx { isPM: boolean; isStaff: boolean; isMember: boolean; isPartner: boolean; }
 
-// 추가 탭 버튼 (조건부로 표시되는 탭들 — 배정/신청자/평가위원/평가결과/사업보고/외부공유)
-interface ExtraTabBtnProps {
-  active: boolean;
-  onClick: () => void;
-  icon: LucideIcon;
+interface TabDef {
+  key: TabKey;
   label: string;
+  Icon: LucideIcon;
+  hide?: (c: AuthCtx) => boolean;
 }
-function ExtraTabBtn({ active, onClick, icon: Icon, label }: ExtraTabBtnProps) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={[
-        'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
-        active ? 'text-violet-700 border-violet-600' : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
-      ].join(' ')}
-    >
-      <Icon size={15} aria-hidden="true" />
-      {label}
-    </button>
-  );
-}
+
+const TABS: TabDef[] = [
+  { key: 'overview',     label: '개요',         Icon: Info },
+  { key: 'curriculum',   label: '커리큘럼',     Icon: BookOpen,        hide: (c) => c.isMember || c.isPartner },
+  { key: 'participants', label: '교육생',       Icon: Users2,          hide: (c) => c.isMember || c.isPartner },
+  { key: 'attendance',   label: '출석',         Icon: ClipboardCheck,  hide: (c) => c.isMember || c.isPartner },
+  { key: 'instructor',   label: '강사',         Icon: Mic2 },
+  { key: 'report',       label: '만족도·보고',  Icon: FileBarChart },
+  { key: 'grant',        label: '지원금',       Icon: Award,           hide: (c) => !c.isPM },
+  { key: 'settings',     label: '설정·공유',    Icon: Settings,        hide: (c) => !c.isPM },
+];
 
 const SELECT_COLUMNS = '*, project:projects(id,name,status)';
 
@@ -125,8 +87,7 @@ export default function ProgramDetailPage() {
   const [program, setProgram] = useState<DetailProgram | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // 동적 탭 — placeholder 모듈 ID 도 받기 위해 string 으로 확장
-  const [tab, setTab] = useState<string>('overview');
+  const [tab, setTab] = useState<TabKey>('overview');
 
   // 1) 데이터 fetch (훅 #1)
   useEffect(() => {
@@ -157,19 +118,14 @@ export default function ProgramDetailPage() {
     };
   }, [id, toast]);
 
-  // 2) 동적 탭 (훅 #2) — program?.modules 가 null/undefined 이어도 안전 (resolveVisibleTabs 내부 가드)
-  const visibleTabs = useMemo<VisibleTab[]>(
-    () => resolveVisibleTabs(program?.modules ?? null),
-    [program?.modules],
-  );
+  // STEP-PROGRAM-TABS-CONSOLIDATE — 권한별 보이는 탭 계산
+  const authCtx = useMemo<AuthCtx>(() => ({ isPM, isStaff, isMember, isPartner }), [isPM, isStaff, isMember, isPartner]);
+  const visibleTabs = useMemo(() => TABS.filter((t) => !t.hide || !t.hide(authCtx)), [authCtx]);
 
-  // 3) 탭 fallback (훅 #3) — visibleTabs 에 현재 tab 없으면 첫 가시 탭으로
+  // 탭 fallback — 현재 tab이 visibleTabs에 없으면 첫 가시 탭으로
   useEffect(() => {
     if (visibleTabs.length === 0) return;
-    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications', 'eval_report', 'report_review', 'mentor_team', 'my_report'];
-    if (!allKeys.includes(tab)) {
-      setTab(visibleTabs[0]?.key ?? 'overview');
-    }
+    if (!visibleTabs.some((t) => t.key === tab)) setTab(visibleTabs[0].key);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleTabs]);
 
@@ -206,8 +162,6 @@ export default function ProgramDetailPage() {
   if (!program) return <NotFound />;
 
   const programId = program.id;
-  const isPlaceholderActive = visibleTabs.some((t) => t.key === tab && t.isPlaceholder);
-  const activePlaceholderLabel = visibleTabs.find((t) => t.key === tab)?.label;
   // STEP-PARTNER-SIDEBAR — PARTNER 가 본인 담당 프로그램이 아닌 경우 읽기 전용 배너
   const isPartnerReadOnly = isPartner && !partnerProgramIds.has(programId);
 
@@ -268,61 +222,19 @@ export default function ProgramDetailPage() {
       >
         {visibleTabs.map((vt) => {
           const active = tab === vt.key;
-          const Icon = getTabIcon(vt);
+          const Icon = vt.Icon;
           return (
-            <button
-              key={vt.key}
-              type="button"
-              role="tab"
-              aria-selected={active}
+            <button key={vt.key} type="button" role="tab" aria-selected={active}
               onClick={() => setTab(vt.key)}
               className={[
                 'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
-                active
-                  ? 'text-violet-700 border-violet-600'
-                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
-              ].join(' ')}
-            >
+                active ? 'text-violet-700 border-violet-600' : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
+              ].join(' ')}>
               <Icon size={15} aria-hidden="true" />
               {vt.label}
-              {vt.isPlaceholder && (
-                <span className="text-[10px] text-slate-400 font-normal">(준비 중)</span>
-              )}
             </button>
           );
         })}
-        {/* Q7-A: PM/ADMIN + 컨소시엄 연결 시만 배정 탭 표시 */}
-        {isPM && program.consortium_id && (
-          <ExtraTabBtn active={tab === 'assignment'} onClick={() => setTab('assignment')} icon={Users2} label="배정" />
-        )}
-        {/* STEP-APPLICATION-MGMT — 신청자 탭 (항상 노출) */}
-        <ExtraTabBtn active={tab === 'applications'} onClick={() => setTab('applications')} icon={Users2} label="신청자" />
-        {/* STEP-PARTICIPANT-PORTAL — 참여자 통합 토큰 탭 */}
-        <ExtraTabBtn active={tab === 'participants'} onClick={() => setTab('participants')} icon={Users2} label="참여자" />
-        {/* STEP-EVALUATION-SYSTEM — application_type='evaluation' 일 때만 평가위원 탭 */}
-        {program.application_type === 'evaluation' && (
-          <ExtraTabBtn active={tab === 'evaluator'} onClick={() => setTab('evaluator')} icon={Award} label="평가위원" />
-        )}
-        {/* STEP-EVAL-REPORT — application_type='evaluation' 일 때만 평가결과 탭 */}
-        {program.application_type === 'evaluation' && (
-          <ExtraTabBtn active={tab === 'eval_report'} onClick={() => setTab('eval_report')} icon={BarChart3} label="평가결과" />
-        )}
-        {/* STEP-PM-REPORT-REVIEW — 사업보고 탭 (PM/ADMIN 용 — PARTNER 는 담당팀 탭으로 대체) */}
-        {/* PM/ADMIN/STAFF — 검수 탭 (isMember 도 isPartner 도 아닌 경우) */}
-        {!isPartner && !isMember && (
-          <ExtraTabBtn active={tab === 'report_review'} onClick={() => setTab('report_review')} icon={FileBarChart} label="사업보고" />
-        )}
-        {/* MEMBER — 본인 작성 탭 */}
-        {isMember && (
-          <ExtraTabBtn active={tab === 'my_report'} onClick={() => setTab('my_report')} icon={FileBarChart} label="사업보고" />
-        )}
-        {/* STEP-MENTOR-TEAM-VIEW — PARTNER(멘토) 담당팀 탭 */}
-        {isPartner && (
-          <ExtraTabBtn active={tab === 'mentor_team'} onClick={() => setTab('mentor_team')} icon={Handshake} label="담당팀" />
-        )}
-        {SHARE_TAB_ALWAYS && (
-          <ExtraTabBtn active={tab === 'share'} onClick={() => setTab('share')} icon={Share2} label="외부 공유" />
-        )}
       </nav>
 
       <div role="tabpanel">
@@ -337,42 +249,13 @@ export default function ProgramDetailPage() {
             <OverviewTab programId={programId} description={program.description ?? null} />
           </div>
         )}
-        {tab === 'curriculum' && <CurriculumTab programId={programId} programName={program?.name} />}
-        {tab === 'staff' && <StaffStudentsTab programId={programId} />}
-        {tab === 'attendance' && <AttendanceLogTab programId={programId} />}
-        {tab === 'mentoring' && <MentoringTab programId={programId} />}
-        {tab === 'staff_fee' && <StaffFeeTab programId={programId} />}
-        {tab === 'evaluator' && <EvaluatorTab programId={programId} />}
-        {tab === 'eval_report' && <EvalReportTab programId={programId} />}
-        {tab === 'applications' && <ApplicationTab programId={programId} />}
-        {tab === 'report_review' && !isPartner && !isMember && <ReportReviewTab programId={programId} />}
-        {tab === 'mentor_team' && isPartner && <MentorTeamTab programId={programId} />}
-        {tab === 'my_report' && isMember && <PerformanceReportTab programId={programId} />}
-        {tab === 'survey' && <SurveyTab programId={programId} canEdit={isStaff} />}
-        {tab === 'participants' && <ParticipantTab programId={programId} programName={program?.name ?? ''} canEdit={isStaff} />}
-        {tab === 'share' && <ShareTab programId={programId} />}
-        {tab === 'report' && <ReportBuilderTab programId={programId} />}
-        {tab === 'files' && <ProgramFilesTab programId={programId} />}
-        {tab === 'assignment' && isPM && (
-          <AssignmentTab
-            programId={programId}
-            consortiumId={program.consortium_id ?? null}
-            isPM={isPM}
-          />
-        )}
-
-        {/* 미구현 모듈 placeholder (Q4-A) */}
-        {isPlaceholderActive && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <Hourglass size={32} className="mb-3 text-slate-300" aria-hidden="true" />
-            <p className="text-sm font-bold text-slate-600">
-              ✦ {activePlaceholderLabel} 탭은 곧 추가될 예정이에요
-            </p>
-            <p className="text-xs mt-1">
-              현재는 모듈만 등록되어 있고 상세 화면이 준비 중입니다.
-            </p>
-          </div>
-        )}
+        {tab === 'curriculum'   && <CurriculumTab programId={programId} programName={program.name} />}
+        {tab === 'participants' && <ParticipantManageTab programId={programId} programName={program.name} canEdit={isStaff} />}
+        {tab === 'attendance'   && <AttendanceLogTab programId={programId} />}
+        {tab === 'instructor'   && <InstructorManageTab programId={programId} isPartner={isPartner} />}
+        {tab === 'report'       && <ReportManageTab programId={programId} isPartner={isPartner} isMember={isMember} isStaff={isStaff} applicationType={program.application_type} />}
+        {tab === 'grant'        && <GrantManageTab programId={programId} consortiumId={program.consortium_id ?? null} isPM={isPM} applicationType={program.application_type} hasConsortium={Boolean(program.consortium_id)} />}
+        {tab === 'settings'     && <SettingsShareTab programId={programId} />}
       </div>
     </div>
   );
