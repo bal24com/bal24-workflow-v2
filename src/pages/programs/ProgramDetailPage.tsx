@@ -27,6 +27,7 @@ import AssignmentTab from './detail/AssignmentTab';
 import MentoringTab from './detail/MentoringTab';
 import StaffFeeTab from './detail/StaffFeeTab';
 import EvaluatorTab from './detail/EvaluatorTab';
+import ApplicationTab from './detail/ApplicationTab';
 import {
   resolveVisibleTabs, SHARE_TAB_ALWAYS,
   type TabKey, type VisibleTab,
@@ -50,8 +51,9 @@ const TAB_ICON: Record<TabKey, LucideIcon> = {
   report:     FileBarChart,
   files:      FolderOpen,
   mentoring:  Handshake,
-  staff_fee:  Receipt,
-  evaluator:  Award,
+  staff_fee:    Receipt,
+  evaluator:    Award,
+  applications: Users2,
 };
 
 function getTabIcon(tab: VisibleTab): LucideIcon {
@@ -128,7 +130,7 @@ export default function ProgramDetailPage() {
   // 3) 탭 fallback (훅 #3) — visibleTabs 에 현재 tab 없으면 첫 가시 탭으로
   useEffect(() => {
     if (visibleTabs.length === 0) return;
-    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator'];
+    const allKeys = [...visibleTabs.map((t) => t.key), 'share', 'assignment', 'evaluator', 'applications'];
     if (!allKeys.includes(tab)) {
       setTab(visibleTabs[0]?.key ?? 'overview');
     }
@@ -272,6 +274,28 @@ export default function ProgramDetailPage() {
           );
         })()}
 
+        {/* STEP-APPLICATION-MGMT — 신청자 탭 (항상 노출) */}
+        {(() => {
+          const active = tab === 'applications';
+          return (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab('applications')}
+              className={[
+                'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
+                active
+                  ? 'text-violet-700 border-violet-600'
+                  : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
+              ].join(' ')}
+            >
+              <Users2 size={15} aria-hidden="true" />
+              신청자
+            </button>
+          );
+        })()}
+
         {/* STEP-EVALUATION-SYSTEM — application_type='evaluation' 일 때만 평가위원 탭 */}
         {program.application_type === 'evaluation' && (() => {
           const active = tab === 'evaluator';
@@ -326,6 +350,7 @@ export default function ProgramDetailPage() {
         {tab === 'mentoring' && <MentoringTab programId={programId} />}
         {tab === 'staff_fee' && <StaffFeeTab programId={programId} />}
         {tab === 'evaluator' && <EvaluatorTab programId={programId} />}
+        {tab === 'applications' && <ApplicationTab programId={programId} />}
         {tab === 'survey' && <SurveyResultTab programId={programId} />}
         {tab === 'share' && <ShareTab programId={programId} />}
         {tab === 'report' && <ReportBuilderTab programId={programId} />}
