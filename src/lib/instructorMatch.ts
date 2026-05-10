@@ -48,21 +48,24 @@ interface CurriculumStaffLink {
   match: MatchedInstructor;
 }
 
-/** 매칭된 강사 → curriculum_staff bulk INSERT (중복 체크 포함) */
-export async function linkMatchedStaff(links: CurriculumStaffLink[]): Promise<{ inserted: number; skipped: number; error?: string }> {
+export type CurriculumStaffRole = '강사' | 'FT' | '멘토' | 'TA' | '운영진';
+
+/** 매칭된 강사 → curriculum_staff bulk INSERT (역할 파라미터 + 중복 체크) */
+export async function linkMatchedStaff(
+  links: CurriculumStaffLink[], role: CurriculumStaffRole = '강사',
+): Promise<{ inserted: number; skipped: number; error?: string }> {
   const valid = links.filter((l) => l.match.source !== 'none' && (l.match.staff_pool_id || l.match.profile_id));
   if (valid.length === 0) return { inserted: 0, skipped: 0 };
 
   const curriculumIds = [...new Set(valid.map((l) => l.curriculumId))];
   const exist = await supabase.from('curriculum_staff')
-    .select('curriculum_id, staff_pool_id, profile_id').in('curriculum_id', curriculumIds);
+    .select('curriculum_id, staff_pool_id, profile_id, role').in('curriculum_id', curriculumIds);
   if (exist.error) {
     console.error('[instructor-match] 중복 조회 실패:', exist.error.message);
     return { inserted: 0, skipped: 0, error: exist.error.message };
   }
-
   const existSet = new Set((exist.data ?? []).map((e) =>
-    `${e.curriculum_id}::${e.staff_pool_id ?? ''}::${e.profile_id ?? ''}`
+    `${e.curriculum_id}::${e.staff_pool_id ?? ''}::${e.profile_id ?? ''}::${e.role ?? ''}`
   ));
 
   const rows = valid
@@ -70,9 +73,9 @@ export async function linkMatchedStaff(links: CurriculumStaffLink[]): Promise<{ 
       curriculum_id: l.curriculumId,
       staff_pool_id: l.match.staff_pool_id ?? null,
       profile_id: l.match.profile_id ?? null,
-      role: '강사' as const,
+      role,
     }))
-    .filter((r) => !existSet.has(`${r.curriculum_id}::${r.staff_pool_id ?? ''}::${r.profile_id ?? ''}`));
+    .filter((r) => !existSet.has(`${r.curriculum_id}::${r.staff_pool_id ?? ''}::${r.profile_id ?? ''}::${role}`));
 
   const skipped = valid.length - rows.length;
   if (rows.length === 0) return { inserted: 0, skipped };
@@ -83,4 +86,33 @@ export async function linkMatchedStaff(links: CurriculumStaffLink[]): Promise<{ 
     return { inserted: 0, skipped, error: error.message };
   }
   return { inserted: rows.length, skipped };
+}
+
+export interface MatchSummary {
+  matched: number;
+  unmatched: string[];
+}
+
+/** 이름 배열 → 인력풀 매칭 → 역할 지정 curriculum_staff INSERT. "전체"는 매칭 시도 X */
+export async function matchAndLinkByRole(
+  names: string[], curriculumId: string, role: '강사' | '멘토',
+): Promise<MatchSummary> {
+  const filtered = [...new Set(names.map((n) => n?.trim()).filter(Boolean))];
+  if (filtered.length === 0) return { matched: 0, unmatched: [] };
+
+  // "전체"는 매칭 시도 X — unmatched로 직접 분류
+  const general = filtered.filter((n) => n === '전체');
+  const targets = filtered.filter((n) => n !== '전체');
+
+  const map = await matchInstructorsByNames(targets);
+  const links: CurriculumStaffLink[] = [];
+  const unmatched: string[] = [...general];
+  for (const n of targets) {
+    const m = map.get(n);
+    if (m && m.source !== 'none') links.push({ curriculumId, match: m });
+    else unmatched.push(n);
+  }
+
+  const r = await linkMatchedStaff(links, role);
+  return { matched: r.inserted, unmatched };
 }

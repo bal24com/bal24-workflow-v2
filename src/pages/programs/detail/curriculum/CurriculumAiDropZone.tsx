@@ -1,16 +1,17 @@
-// bal24 v2 — 커리큘럼 인라인 AI 드롭존 (파일 → 차시 추출 + 강사 인력풀 매칭 + program_curriculum INSERT)
+// bal24 v2 — 커리큘럼 인라인 AI 드롭존 (파일 → 차시 + 강사·멘토 다중 매칭 → INSERT)
 
 import { useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import {
-  Loader2, Sparkles, FolderOpen, Trash2, CheckCircle2, ChevronDown, ChevronRight, AlertTriangle,
+  Loader2, Sparkles, FolderOpen, Trash2, CheckCircle2, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
 import { extractSessionsFromDocument } from '../../../../lib/curriculumExtract';
 import {
-  matchInstructorsByNames, linkMatchedStaff, type MatchedInstructor,
+  matchInstructorsByNames, matchAndLinkByRole, type MatchedInstructor,
 } from '../../../../lib/instructorMatch';
+import InstructorMentorCell from './InstructorMentorCell';
 import type { ExtractedSession } from '../../../../lib/programAutoFill';
 
 interface Props {
@@ -20,11 +21,22 @@ interface Props {
 }
 
 interface DraftSession extends ExtractedSession {
-  match?: MatchedInstructor;
   expanded?: boolean;
+  instructorMatches: Record<string, MatchedInstructor>;
+  mentorMatches: Record<string, MatchedInstructor>;
 }
 
 const ACCEPT = '.pdf,.docx,.pptx,.png,.jpg,.jpeg,.xlsx,.csv,.txt';
+
+function emptyDraft(s: ExtractedSession): DraftSession {
+  return {
+    ...s,
+    instructor_names: s.instructor_names ?? [],
+    mentor_names: s.mentor_names ?? [],
+    instructorMatches: {},
+    mentorMatches: {},
+  };
+}
 
 export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessionsInserted }: Props) {
   const toast = useToast();
@@ -36,10 +48,7 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   function reset() {
-    setFile(null);
-    setDrafts([]);
-    setExtracting(false);
-    setSubmitting(false);
+    setFile(null); setDrafts([]); setExtracting(false); setSubmitting(false);
   }
 
   async function handleExtract() {
@@ -47,21 +56,30 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
     setExtracting(true);
     try {
       const sessions = await extractSessionsFromDocument(file);
-      if (sessions.length === 0) {
-        toast.error('차시를 추출하지 못했어요. 다른 파일로 시도해 주세요.');
-        return;
-      }
-      // 강사명 자동 매칭 (인력풀 4단계 fallback)
-      const names = sessions.map((s) => s.instructor_name?.trim()).filter((n): n is string => Boolean(n));
-      const matchMap = names.length > 0 ? await matchInstructorsByNames(names) : new Map();
-      const matched = sessions.map<DraftSession>((s) => ({
-        ...s,
-        match: s.instructor_name ? matchMap.get(s.instructor_name.trim()) : undefined,
-      }));
-      setDrafts(matched);
-      const ok = matched.filter((d) => d.match?.source && d.match.source !== 'none').length;
-      const ng = matched.filter((d) => d.instructor_name && (!d.match || d.match.source === 'none')).length;
-      toast.success(`${matched.length}개 차시 추출. 강사 매칭 ${ok}건${ng > 0 ? ` / 미매칭 ${ng}건` : ''}.`);
+      if (sessions.length === 0) { toast.error('차시를 추출하지 못했어요. 다른 파일로 시도해 주세요.'); return; }
+      // 강사·멘토 이름 모두 일괄 매칭
+      const allInstructorNames = sessions.flatMap((s) => s.instructor_names ?? []).filter((n) => n !== '전체');
+      const allMentorNames = sessions.flatMap((s) => s.mentor_names ?? []).filter((n) => n !== '전체');
+      const [iMap, mMap] = await Promise.all([
+        allInstructorNames.length > 0 ? matchInstructorsByNames(allInstructorNames) : Promise.resolve(new Map()),
+        allMentorNames.length > 0 ? matchInstructorsByNames(allMentorNames) : Promise.resolve(new Map()),
+      ]);
+      const next: DraftSession[] = sessions.map((s) => {
+        const d = emptyDraft(s);
+        for (const n of s.instructor_names ?? []) {
+          d.instructorMatches[n] = n === '전체' ? { source: 'none' } : (iMap.get(n) ?? { source: 'none' });
+        }
+        for (const n of s.mentor_names ?? []) {
+          d.mentorMatches[n] = n === '전체' ? { source: 'none' } : (mMap.get(n) ?? { source: 'none' });
+        }
+        return d;
+      });
+      setDrafts(next);
+      const okI = [...iMap.values()].filter((m) => m.source !== 'none').length;
+      const okM = [...mMap.values()].filter((m) => m.source !== 'none').length;
+      const ngI = allInstructorNames.length - okI;
+      const ngM = allMentorNames.length - okM;
+      toast.success(`${next.length}개 차시 · 강사 매칭 ${okI}건${ngI > 0 ? `/미매칭 ${ngI}` : ''} · 멘토 매칭 ${okM}건${ngM > 0 ? `/미매칭 ${ngM}` : ''}`);
     } finally {
       setExtracting(false);
     }
@@ -89,20 +107,29 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
         start_time: s.start_time?.trim() || null,
         end_time: s.end_time?.trim() || null,
         content: s.content?.trim() || null,
-        instructor_name_raw: s.instructor_name?.trim() || null,
+        instructor_name_raw: (s.instructor_names ?? []).join(', ') || null,
       }));
       const ins = await supabase.from('program_curriculum').insert(rows).select('id');
       if (ins.error) throw ins.error;
       const inserted = (ins.data ?? []) as { id: string }[];
 
-      // 매칭된 강사 → curriculum_staff 자동 INSERT (중복 체크)
-      const links = filtered
-        .map((s, i) => ({ curriculumId: inserted[i]?.id, match: s.match }))
-        .filter((l): l is { curriculumId: string; match: MatchedInstructor } => Boolean(l.curriculumId && l.match));
-      const link = await linkMatchedStaff(links);
+      // 매칭된 강사·멘토 → curriculum_staff INSERT (역할별)
+      let totalI = 0; let totalM = 0; const allUnmatched: string[] = [];
+      for (let i = 0; i < filtered.length; i += 1) {
+        const id = inserted[i]?.id;
+        if (!id) continue;
+        const ri = await matchAndLinkByRole(filtered[i].instructor_names ?? [], id, '강사');
+        const rm = await matchAndLinkByRole(filtered[i].mentor_names ?? [], id, '멘토');
+        totalI += ri.matched; totalM += rm.matched;
+        allUnmatched.push(...ri.unmatched, ...rm.unmatched);
+      }
 
-      const matchedMsg = link.inserted > 0 ? ` · 강사 ${link.inserted}건 자동 매핑` : '';
-      toast.success(`${rows.length}개 차시 등록${matchedMsg}.`);
+      const baseMsg = `${rows.length}개 차시 등록 완료 · 강사 ${totalI}건 / 멘토 ${totalM}건 자동 매핑`;
+      if (allUnmatched.length > 0) {
+        toast.success(`${baseMsg}. ⚠ 미매칭 ${allUnmatched.length}명 — 등록 후 [강사 요청]으로 초대하세요.`);
+      } else {
+        toast.success(baseMsg);
+      }
       reset();
       onSessionsInserted();
     } catch (err) {
@@ -117,8 +144,7 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
   const onDragOver = (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragActive(true); };
   const onDragLeave = (e: DragEvent<HTMLDivElement>) => { if (e.currentTarget === e.target) setDragActive(false); };
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragActive(false);
+    e.preventDefault(); setDragActive(false);
     const f = e.dataTransfer?.files?.[0];
     if (f) setFile(f);
   };
@@ -127,7 +153,7 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
     <section className="rounded-xl border-2 border-dashed border-violet-200 bg-violet-50/50 p-4 space-y-3">
       <div className="flex items-center gap-1.5">
         <Sparkles size={14} className="text-violet-500" aria-hidden="true" />
-        <p className="text-sm font-bold text-violet-800">커리큘럼 — 문서 추출 + AI 생성 + 강사 매칭</p>
+        <p className="text-sm font-bold text-violet-800">커리큘럼 — 문서 추출 + 강사·멘토 다중 매칭</p>
       </div>
 
       {drafts.length === 0 ? (
@@ -145,9 +171,8 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
               <p className="text-sm font-semibold text-violet-700 truncate" title={file.name}>{file.name}</p>
             ) : (
               <>
-                <p className="text-xs text-slate-700 font-semibold">파일을 여기에 드래그하면 AI가 커리큘럼·강사 자동 추출</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">클릭해서 파일 선택도 가능</p>
-                <p className="text-[10px] text-slate-400 mt-1">운영안·제안서·일정표 PDF·이미지·DOCX·XLSX 지원</p>
+                <p className="text-xs text-slate-700 font-semibold">파일을 여기에 드래그하면 AI가 차시 + 강사·멘토 자동 추출</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">클릭해서 파일 선택도 가능 · PDF·이미지·DOCX·XLSX 지원</p>
               </>
             )}
           </div>
@@ -160,7 +185,7 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
               <button type="button" onClick={() => void handleExtract()} disabled={extracting}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-40">
                 {extracting ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <Sparkles size={12} aria-hidden="true" />}
-                {extracting ? '커리큘럼 추출 중…' : 'AI로 차시 + 강사 자동 추출'}
+                {extracting ? '추출 중…' : 'AI로 차시 + 강사·멘토 자동 추출'}
               </button>
             </div>
           )}
@@ -168,21 +193,26 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
       ) : (
         <>
           <p className="text-[11px] text-violet-700">
-            {drafts.length}개 차시 · 강사 매칭 결과 검토 후 등록 (현재 차시 {lastSessionNo}개 뒤에 추가)
+            {drafts.length}개 차시 · 매칭 결과 검토 후 등록 (현재 차시 {lastSessionNo}개 뒤에 추가)
           </p>
-          <ul className="rounded-lg border border-violet-100 bg-white max-h-[420px] overflow-y-auto divide-y divide-violet-100">
+          <ul className="rounded-lg border border-violet-100 bg-white max-h-[480px] overflow-y-auto divide-y divide-violet-100">
             {drafts.map((s, idx) => (
               <li key={idx} className="px-2 py-1.5 text-xs">
-                <div className="grid grid-cols-[28px_minmax(60px,80px)_minmax(90px,110px)_minmax(0,1fr)_minmax(140px,180px)_24px_24px] items-center gap-2">
+                <div className="grid grid-cols-[24px_minmax(60px,80px)_minmax(80px,100px)_minmax(0,1fr)_minmax(140px,180px)_minmax(140px,180px)_22px_22px] items-center gap-2">
                   <span className="text-violet-600 font-bold tabular-nums text-center">{lastSessionNo + idx + 1}</span>
                   <input type="text" value={s.day_label ?? ''} onChange={(e) => patchDraft(idx, { day_label: e.target.value })}
                     placeholder="1일차" className="rounded border border-slate-200 px-1.5 py-1 focus:outline-none focus:border-violet-400" />
-                  <input type="text" value={(s.start_time ?? '') + (s.end_time ? `~${s.end_time}` : '')} readOnly
-                    placeholder="09:00~11:00"
+                  <input type="text" readOnly value={(s.start_time ?? '') + (s.end_time ? `~${s.end_time}` : '')}
+                    placeholder="펼침 편집"
                     className="rounded border border-slate-100 bg-slate-50 px-1.5 py-1 text-slate-500 cursor-not-allowed" title="펼침에서 편집" />
                   <input type="text" value={s.title} onChange={(e) => patchDraft(idx, { title: e.target.value })}
                     placeholder="차시명" className="rounded border border-slate-200 px-1.5 py-1 font-semibold focus:outline-none focus:border-violet-400" />
-                  <InstructorCell draft={s} onChange={(v) => patchDraft(idx, { instructor_name: v })} />
+                  <InstructorMentorCell names={s.instructor_names ?? []} matches={s.instructorMatches}
+                    onChange={(names, m) => patchDraft(idx, { instructor_names: names, instructorMatches: m })}
+                    placeholder="강사" />
+                  <InstructorMentorCell names={s.mentor_names ?? []} matches={s.mentorMatches}
+                    onChange={(names, m) => patchDraft(idx, { mentor_names: names, mentorMatches: m })}
+                    placeholder="멘토" />
                   <button type="button" onClick={() => patchDraft(idx, { expanded: !s.expanded })} aria-label="상세 펼침"
                     className="p-1 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-600">
                     {s.expanded ? <ChevronDown size={11} aria-hidden="true" /> : <ChevronRight size={11} aria-hidden="true" />}
@@ -220,29 +250,5 @@ export default function CurriculumAiDropZone({ programId, lastSessionNo, onSessi
         </>
       )}
     </section>
-  );
-}
-
-function InstructorCell({ draft, onChange }: { draft: DraftSession; onChange: (v: string) => void }) {
-  const matched = draft.match && draft.match.source !== 'none';
-  const hasName = Boolean(draft.instructor_name?.trim());
-  return (
-    <div className="flex items-center gap-1">
-      <input type="text" value={draft.instructor_name ?? ''} onChange={(e) => onChange(e.target.value)}
-        placeholder="강사명" className="flex-1 rounded border border-slate-200 px-1.5 py-1 focus:outline-none focus:border-violet-400" />
-      {hasName && (
-        matched ? (
-          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"
-            title={`${draft.match?.source === 'staff_pool' ? '인력풀' : '임직원'} 매칭`}>
-            <CheckCircle2 size={9} aria-hidden="true" /> {draft.match?.source === 'staff_pool' ? '풀' : '내부'}
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700"
-            title="인력풀 미매칭 — 등록 후 [강사 요청]에서 초대">
-            <AlertTriangle size={9} aria-hidden="true" /> 미매칭
-          </span>
-        )
-      )}
-    </div>
   );
 }

@@ -12,7 +12,12 @@ export interface ExtractedSession {
   start_time?: string;
   end_time?: string;
   title: string;
+  /** @deprecated 단일 강사 (역호환). 신규는 instructor_names 사용. */
   instructor_name?: string;
+  /** STEP-CURRICULUM-MULTI-INSTRUCTOR — 강사 다중 (역할 '강사') */
+  instructor_names?: string[];
+  /** STEP-CURRICULUM-MULTI-INSTRUCTOR — 멘토 다중 (역할 '멘토') */
+  mentor_names?: string[];
   /** STEP-CURRICULUM-INSTRUCTOR-MATCH — 강의 내용·진행 방식 */
   content?: string;
 }
