@@ -10,8 +10,6 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import ProjectsPage from './pages/projects/ProjectsPage';
 import ProjectDetailPage from './pages/projects/ProjectDetailPage';
 import ProgramsPage from './pages/programs/ProgramsPage';
-import ProgramDetailPage from './pages/programs/ProgramDetailPage';
-import ProgramEditPage from './pages/programs/edit/ProgramEditPage';
 import ClientsPage from './pages/clients/ClientsPage';
 import ExpertsPage from './pages/experts/ExpertsPage';
 import ConsortiumPage from './pages/consortium/ConsortiumPage';
@@ -21,11 +19,8 @@ import ExpensesPage from './pages/expenses/ExpensesPage';
 import ReceiptsPage from './pages/receipts/ReceiptsPage';
 import AttendancePage from './pages/attendance/AttendancePage';
 import AttendanceDetailPage from './pages/attendance/AttendanceDetailPage';
-import CertificatePage from './pages/certificates/CertificatePage';
 import ActivityLogsPage from './pages/activity-logs/ActivityLogsPage';
 import FormManagePage from './pages/forms/FormManagePage';
-import ProjectReportPage from './pages/reports/ProjectReportPage';
-import SettlementPage from './pages/settlements/SettlementPage';
 import PortalManagePage from './pages/portal/PortalManagePage';
 import PortalTemplatePage from './pages/portal/templates/PortalTemplatePage';
 import SchedulePage from './pages/schedule/SchedulePage';
@@ -41,6 +36,14 @@ import MyReportPage from './pages/my-report/MyReportPage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
+
+// ── PrivateRoute 안쪽이지만 vendor-docs(docx/jspdf/html2canvas/xlsx) 를 끌어오는
+//    무거운 페이지들도 lazy 처리 (STEP-BUNDLE-SPLIT-2)
+const ProgramDetailPage    = lazy(() => import('./pages/programs/ProgramDetailPage'));
+const ProgramEditPage      = lazy(() => import('./pages/programs/edit/ProgramEditPage'));
+const CertificatePage      = lazy(() => import('./pages/certificates/CertificatePage'));
+const ProjectReportPage    = lazy(() => import('./pages/reports/ProjectReportPage'));
+const SettlementPage       = lazy(() => import('./pages/settlements/SettlementPage'));
 
 // ── 공개 라우트 (인증 불필요) — lazy import 로 메인 청크에서 분리 ──
 const CheckInPage           = lazy(() => import('./pages/attendance-checkin/CheckInPage'));
