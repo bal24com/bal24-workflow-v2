@@ -3,6 +3,7 @@
 
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Briefcase,
   ClipboardList,
@@ -241,6 +242,13 @@ export default function LoginPage() {
               onTogglePassword={() => setShowPassword((v) => !v)}
               onSubmit={handleSubmit}
             />
+
+            <p className="text-center text-sm text-slate-500">
+              아직 계정이 없으신가요?{' '}
+              <Link to="/join" className="font-medium text-violet-600 hover:underline">
+                가입 신청하기
+              </Link>
+            </p>
 
             <div className="rounded-xl bg-amber-100/60 border border-amber-200/60 px-4 py-3 text-xs text-amber-900">
               계정 관련 문의는 관리자에게 연락해 주세요.
