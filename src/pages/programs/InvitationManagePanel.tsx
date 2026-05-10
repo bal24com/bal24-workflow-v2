@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  X, Plus, Loader2, Copy, RefreshCw, FileIcon, ExternalLink,
+  X, Plus, Loader2, Copy, RefreshCw, FileIcon, ExternalLink, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +14,9 @@ import InvitationAddForm from './InvitationAddForm';
 import { formatDateKo } from '../../lib/utils';
 import { copyToClipboard } from '../../lib/clipboard';
 import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../utils/statusStyles';
+import { useToast } from '../../contexts/ToastContext';
+import { useUserProfile } from '../../hooks/useUserProfile';
+import { approveInvitation, rejectInvitation } from '../../lib/inviteApproval';
 import type {
   InstructorInvitation, InvitationFile, StaffPool,
 } from '../../types/database';
@@ -28,6 +31,8 @@ type Props = {
   defaultSessionInfo?: string;
   /** STEP-CURRICULUM-INSTRUCTOR-VIEW — 차시 정보 기반 자동 메시지 prefill */
   defaultMessage?: string;
+  /** STEP-INVITE-APPROVE-PART2 — 승인/반려 후 부모(CurriculumTab)에서 강사 섹션 갱신 트리거 */
+  onApproved?: () => void;
 };
 
 
@@ -38,8 +43,11 @@ function translateError(raw: string): string {
 }
 
 export default function InvitationManagePanel({
-  open, programId, programName, onClose, defaultCurriculumId, defaultSessionInfo, defaultMessage,
+  open, programId, programName, onClose,
+  defaultCurriculumId, defaultSessionInfo, defaultMessage, onApproved,
 }: Props) {
+  const toast = useToast();
+  const { profile, isPM } = useUserProfile();
   const [invitations, setInvitations] = useState<InstructorInvitation[]>([]);
   const [experts, setExperts] = useState<Pick<StaffPool, 'id' | 'name' | 'phone' | 'email'>[]>([]);
   const [submittedMap, setSubmittedMap] = useState<Map<string, boolean>>(new Map());
@@ -47,6 +55,8 @@ export default function InvitationManagePanel({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [addExpanded, setAddExpanded] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // STEP-INVITE-APPROVE-PART2 — 승인/반려 진행 중 표시 (id별)
+  const [actingId, setActingId] = useState<string | null>(null);
 
   // 신호 파일 (단일 파일 다운로드)
   const [openingUrl, setOpeningUrl] = useState<string | null>(null);
@@ -114,6 +124,38 @@ export default function InvitationManagePanel({
       setTimeout(() => setCopiedId(null), 1500);
     } else {
       setErrorMsg('링크 복사에 실패했어요. 직접 선택해서 복사해 주세요.');
+    }
+  };
+
+  // STEP-INVITE-APPROVE-PART2 — 승인 (status='수락' → trigger가 curriculum_staff INSERT)
+  const handleApprove = async (inv: InstructorInvitation) => {
+    if (!profile?.id) { toast.error('로그인 정보를 확인할 수 없어요.'); return; }
+    setActingId(inv.id);
+    try {
+      const r = await approveInvitation(inv.id, profile.id, profile.name ?? '관리자');
+      if (!r.ok) { toast.error(r.error ?? '승인 중 오류가 발생했습니다. 다시 시도해주세요.'); return; }
+      toast.success(`"${inv.name}" 강사가 승인되었습니다. 커리큘럼에 자동 배정됩니다.`);
+      await fetchData();
+      onApproved?.();
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  // STEP-INVITE-APPROVE-PART2 — 반려 (사유 prompt — 후속 STEP에서 모달로 교체 예정)
+  const handleReject = async (inv: InstructorInvitation) => {
+    if (!profile?.id) { toast.error('로그인 정보를 확인할 수 없어요.'); return; }
+    const reason = window.prompt(`"${inv.name}" 초대를 반려할 사유를 입력해 주세요.`, '');
+    if (reason === null) return;
+    setActingId(inv.id);
+    try {
+      const r = await rejectInvitation(inv.id, profile.id, profile.name ?? '관리자', reason || undefined);
+      if (!r.ok) { toast.error(r.error ?? '반려 중 오류가 발생했습니다.'); return; }
+      toast.success('초대가 반려되었습니다.');
+      await fetchData();
+      onApproved?.();
+    } finally {
+      setActingId(null);
     }
   };
 
@@ -259,18 +301,22 @@ export default function InvitationManagePanel({
                         <Copy size={11} />{copiedId === inv.id ? '복사됨!' : '초대 링크'}
                       </button>
                     )}
-                    {/* STEP-INVITE-APPROVE-PART1 — '제출' 행 전용 placeholder (PART2에서 활성화) */}
-                    {inv.status === '제출' && (
+                    {/* STEP-INVITE-APPROVE-PART2 — '제출' 행 활성 버튼 (PM/Admin만) */}
+                    {inv.status === '제출' && isPM && (
                       <>
-                        <button type="button" disabled
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-400 bg-slate-50 cursor-not-allowed ml-auto"
-                          title="다음 업데이트(PART2)에서 활성화">
-                          ✓ 승인 (다음 업데이트)
+                        <button type="button" disabled={actingId === inv.id}
+                          onClick={() => void handleApprove(inv)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 ml-auto">
+                          {actingId === inv.id
+                            ? <Loader2 size={11} className="animate-spin" aria-hidden="true" />
+                            : <CheckCircle2 size={11} aria-hidden="true" />}
+                          승인
                         </button>
-                        <button type="button" disabled
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-400 bg-slate-50 cursor-not-allowed"
-                          title="다음 업데이트(PART2)에서 활성화">
-                          ✗ 반려
+                        <button type="button" disabled={actingId === inv.id}
+                          onClick={() => void handleReject(inv)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 disabled:opacity-50">
+                          <XCircle size={11} aria-hidden="true" />
+                          반려
                         </button>
                       </>
                     )}

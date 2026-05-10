@@ -336,6 +336,7 @@ export default function CurriculumTab({ programId, programName }: Props) {
         defaultCurriculumId={inviteCurriculumId}
         defaultSessionInfo={inviteSessionInfo}
         defaultMessage={inviteMessage}
+        onApproved={() => setStaffSectionKey((k) => k + 1)}
         onClose={() => {
           setInvitePanelOpen(false); setInviteCurriculumId(null); setInviteSessionInfo(''); setInviteMessage('');
           void refresh();
