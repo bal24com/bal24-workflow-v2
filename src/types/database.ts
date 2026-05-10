@@ -73,6 +73,8 @@ export interface Client {
   representative?: string | null;
   business_type?: string | null;
   business_item?: string | null;
+  /** STEP-EXPERT-CRUD-FULL — 부서명 (선택) */
+  department?: string | null;
   address?: string | null;
   phone?: string | null;
   email?: string | null;
@@ -84,6 +86,8 @@ export interface Client {
   created_by?: string | null;
   created_at: string;
   updated_at: string;
+  /** STEP-EXPERT-CRUD-FULL — soft-delete 휴지통 (30일 후 영구 삭제) */
+  deleted_at?: string | null;
 }
 
 export interface ClientContact {
@@ -100,6 +104,12 @@ export interface ClientContact {
 }
 
 // ─── 인력풀 ───────────────────────────────────────────
+/** STEP-EXPERT-CRUD-FULL — 인력풀 학력·경력·자격 (jsonb 저장) */
+export interface EducationItem { school: string; major: string; degree: string; year: string }
+export interface CareerItem { company: string; role: string; period: string }
+export interface CertItem { name: string; issuer: string; year: string }
+export type StaffType = '강사' | '멘토' | 'FT' | 'TA' | '운영진' | '기타';
+
 export interface StaffPool {
   id: string;
   name: string;
@@ -120,6 +130,13 @@ export interface StaffPool {
   id_number?: string | null;
   note?: string | null;
   tags?: string[] | null;
+  /** STEP-EXPERT-CRUD-FULL — 주 역할 분류 + 구조화 이력 + 휴지통 */
+  staff_type?: StaffType | null;
+  education_history?: EducationItem[];
+  career_history?: CareerItem[];
+  certifications?: CertItem[];
+  resume_url?: string | null;
+  deleted_at?: string | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;

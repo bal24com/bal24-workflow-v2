@@ -232,9 +232,11 @@ export default function ClientsPage() {
   const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
+      // STEP-EXPERT-CRUD-FULL — 휴지통(deleted_at IS NOT NULL) 제외
       const { data, error } = await supabase
         .from('clients')
         .select(SELECT_COLUMNS)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       setClients((data ?? []) as ClientRow[]);
@@ -380,6 +382,7 @@ export default function ClientsPage() {
         open={Boolean(detailTarget)}
         client={detailTarget}
         onClose={() => setDetailTarget(null)}
+        onDeleted={() => void fetchClients()}
       />
     </div>
   );

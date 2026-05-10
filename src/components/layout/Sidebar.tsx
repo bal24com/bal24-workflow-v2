@@ -19,6 +19,7 @@ import {
   Sparkles,
   Home,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -77,6 +78,14 @@ const SECTIONS: MenuSection[] = [
     ],
   },
 ];
+
+// STEP-EXPERT-CRUD-FULL — admin 전용 추가 메뉴 (휴지통 등)
+const ADMIN_EXTRA: MenuSection = {
+  heading: '관리',
+  items: [
+    { to: '/admin', label: '휴지통·관리', Icon: Trash2 },
+  ],
+};
 
 // PARTNER 사이드바 (3그룹 — 홈/사업/도구)
 const PARTNER_SECTIONS: MenuSection[] = [
@@ -190,13 +199,16 @@ export default function Sidebar() {
   }, [user]);
 
   // V2 실측 가정: profiles.role 은 소문자 ('admin', 'partner', 'member' 등)
+  const isAdmin   = role === 'admin';
   const isPartner = role === 'partner';
   const isMember  = role === 'member';
   const isFinance = role === 'finance';
-  const sections  = isPartner ? PARTNER_SECTIONS
-                  : isMember  ? MEMBER_SECTIONS
-                  : isFinance ? FINANCE_SECTIONS
-                  : SECTIONS;
+  const baseSections = isPartner ? PARTNER_SECTIONS
+                     : isMember  ? MEMBER_SECTIONS
+                     : isFinance ? FINANCE_SECTIONS
+                     : SECTIONS;
+  // STEP-EXPERT-CRUD-FULL — admin 만 [관리] 그룹 추가 노출
+  const sections = isAdmin ? [...baseSections, ADMIN_EXTRA] : baseSections;
 
   return (
     <aside

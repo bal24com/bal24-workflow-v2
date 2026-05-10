@@ -2,7 +2,7 @@
 // 카드(기본) / 리스트 + 분야 필터 + 검색 + 신규 등록
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutGrid, List, Plus, Loader2, Search, UserStar, Phone, Mail } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, Search, UserStar, Phone, Mail, Pencil, Trash2 } from 'lucide-react';
 import {
   Button,
   Card,
@@ -14,6 +14,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
+import { softDelete } from '../../lib/softDeleteUtils';
 import type { StaffPool } from '../../types/database';
 import ExpertFormModal from './ExpertFormModal';
 
@@ -33,9 +34,19 @@ function expertMatchesField(s: StaffPool, filter: FieldFilter): boolean {
   return tags.includes(filter);
 }
 
-function ExpertGridCard({ s }: { s: StaffPool }) {
+function ExpertGridCard({ s, onEdit, onDelete }: { s: StaffPool; onEdit: () => void; onDelete: () => void }) {
   return (
-    <Card className="hover:border-primary/30 hover:shadow-md transition h-full">
+    <Card className="group hover:border-primary/30 hover:shadow-md transition h-full relative">
+      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+        <button type="button" onClick={onEdit} aria-label="수정"
+          className="p-1.5 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600 bg-white border border-slate-200">
+          <Pencil size={12} />
+        </button>
+        <button type="button" onClick={onDelete} aria-label="삭제"
+          className="p-1.5 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500 bg-white border border-slate-200">
+          <Trash2 size={12} />
+        </button>
+      </div>
       <CardHeader>
         <div className="flex items-start gap-3">
           {s.profile_image_url ? (
@@ -50,7 +61,14 @@ function ExpertGridCard({ s }: { s: StaffPool }) {
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <CardTitle className="truncate">{s.name}</CardTitle>
+            <CardTitle className="truncate flex items-center gap-1.5">
+              {s.name}
+              {s.staff_type && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 border border-violet-200">
+                  {s.staff_type}
+                </span>
+              )}
+            </CardTitle>
             <CardDescription>
               {[s.organization, s.position].filter(Boolean).join(' · ') || '소속·직책 미지정'}
             </CardDescription>
@@ -87,9 +105,9 @@ function ExpertGridCard({ s }: { s: StaffPool }) {
   );
 }
 
-function ExpertListRow({ s }: { s: StaffPool }) {
+function ExpertListRow({ s, onEdit, onDelete }: { s: StaffPool; onEdit: () => void; onDelete: () => void }) {
   return (
-    <li className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition">
+    <li className="group flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition relative">
       {s.profile_image_url ? (
         <img src={s.profile_image_url} alt={`${s.name} 프로필`} className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-200" />
       ) : (
@@ -99,7 +117,14 @@ function ExpertListRow({ s }: { s: StaffPool }) {
       )}
       <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-bold text-text truncate">{s.name}</div>
+          <div className="text-sm font-bold text-text truncate flex items-center gap-1.5">
+            {s.name}
+            {s.staff_type && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 border border-violet-200">
+                {s.staff_type}
+              </span>
+            )}
+          </div>
           <div className="text-xs text-muted truncate">
             {[s.organization, s.position].filter(Boolean).join(' · ') || '소속·직책 미지정'}
           </div>
@@ -122,6 +147,16 @@ function ExpertListRow({ s }: { s: StaffPool }) {
           {!s.phone_mobile && !s.email && <span className="text-slate-400">연락처 미지정</span>}
         </div>
       </div>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
+        <button type="button" onClick={onEdit} aria-label="수정"
+          className="p-1.5 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600">
+          <Pencil size={12} />
+        </button>
+        <button type="button" onClick={onDelete} aria-label="삭제"
+          className="p-1.5 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500">
+          <Trash2 size={12} />
+        </button>
+      </div>
     </li>
   );
 }
@@ -134,13 +169,17 @@ export default function ExpertsPage() {
   const [field, setField] = useState<FieldFilter>('전체');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  // STEP-EXPERT-CRUD-FULL — 수정 대상 (null = 신규 등록)
+  const [editTarget, setEditTarget] = useState<StaffPool | null>(null);
 
   const fetchExperts = useCallback(async () => {
     setLoading(true);
     try {
+      // STEP-EXPERT-CRUD-FULL — 휴지통(deleted_at IS NOT NULL) 제외
       const { data, error } = await supabase
         .from('staff_pool')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       setExperts((data ?? []) as StaffPool[]);
@@ -161,6 +200,15 @@ export default function ExpertsPage() {
   useEffect(() => {
     void fetchExperts();
   }, [fetchExperts]);
+
+  // STEP-EXPERT-CRUD-FULL — soft-delete (휴지통 30일 보관)
+  const handleDelete = async (s: StaffPool) => {
+    if (!window.confirm(`"${s.name}" 전문가를 삭제할까요? 30일 후 자동으로 완전 삭제됩니다. (관리자 휴지통에서 복원 가능)`)) return;
+    const err = await softDelete('staff_pool', s.id);
+    if (err) { toast.error(err); return; }
+    toast.success('전문가를 휴지통으로 이동했어요.');
+    void fetchExperts();
+  };
 
   const counts = useMemo<Record<FieldFilter, number>>(() => {
     const acc: Record<FieldFilter, number> = { 전체: experts.length, 교육: 0, 컨설팅: 0, 행사: 0, 기타: 0 };
@@ -232,7 +280,7 @@ export default function ExpertsPage() {
               <List size={16} />
             </button>
           </div>
-          <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setModalOpen(true)}>신규 등록</Button>
+          <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => { setEditTarget(null); setModalOpen(true); }}>신규 등록</Button>
         </div>
       </div>
 
@@ -259,7 +307,7 @@ export default function ExpertsPage() {
           description={!search.trim() && field === '전체' ? '첫 전문가를 등록해 보세요.' : undefined}
           action={
             !search.trim() && field === '전체' && (
-              <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => setModalOpen(true)}>
+              <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => { setEditTarget(null); setModalOpen(true); }}>
                 + 전문가 등록
               </Button>
             )
@@ -267,17 +315,26 @@ export default function ExpertsPage() {
         />
       ) : view === 'card' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visible.map((s) => (<ExpertGridCard key={s.id} s={s} />))}
+          {visible.map((s) => (
+            <ExpertGridCard key={s.id} s={s}
+              onEdit={() => { setEditTarget(s); setModalOpen(true); }}
+              onDelete={() => void handleDelete(s)} />
+          ))}
         </div>
       ) : (
         <ul className="space-y-2">
-          {visible.map((s) => (<ExpertListRow key={s.id} s={s} />))}
+          {visible.map((s) => (
+            <ExpertListRow key={s.id} s={s}
+              onEdit={() => { setEditTarget(s); setModalOpen(true); }}
+              onDelete={() => void handleDelete(s)} />
+          ))}
         </ul>
       )}
 
       <ExpertFormModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        expert={editTarget}
+        onClose={() => { setModalOpen(false); setEditTarget(null); }}
         onCreated={() => void fetchExperts()}
       />
     </div>

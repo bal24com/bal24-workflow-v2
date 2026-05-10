@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Building2, Phone, Mail, MapPin, FileText, Banknote, Briefcase, Loader2, ExternalLink,
+  Building2, Phone, Mail, MapPin, FileText, Banknote, Briefcase, Loader2, ExternalLink, Trash2, Users,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Modal } from '../../components/ui';
+import { Modal, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
+import { softDelete } from '../../lib/softDeleteUtils';
+import { useToast } from '../../contexts/ToastContext';
 import type { Client, ClientContact, ProjectStatus } from '../../types/database';
 
 type TabKey = 'info' | 'bank' | 'projects';
@@ -24,6 +26,8 @@ interface Props {
   open: boolean;
   client: Client | null;
   onClose: () => void;
+  /** STEP-EXPERT-CRUD-FULL — 삭제 후 부모 목록 갱신 콜백 */
+  onDeleted?: () => void;
 }
 
 const TYPE_BADGE: Record<string, { bg: string; text: string; label: string }> = {
@@ -46,12 +50,27 @@ const STATUS_TONE: Record<ProjectStatus, string> = {
   '종료': 'bg-emerald-100 text-emerald-700',
 };
 
-export default function ClientDetailModal({ open, client, onClose }: Props) {
+export default function ClientDetailModal({ open, client, onClose, onDeleted }: Props) {
+  const toast = useToast();
   const [tab, setTab] = useState<TabKey>('info');
   const [contacts, setContacts] = useState<ClientContact[]>([]);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // STEP-EXPERT-CRUD-FULL — soft-delete (휴지통 30일 보관)
+  async function handleDelete() {
+    if (!client) return;
+    if (!window.confirm(`"${client.name}" 고객사를 삭제할까요? 30일 후 자동으로 완전 삭제됩니다. (관리자 휴지통에서 복원 가능)`)) return;
+    setDeleting(true);
+    const err = await softDelete('clients', client.id);
+    setDeleting(false);
+    if (err) { toast.error(err); return; }
+    toast.success('고객사를 휴지통으로 이동했어요.');
+    onClose();
+    onDeleted?.();
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -105,6 +124,17 @@ export default function ClientDetailModal({ open, client, onClose }: Props) {
       size="lg"
       title={client.name}
       description={client.business_name ?? undefined}
+      footer={
+        <Button
+          variant="outline"
+          leftIcon={<Trash2 size={14} />}
+          onClick={() => void handleDelete()}
+          disabled={deleting}
+          className="!border-rose-300 !text-rose-600 hover:!bg-rose-50"
+        >
+          {deleting ? '삭제 중…' : '삭제'}
+        </Button>
+      }
     >
       <div className="space-y-4">
         <div className="flex items-center gap-2 flex-wrap">
@@ -151,6 +181,11 @@ export default function ClientDetailModal({ open, client, onClose }: Props) {
               <DetailRow icon={<Briefcase size={14} aria-hidden="true" />} label="업태/종목">
                 {[client.business_type, client.business_item].filter(Boolean).join(' · ') || '미등록'}
               </DetailRow>
+              {client.department && (
+                <DetailRow icon={<Users size={14} aria-hidden="true" />} label="부서">
+                  {client.department}
+                </DetailRow>
+              )}
               {client.phone && (
                 <DetailRow icon={<Phone size={14} aria-hidden="true" />} label="대표 전화">
                   <a href={`tel:${client.phone}`} className="text-violet-700 hover:underline">{client.phone}</a>

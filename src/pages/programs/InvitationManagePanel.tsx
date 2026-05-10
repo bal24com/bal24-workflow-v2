@@ -17,6 +17,7 @@ import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../utils/statusStyles';
 import { useToast } from '../../contexts/ToastContext';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { approveInvitation, rejectInvitation } from '../../lib/inviteApproval';
+import RejectionReasonModal from './detail/RejectionReasonModal';
 import type {
   InstructorInvitation, InvitationFile, StaffPool,
 } from '../../types/database';
@@ -57,6 +58,8 @@ export default function InvitationManagePanel({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   // STEP-INVITE-APPROVE-PART2 — 승인/반려 진행 중 표시 (id별)
   const [actingId, setActingId] = useState<string | null>(null);
+  // STEP-EXPERT-CRUD-FULL — 반려 사유 입력 모달 대상
+  const [rejectTarget, setRejectTarget] = useState<InstructorInvitation | null>(null);
 
   // 신호 파일 (단일 파일 다운로드)
   const [openingUrl, setOpeningUrl] = useState<string | null>(null);
@@ -142,16 +145,20 @@ export default function InvitationManagePanel({
     }
   };
 
-  // STEP-INVITE-APPROVE-PART2 — 반려 (사유 prompt — 후속 STEP에서 모달로 교체 예정)
-  const handleReject = async (inv: InstructorInvitation) => {
+  // STEP-EXPERT-CRUD-FULL — 반려 모달 트리거 (RejectionReasonModal로 사유 입력)
+  const handleRejectClick = (inv: InstructorInvitation) => {
     if (!profile?.id) { toast.error('로그인 정보를 확인할 수 없어요.'); return; }
-    const reason = window.prompt(`"${inv.name}" 초대를 반려할 사유를 입력해 주세요.`, '');
-    if (reason === null) return;
-    setActingId(inv.id);
+    setRejectTarget(inv);
+  };
+
+  const confirmReject = async (reason: string) => {
+    if (!rejectTarget || !profile?.id) return;
+    setActingId(rejectTarget.id);
     try {
-      const r = await rejectInvitation(inv.id, profile.id, profile.name ?? '관리자', reason || undefined);
+      const r = await rejectInvitation(rejectTarget.id, profile.id, profile.name ?? '관리자', reason);
       if (!r.ok) { toast.error(r.error ?? '반려 중 오류가 발생했습니다.'); return; }
       toast.success('초대가 반려되었습니다.');
+      setRejectTarget(null);
       await fetchData();
       onApproved?.();
     } finally {
@@ -313,7 +320,7 @@ export default function InvitationManagePanel({
                           승인
                         </button>
                         <button type="button" disabled={actingId === inv.id}
-                          onClick={() => void handleReject(inv)}
+                          onClick={() => handleRejectClick(inv)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 disabled:opacity-50">
                           <XCircle size={11} aria-hidden="true" />
                           반려
@@ -333,6 +340,14 @@ export default function InvitationManagePanel({
           )}
         </div>
       </aside>
+      {/* STEP-EXPERT-CRUD-FULL — 반려 사유 입력 모달 (window.prompt 대체) */}
+      <RejectionReasonModal
+        open={rejectTarget !== null}
+        targetLabel={rejectTarget?.name ?? ''}
+        submitting={actingId === rejectTarget?.id}
+        onClose={() => setRejectTarget(null)}
+        onConfirm={(reason) => void confirmReject(reason)}
+      />
     </>
   );
 }

@@ -156,6 +156,7 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
         business_number: businessNumberDigits || null,
         business_type: form.businessType.trim() || null,
         business_item: form.businessItem.trim() || null,
+        department: form.department.trim() || null,
         address: form.address.trim() || null,
         phone: form.phone.trim() || null,
         email: form.email.trim() || null,
@@ -280,6 +281,7 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
             <Input label="업태" value={form.businessType} onChange={(e) => update('businessType', e.target.value)} disabled={submitting} placeholder="예) 서비스업" />
             <Input label="종목" value={form.businessItem} onChange={(e) => update('businessItem', e.target.value)} disabled={submitting} placeholder="예) 교육서비스" />
           </div>
+          <Input label="부서명" value={form.department} onChange={(e) => update('department', e.target.value)} disabled={submitting} placeholder="부서명 (선택)" helperText="해당 고객사 내 부서·팀명" />
           <Input label="주소" value={form.address} onChange={(e) => update('address', e.target.value)} disabled={submitting} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="대표 전화" type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} disabled={submitting} placeholder="02-0000-0000" />

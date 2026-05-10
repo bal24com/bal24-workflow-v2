@@ -24,6 +24,7 @@ import PortalManagePage from './pages/portal/PortalManagePage';
 import PortalTemplatePage from './pages/portal/templates/PortalTemplatePage';
 import SchedulePage from './pages/schedule/SchedulePage';
 import MembersPage from './pages/members/MembersPage';
+import AdminPage from './pages/admin/AdminPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AiPage from './pages/ai/AiPage';
 import ApplicationPage from './pages/applications/ApplicationPage';
@@ -202,6 +203,7 @@ export default function App() {
               {/* 기타 */}
               <Route path="/members" element={<MembersPage />} />
               <Route path="/team" element={<Navigate to="/members" replace />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/ai" element={<AiPage />} />
 
               {/* 구 경로 호환 */}

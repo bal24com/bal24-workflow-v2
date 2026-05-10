@@ -1,5 +1,6 @@
-// bal24 v2 — 전문가(staff_pool) 신규 등록 모달
+// bal24 v2 — 전문가(staff_pool) 등록·수정 모달
 // 기본정보 + 계좌 + 민감정보(주민번호 마스킹) + 프로필 사진 + 명함 인식
+// STEP-EXPERT-CRUD-FULL — 학력·경력·자격·이력서 + edit 모드 + soft-delete
 
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
@@ -7,11 +8,15 @@ import { ScanLine, Loader2 } from 'lucide-react';
 import { Modal, Button, Input, FileDropZone } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { extractBusinessCardInfo, ClaudeApiKeyMissingError, ClaudeApiError } from '../../lib/claude';
+import ExpertFormExtSection from './ExpertFormExtSection';
+import type { CareerItem, CertItem, EducationItem, StaffPool, StaffType } from '../../types/database';
 
 const STORAGE_BUCKET = 'expert-files';
 
 type Props = {
   open: boolean;
+  /** STEP-EXPERT-CRUD-FULL — 수정 모드 시 expert 전달, 미전달 시 신규 등록 */
+  expert?: StaffPool | null;
   onClose: () => void;
   onCreated: () => void;
 };
@@ -40,6 +45,24 @@ const EMPTY: FormState = {
   idNumber: '',
 };
 
+function expertToForm(s: StaffPool): FormState {
+  return {
+    name: s.name ?? '',
+    organization: s.organization ?? '',
+    position: s.position ?? '',
+    specialty: (s.specialty ?? []).join(', '),
+    phoneMobile: s.phone_mobile ?? '',
+    phoneOffice: s.phone_office ?? '',
+    email: s.email ?? '',
+    mainDuties: s.main_duties ?? '',
+    careerSummary: s.career_summary ?? '',
+    bankName: s.bank_name ?? '',
+    bankAccount: s.bank_account ?? '',
+    bankHolder: s.bank_holder ?? '',
+    idNumber: s.id_number ?? '',
+  };
+}
+
 function maskIdNumber(raw: string): string {
   const d = raw.replace(/\D/g, '');
   if (d.length < 7) return d;
@@ -65,10 +88,18 @@ function translateUploadError(raw: string): string {
   return '파일 업로드 중 오류가 발생했어요.';
 }
 
-export default function ExpertFormModal({ open, onClose, onCreated }: Props) {
+export default function ExpertFormModal({ open, expert, onClose, onCreated }: Props) {
+  const isEdit = Boolean(expert);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoName, setPhotoName] = useState<string | null>(null);
+
+  // STEP-EXPERT-CRUD-FULL — 확장 필드
+  const [staffType, setStaffType] = useState<StaffType | ''>('');
+  const [resumeUrl, setResumeUrl] = useState('');
+  const [educations, setEducations] = useState<EducationItem[]>([]);
+  const [careers, setCareers] = useState<CareerItem[]>([]);
+  const [certs, setCerts] = useState<CertItem[]>([]);
 
   const [uploading, setUploading] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -79,15 +110,25 @@ export default function ExpertFormModal({ open, onClose, onCreated }: Props) {
 
   const cardInputRef = useRef<HTMLInputElement | null>(null);
 
+  // 모달 열릴 때 — expert 있으면 prefill, 없으면 EMPTY
   useEffect(() => {
-    if (open) return;
-    setForm(EMPTY);
-    setPhotoUrl(null);
-    setPhotoName(null);
-    setNameError(null);
-    setErrorMsg(null);
-    setInfoMsg(null);
-  }, [open]);
+    if (!open) return;
+    if (expert) {
+      setForm(expertToForm(expert));
+      setPhotoUrl(expert.profile_image_url ?? null);
+      setPhotoName(expert.profile_image_url ? '등록된 프로필' : null);
+      setStaffType((expert.staff_type ?? '') as StaffType | '');
+      setResumeUrl(expert.resume_url ?? '');
+      setEducations(expert.education_history ?? []);
+      setCareers(expert.career_history ?? []);
+      setCerts(expert.certifications ?? []);
+    } else {
+      setForm(EMPTY); setPhotoUrl(null); setPhotoName(null);
+      setStaffType(''); setResumeUrl('');
+      setEducations([]); setCareers([]); setCerts([]);
+    }
+    setNameError(null); setErrorMsg(null); setInfoMsg(null);
+  }, [open, expert]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -165,10 +206,13 @@ export default function ExpertFormModal({ open, onClose, onCreated }: Props) {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-
       const idDigits = form.idNumber.replace(/\D/g, '');
+      // 빈 항목 정리 (저장 시 noise 제거)
+      const eduClean = educations.filter((e) => e.school.trim() || e.major.trim() || e.year.trim());
+      const careerClean = careers.filter((c) => c.company.trim() || c.role.trim() || c.period.trim());
+      const certsClean = certs.filter((c) => c.name.trim() || c.issuer.trim() || c.year.trim());
 
-      const { error } = await supabase.from('staff_pool').insert({
+      const payload = {
         name: form.name.trim(),
         organization: form.organization.trim() || null,
         position: form.position.trim() || null,
@@ -183,14 +227,24 @@ export default function ExpertFormModal({ open, onClose, onCreated }: Props) {
         bank_holder: form.bankHolder.trim() || null,
         id_number: idDigits || null,
         profile_image_url: photoUrl,
-      });
+        // STEP-EXPERT-CRUD-FULL — 확장 필드
+        staff_type: staffType || null,
+        resume_url: resumeUrl.trim() || null,
+        education_history: eduClean,
+        career_history: careerClean,
+        certifications: certsClean,
+      };
+
+      const { error } = isEdit && expert
+        ? await supabase.from('staff_pool').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', expert.id)
+        : await supabase.from('staff_pool').insert(payload);
 
       if (error) throw error;
       onCreated();
       onClose();
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
-      console.error('[experts] 등록 실패:', raw);
+      console.error(`[experts] ${isEdit ? '수정' : '등록'} 실패:`, raw);
       setErrorMsg(translateInsertError(raw));
     } finally {
       setSubmitting(false);
@@ -201,14 +255,16 @@ export default function ExpertFormModal({ open, onClose, onCreated }: Props) {
     <Modal
       open={open}
       onClose={onClose}
-      title="전문가 신규 등록"
-      description="이름만 필수예요. '명함 인식'으로 빠르게 채울 수 있어요."
+      title={isEdit ? '전문가 수정' : '전문가 신규 등록'}
+      description={isEdit ? '정보를 수정하고 저장하면 즉시 반영돼요.' : "이름만 필수예요. '명함 인식'으로 빠르게 채울 수 있어요."}
       size="lg"
       closeOnBackdrop={!submitting && !uploading && !scanning}
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={submitting || uploading || scanning}>취소</Button>
-          <Button type="submit" form="expert-form" variant="primary" loading={submitting} disabled={uploading || scanning}>저장하기</Button>
+          <Button type="submit" form="expert-form" variant="primary" loading={submitting} disabled={uploading || scanning}>
+            {isEdit ? '수정 완료' : '저장하기'}
+          </Button>
         </>
       }
     >
@@ -288,6 +344,21 @@ export default function ExpertFormModal({ open, onClose, onCreated }: Props) {
             accept="image/*"
           />
         </section>
+
+        {/* STEP-EXPERT-CRUD-FULL — 주 역할 + 학력 + 경력 + 자격 + 이력서 URL */}
+        <ExpertFormExtSection
+          staffType={staffType}
+          resumeUrl={resumeUrl}
+          educations={educations}
+          careers={careers}
+          certs={certs}
+          disabled={submitting}
+          onStaffType={setStaffType}
+          onResumeUrl={setResumeUrl}
+          onEducations={setEducations}
+          onCareers={setCareers}
+          onCerts={setCerts}
+        />
 
         {infoMsg && (
           <div role="status" className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5 text-sm text-emerald-700">{infoMsg}</div>

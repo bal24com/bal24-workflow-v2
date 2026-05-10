@@ -15,6 +15,7 @@ export type ClientForm = {
   businessNumber: string;
   businessType: string;
   businessItem: string;
+  department: string;          // STEP-EXPERT-CRUD-FULL
   bankName: string;
   bankAccount: string;
   bankHolder: string;
@@ -25,21 +26,11 @@ export type ClientForm = {
 };
 
 export const EMPTY_CLIENT: ClientForm = {
-  name: '',
-  businessName: '',
-  ceoName: '',
-  clientType: 'client',
-  representative: '',
-  businessNumber: '',
-  businessType: '',
-  businessItem: '',
-  bankName: '',
-  bankAccount: '',
-  bankHolder: '',
-  address: '',
-  phone: '',
-  email: '',
-  note: '',
+  name: '', businessName: '', ceoName: '', clientType: 'client',
+  representative: '', businessNumber: '', businessType: '', businessItem: '',
+  department: '',
+  bankName: '', bankAccount: '', bankHolder: '',
+  address: '', phone: '', email: '', note: '',
 };
 
 export function clientToForm(c: Client): ClientForm {
@@ -52,6 +43,7 @@ export function clientToForm(c: Client): ClientForm {
     businessNumber: c.business_number ?? '',
     businessType: c.business_type ?? '',
     businessItem: c.business_item ?? '',
+    department: c.department ?? '',
     bankName: c.bank_name ?? '',
     bankAccount: c.bank_account ?? '',
     bankHolder: c.bank_holder ?? '',
