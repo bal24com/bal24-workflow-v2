@@ -43,12 +43,14 @@ export function useUserProfile() {
     return () => { cancelled = true; };
   }, [user]);
 
-  // STEP-ROLE-NORMALIZE — hasRole 헬퍼로 소문자 통일 (대소문자 무관 비교)
+  // STEP-ROLE-NORMALIZE-PM — hasRole 헬퍼로 소문자 통일 + 권한 위계 반영
   // ⚠️ 모든 역할 비교는 hasRole 사용 — 직접 `role === 'PM'` 비교 금지
+  // - admin 은 모든 권한 상속 (isPM/isStaff/isFinance 모두 true)
+  // - pm 은 staff 권한도 보유 (isStaff true)
   const role: Role | null = profile?.role ?? null;
   const isAdmin   = hasRole(role, 'admin');
   const isPM      = hasRole(role, 'pm') || isAdmin;
-  const isStaff   = hasRole(role, 'staff');
+  const isStaff   = hasRole(role, 'staff') || isPM;
   const isFinance = hasRole(role, 'finance') || isAdmin;
   const isPartner = hasRole(role, 'partner');
   const isMember  = hasRole(role, 'member');
