@@ -13,9 +13,11 @@ import { formatDateKo } from '../../../lib/utils';
 import { supabase } from '../../../lib/supabase';
 import {
   fetchApplications, updateApplicationStatus, bulkUpdateStatus, fetchAvgScores,
+  inviteAsMember as inviteAsMemberUtil,
   PARTICIPANT_STATUS_LABELS, PARTICIPANT_STATUS_TONE,
 } from './applicationMgmtUtils';
 import ApplicationDetailModal from '../../applications/ApplicationDetailModal';
+import RejectionReasonModal from './RejectionReasonModal';
 import { sendNotification } from '../../../lib/notifyUtils';
 import type {
   ParticipantApplication, ParticipantStatus,
@@ -54,6 +56,8 @@ export default function ApplicationTab({ programId }: Props) {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [detailTarget, setDetailTarget] = useState<ParticipantApplication | null>(null);
+  // STEP-REJECTION-REASON-UI — 탈락 사유 모달 상태 (단건 또는 일괄)
+  const [rejectTarget, setRejectTarget] = useState<{ kind: 'single'; app: ParticipantApplication } | { kind: 'bulk'; ids: string[] } | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -73,15 +77,9 @@ export default function ApplicationTab({ programId }: Props) {
       setScores(new Map());
     }
     // STEP-MEMBER-INVITE-REPORT — 합격자 이메일로 member_invitations 일괄 조회
-    const acceptedEmails = list
-      .filter((a) => a.status === 'accepted' && !!a.email)
-      .map((a) => (a.email as string).toLowerCase());
+    const acceptedEmails = list.filter((a) => a.status === 'accepted' && !!a.email).map((a) => (a.email as string).toLowerCase());
     if (acceptedEmails.length > 0) {
-      const { data: invs, error: invErr } = await supabase
-        .from('member_invitations')
-        .select('email')
-        .in('email', acceptedEmails)
-        .is('deleted_at', null);
+      const { data: invs, error: invErr } = await supabase.from('member_invitations').select('email').in('email', acceptedEmails).is('deleted_at', null);
       if (invErr) console.error('[member-invite] 초대 목록 조회 실패:', invErr.message);
       setInvitedEmails(new Set(((invs ?? []) as { email: string }[]).map((r) => r.email.toLowerCase())));
     } else {
@@ -130,7 +128,7 @@ export default function ApplicationTab({ programId }: Props) {
     });
   };
 
-  // STEP-MEMBER-INVITE-REPORT — 합격자 MEMBER 초대
+  // STEP-MEMBER-INVITE-REPORT — 합격자 MEMBER 초대 (UI 래퍼 — 핵심 로직은 utils 에)
   async function inviteAsMember(app: ParticipantApplication) {
     if (!app.email) {
       toast.error('신청 시 이메일이 입력되지 않아 초대할 수 없어요.');
@@ -139,47 +137,18 @@ export default function ApplicationTab({ programId }: Props) {
     const email = app.email.trim().toLowerCase();
     setInvitingId(app.id);
     try {
-      // 1) 중복 확인
-      const { data: existing, error: existErr } = await supabase
-        .from('member_invitations')
-        .select('id, status')
-        .eq('email', email)
-        .is('deleted_at', null)
-        .maybeSingle();
-      if (existErr) {
-        console.error('[member-invite] 중복 확인 실패:', existErr.message);
-        toast.error('초대 확인 중 오류가 발생했어요.');
-        return;
-      }
-      if (existing) {
-        toast.error('이미 초대가 발송된 이메일이에요.');
+      const r = await inviteAsMemberUtil(app, user?.id ?? null);
+      if (r.alreadyInvited) {
+        toast.error(r.errorMessage ?? '이미 초대됐어요.');
         setInvitedEmails((p) => new Set(p).add(email));
         return;
       }
-      // 2) member_invitations INSERT
-      const { data: inv, error: invErr } = await supabase
-        .from('member_invitations')
-        .insert({ email, role: 'member', invited_by: user?.id ?? null })
-        .select('id, token')
-        .single();
-      if (invErr || !inv) {
-        const m = invErr?.message?.toLowerCase() ?? '';
-        console.error('[member-invite] INSERT 실패:', invErr?.message);
-        if (m.includes('row-level security') || m.includes('permission')) {
-          toast.error('초대 권한이 없어요. ADMIN 만 초대할 수 있어요.');
-        } else {
-          toast.error('초대 생성 중 오류가 발생했어요.');
-        }
+      if (!r.success) {
+        toast.error(r.errorMessage ?? '초대 생성 중 오류가 발생했어요.');
         return;
       }
-      // 3) Edge Function — invitation_id 만 전달 (V2 send-invite 시그니처)
-      const row = inv as { id: string; token: string };
-      const { error: fnErr } = await supabase.functions.invoke('send-invite', {
-        body: { invitation_id: row.id },
-      });
-      if (fnErr) {
-        console.error('[member-invite] 이메일 발송 실패:', fnErr.message);
-        toast.warning(`초대는 등록됐지만 이메일 발송이 실패했어요. 직접 링크를 복사해 전달하세요: ${window.location.origin}/invite/member/${row.token}`);
+      if (r.emailFailed) {
+        toast.warning(`초대는 등록됐지만 이메일 발송이 실패했어요. 직접 링크를 복사해 전달하세요: ${r.inviteLink}`);
       } else {
         toast.success(`${app.name}님께 초대 이메일을 발송했어요.`);
       }
@@ -189,16 +158,20 @@ export default function ApplicationTab({ programId }: Props) {
     }
   }
 
-  // STEP-EMAIL-NOTIFY — 합격/탈락 시 메일 발송 헬퍼 (fire-and-forget)
-  const notifyOne = (app: ParticipantApplication, next: ParticipantStatus) => {
+  // STEP-EMAIL-NOTIFY + REJECTION-REASON-UI — 합격/탈락 메일 (rejected 는 reason 포함)
+  const notifyOne = (app: ParticipantApplication, next: ParticipantStatus, reason?: string) => {
     if ((next !== 'accepted' && next !== 'rejected') || !app.email) return;
     void sendNotification({
       type: next, recipientEmail: app.email, recipientName: app.name,
-      programTitle: programName, note: app.review_notes ?? undefined,
+      programTitle: programName,
+      note: app.review_notes ?? undefined,
+      reason: next === 'rejected' ? reason : undefined,
     });
   };
 
   async function handleSingleStatus(app: ParticipantApplication, next: ParticipantStatus) {
+    // 탈락은 사유 모달로 흐름 분기
+    if (next === 'rejected') { setRejectTarget({ kind: 'single', app }); return; }
     setActing(true);
     const r = await updateApplicationStatus(app.id, next, user?.id ?? null);
     setActing(false);
@@ -211,16 +184,36 @@ export default function ApplicationTab({ programId }: Props) {
   async function handleBulkStatus(next: ParticipantStatus) {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) { toast.error('선택된 신청자가 없어요.'); return; }
+    // 일괄 탈락은 사유 모달로 흐름 분기
+    if (next === 'rejected') { setRejectTarget({ kind: 'bulk', ids }); return; }
     if (!window.confirm(`${ids.length}명을 '${PARTICIPANT_STATUS_LABELS[next]}' 로 변경할까요?`)) return;
     setActing(true);
     const r = await bulkUpdateStatus(ids, next, user?.id ?? null);
     setActing(false);
     if (!r.success) { toast.error(r.error ?? '일괄 처리 실패'); return; }
     toast.success(`${r.updatedCount}명을 처리했어요.`);
-    if (next === 'accepted' || next === 'rejected') {
+    if (next === 'accepted') {
       const idSet = new Set(ids);
       items.filter((a) => idSet.has(a.id)).forEach((a) => notifyOne(a, next));
     }
+    await refresh();
+  }
+
+  // STEP-REJECTION-REASON-UI — 모달 확정 시 호출 (단건/일괄 공용)
+  async function confirmRejection(reason: string) {
+    if (!rejectTarget || !reason.trim()) return;
+    const isSingle = rejectTarget.kind === 'single';
+    const ids = isSingle ? [rejectTarget.app.id] : rejectTarget.ids;
+    setActing(true);
+    const r = isSingle
+      ? await updateApplicationStatus(ids[0], 'rejected', user?.id ?? null)
+      : await bulkUpdateStatus(ids, 'rejected', user?.id ?? null);
+    setActing(false);
+    if (!r.success) { toast.error(r.error ?? '탈락 처리 실패'); return; }
+    toast.success(isSingle ? `${rejectTarget.app.name} 님을 탈락 처리했어요.` : `${(r as { updatedCount?: number }).updatedCount ?? ids.length}명을 탈락 처리했어요.`);
+    const idSet = new Set(ids);
+    items.filter((a) => idSet.has(a.id)).forEach((a) => notifyOne(a, 'rejected', reason));
+    setRejectTarget(null);
     await refresh();
   }
 
@@ -391,6 +384,16 @@ export default function ApplicationTab({ programId }: Props) {
           onSaved={() => { void refresh(); setDetailTarget(null); }}
         />
       )}
+
+      <RejectionReasonModal
+        open={rejectTarget !== null}
+        targetLabel={rejectTarget?.kind === 'single'
+          ? rejectTarget.app.name
+          : rejectTarget?.kind === 'bulk' ? `${rejectTarget.ids.length}명 (일괄 처리)` : ''}
+        submitting={acting}
+        onClose={() => setRejectTarget(null)}
+        onConfirm={(reason) => void confirmRejection(reason)}
+      />
     </div>
   );
 }

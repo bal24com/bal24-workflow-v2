@@ -1,8 +1,66 @@
 // bal24 v2 — STEP-APPLICATION-MGMT 신청자 관리 헬퍼 (PM)
-// fetch / 단건 상태 변경 / 일괄 상태 변경.
+// fetch / 단건 상태 변경 / 일괄 상태 변경 / MEMBER 초대.
 
 import { supabase } from '../../../lib/supabase';
 import type { ParticipantApplication, ParticipantStatus } from '../../../types/application';
+
+// ─── STEP-MEMBER-INVITE-REPORT — 합격자 MEMBER 초대 결과 타입 ───
+export interface InviteAsMemberResult {
+  success: boolean;
+  alreadyInvited?: boolean;
+  emailFailed?: boolean;
+  inviteLink?: string;
+  errorMessage?: string;
+}
+
+/**
+ * 합격자 신청 정보를 받아 member_invitations 에 INSERT + send-invite Edge Function 호출.
+ * 호출자가 토스트/상태 setter 처리 (UI 와 분리).
+ */
+export async function inviteAsMember(
+  app: ParticipantApplication,
+  invitedByUserId: string | null,
+): Promise<InviteAsMemberResult> {
+  if (!app.email) {
+    return { success: false, errorMessage: '신청 시 이메일이 입력되지 않아 초대할 수 없어요.' };
+  }
+  const email = app.email.trim().toLowerCase();
+  // 1) 중복 확인
+  const { data: existing, error: existErr } = await supabase
+    .from('member_invitations').select('id, status')
+    .eq('email', email).is('deleted_at', null).maybeSingle();
+  if (existErr) {
+    console.error('[member-invite] 중복 확인 실패:', existErr.message);
+    return { success: false, errorMessage: '초대 확인 중 오류가 발생했어요.' };
+  }
+  if (existing) {
+    return { success: false, alreadyInvited: true, errorMessage: '이미 초대가 발송된 이메일이에요.' };
+  }
+  // 2) INSERT
+  const { data: inv, error: invErr } = await supabase
+    .from('member_invitations')
+    .insert({ email, role: 'member', invited_by: invitedByUserId })
+    .select('id, token').single();
+  if (invErr || !inv) {
+    const m = invErr?.message?.toLowerCase() ?? '';
+    console.error('[member-invite] INSERT 실패:', invErr?.message);
+    if (m.includes('row-level security') || m.includes('permission')) {
+      return { success: false, errorMessage: '초대 권한이 없어요. ADMIN 만 초대할 수 있어요.' };
+    }
+    return { success: false, errorMessage: '초대 생성 중 오류가 발생했어요.' };
+  }
+  // 3) Edge Function 호출
+  const row = inv as { id: string; token: string };
+  const inviteLink = `${window.location.origin}/invite/member/${row.token}`;
+  const { error: fnErr } = await supabase.functions.invoke('send-invite', {
+    body: { invitation_id: row.id },
+  });
+  if (fnErr) {
+    console.error('[member-invite] 이메일 발송 실패:', fnErr.message);
+    return { success: true, emailFailed: true, inviteLink };
+  }
+  return { success: true, inviteLink };
+}
 
 export const PARTICIPANT_STATUS_VALUES: ParticipantStatus[] = [
   'applied', 'reviewing', 'accepted', 'rejected', 'withdrawn', 'completed',

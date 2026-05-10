@@ -26,6 +26,7 @@ interface NotifyRequest {
   programTitle: string;
   projectTitle?: string;
   note?: string;
+  reason?: string;
   rejectReason?: string;
 }
 
@@ -50,13 +51,14 @@ function buildTemplate(req: NotifyRequest): Template {
 <p>담당자가 곧 추가 안내를 드릴 예정이에요.</p>`,
       };
     case 'rejected': {
-      const noteHtml = req.note?.trim()
-        ? `<p style="color:#64748B;font-size:13px;">사유: ${escapeHtml(req.note.trim())}</p>` : '';
+      // STEP-REJECTION-REASON-UI — reason(모달 입력) > note(legacy) > fallback 우선순위
+      const rawReason = (req.reason?.trim() || req.note?.trim() || '').trim();
+      const reasonText = rawReason || '별도 안내 예정';
       return {
         subject: `[WorkFlow] 심사 결과 안내 — ${req.programTitle}`,
         body: `<p>${name}님,</p>
 <p>아쉽게도 <strong>${program}</strong> 심사에서 선정되지 않으셨어요.</p>
-${noteHtml}
+<p style="color:#64748B;font-size:13px;white-space:pre-wrap;">탈락 사유: ${escapeHtml(reasonText)}</p>
 <p>더 좋은 기회에 다시 뵙기를 바라겠습니다.</p>`,
       };
     }
