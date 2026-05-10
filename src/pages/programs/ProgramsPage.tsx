@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LayoutGrid, List, Plus, Loader2, UserPlus } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, UserPlus, FolderUp } from 'lucide-react';
 import {
   Button,
   Card,
@@ -29,6 +29,8 @@ import ConsortiumFilterTabs, {
 import { useToast } from '../../contexts/ToastContext';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import ProgramFormModal from './ProgramFormModal';
+import BulkProgramModal from './BulkProgramModal';
+import ProgramsFilterTabs from './ProgramsFilterTabs';
 import InvitationManagePanel from './InvitationManagePanel';
 import { useMemberProgramIds } from './useMemberProgramIds';
 
@@ -42,55 +44,6 @@ type ProgramRow = Program & {
 
 // consortium join은 일부 환경에서 400 유발 → 선제 제거. consortium_id 는 '*' 로 수신되어 필터 로직 그대로 작동.
 const SELECT_COLUMNS = '*, project:projects(id,name)';
-
-function FilterTabs<T extends string>({
-  values,
-  value,
-  onChange,
-  counts,
-  ariaLabel,
-}: {
-  values: T[];
-  value: T;
-  onChange: (next: T) => void;
-  counts?: Record<string, number>;
-  ariaLabel: string;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label={ariaLabel}>
-      {values.map((s) => {
-        const active = value === s;
-        return (
-          <button
-            key={s}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(s)}
-            className={[
-              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors',
-              active
-                ? 'bg-primary text-white shadow-sm'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50',
-            ].join(' ')}
-          >
-            {s}
-            {counts && (
-              <span
-                className={[
-                  'inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded text-[10px]',
-                  active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500',
-                ].join(' ')}
-              >
-                {counts[s] ?? 0}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 function ProgramMeta({ p }: { p: ProgramRow }) {
   return (
@@ -200,6 +153,7 @@ export default function ProgramsPage() {
   const [filterConsortiumId, setFilterConsortiumId] = useState<ConsortiumFilter>(null);
   const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [invitePanel, setInvitePanel] = useState<ProgramRow | null>(null);
 
   useEffect(() => {
@@ -281,7 +235,7 @@ export default function ProgramsPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1.5">
             <div className="text-xs font-semibold text-slate-500">상태</div>
-            <FilterTabs<StatusFilter>
+            <ProgramsFilterTabs<StatusFilter>
               values={['전체', ...PROGRAM_STATUS_VALUES]}
               value={statusFilter}
               onChange={setStatusFilter}
@@ -319,6 +273,14 @@ export default function ProgramsPage() {
             </div>
 
             <Button
+              variant="outline"
+              leftIcon={<FolderUp size={16} />}
+              onClick={() => setBulkOpen(true)}
+            >
+              일괄 등록
+            </Button>
+
+            <Button
               variant="primary"
               leftIcon={<Plus size={16} />}
               onClick={() => setModalOpen(true)}
@@ -330,7 +292,7 @@ export default function ProgramsPage() {
 
         <div className="space-y-1.5">
           <div className="text-xs font-semibold text-slate-500">유형</div>
-          <FilterTabs<TypeFilter>
+          <ProgramsFilterTabs<TypeFilter>
             values={['전체', ...PROGRAM_TYPE_VALUES]}
             value={typeFilter}
             onChange={setTypeFilter}
@@ -382,6 +344,12 @@ export default function ProgramsPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={() => void fetchPrograms()}
+      />
+
+      <BulkProgramModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onSuccess={() => void fetchPrograms()}
       />
 
       <InvitationManagePanel

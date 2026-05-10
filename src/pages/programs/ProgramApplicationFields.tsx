@@ -3,6 +3,38 @@
 
 import { Input } from '../../components/ui';
 
+export interface ApplicationValidationInput {
+  applicationType: 'open' | 'evaluation';
+  applicationStartDate: string;
+  applicationEndDate: string;
+  maxApplicants: string;
+  grantEnabled: boolean;
+  grantBudget: string;
+}
+
+export interface ApplicationValidationResult {
+  error: string | null;
+  parsedMaxApplicants: number | null;
+  parsedGrantBudget: number;
+}
+
+/** 평가형 신청 + 지원금 검증 — error 있으면 form 중단 */
+export function validateApplication(s: ApplicationValidationInput): ApplicationValidationResult {
+  if (s.applicationType === 'evaluation' && s.applicationStartDate && s.applicationEndDate
+      && s.applicationStartDate > s.applicationEndDate) {
+    return { error: '신청 종료일이 시작일보다 빠를 수 없어요.', parsedMaxApplicants: null, parsedGrantBudget: 0 };
+  }
+  const parsedMaxApplicants = s.maxApplicants.trim() ? Number(s.maxApplicants.replace(/,/g, '')) : null;
+  if (parsedMaxApplicants !== null && (Number.isNaN(parsedMaxApplicants) || parsedMaxApplicants < 0)) {
+    return { error: '선발 인원은 0 이상의 숫자로 입력해 주세요.', parsedMaxApplicants: null, parsedGrantBudget: 0 };
+  }
+  const parsedGrantBudget = s.grantEnabled && s.grantBudget.trim() ? Number(s.grantBudget.replace(/,/g, '')) : 0;
+  if (s.grantEnabled && (Number.isNaN(parsedGrantBudget) || parsedGrantBudget < 0)) {
+    return { error: '지원금 예산은 0 이상의 숫자로 입력해 주세요.', parsedMaxApplicants, parsedGrantBudget: 0 };
+  }
+  return { error: null, parsedMaxApplicants, parsedGrantBudget };
+}
+
 interface Props {
   applicationType: 'open' | 'evaluation';
   setApplicationType: (v: 'open' | 'evaluation') => void;

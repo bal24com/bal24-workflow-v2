@@ -9,10 +9,12 @@ import { supabase } from '../../lib/supabase';
 import { PROGRAM_STATUS_VALUES } from './programStatus';
 import type { ExtendedProgramType } from './programTypeConfig';
 import ProgramTemplateSelector from './detail/ProgramTemplateSelector';
-import ProgramApplicationFields from './ProgramApplicationFields';
+import ProgramApplicationFields, { validateApplication } from './ProgramApplicationFields';
 import ProgramOrgFields, { EMPTY_ORG_VALUES, type ProgramOrgValues } from './ProgramOrgFields';
 import ProgramVisibilityField, { type ProgramVisibility } from './ProgramVisibilityField';
+import ProgramAutofillSection from './ProgramAutofillSection';
 import ProgramTypeSelector from './ProgramTypeSelector';
+import { applyExtractedProgram, type ExtractedProgram, type ExtractedProgramType } from '../../lib/programAutoFill';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
 
 /** program_type(14종 영문) → 기존 programs.type(4종 한글) 매핑 — type 컬럼 NOT NULL 호환용 */
@@ -121,6 +123,17 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     setErrorMsg(null);
   }, [open]);
 
+  const handleAutoApply = (prog: ExtractedProgram): number => applyExtractedProgram(prog, {
+    setName, setDescription, setStartDate, setEndDate, setVenue,
+    setProgramType: (v: ExtractedProgramType) => setProgramType(v as ExtendedProgramType),
+    setOrg: (patch) => setOrgValues((p) => ({
+      clientOrg:       patch.client_org        ?? p.clientOrg,
+      department:      patch.department        ?? p.department,
+      targetAudience:  patch.target_audience   ?? p.targetAudience,
+      maxParticipants: patch.max_participants != null ? String(patch.max_participants) : p.maxParticipants,
+    })),
+  });
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setNameError(null);
@@ -141,23 +154,11 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
       return;
     }
 
-    // STEP-PROGRAM-CREATION-WIZARD — 평가형 신청 기간·정원 검증
-    if (applicationType === 'evaluation') {
-      if (applicationStartDate && applicationEndDate && applicationStartDate > applicationEndDate) {
-        setErrorMsg('신청 종료일이 시작일보다 빠를 수 없어요.');
-        return;
-      }
-    }
-    const parsedMaxApplicants = maxApplicants.trim() ? Number(maxApplicants.replace(/,/g, '')) : null;
-    if (parsedMaxApplicants !== null && (Number.isNaN(parsedMaxApplicants) || parsedMaxApplicants < 0)) {
-      setErrorMsg('선발 인원은 0 이상의 숫자로 입력해 주세요.');
-      return;
-    }
-    const parsedGrantBudget = grantEnabled && grantBudget.trim() ? Number(grantBudget.replace(/,/g, '')) : 0;
-    if (grantEnabled && (Number.isNaN(parsedGrantBudget) || parsedGrantBudget < 0)) {
-      setErrorMsg('지원금 예산은 0 이상의 숫자로 입력해 주세요.');
-      return;
-    }
+    // STEP-PROGRAM-CREATION-WIZARD — 평가형 신청·지원금 검증 (분리 함수)
+    const av = validateApplication({ applicationType, applicationStartDate, applicationEndDate, maxApplicants, grantEnabled, grantBudget });
+    if (av.error) { setErrorMsg(av.error); return; }
+    const parsedMaxApplicants = av.parsedMaxApplicants;
+    const parsedGrantBudget = av.parsedGrantBudget;
 
     setSubmitting(true);
     try {
@@ -234,6 +235,8 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
       }
     >
       <form id="program-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <ProgramAutofillSection onApply={handleAutoApply} disabled={submitting} />
+
         <Input
           label="프로그램명"
           required
