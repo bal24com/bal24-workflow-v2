@@ -205,9 +205,10 @@ export default function CurriculumTab({ programId }: Props) {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-[28px_56px_minmax(120px,140px)_minmax(120px,140px)_minmax(0,1fr)_minmax(140px,180px)_28px_28px] items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className="grid grid-cols-[28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(140px,180px)_28px_28px] items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             <span aria-hidden="true" />
-            <span className="text-center">일차</span>
+            <span className="text-center">#</span>
+            <span>일자</span>
             <span>시작</span>
             <span>종료</span>
             <span>주제·차시명</span>

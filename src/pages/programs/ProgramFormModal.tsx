@@ -10,6 +10,8 @@ import { PROGRAM_STATUS_VALUES } from './programStatus';
 import type { ExtendedProgramType } from './programTypeConfig';
 import ProgramTemplateSelector from './detail/ProgramTemplateSelector';
 import ProgramApplicationFields from './ProgramApplicationFields';
+import ProgramOrgFields, { EMPTY_ORG_VALUES, type ProgramOrgValues } from './ProgramOrgFields';
+import ProgramVisibilityField, { type ProgramVisibility } from './ProgramVisibilityField';
 import ProgramTypeSelector from './ProgramTypeSelector';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
 
@@ -22,13 +24,6 @@ function toLegacyType(pt: ExtendedProgramType): ProgramType {
 
 type ProjectOption = Pick<Project, 'id' | 'name'>;
 type ConsortiumOption = { id: string; name: string };
-type Visibility = 'private' | 'internal' | 'public';
-
-const VISIBILITY_OPTIONS: { value: Visibility; label: string; desc: string }[] = [
-  { value: 'internal', label: '팀 내부 공개', desc: '로그인한 팀원 전체가 조회 가능' },
-  { value: 'private',  label: '배정자 한정',  desc: '배정된 담당자·강사·멘토만 조회 가능' },
-  { value: 'public',   label: '외부 공개',    desc: '외부 링크로도 접근 가능' },
-];
 
 type Props = {
   open: boolean;
@@ -49,7 +44,9 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
   const [venue, setVenue] = useState('');
   const [capacity, setCapacity] = useState('');
   const [description, setDescription] = useState('');
-  const [visibility, setVisibility] = useState<Visibility>('internal');
+  // STEP-PROGRAM-BUNDLE — 기관·부서·교육대상·정원 (분리 컴포넌트)
+  const [orgValues, setOrgValues] = useState<ProgramOrgValues>(EMPTY_ORG_VALUES);
+  const [visibility, setVisibility] = useState<ProgramVisibility>('internal');
   // STEP-PROGRAM-CREATION-WIZARD — 신청·지원금 6 필드
   const [applicationType, setApplicationType] = useState<'open' | 'evaluation'>('open');
   const [applicationStartDate, setApplicationStartDate] = useState('');
@@ -112,6 +109,7 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     setVenue('');
     setCapacity('');
     setDescription('');
+    setOrgValues(EMPTY_ORG_VALUES);
     setVisibility('internal');
     setApplicationType('open');
     setApplicationStartDate('');
@@ -164,6 +162,9 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
     setSubmitting(true);
     try {
       const orderNum = displayOrder.trim() ? Number(displayOrder.replace(/,/g, '')) : 0;
+      const parsedMaxParticipants = orgValues.maxParticipants.trim()
+        ? Number(orgValues.maxParticipants.replace(/,/g, ''))
+        : null;
       const { error } = await supabase.from('programs').insert({
         project_id: projectId || null,
         consortium_id: consortiumId || null,
@@ -179,6 +180,11 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
         venue: venue.trim() || null,
         capacity: parsedCapacity,
         description: description.trim() || null,
+        // STEP-PROGRAM-BUNDLE
+        client_org: orgValues.clientOrg.trim() || null,
+        department: orgValues.department.trim() || null,
+        target_audience: orgValues.targetAudience.trim() || null,
+        max_participants: parsedMaxParticipants,
         // STEP-PROGRAM-CREATION-WIZARD 신청·지원금
         application_type: applicationType,
         application_start_date: applicationType === 'evaluation' ? (applicationStartDate || null) : null,
@@ -343,22 +349,10 @@ export default function ProgramFormModal({ open, onClose, onCreated }: Props) {
           />
         </div>
 
-        <div className="space-y-1.5">
-          <label htmlFor="program-visibility" className="text-sm font-semibold text-slate-700">
-            가시성 <span className="text-xs font-normal text-slate-400">— 누구에게 노출할지 선택</span>
-          </label>
-          <select
-            id="program-visibility"
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value as Visibility)}
-            disabled={submitting}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-          >
-            {VISIBILITY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label} — {o.desc}</option>
-            ))}
-          </select>
-        </div>
+        {/* STEP-PROGRAM-BUNDLE — 기관·부서·교육대상·정원 (분리 컴포넌트) */}
+        <ProgramOrgFields values={orgValues} onChange={setOrgValues} disabled={submitting} />
+
+        <ProgramVisibilityField value={visibility} onChange={setVisibility} disabled={submitting} />
 
         {/* STEP-PROGRAM-CREATION-WIZARD — 신청·지원금 (별도 컴포넌트) */}
         <ProgramApplicationFields

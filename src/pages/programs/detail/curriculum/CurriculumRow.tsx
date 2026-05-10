@@ -26,6 +26,7 @@ interface Props {
 
 interface Draft {
   session_no: number;
+  day_label: string | null;    // STEP-PROGRAM-BUNDLE — "1일차"·"5월 7일" 자유 입력
   start_time: string | null;   // 'HH:MM' 또는 null
   end_time: string | null;
   title: string;
@@ -37,6 +38,7 @@ interface Draft {
 function toDraft(c: CurriculumWithStaff): Draft {
   return {
     session_no: c.session_no,
+    day_label: c.day_label ?? null,
     start_time: trimTime(c.start_time) || null,
     end_time: trimTime(c.end_time) || null,
     title: c.title,
@@ -49,6 +51,7 @@ function toDraft(c: CurriculumWithStaff): Draft {
 function isEqual(a: Draft, b: Draft): boolean {
   return (
     a.session_no === b.session_no &&
+    a.day_label === b.day_label &&
     a.start_time === b.start_time &&
     a.end_time === b.end_time &&
     a.title === b.title &&
@@ -90,6 +93,7 @@ export default function CurriculumRow({
       const duration = computeDuration(draft.start_time, draft.end_time);
       const patch: Partial<ProgramCurriculum> = {
         session_no: draft.session_no,
+        day_label: draft.day_label,
         start_time: padTime(draft.start_time),
         end_time: padTime(draft.end_time),
         duration,
@@ -124,7 +128,7 @@ export default function CurriculumRow({
       } bg-white overflow-hidden transition-colors`}
     >
       {/* 테이블 행 */}
-      <div className="grid grid-cols-[28px_56px_minmax(120px,140px)_minmax(120px,140px)_minmax(0,1fr)_minmax(140px,180px)_28px_28px] items-center gap-2 px-2 py-2">
+      <div className="grid grid-cols-[28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(140px,180px)_28px_28px] items-center gap-2 px-2 py-2">
         <button
           type="button"
           aria-label="순서 변경 핸들"
@@ -139,6 +143,14 @@ export default function CurriculumRow({
           value={draft.session_no}
           onChange={(e) => patchDraft('session_no', Number(e.target.value) || draft.session_no)}
           className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs text-center tabular-nums focus:outline-none focus:border-violet-400"
+        />
+
+        <input
+          type="text"
+          value={draft.day_label ?? ''}
+          onChange={(e) => patchDraft('day_label', e.target.value || null)}
+          placeholder="1일차"
+          className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400"
         />
 
         <DateTimePicker

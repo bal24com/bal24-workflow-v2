@@ -233,6 +233,14 @@ export interface Program {
   venue?: string | null;
   capacity?: number | null;
   description?: string | null;
+  /** STEP-PROGRAM-BUNDLE — 기관/단체명 */
+  client_org?: string | null;
+  /** STEP-PROGRAM-BUNDLE — 부서 */
+  department?: string | null;
+  /** STEP-PROGRAM-BUNDLE — 교육 대상 */
+  target_audience?: string | null;
+  /** STEP-PROGRAM-BUNDLE — 정원 (capacity 와 별개. V9 maxParticipants 매핑) */
+  max_participants?: number | null;
   /** V7 ③ 공지사항 (집합장소·시간·준비물 등) — 2026-05-08 추가 */
   notice?: string | null;
   /** V7 ③-1 공지 첨부 — 2026-05-08 추가 */
@@ -288,6 +296,8 @@ export interface ProgramCurriculum {
   /** 종료 시간 HH:MM:SS — V7 스타일 시간 picker (2026-05-08 추가) */
   end_time?: string | null;
   venue?: string | null;
+  /** STEP-PROGRAM-BUNDLE — 일자 라벨 ("1일차" / "5월 7일" 등 자유 입력) */
+  day_label?: string | null;
   created_at: string;
 }
 

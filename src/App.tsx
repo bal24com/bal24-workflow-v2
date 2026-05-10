@@ -37,6 +37,7 @@ import ToastContainer from './components/ToastContainer';
 
 // ── PrivateRoute 안쪽이지만 vendor-docs(docx/jspdf/html2canvas/xlsx) 를 끌어오는
 //    무거운 페이지들도 lazy 처리 (STEP-BUNDLE-SPLIT-2)
+const ProgramsPage         = lazy(() => import('./pages/programs/ProgramsPage'));
 const ProgramDetailPage    = lazy(() => import('./pages/programs/ProgramDetailPage'));
 const ProgramEditPage      = lazy(() => import('./pages/programs/edit/ProgramEditPage'));
 const CertificatePage      = lazy(() => import('./pages/certificates/CertificatePage'));
@@ -151,8 +152,8 @@ export default function App() {
               <Route path="/consortium" element={<ConsortiumPage />} />
               <Route path="/consortium/:id" element={<ConsortiumDetailPage />} />
               <Route path="/consortiums" element={<Navigate to="/consortium" replace />} />
-              {/* STEP-MENU-RESTRUCTURE — /programs 리스트는 /projects 로 통합 (북마크 호환) */}
-              <Route path="/programs" element={<Navigate to="/projects" replace />} />
+              {/* STEP-PROGRAM-BUNDLE — /programs 메뉴 복원 (직접 라우팅) */}
+              <Route path="/programs" element={<ProgramsPage />} />
               <Route path="/programs/:id" element={<ProgramDetailPage />} />
               <Route path="/programs/:id/edit" element={<ProgramEditPage />} />
               <Route path="/clients" element={<ClientsPage />} />

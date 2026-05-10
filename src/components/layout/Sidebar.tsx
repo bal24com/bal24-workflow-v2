@@ -49,6 +49,7 @@ const SECTIONS: MenuSection[] = [
     heading: '사업',
     items: [
       { to: '/projects',   label: '프로젝트', Icon: FolderKanban },
+      { to: '/programs',   label: '프로그램', Icon: BookOpen },
       { to: '/consortium', label: '컨소시엄', Icon: Building2 },
     ],
   },
