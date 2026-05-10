@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, FileText, Info, Loader2, Users, FileBarChart, Link2 } from 'lucide-react';
+import { ArrowLeft, ClipboardList, FileText, Info, Loader2, Users, FileBarChart, Link2, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Badge, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
@@ -15,6 +15,7 @@ import TasksTab from './detail/TasksTab';
 import MembersTab from './detail/MembersTab';
 import FilesTab from './detail/FilesTab';
 import PortalTab from './detail/PortalTab';
+import GrantLedgerTab from './detail/GrantLedgerTab';
 import StageProgressBar from './detail/StageProgressBar';
 
 type DetailProject = Project & {
@@ -22,13 +23,14 @@ type DetailProject = Project & {
   pm?: { id: string; name: string } | null;
 };
 
-type TabKey = 'overview' | 'tasks' | 'members' | 'files' | 'portal';
+type TabKey = 'overview' | 'tasks' | 'members' | 'files' | 'portal' | 'grant';
 
 const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'overview', label: '개요',     Icon: Info },
   { key: 'tasks',    label: '태스크',   Icon: ClipboardList },
   { key: 'members',  label: '참여인력', Icon: Users },
   { key: 'files',    label: '파일',     Icon: FileText },
+  { key: 'grant',    label: '지원금',   Icon: Wallet },
   { key: 'portal',   label: '포털',     Icon: Link2 },
 ];
 
@@ -185,6 +187,7 @@ export default function ProjectDetailPage() {
         {tab === 'tasks' && <TasksTab projectId={projectId} />}
         {tab === 'members' && <MembersTab projectId={projectId} />}
         {tab === 'files' && <FilesTab projectId={projectId} uploaderId={user?.id} />}
+        {tab === 'grant' && <GrantLedgerTab projectId={projectId} />}
         {tab === 'portal' && <PortalTab projectId={projectId} clientId={project.client_id ?? null} />}
       </div>
     </div>
