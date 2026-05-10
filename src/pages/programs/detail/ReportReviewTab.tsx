@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, FileBarChart, Eye, ClipboardCheck, Link2,
+  Loader2, FileBarChart, Eye, ClipboardCheck, Link2, FileSearch,
 } from 'lucide-react';
 import EmptyState from '../../../components/EmptyState';
 import { useToast } from '../../../contexts/ToastContext';
@@ -14,6 +14,9 @@ import {
   REPORT_STATUS_LABELS, type PerformanceReport, type ReportStatus,
 } from '../../../types/performanceReport';
 import { sendNotification } from '../../../lib/notifyUtils';
+import {
+  generateAuditToken, copyAuditPortalLink, updateMentorAssignment,
+} from './reportReviewUtils';
 import ReportReviewModal from './ReportReviewModal';
 
 interface Props {
@@ -110,31 +113,30 @@ export default function ReportReviewTab({ programId }: Props) {
     setLoading(false);
   }, [programId, toast]);
 
+  // STEP-AUDIT-TOKEN-UI — 감사 의뢰 (audit_token 발급)
+  async function requestAudit(reportId: string) {
+    if (!window.confirm('회계사무소 감사를 의뢰할까요?\n감사 링크가 생성돼요.')) return;
+    setActing(true);
+    const r = await generateAuditToken(reportId);
+    setActing(false);
+    if (!r.ok) { toast.error('감사 의뢰 중 오류가 발생했어요.'); return; }
+    toast.success('감사 링크가 생성됐어요.');
+    await refresh();
+  }
+
   // 감사 포털 링크 복사
   async function copyAuditLink(auditToken: string) {
-    const url = `${window.location.origin}/audit/${auditToken}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success('감사 링크를 클립보드에 복사했어요.');
-    } catch (err) {
-      console.error('[report-review] 클립보드 복사 실패:', err instanceof Error ? err.message : '');
-      toast.error('링크 복사에 실패했어요. 직접 복사해 주세요.');
-    }
+    const r = await copyAuditPortalLink(auditToken);
+    if (r.ok) toast.success('감사 링크를 클립보드에 복사했어요.');
+    else toast.error('링크 복사에 실패했어요. 직접 복사해 주세요.');
   }
 
   // 멘토 배정/해제
   async function assignMentor(reportId: string, mentorId: string | null) {
     setActing(true);
-    const { error } = await supabase
-      .from('performance_reports')
-      .update({ mentor_id: mentorId, updated_at: new Date().toISOString() })
-      .eq('id', reportId);
+    const r = await updateMentorAssignment(reportId, mentorId);
     setActing(false);
-    if (error) {
-      console.error('[report-review] 멘토 배정 실패:', error.message);
-      toast.error('멘토 배정 중 오류가 발생했어요.');
-      return;
-    }
+    if (!r.ok) { toast.error('멘토 배정 중 오류가 발생했어요.'); return; }
     toast.success(mentorId ? '멘토를 배정했어요.' : '멘토 배정을 해제했어요.');
     await refresh();
   }
@@ -161,23 +163,16 @@ export default function ReportReviewTab({ programId }: Props) {
     return items.filter((r) => r.status === filter);
   }, [items, filter]);
 
-  // 검토 시작: submitted → reviewing (멱등 처리)
+  // 검토 시작: submitted → reviewing (멱등 처리 — `.eq('status','submitted')` 가드)
   async function startReview(reportId: string) {
     setActing(true);
-    const { error } = await supabase
-      .from('performance_reports')
-      .update({
-        status: 'reviewing',
-        pm_reviewed_by: user?.id ?? null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', reportId)
-      .eq('status', 'submitted');
+    const { error } = await supabase.from('performance_reports')
+      .update({ status: 'reviewing', pm_reviewed_by: user?.id ?? null, updated_at: new Date().toISOString() })
+      .eq('id', reportId).eq('status', 'submitted');
     setActing(false);
     if (error) {
       console.error('[report-review] 검토 시작 실패:', error.message);
-      toast.error('검토 시작 중 오류가 발생했어요.');
-      return;
+      toast.error('검토 시작 중 오류가 발생했어요.'); return;
     }
     toast.success('검토를 시작했어요.');
     await refresh();
@@ -365,6 +360,14 @@ export default function ReportReviewTab({ programId }: Props) {
                         <Eye size={11} aria-hidden="true" />
                         {isProcessed ? '열람' : '검토'}
                       </button>
+                      {r.status === 'approved' && !r.audit_token && (
+                        <button type="button" onClick={() => void requestAudit(r.id)} disabled={acting}
+                          title="회계사무소 감사 링크를 생성해요"
+                          className="inline-flex items-center gap-0.5 text-[11px] px-2 py-1 rounded-md border border-orange-200 text-orange-700 hover:bg-orange-50 disabled:opacity-50">
+                          <FileSearch size={11} aria-hidden="true" />
+                          감사 의뢰
+                        </button>
+                      )}
                       {r.audit_token && (
                         <button type="button" onClick={() => void copyAuditLink(r.audit_token as string)}
                           title={r.audit_submitted_at ? '감사 완료됨 (재발송용)' : '감사 링크 복사'}

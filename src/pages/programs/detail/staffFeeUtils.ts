@@ -133,8 +133,13 @@ interface MarkPaidResult {
  *    program 의 project_id/consortium_id 자동 채움
  * 3. program_staff_fees: payment_status='지급완료', expense_id 역참조, paid_at
  *
- * ⚠ 원자성 한계: expenses 생성 후 fee 업데이트 실패 시 고아 레코드 발생 가능.
- *    향후 STEP-STAFF-FEE-DB-TRIGGER 로 트랜잭션화 권장.
+ * ✅ STEP-STAFF-FEE-DB-TRIGGER (2026-05-10) 적용:
+ *    DB 트리거 `trg_sync_staff_fee_expense_id` 가 expenses INSERT 후
+ *    해당 staff_fee.expense_id 를 자동 연결하므로 아래 ④ UPDATE 가
+ *    실패해도 정합성은 트리거가 보장한다 (expense_id 는 동기화됨).
+ *    UPDATE 는 payment_status='지급완료'·paid_at 만 갱신하면 됨.
+ *    expenses soft delete 시에도 트리거(`trg_clear_staff_fee_expense_id`)가
+ *    expense_id 를 null 로 자동 해제한다.
  */
 export async function markStaffFeeAsPaid(
   fee: StaffFee,

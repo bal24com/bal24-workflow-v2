@@ -43,12 +43,23 @@ export function useUserProfile() {
     return () => { cancelled = true; };
   }, [user]);
 
-  // STEP-ROLE-TYPE-AUDIT — hasRole 헬퍼 사용 (소문자 통일 + 대소문자 안전망)
+  // STEP-ROLE-NORMALIZE — hasRole 헬퍼로 소문자 통일 (대소문자 무관 비교)
+  // ⚠️ 모든 역할 비교는 hasRole 사용 — 직접 `role === 'PM'` 비교 금지
   const role: Role | null = profile?.role ?? null;
-  const isAdmin = hasRole(role, 'admin');
-  const isPM = hasRole(role, 'pm') || isAdmin;
+  const isAdmin   = hasRole(role, 'admin');
+  const isPM      = hasRole(role, 'pm') || isAdmin;
+  const isStaff   = hasRole(role, 'staff');
   const isFinance = hasRole(role, 'finance') || isAdmin;
-  const isMember = !!profile?.consortium_member_id;
+  const isPartner = hasRole(role, 'partner');
+  const isMember  = hasRole(role, 'member');
 
-  return { profile, loading, role, isAdmin, isPM, isFinance, isMember };
+  // STEP-ROLE-NORMALIZE — 컨소시엄 참여기관 매핑 여부 (역할과 별개)
+  // ProgramsPage 등 일부 페이지에서 "내가 속한 컨소시엄 프로그램" 필터링에 사용
+  const hasConsortiumMembership = !!profile?.consortium_member_id;
+
+  return {
+    profile, loading, role,
+    isAdmin, isPM, isStaff, isFinance, isPartner, isMember,
+    hasConsortiumMembership,
+  };
 }
