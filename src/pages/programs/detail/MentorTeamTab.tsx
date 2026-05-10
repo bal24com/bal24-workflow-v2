@@ -12,8 +12,9 @@ import { formatMoney } from '../../../lib/utils';
 import { supabase } from '../../../lib/supabase';
 import { isMissingTableError } from '../../schedule/scheduleUtils';
 import {
-  REPORT_STATUS_LABELS, type PerformanceReport, type ReportStatus,
+  REPORT_STATUS_LABELS, type PerformanceReport,
 } from '../../../types/performanceReport';
+import { PERFORMANCE_REPORT_STATUS_CLASS as STATUS_CLASS } from '../../../utils/statusStyles';
 import MentorReportViewModal from './MentorReportViewModal';
 import MentoringLogModal from './MentoringLogModal';
 
@@ -28,15 +29,6 @@ interface MentorReportRow extends PerformanceReport {
     organization: string | null;
   } | null;
 }
-
-// CLAUDE.md 디자인 시스템: 회색/바이올렛/주황/민트
-const STATUS_CLASS: Record<ReportStatus, string> = {
-  draft:     'bg-slate-100 text-slate-700 border-slate-200',
-  submitted: 'bg-violet-50 text-violet-700 border-violet-200',
-  reviewing: 'bg-amber-50 text-amber-700 border-amber-200',
-  approved:  'bg-cyan-50 text-cyan-700 border-cyan-200',
-  rejected:  'bg-orange-50 text-orange-700 border-orange-200',
-};
 
 const SELECT_COLUMNS = `
   *,

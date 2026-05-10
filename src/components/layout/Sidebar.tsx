@@ -103,12 +103,13 @@ const PARTNER_SECTIONS: MenuSection[] = [
   },
 ];
 
-// STEP-MEMBER-REPORT-PORTAL — MEMBER 전용 사이드바 (변경 없음)
+// MEMBER 전용 사이드바
 const MEMBER_SECTIONS: MenuSection[] = [
   {
     heading: '내 사업',
     items: [
       { to: '/home',      label: '홈',       Icon: Home },
+      { to: '/schedule',  label: '일정',     Icon: CalendarDays },
       { to: '/my-report', label: '사업보고', Icon: BookOpen },
     ],
   },

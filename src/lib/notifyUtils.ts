@@ -3,7 +3,7 @@
 
 import { supabase } from './supabase';
 
-export type NotifyType = 'applied' | 'accepted' | 'rejected' | 'returned';
+export type NotifyType = 'applied' | 'accepted' | 'rejected' | 'returned' | 'submitted';
 
 export interface NotifyParams {
   type: NotifyType;
@@ -47,5 +47,38 @@ export async function sendNotification(params: NotifyParams): Promise<void> {
   } catch (err) {
     const message = err instanceof Error ? err.message : '';
     console.error('[notify] 예외:', message);
+  }
+}
+
+/**
+ * MEMBER 가 보고서 제출 시 담당 PM 에게 이메일 알림 (fire-and-forget).
+ * project_id → projects.pm_id → profiles.email 순으로 조회.
+ * 어느 단계든 실패 시 조용히 종료 (UI 영향 없음).
+ */
+export async function notifyReportSubmittedToPM(params: {
+  projectId: string | null;
+  programTitle: string;
+  applicantName?: string;
+}): Promise<void> {
+  if (!params.projectId) return;
+  try {
+    const { data: project } = await supabase
+      .from('projects').select('pm_id').eq('id', params.projectId).maybeSingle();
+    const pmId = (project?.pm_id as string | null | undefined) ?? null;
+    if (!pmId) return;
+    const { data: pm } = await supabase
+      .from('profiles').select('email, name').eq('id', pmId).maybeSingle();
+    const pmEmail = ((pm?.email as string | null | undefined) ?? '').trim();
+    if (!pmEmail) return;
+    await sendNotification({
+      type: 'submitted',
+      recipientEmail: pmEmail,
+      recipientName: (pm?.name as string | null | undefined) ?? 'PM',
+      programTitle: params.programTitle,
+      note: params.applicantName,
+    });
+  } catch (err) {
+    const m = err instanceof Error ? err.message : '';
+    console.error('[notify] PM 제출 알림 예외:', m);
   }
 }

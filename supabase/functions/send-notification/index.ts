@@ -17,7 +17,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-type NotifyType = 'applied' | 'accepted' | 'rejected' | 'returned';
+type NotifyType = 'applied' | 'accepted' | 'rejected' | 'returned' | 'submitted';
 
 interface NotifyRequest {
   type: NotifyType;
@@ -71,6 +71,17 @@ function buildTemplate(req: NotifyRequest): Template {
 <p>제출하신 <strong>${program}</strong> 보고서가 반려되었어요.</p>
 ${reasonHtml}
 <p>수정 후 다시 제출해 주세요.</p>`,
+      };
+    }
+    case 'submitted': {
+      // 제출 알림 — recipient 는 담당 PM, name 은 PM 이름, note 는 신청자 이름
+      const applicantHtml = req.note?.trim()
+        ? `<p style="color:#64748B;font-size:13px;">신청자: ${escapeHtml(req.note.trim())}</p>` : '';
+      return {
+        subject: `[WorkFlow] 집행완료보고서가 제출됐습니다 — ${req.programTitle}`,
+        body: `<p>${name}님,</p>
+<p><strong>${program}</strong> 보고서가 제출됐어요. 검토해 주세요.</p>
+${applicantHtml}`,
       };
     }
   }

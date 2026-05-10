@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../../components/ui';
 import { useMyReport } from '../../my-report/useMyReport';
+import { notifyReportSubmittedToPM } from '../../../lib/notifyUtils';
 import { REPORT_STATUS_LABELS } from '../../../types/performanceReport';
 import ReportBasicSection from '../../my-report/ReportBasicSection';
 import ReportTargetSection from '../../my-report/ReportTargetSection';
@@ -137,7 +138,15 @@ export default function PerformanceReportTab({ programId }: Props) {
               leftIcon={<Send size={14} />}
               onClick={async () => {
                 if (!window.confirm('제출 후에는 수정이 어려워요. 제출하시겠어요?')) return;
-                await submitReport();
+                const ok = await submitReport();
+                if (ok && application) {
+                  // PM 에게 제출 알림 (fire-and-forget)
+                  void notifyReportSubmittedToPM({
+                    projectId: application.project_id,
+                    programTitle: application.program_name ?? '프로그램',
+                    applicantName: application.applicant_name ?? undefined,
+                  });
+                }
               }}
             >
               {isRejected ? '수정 후 재제출' : '최종 제출'}
