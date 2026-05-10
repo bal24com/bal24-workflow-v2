@@ -55,6 +55,17 @@ const PARTNER_SECTIONS: MenuSection[] = [
   },
 ];
 
+// STEP-MEMBER-REPORT-PORTAL — MEMBER 전용 사이드바 (홈 + 사업보고)
+const MEMBER_SECTIONS: MenuSection[] = [
+  {
+    heading: '내 사업',
+    items: [
+      { to: '/home',      label: '홈',       Icon: Home },
+      { to: '/my-report', label: '사업보고', Icon: BookOpen },
+    ],
+  },
+];
+
 const SECTIONS: MenuSection[] = [
   {
     heading: '운영',
@@ -143,9 +154,12 @@ export default function Sidebar() {
     return () => { cancelled = true; };
   }, [user]);
 
-  // V2 실측 가정: profiles.role 은 소문자 ('admin', 'partner' 등)
+  // V2 실측 가정: profiles.role 은 소문자 ('admin', 'partner', 'member' 등)
   const isPartner = role === 'partner';
-  const sections = isPartner ? PARTNER_SECTIONS : SECTIONS;
+  const isMember  = role === 'member';
+  const sections  = isPartner ? PARTNER_SECTIONS
+                  : isMember  ? MEMBER_SECTIONS
+                  : SECTIONS;
 
   return (
     <aside
@@ -160,7 +174,7 @@ export default function Sidebar() {
           <div className="leading-tight">
             <div className="text-base font-bold">bal24</div>
             <div className="text-xs text-slate-400">
-              {isPartner ? 'WorkFlow · 참여사' : 'WorkFlow v2'}
+              {isPartner ? 'WorkFlow · 참여사' : isMember ? 'WorkFlow · 수혜기업' : 'WorkFlow v2'}
             </div>
           </div>
         </div>
@@ -183,8 +197,8 @@ export default function Sidebar() {
           </div>
         ))}
 
-        {/* PARTNER 전용 — 마이페이지 바로가기 (Q5) */}
-        {isPartner && myToken && (
+        {/* PARTNER/MEMBER — 마이페이지 바로가기 */}
+        {(isPartner || isMember) && myToken && (
           <div className="mt-4 pt-4 border-t border-white/10 space-y-1">
             <div className="px-3 mb-1.5 text-[10px] font-bold tracking-widest uppercase text-slate-500">
               개인
