@@ -8,6 +8,7 @@ import { Button } from '../../../../components/ui';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
 import FinalReportItemEditor from './FinalReportItemEditor';
+import FinalReportAiButton from './FinalReportAiButton';
 import type { FinalReportSection as Section, FinalReportSectionType } from '../../../../types/database';
 
 interface Props {
@@ -126,6 +127,7 @@ export default function FinalReportSection({ projectId }: Props) {
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-[#1E1B4B]">결과보고서 ({sections.length}개 항목)</h2>
         <div className="flex items-center gap-2">
+          <FinalReportAiButton projectId={projectId} sections={sections} onCompleted={() => void reload()} />
           <Button variant="outline" size="sm" leftIcon={<RefreshCcw size={12} />} onClick={() => void reloadAuto()}>
             데이터 새로고침
           </Button>

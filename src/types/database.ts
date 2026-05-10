@@ -173,6 +173,12 @@ export interface Project {
   client_access_token: string;
   /** STEP-PROJECT-ROLE-UNIFIED-TS — 자사 수행 역할 (운영사/참여사) */
   our_role?: 'operator' | 'member' | null;
+  /** STEP-PROJECT-RESTRUCTURE — 계약 정보 */
+  contract_amount?: number | null;
+  contract_type?: string | null;
+  duration_months?: number | null;
+  source_doc_url?: string | null;
+  source_doc_type?: string | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;

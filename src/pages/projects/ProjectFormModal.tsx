@@ -16,6 +16,8 @@ import {
   OUR_ROLE_VALUES, OUR_ROLE_LABELS, OUR_ROLE_DESCRIPTIONS,
   type OurRole,
 } from '../../constants/projectRoles';
+import ProjectAutoFillSection from './ProjectAutoFillSection';
+import type { ProjectAutoFillResult, ProjectAutoFillMember } from '../../lib/projectAutoFill';
 
 const PROJECT_TYPES: ProjectType[] = ['교육', '컨설팅', '이벤트'];
 
@@ -42,6 +44,10 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
   const [description, setDescription] = useState('');
   // STEP-PROJECT-ROLE-UNIFIED-TS — 자사 수행 역할
   const [ourRole, setOurRole] = useState<OurRole>('operator');
+  // STEP-AI-DOC-FEATURES — AI 자동채우기 결과 (contract·duration·members·자동 컨소시엄)
+  const [autoExtra, setAutoExtra] = useState<{ contract_amount: number | null; contract_type: string | null; duration_months: number | null }>({ contract_amount: null, contract_type: null, duration_months: null });
+  const [autoMembers, setAutoMembers] = useState<ProjectAutoFillMember[]>([]);
+  const [autoConsortium, setAutoConsortium] = useState(true);
 
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
@@ -104,9 +110,26 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
     setConsortiumId('');
     setDescription('');
     setOurRole('operator');
+    setAutoExtra({ contract_amount: null, contract_type: null, duration_months: null });
+    setAutoMembers([]);
+    setAutoConsortium(true);
     setErrorMsg(null);
     setNameError(null);
   }, [open]);
+
+  function handleAutoApply(r: ProjectAutoFillResult) {
+    if (r.name)        setName(r.name);
+    if (r.start_date)  setStartDate(r.start_date);
+    if (r.end_date)    setEndDate(r.end_date);
+    if (r.description) setDescription(r.description);
+    if (r.contract_amount != null) setBudget(String(r.contract_amount));
+    setAutoExtra({
+      contract_amount: r.contract_amount,
+      contract_type: r.contract_type,
+      duration_months: r.duration_months,
+    });
+    setAutoMembers(r.consortium_members);
+  }
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -130,6 +153,24 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
 
     setSubmitting(true);
     try {
+      // STEP-AI-DOC-FEATURES — autoConsortium 시 컨소시엄 먼저 생성
+      let finalConsortiumId: string | null = consortiumId || null;
+      const validMembers = autoMembers.filter((m) => m.org_name.trim());
+      if (autoConsortium && validMembers.length > 0 && !finalConsortiumId) {
+        const { data: con, error: conErr } = await supabase.from('consortiums').insert({
+          name: `${name.trim()} 공동수행체`, status: '구성중',
+          start_date: startDate || null, end_date: endDate || null,
+        }).select('id').single();
+        if (conErr) throw conErr;
+        finalConsortiumId = (con as { id: string }).id;
+        const memberRows = validMembers.map((m) => ({
+          consortium_id: finalConsortiumId, org_name: m.org_name.trim(),
+          responsibilities: m.responsibilities.trim() || null,
+        }));
+        const { error: memErr } = await supabase.from('consortium_members').insert(memberRows);
+        if (memErr) console.error('[projects] consortium_members 실패:', memErr.message);
+      }
+
       const { error } = await supabase.from('projects').insert({
         name: name.trim(),
         type: [type],
@@ -140,8 +181,11 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
         description: description.trim() || null,
         client_id: clientId || null,
         pm_id: pmId || null,
-        consortium_id: consortiumId || null,
+        consortium_id: finalConsortiumId,
         our_role: ourRole,
+        contract_amount: autoExtra.contract_amount,
+        contract_type: autoExtra.contract_type,
+        duration_months: autoExtra.duration_months,
       });
 
       if (error) throw error;
@@ -182,6 +226,11 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
       }
     >
       <form id="project-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <ProjectAutoFillSection onApply={handleAutoApply}
+          members={autoMembers} setMembers={setAutoMembers}
+          autoConsortium={autoConsortium} setAutoConsortium={setAutoConsortium}
+          disabled={submitting} />
+
         <Input
           label="프로젝트명"
           required
