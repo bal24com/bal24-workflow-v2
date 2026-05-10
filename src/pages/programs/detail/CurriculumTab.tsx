@@ -10,6 +10,7 @@ import CurriculumRow from './curriculum/CurriculumRow';
 import SaveTemplateModal from './curriculum/SaveTemplateModal';
 import LoadTemplateModal from './curriculum/LoadTemplateModal';
 import AiCurriculumModal from './curriculum/AiCurriculumModal';
+import CurriculumStaffSection from './curriculum/CurriculumStaffSection';
 import InvitationManagePanel from '../InvitationManagePanel';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
 import type {
@@ -37,12 +38,16 @@ export default function CurriculumTab({ programId, programName }: Props) {
   const [invitePanelOpen, setInvitePanelOpen] = useState(false);
   const [inviteCurriculumId, setInviteCurriculumId] = useState<string | null>(null);
   const [inviteSessionInfo, setInviteSessionInfo] = useState<string>('');
+  const [inviteMessage, setInviteMessage] = useState<string>('');
   // STEP-CURRICULUM-INSTRUCTOR-FIX — 차시별 강사 초대 매핑
   const [invitationMap, setInvitationMap] = useState<Map<string, InvitationSummary>>(new Map());
+  // STEP-CURRICULUM-INSTRUCTOR-VIEW — 강사 배정 현황 새로고침 키
+  const [staffSectionKey, setStaffSectionKey] = useState(0);
 
-  function openInvite(curriculumId: string | null, title: string) {
+  function openInvite(curriculumId: string | null, sessionInfo: string) {
     setInviteCurriculumId(curriculumId);
-    setInviteSessionInfo(title);
+    setInviteSessionInfo(sessionInfo);
+    setInviteMessage(sessionInfo ? `${sessionInfo} 담당 강의를 부탁드립니다.` : '');
     setInvitePanelOpen(true);
   }
 
@@ -59,6 +64,7 @@ export default function CurriculumTab({ programId, programName }: Props) {
       if (inv.curriculum_id) map.set(inv.curriculum_id, { id: inv.id, name: inv.name, status: inv.status });
     }
     setInvitationMap(map);
+    setStaffSectionKey((k) => k + 1);
   }, [programId]);
 
   useEffect(() => {
@@ -269,6 +275,14 @@ export default function CurriculumTab({ programId, programName }: Props) {
         </>
       )}
 
+      {/* STEP-CURRICULUM-INSTRUCTOR-VIEW — 차시별 강사·멘토 배정 현황 + 강사 요청 */}
+      <div className="border-t border-slate-100 my-2" />
+      <CurriculumStaffSection
+        programId={programId}
+        refreshKey={staffSectionKey}
+        onRequestInstructor={(cid, info) => openInvite(cid, info)}
+      />
+
       <StaffMatchModal
         open={matchTarget !== null}
         onClose={() => setMatchTarget(null)}
@@ -313,8 +327,9 @@ export default function CurriculumTab({ programId, programName }: Props) {
         programName={programName ?? '프로그램'}
         defaultCurriculumId={inviteCurriculumId}
         defaultSessionInfo={inviteSessionInfo}
+        defaultMessage={inviteMessage}
         onClose={() => {
-          setInvitePanelOpen(false); setInviteCurriculumId(null); setInviteSessionInfo('');
+          setInvitePanelOpen(false); setInviteCurriculumId(null); setInviteSessionInfo(''); setInviteMessage('');
           void refresh();
         }}
       />

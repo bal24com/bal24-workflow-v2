@@ -12,6 +12,8 @@ interface Props {
   experts: Pick<StaffPool, 'id' | 'name' | 'phone' | 'email'>[];
   defaultCurriculumId?: string | null;
   defaultSessionInfo?: string;
+  /** STEP-CURRICULUM-INSTRUCTOR-VIEW — 강사 요청 진입 시 메시지 자동 prefill */
+  defaultMessage?: string;
   onSubmitted: () => void;
   onCancel: () => void;
 }
@@ -23,7 +25,7 @@ function translateError(raw: string): string {
 }
 
 export default function InvitationAddForm({
-  programId, experts, defaultCurriculumId, defaultSessionInfo, onSubmitted, onCancel,
+  programId, experts, defaultCurriculumId, defaultSessionInfo, defaultMessage, onSubmitted, onCancel,
 }: Props) {
   const [expertId, setExpertId] = useState('');
   const [profileId, setProfileId] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export default function InvitationAddForm({
   const [email, setEmail] = useState('');
   const [curriculumId, setCurriculumId] = useState<string>(defaultCurriculumId ?? '');
   const [sessionInfo, setSessionInfo] = useState<string>(defaultSessionInfo ?? '');
-  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteMessage, setInviteMessage] = useState<string>(defaultMessage ?? '');
   const [notes, setNotes] = useState('');
   const [poolQuery, setPoolQuery] = useState('');
   const [poolResults, setPoolResults] = useState<InstructorPoolEntry[]>([]);
@@ -43,7 +45,8 @@ export default function InvitationAddForm({
   useEffect(() => {
     if (defaultCurriculumId) setCurriculumId(defaultCurriculumId);
     if (defaultSessionInfo) setSessionInfo(defaultSessionInfo);
-  }, [defaultCurriculumId, defaultSessionInfo]);
+    if (defaultMessage) setInviteMessage(defaultMessage);
+  }, [defaultCurriculumId, defaultSessionInfo, defaultMessage]);
 
   const onPickExpert = (id: string) => {
     setExpertId(id);

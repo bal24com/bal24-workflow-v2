@@ -26,6 +26,8 @@ type Props = {
   /** STEP-INSTRUCTOR-INVITE-A — CurriculumTab에서 차시 지정 진입 시 폼 미리 채움 */
   defaultCurriculumId?: string | null;
   defaultSessionInfo?: string;
+  /** STEP-CURRICULUM-INSTRUCTOR-VIEW — 차시 정보 기반 자동 메시지 prefill */
+  defaultMessage?: string;
 };
 
 
@@ -36,7 +38,7 @@ function translateError(raw: string): string {
 }
 
 export default function InvitationManagePanel({
-  open, programId, programName, onClose, defaultCurriculumId, defaultSessionInfo,
+  open, programId, programName, onClose, defaultCurriculumId, defaultSessionInfo, defaultMessage,
 }: Props) {
   const [invitations, setInvitations] = useState<InstructorInvitation[]>([]);
   const [experts, setExperts] = useState<Pick<StaffPool, 'id' | 'name' | 'phone' | 'email'>[]>([]);
@@ -92,8 +94,8 @@ export default function InvitationManagePanel({
   // STEP-INSTRUCTOR-INVITE-A — 차시 지정 진입 시 폼 자동 펼침
   useEffect(() => {
     if (!open) return;
-    if (defaultCurriculumId || defaultSessionInfo) setAddExpanded(true);
-  }, [open, defaultCurriculumId, defaultSessionInfo]);
+    if (defaultCurriculumId || defaultSessionInfo || defaultMessage) setAddExpanded(true);
+  }, [open, defaultCurriculumId, defaultSessionInfo, defaultMessage]);
 
   // 통계 계산
   const stats = {
@@ -185,6 +187,7 @@ export default function InvitationManagePanel({
               experts={experts}
               defaultCurriculumId={defaultCurriculumId}
               defaultSessionInfo={defaultSessionInfo}
+              defaultMessage={defaultMessage}
               onSubmitted={() => { setAddExpanded(false); void fetchData(); }}
               onCancel={() => setAddExpanded(false)}
             />
