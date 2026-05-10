@@ -13,6 +13,7 @@ import { supabase } from '../../../lib/supabase';
 import {
   REPORT_STATUS_LABELS, type PerformanceReport, type ReportStatus,
 } from '../../../types/performanceReport';
+import { sendNotification } from '../../../lib/notifyUtils';
 import ReportReviewModal from './ReportReviewModal';
 
 interface Props {
@@ -72,21 +73,17 @@ export default function ReportReviewTab({ programId }: Props) {
   const [acting, setActing] = useState(false);
   const [target, setTarget] = useState<ReportRow | null>(null);
   const [partners, setPartners] = useState<PartnerOption[]>([]);
+  // STEP-EMAIL-NOTIFY — 반려 메일 발송 시 프로그램명 사용
+  const [programName, setProgramName] = useState<string>('');
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const [reportsRes, partnersRes] = await Promise.all([
-      supabase
-        .from('performance_reports')
-        .select(SELECT_COLUMNS)
-        .eq('program_id', programId)
-        .order('submitted_at', { ascending: false, nullsFirst: false }),
-      supabase
-        .from('profiles')
-        .select('id, name')
-        .eq('role', 'partner')
-        .order('name', { ascending: true }),
+    const [reportsRes, partnersRes, progRes] = await Promise.all([
+      supabase.from('performance_reports').select(SELECT_COLUMNS).eq('program_id', programId).order('submitted_at', { ascending: false, nullsFirst: false }),
+      supabase.from('profiles').select('id, name').eq('role', 'partner').order('name', { ascending: true }),
+      supabase.from('programs').select('name').eq('id', programId).maybeSingle(),
     ]);
+    setProgramName(((progRes.data?.name as string | undefined) ?? ''));
 
     const { data, error } = reportsRes;
     if (error) {
@@ -210,17 +207,16 @@ export default function ReportReviewTab({ programId }: Props) {
   }
 
   async function rejectReport(reportId: string, reason: string) {
-    if (!reason.trim()) {
-      toast.error('반려 사유를 입력해 주세요.');
-      return;
-    }
+    if (!reason.trim()) { toast.error('반려 사유를 입력해 주세요.'); return; }
+    // 발송 직전 수신자 정보 캡처 (refresh 후 target 이 null 이 될 수 있음)
+    const row = items.find((r) => r.id === reportId);
+    const recipientEmail = row?.participant_applications?.email?.trim() ?? '';
+    const recipientName = row?.manager_name ?? row?.participant_applications?.name ?? '';
     setActing(true);
     const { error } = await supabase
       .from('performance_reports')
       .update({
-        status: 'rejected',
-        reject_reason: reason.trim(),
-        pm_comment: reason.trim(),
+        status: 'rejected', reject_reason: reason.trim(), pm_comment: reason.trim(),
         pm_reviewed_by: user?.id ?? null,
         pm_reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -233,6 +229,13 @@ export default function ReportReviewTab({ programId }: Props) {
       return;
     }
     toast.success('보고서를 반려했어요.');
+    // STEP-EMAIL-NOTIFY — 보고서 반려 이메일 (fire-and-forget)
+    if (recipientEmail && recipientName) {
+      void sendNotification({
+        type: 'returned', recipientEmail, recipientName,
+        programTitle: programName, rejectReason: reason.trim(),
+      });
+    }
     setTarget(null);
     await refresh();
   }

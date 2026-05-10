@@ -16,6 +16,7 @@ import {
   PARTICIPANT_STATUS_LABELS, PARTICIPANT_STATUS_TONE,
 } from './applicationMgmtUtils';
 import ApplicationDetailModal from '../../applications/ApplicationDetailModal';
+import { sendNotification } from '../../../lib/notifyUtils';
 import type {
   ParticipantApplication, ParticipantStatus,
 } from '../../../types/application';
@@ -43,6 +44,8 @@ export default function ApplicationTab({ programId }: Props) {
   const [scores, setScores] = useState<Map<string, { avg: number; count: number }>>(new Map());
   const [isEvaluation, setIsEvaluation] = useState(false);
   const [maxApplicants, setMaxApplicants] = useState<number | null>(null);
+  // STEP-EMAIL-NOTIFY — 이메일 발송 시 프로그램명 사용
+  const [programName, setProgramName] = useState<string>('');
   // STEP-MEMBER-INVITE-REPORT — 합격자 MEMBER 초대 상태 관리
   const [invitedEmails, setInvitedEmails] = useState<Set<string>>(new Set());
   const [invitingId, setInvitingId] = useState<string | null>(null);
@@ -56,9 +59,10 @@ export default function ApplicationTab({ programId }: Props) {
     setLoading(true);
     // 1) 프로그램 application_type + max_applicants 확인
     const { data: prog } = await supabase
-      .from('programs').select('application_type, max_applicants').eq('id', programId).maybeSingle();
+      .from('programs').select('name, application_type, max_applicants').eq('id', programId).maybeSingle();
     setIsEvaluation((prog?.application_type ?? 'open') === 'evaluation');
     setMaxApplicants((prog?.max_applicants as number | null | undefined) ?? null);
+    setProgramName((prog?.name as string | null | undefined) ?? '');
     // 2) 신청자 + (평가형이면) 점수
     const list = await fetchApplications(programId);
     setItems(list);
@@ -111,19 +115,11 @@ export default function ApplicationTab({ programId }: Props) {
 
   const allChecked = visible.length > 0 && visible.every((a) => selectedIds.has(a.id));
   const toggleAll = () => {
-    if (allChecked) {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        visible.forEach((a) => next.delete(a.id));
-        return next;
-      });
-    } else {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        visible.forEach((a) => next.add(a.id));
-        return next;
-      });
-    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      visible.forEach((a) => allChecked ? next.delete(a.id) : next.add(a.id));
+      return next;
+    });
   };
   const toggleOne = (id: string) => {
     setSelectedIds((prev) => {
@@ -163,11 +159,7 @@ export default function ApplicationTab({ programId }: Props) {
       // 2) member_invitations INSERT
       const { data: inv, error: invErr } = await supabase
         .from('member_invitations')
-        .insert({
-          email,
-          role: 'member',
-          invited_by: user?.id ?? null,
-        })
+        .insert({ email, role: 'member', invited_by: user?.id ?? null })
         .select('id, token')
         .single();
       if (invErr || !inv) {
@@ -197,27 +189,38 @@ export default function ApplicationTab({ programId }: Props) {
     }
   }
 
+  // STEP-EMAIL-NOTIFY — 합격/탈락 시 메일 발송 헬퍼 (fire-and-forget)
+  const notifyOne = (app: ParticipantApplication, next: ParticipantStatus) => {
+    if ((next !== 'accepted' && next !== 'rejected') || !app.email) return;
+    void sendNotification({
+      type: next, recipientEmail: app.email, recipientName: app.name,
+      programTitle: programName, note: app.review_notes ?? undefined,
+    });
+  };
+
   async function handleSingleStatus(app: ParticipantApplication, next: ParticipantStatus) {
     setActing(true);
     const r = await updateApplicationStatus(app.id, next, user?.id ?? null);
     setActing(false);
     if (!r.success) { toast.error(r.error ?? '상태 변경 실패'); return; }
     toast.success(`상태를 '${PARTICIPANT_STATUS_LABELS[next]}' 로 변경했어요.`);
+    notifyOne(app, next);
     await refresh();
   }
 
   async function handleBulkStatus(next: ParticipantStatus) {
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) {
-      toast.error('선택된 신청자가 없어요.');
-      return;
-    }
+    if (ids.length === 0) { toast.error('선택된 신청자가 없어요.'); return; }
     if (!window.confirm(`${ids.length}명을 '${PARTICIPANT_STATUS_LABELS[next]}' 로 변경할까요?`)) return;
     setActing(true);
     const r = await bulkUpdateStatus(ids, next, user?.id ?? null);
     setActing(false);
     if (!r.success) { toast.error(r.error ?? '일괄 처리 실패'); return; }
     toast.success(`${r.updatedCount}명을 처리했어요.`);
+    if (next === 'accepted' || next === 'rejected') {
+      const idSet = new Set(ids);
+      items.filter((a) => idSet.has(a.id)).forEach((a) => notifyOne(a, next));
+    }
     await refresh();
   }
 

@@ -15,6 +15,7 @@ import PromoSection from './PromoSection';
 import {
   checkApplicationGate, checkDuplicateApplication, submitApplication,
 } from './applicationUtils';
+import { sendNotification } from '../../lib/notifyUtils';
 import {
   useApplicationCapacity, getCapacityMessage,
 } from '../../hooks/useApplicationCapacity';
@@ -140,6 +141,13 @@ export default function ApplyPage() {
       }
       toast.success('신청이 완료됐어요! 검토 후 연락드릴게요.');
       setSubmitted(true);
+      // STEP-EMAIL-NOTIFY — 신청 접수 이메일 (fire-and-forget)
+      void sendNotification({
+        type: 'applied',
+        recipientEmail: form.email,
+        recipientName: form.name,
+        programTitle: program.name,
+      });
     } finally {
       setSubmitting(false);
     }
