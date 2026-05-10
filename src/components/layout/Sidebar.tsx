@@ -114,6 +114,32 @@ const MEMBER_SECTIONS: MenuSection[] = [
   },
 ];
 
+// FINANCE 전용 사이드바 (3그룹 — 홈/재무/도구)
+const FINANCE_SECTIONS: MenuSection[] = [
+  {
+    heading: '홈',
+    items: [
+      { to: '/home',     label: '대시보드', Icon: LayoutDashboard },
+      { to: '/schedule', label: '일정',     Icon: CalendarDays },
+    ],
+  },
+  {
+    heading: '재무',
+    items: [
+      { to: '/income',   label: '수입',   Icon: TrendingUp },
+      { to: '/expense',  label: '지출',   Icon: TrendingDown },
+      { to: '/receipts', label: '증빙',   Icon: Receipt },
+      { to: '/reports',  label: '리포트', Icon: BarChart3 },
+    ],
+  },
+  {
+    heading: '도구',
+    items: [
+      { to: '/ai', label: 'AI', Icon: Sparkles },
+    ],
+  },
+];
+
 function MenuLink({ to, label, Icon }: MenuItem) {
   return (
     <NavLink
@@ -165,8 +191,10 @@ export default function Sidebar() {
   // V2 실측 가정: profiles.role 은 소문자 ('admin', 'partner', 'member' 등)
   const isPartner = role === 'partner';
   const isMember  = role === 'member';
+  const isFinance = role === 'finance';
   const sections  = isPartner ? PARTNER_SECTIONS
                   : isMember  ? MEMBER_SECTIONS
+                  : isFinance ? FINANCE_SECTIONS
                   : SECTIONS;
 
   return (
