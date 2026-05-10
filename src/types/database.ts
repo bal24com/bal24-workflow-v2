@@ -1070,3 +1070,20 @@ export interface MemberInvitation {
   created_at: string;
   deleted_at?: string | null;
 }
+
+export type MemberRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface MemberRequest {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  department?: string | null;
+  position?: string | null;
+  message?: string | null;
+  status: MemberRequestStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  reject_reason?: string | null;
+  created_at: string;
+}

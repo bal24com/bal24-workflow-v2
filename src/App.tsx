@@ -63,6 +63,7 @@ const MyPage                = lazy(() => import('./pages/mypage/MyPage'));
 const MemberInvitePage      = lazy(() => import('./pages/invite/MemberInvitePage'));
 const EvaluatePage          = lazy(() => import('./pages/evaluate/EvaluatePage'));
 const AuditPortalPage       = lazy(() => import('./pages/audit/AuditPortalPage'));
+const JoinRequestPage       = lazy(() => import('./pages/join/JoinRequestPage'));
 
 function LoadingScreen() {
   return (
@@ -122,6 +123,7 @@ export default function App() {
             <Route path="/invite/member/:token" element={<MemberInvitePage />} />
             <Route path="/evaluate/:token" element={<EvaluatePage />} />
             <Route path="/audit/:token" element={<AuditPortalPage />} />
+            <Route path="/join" element={<JoinRequestPage />} />
 
             <Route
               path="/login"

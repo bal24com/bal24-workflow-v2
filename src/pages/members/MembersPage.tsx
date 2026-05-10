@@ -12,6 +12,7 @@ import MemberFormModal from './MemberFormModal';
 import MemberDetailPanel from './MemberDetailPanel';
 import MemberInviteModal from './MemberInviteModal';
 import InviteListSection from './InviteListSection';
+import MemberRequestsTab from './MemberRequestsTab';
 import {
   ROLE_LABELS, ROLE_BADGE_TONE,
   getRoleBadgeTone, getRoleLabel, normalizeRole, hasRole,
@@ -56,6 +57,10 @@ export default function MembersPage() {
 
   // STEP-ROLE-TYPE-AUDIT — hasRole 헬퍼 사용
   const isAdmin = hasRole(myRole, 'admin');
+  const isPM = hasRole(myRole, 'pm');
+  const canSeeRequests = isAdmin || isPM;
+  // 탭 ('list' = 팀원 목록 · 'requests' = 가입신청)
+  const [activeTab, setActiveTab] = useState<'list' | 'requests'>('list');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -132,7 +137,7 @@ export default function MembersPage() {
           <span aria-hidden="true">👤</span>
           팀원 관리
         </h1>
-        {isAdmin && (
+        {isAdmin && activeTab === 'list' && (
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={openCreate}>직접 등록</Button>
             <Button variant="primary" onClick={() => setInviteOpen(true)}>
@@ -143,6 +148,35 @@ export default function MembersPage() {
         )}
       </header>
 
+      {/* 탭 */}
+      {canSeeRequests && (
+        <nav role="tablist" className="flex items-center gap-1 border-b border-slate-200">
+          {([
+            { key: 'list', label: '팀원 목록' },
+            { key: 'requests', label: '가입신청' },
+          ] as const).map((t) => {
+            const active = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveTab(t.key)}
+                className={[
+                  'px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors',
+                  active ? 'text-violet-700 border-violet-600' : 'text-slate-500 border-transparent hover:text-[#1E1B4B]',
+                ].join(' ')}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
+      {activeTab === 'requests' && canSeeRequests ? <MemberRequestsTab /> : (
+      <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex flex-wrap gap-1.5 rounded-xl border border-violet-100 bg-white p-1 shadow-sm">
           {ROLE_OPTIONS.map((opt) => (
@@ -244,6 +278,8 @@ export default function MembersPage() {
 
       {/* STEP-MEMBER-INVITE — 초대 대기 목록 (ADMIN 전용) */}
       {isAdmin && <InviteListSection isAdmin={isAdmin} reloadKey={inviteReloadKey} />}
+      </>
+      )}
 
       <MemberFormModal
         open={modalOpen}
