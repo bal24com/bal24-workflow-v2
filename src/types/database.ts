@@ -409,7 +409,10 @@ export type ShareItem =
   | 'outcome_upload'
   | 'invite_response'
   | 'activity_log'
-  | 'lecture_certificate';
+  | 'lecture_certificate'
+  // STEP-TAB-RESTRUCTURE-B — progress 단계 보강
+  | 'portal_progress'
+  | 'mypage';
 
 /** 노출 항목 toggle 상태 — audience × item × boolean */
 export type ShareVisibility = Partial<Record<ShareAudience, Partial<Record<ShareItem, boolean>>>>;

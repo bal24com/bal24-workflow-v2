@@ -17,6 +17,9 @@ export const SHARE_ITEM_LABEL: Record<ShareItem, string> = {
   invite_response: '초대수락/거절',
   activity_log: '활동일지 작성',
   lecture_certificate: '강의확인서 수령',
+  // STEP-TAB-RESTRUCTURE-B — progress 단계 보강
+  portal_progress: '고객 포털 (진행현황)',
+  mypage: '마이페이지',
 };
 
 export const SHARE_AUDIENCE_LABEL: Record<ShareAudience, string> = {
@@ -34,35 +37,36 @@ export const SHARE_STAGE_LABEL: Record<ShareStage, string> = {
 };
 
 /** 어떤 단계에 어떤 항목이 노출 가능한지 (코드 hardcoded 매트릭스) */
+/** STEP-TAB-RESTRUCTURE-B — progress 단계에 portal_progress / mypage 추가 */
 export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>> = {
   client: {
     before: [],
     pre:    ['basic_info', 'curriculum', 'instructors', 'materials'],
     ready:  ['basic_info', 'curriculum', 'instructors', 'materials'],
-    progress: [],
+    progress: ['portal_progress'],
     result: ['survey_view', 'edit_request', 'feedback_comments'],
   },
   student: {
     before: [],
     pre:    [],
     ready:  [],
-    progress: ['checkin'],
+    progress: ['checkin', 'mypage'],
     result: ['survey_submit', 'outcome_upload'],
   },
   expert: {
     before: [],
     pre:    ['invite_response'],
     ready:  ['invite_response'],
-    progress: ['activity_log'],
+    progress: ['activity_log', 'mypage'],
     result: ['lecture_certificate'],
   },
 };
 
 /** 대상별 전체 항목 목록 (관리자 UI 체크박스용) */
 export const ITEMS_BY_AUDIENCE: Record<ShareAudience, ShareItem[]> = {
-  client: ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_view', 'edit_request', 'feedback_comments'],
-  student: ['checkin', 'survey_submit', 'outcome_upload'],
-  expert: ['invite_response', 'activity_log', 'lecture_certificate'],
+  client: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments'],
+  student: ['checkin', 'mypage', 'survey_submit', 'outcome_upload'],
+  expert: ['invite_response', 'activity_log', 'mypage', 'lecture_certificate'],
 };
 
 /** 대상×단계 매트릭스 헤더 (UI 안내용) */
@@ -71,7 +75,7 @@ export const STAGE_TIPS: Record<ShareAudience, Record<ShareStage, string>> = {
     before: '시작 전엔 노출 안 됨',
     pre: '사전·준비 단계에서 노출',
     ready: '사전·준비 단계에서 노출',
-    progress: '진행 중엔 별도 노출 없음',
+    progress: '진행 중 고객 포털에서 진행현황 확인',
     result: '결과 단계에서 노출',
   },
   student: {

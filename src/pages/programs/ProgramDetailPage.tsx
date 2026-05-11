@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, Info, Loader2, Mic2, Pencil, FileBarChart, BookOpen, Users2, Award, Settings, FileText,
+  ArrowLeft, Info, Loader2, Mic2, Pencil, FileBarChart, BookOpen, Users2, Settings, FileText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -17,7 +17,6 @@ import {
 import type { Program } from '../../types/database';
 import OverviewTab from './detail/OverviewTab';
 import CurriculumTab from './detail/CurriculumTab';
-import AttendanceLogTab from './detail/AttendanceLogTab';
 import ProgramDeleteButton from './ProgramDeleteButton';
 import ProgramOverviewCard from './detail/overview/ProgramOverviewCard';
 import ProgramCurriculumSummaryCard from './detail/overview/ProgramCurriculumSummaryCard';
@@ -27,7 +26,6 @@ import ParticipantManageTab from './detail/ParticipantManageTab';
 import InstructorManageTab from './detail/InstructorManageTab';
 import ReportManageTab from './detail/ReportManageTab';
 import ProgramReportTab from './detail/ProgramReportTab';
-import GrantManageTab from './detail/GrantManageTab';
 import SettingsShareTab from './detail/SettingsShareTab';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { usePartnerProfile } from '../../hooks/usePartnerProfile';
@@ -38,8 +36,9 @@ type DetailProgram = Program & {
 };
 
 // STEP-PROGRAM-TABS-CONSOLIDATE — 9 탭 (STEP-PROGRAM-REPORT-TAB에서 'final-report' 추가)
-// STEP-PROGRAM-UX-A — 'attendance' → 'activity-log' (출석은 교육생 탭으로 이동, 본 탭은 일지·수료증 전담)
-type TabKey = 'overview' | 'curriculum' | 'participants' | 'activity-log' | 'instructor' | 'report' | 'final-report' | 'grant' | 'settings';
+// STEP-PROGRAM-UX-A — 'attendance' → 'activity-log' (출석은 교육생 탭으로 이동)
+// STEP-TAB-RESTRUCTURE-B — 'activity-log' / 'grant' 제거 → 설정·공유 sub로 이동 (7 탭)
+type TabKey = 'overview' | 'curriculum' | 'participants' | 'instructor' | 'report' | 'final-report' | 'settings';
 
 interface AuthCtx {
   isPM: boolean; isStaff: boolean; isMember: boolean; isPartner: boolean;
@@ -58,15 +57,12 @@ const TABS: TabDef[] = [
   { key: 'overview',     label: '개요',         Icon: Info },
   { key: 'curriculum',   label: '커리큘럼',     Icon: BookOpen,        hide: (c) => c.isMember || c.isPartner },
   { key: 'participants', label: '교육생',       Icon: Users2,          hide: (c) => c.isMember || c.isPartner },
-  // STEP-PROGRAM-UX-A — 출석은 교육생 탭으로 통합, 본 탭은 '일지·수료증' 전담
-  { key: 'activity-log', label: '일지·수료증',  Icon: ClipboardCheck,
-    hide: (c) => c.isMember || c.isPartner || (!c.isPM && !c.hasAttendData) },
   { key: 'instructor',   label: '강사',         Icon: Mic2 },
   { key: 'report',       label: '만족도·보고',  Icon: FileBarChart,
     hide: (c) => !c.isPM && !c.hasSurveyData && (c.isMember || c.isPartner) },
   // STEP-PROGRAM-REPORT-TAB — 결과보고서 (6섹션 자동집계·편집)
   { key: 'final-report', label: '결과보고서',   Icon: FileText,        hide: (c) => c.isMember || c.isPartner },
-  { key: 'grant',        label: '지원금',       Icon: Award,           hide: (c) => !c.isPM },
+  // STEP-TAB-RESTRUCTURE-B — activity-log + grant 흡수. PM만 접근 (활동·지원금·멘토링·파일 등 운영 메뉴)
   { key: 'settings',     label: '설정·공유',    Icon: Settings,        hide: (c) => !c.isPM },
 ];
 
@@ -287,12 +283,18 @@ export default function ProgramDetailPage() {
         )}
         {tab === 'curriculum'   && <CurriculumTab programId={programId} programName={program.name} />}
         {tab === 'participants' && <ParticipantManageTab programId={programId} programName={program.name} canEdit={isStaff} />}
-        {tab === 'activity-log' && <AttendanceLogTab programId={programId} />}
         {tab === 'instructor'   && <InstructorManageTab programId={programId} isPartner={isPartner} />}
         {tab === 'report'       && <ReportManageTab programId={programId} isPartner={isPartner} isMember={isMember} isStaff={isStaff} applicationType={program.application_type} />}
         {tab === 'final-report' && <ProgramReportTab programId={programId} />}
-        {tab === 'grant'        && <GrantManageTab programId={programId} consortiumId={program.consortium_id ?? null} isPM={isPM} applicationType={program.application_type} hasConsortium={Boolean(program.consortium_id)} />}
-        {tab === 'settings'     && <SettingsShareTab programId={programId} />}
+        {tab === 'settings'     && (
+          <SettingsShareTab
+            programId={programId}
+            isPM={isPM}
+            consortiumId={program.consortium_id ?? null}
+            applicationType={program.application_type}
+            hasConsortium={Boolean(program.consortium_id)}
+          />
+        )}
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ export interface AttendanceStats {
   isCompletion: boolean;
 }
 
+/** STEP-TAB-RESTRUCTURE-B — DB programs.completion_threshold 미설정 환경 fallback */
 const COMPLETION_THRESHOLD = 80;
 
 interface AttendanceRow {
@@ -43,6 +44,19 @@ function pickOne<T>(v: T | T[] | null): T | null {
  * - 동일 학생 식별 = phone 우선
  */
 export async function calculateAttendanceForProgram(programId: string): Promise<AttendanceStats[]> {
+  // STEP-TAB-RESTRUCTURE-B — 프로그램별 동적 수료 임계값 fetch
+  let threshold = COMPLETION_THRESHOLD;
+  const progRes = await supabase.from('programs')
+    .select('completion_threshold').eq('id', programId).maybeSingle();
+  if (progRes.error) {
+    // 컬럼 미존재 시 console.warn 후 fallback (80) 유지
+    if (!(progRes.error.message ?? '').toLowerCase().includes('completion_threshold')) {
+      console.warn('[attendance-calc] 임계값 조회 경고:', progRes.error.message);
+    }
+  } else if (progRes.data?.completion_threshold != null) {
+    threshold = progRes.data.completion_threshold;
+  }
+
   // 1) 프로그램의 총 세션 수
   const sesRes = await supabase
     .from('attendance_sessions')
@@ -111,7 +125,7 @@ export async function calculateAttendanceForProgram(programId: string): Promise<
       presentCount,
       fullPresentCount: b.fullPresentSet.size,
       attendanceRate: rate,
-      isCompletion: rate >= COMPLETION_THRESHOLD,
+      isCompletion: rate >= threshold,
     };
   }).sort((a, b) => b.attendanceRate - a.attendanceRate);
 }
