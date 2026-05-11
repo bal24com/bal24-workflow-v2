@@ -217,23 +217,45 @@ export function applyExtractedProgram(prog: ExtractedProgram, target: ProgramAut
   if (prog.ready_date)    { phasePatch.ready_date = prog.ready_date;       count += 1; }
   if (prog.progress_date) { phasePatch.progress_date = prog.progress_date; count += 1; }
   if (prog.result_date)   { phasePatch.result_date = prog.result_date;     count += 1; }
+  // STEP-SHARE-DATE-FIX — AI가 progress_date를 못 뽑았으면 start_date로 보완
+  // (pre_date / ready_date / result_date는 직접 매칭 가능한 단서 없음 → null 유지)
+  if (!phasePatch.progress_date && prog.start_date) {
+    phasePatch.progress_date = prog.start_date;
+  }
   if (Object.keys(phasePatch).length > 0) target.setPhaseDates?.(phasePatch);
   return count;
 }
 
-/** STEP-AUTOFILL-PHASE-DATES — AI 추출 4단계 시작일을 program_share에 upsert (빈/공백 자동 제외) */
+/** STEP-AUTOFILL-PHASE-DATES + STEP-SHARE-DATE-FIX
+ *  AI 추출 4단계 시작일을 program_share에 안전 저장.
+ *  1단계: row가 없으면 seed 생성 (program_id만으로 upsert + ignoreDuplicates)
+ *  2단계: 날짜만 UPDATE (NOT NULL 컬럼 미터치 — token·visibility 등 영향 없음)
+ */
 export async function upsertProgramSharePhaseDates(
   programId: string, phaseDates: PhaseDatesPatch,
 ): Promise<void> {
   if (Object.keys(phaseDates).length === 0) return;
-  const payload: Record<string, string | null> = { program_id: programId };
+
+  // 1단계 — seed (row 없으면 INSERT, 있으면 ignore)
+  const seedRes = await supabase
+    .from('program_share')
+    .upsert({ program_id: programId }, { onConflict: 'program_id', ignoreDuplicates: true });
+  if (seedRes.error) {
+    console.warn('[program-share] seed 생성 실패:', seedRes.error.message);
+    return;
+  }
+
+  // 2단계 — 날짜만 UPDATE
+  const payload: Record<string, string | null> = {};
   for (const k of ['pre_date', 'ready_date', 'progress_date', 'result_date'] as const) {
     const v = phaseDates[k];
-    if (v && v.trim()) payload[k] = v;
+    payload[k] = (v && v.trim()) ? v : null;
   }
-  const { error } = await supabase.from('program_share')
-    .upsert(payload, { onConflict: 'program_id' });
-  if (error) console.warn('[program-share] AI 단계 날짜 upsert 경고:', error.message);
+  const { error } = await supabase
+    .from('program_share')
+    .update({ ...payload, updated_at: new Date().toISOString() })
+    .eq('program_id', programId);
+  if (error) console.warn('[program-share] AI 단계 날짜 저장 실패:', error.message);
 }
 
 /** STEP-PROGRAM-DASHBOARD — AI 추출 차시를 program_curriculum 에 bulk INSERT */
