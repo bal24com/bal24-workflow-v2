@@ -96,9 +96,9 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
   const prevRange = monthBounds(prevYear, prevMonth);
   const today = todayIso();
 
-  // STEP-DASHBOARD-FIX — 종료/취소 제외 + '준비' 포함 (착수 전 프로그램도 활성으로 간주)
+  // STEP-DASHBOARD-FIX — 종료/취소·준비 제외 ('진행'만)
   const ACTIVE_PROJECT_STATUS: ProjectStatus[] = ['진행', '정산'];
-  const ACTIVE_PROGRAM_STATUS: ProgramStatus[] = ['준비', '진행'];
+  const ACTIVE_PROGRAM_STATUS: ProgramStatus[] = ['진행'];
   const OPEN_TASK_STATUS: TaskStatus[] = ['인식', '실행', '검토'];
 
   const [projRes, thisIncomeRes, prevIncomeRes, pendingRes, programRes, todayDueRes, overdueRes] =
@@ -130,16 +130,19 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
         .select('id', { count: 'exact', head: true })
         .is('deleted_at', null)
         .in('status', ACTIVE_PROGRAM_STATUS),
+      // STEP-DASHBOARD-FIX — 삭제(soft-delete)된 프로젝트의 task 제외 (inner join + project.deleted_at IS NULL)
       supabase
         .from('tasks')
-        .select('id', { count: 'exact', head: true })
+        .select('id, project:projects!inner(id, deleted_at)', { count: 'exact', head: true })
         .in('status', OPEN_TASK_STATUS)
-        .eq('due_date', today),
+        .eq('due_date', today)
+        .is('project.deleted_at', null),
       supabase
         .from('tasks')
-        .select('id', { count: 'exact', head: true })
+        .select('id, project:projects!inner(id, deleted_at)', { count: 'exact', head: true })
         .in('status', OPEN_TASK_STATUS)
-        .lt('due_date', today),
+        .lt('due_date', today)
+        .is('project.deleted_at', null),
     ]);
 
   if (projRes.error) console.error('[dashboard] 프로젝트 카운트 실패:', projRes.error.message);
@@ -288,18 +291,21 @@ export async function fetchTaskBuckets(limit = 8): Promise<TaskBuckets> {
   const OPEN_TASK_STATUS: TaskStatus[] = ['인식', '실행', '검토'];
 
   const [todayRes, overdueRes] = await Promise.all([
+    // STEP-DASHBOARD-FIX — 삭제된 프로젝트의 task 제외 (inner join + deleted_at IS NULL)
     supabase
       .from('tasks')
-      .select('id, project_id, title, status, due_date, project:projects(id, name)')
+      .select('id, project_id, title, status, due_date, project:projects!inner(id, name, deleted_at)')
       .in('status', OPEN_TASK_STATUS)
       .eq('due_date', today)
+      .is('project.deleted_at', null)
       .order('seq_num', { ascending: true })
       .limit(limit),
     supabase
       .from('tasks')
-      .select('id, project_id, title, status, due_date, project:projects(id, name)')
+      .select('id, project_id, title, status, due_date, project:projects!inner(id, name, deleted_at)')
       .in('status', OPEN_TASK_STATUS)
       .lt('due_date', today)
+      .is('project.deleted_at', null)
       .order('due_date', { ascending: true })
       .limit(limit),
   ]);
