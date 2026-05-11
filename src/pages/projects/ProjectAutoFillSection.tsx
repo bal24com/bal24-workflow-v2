@@ -40,6 +40,11 @@ export default function ProjectAutoFillSection({
       } else {
         toast.success(`${count}개 항목을 자동으로 채웠어요.`);
       }
+    } catch (err) {
+      // STEP-AUTOFILL-CARD-FULL — 실제 원인 노출 (이전엔 catch 없어서 무한 로딩 가능)
+      const msg = err instanceof Error ? err.message : '알 수 없는 오류';
+      console.error('[project-autofill] handleRun 예외:', msg);
+      toast.error(`자동채우기 실패: ${msg}`);
     } finally {
       setRunning(false);
     }

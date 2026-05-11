@@ -18,6 +18,8 @@ import {
   type ClientForm,
 } from './clientFormHelpers';
 import ClientContactsSection from './ClientContactsSection';
+import ClientCardScanSection from './ClientCardScanSection';
+import type { ClientCardExtracted } from '../../lib/clientCardAutoFill';
 
 type Props = {
   open: boolean;
@@ -104,6 +106,31 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
 
   const update = <K extends keyof ClientForm>(key: K, value: ClientForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // STEP-AUTOFILL-CARD-FULL — 명함 인식 결과 폼·연락처에 적용
+  const handleCardApply = (ex: ClientCardExtracted) => {
+    setForm((prev) => ({
+      ...prev,
+      name:       prev.name.trim()       || ex.name        || prev.name,
+      department: prev.department.trim() || ex.department  || prev.department,
+      address:    prev.address.trim()    || ex.address     || prev.address,
+    }));
+    if (ex.contact_name || ex.phone || ex.email) {
+      setContacts((prev) => {
+        const newContact: ContactDraft = {
+          ...makeContact(),
+          name: ex.contact_name ?? '',
+          position: ex.contact_title ?? '',
+          phoneMobile: ex.phone ?? '',
+          email: ex.email ?? '',
+        };
+        // 첫 행이 비어있으면 교체, 아니면 append
+        const first = prev[0];
+        const firstEmpty = first && !first.name.trim() && !first.phoneMobile.trim() && !first.email.trim();
+        return firstEmpty ? [newContact, ...prev.slice(1)] : [...prev, newContact];
+      });
+    }
   };
 
   const handleLicenseSelected = async (file: File) => {
@@ -245,6 +272,8 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
       }
     >
       <form id="client-form" onSubmit={handleSubmit} className="space-y-5" noValidate>
+        {/* STEP-AUTOFILL-CARD-FULL — 명함 이미지 인식으로 자동채우기 */}
+        {!isEdit && <ClientCardScanSection onApply={handleCardApply} disabled={submitting || uploading} />}
         <section className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">기본 정보</h3>
           {/* STEP-CLIENT-EXPERT-CARD — 상호명+부서명 그룹핑 (한 줄에 인접) */}

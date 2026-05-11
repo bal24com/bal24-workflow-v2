@@ -26,25 +26,23 @@ const EMPTY: ProjectAutoFillResult = {
   consortium_members: [],
 };
 
-const SYSTEM_PROMPT = `당신은 사업 문서에서 프로젝트 등록 정보를 추출하는 전문가입니다.
-아래 문서에서 JSON으로 추출하세요. 확인되지 않은 값은 반드시 null로 반환하고 절대 추측하지 마세요.
+const SYSTEM_PROMPT = `당신은 사업 문서(과업지시서·제안서·계약서·공정표 등)에서 프로젝트 등록 정보를 추출하는 전문가입니다.
+아래 문서를 분석해 다음 항목을 JSON으로만 추출하세요. 확인되지 않은 값은 반드시 null로 반환하고 절대 추측하지 마세요.
 
-반환 형식.
-{
-  "name": "과업명 또는 사업명",
-  "client_name": "발주기관명 (지자체·공공기관명)",
-  "contract_amount": 숫자(원, 쉼표·통화기호 없이) 또는 null,
-  "contract_type": "계약방법 텍스트" 또는 null,
-  "duration_months": 숫자(개월) 또는 null,
-  "start_date": "YYYY-MM-DD" 또는 null,
-  "end_date": "YYYY-MM-DD" 또는 null,
-  "description": "사업 목적 요약 3문장 이내",
-  "consortium_members": [
-    { "org_name": "기관명", "responsibilities": "담당역할" }
-  ]
-}
+추출 항목.
+- name: 과업명/사업명 (문서 표지·제목에서 우선 추출)
+- client_name: 발주기관/주관기관명 (지자체·공공기관명)
+- contract_amount: 계약금액 (원, 쉼표·통화기호·"원" 제거한 숫자만)
+- contract_type: 계약방법 텍스트 (예: 일반경쟁, 수의계약, 협상에 의한 계약)
+- duration_months: 사업 기간 (개월 단위 숫자)
+- start_date: 시작일 YYYY-MM-DD
+- end_date: 종료일 YYYY-MM-DD
+- description: 사업 목적 요약 3문장 이내
+- consortium_members: 참여기관 배열. 단독 사업이면 빈 배열 []
+  · 각 항목: { "org_name": "기관명", "responsibilities": "담당역할" }
 
-JSON만 반환. 다른 텍스트 금지.`;
+반드시 유효한 JSON만 반환. 마크다운 코드블록·다른 텍스트 금지.
+추출 불가 항목은 null. 임의 추측 금지.`;
 
 const TEXT_LIMIT = 6000;
 
