@@ -10,11 +10,15 @@ import SurveyResultCard from './SurveyResultCard';
 import { importSurveyFromXlsx } from './surveyImportUtils';
 import type { SatisfactionSurvey } from '../../../types/database';
 
-interface Props { programId: string }
+interface Props {
+  programId: string;
+  /** STEP-SURVEY-FIX — xlsx import 성공 후 부모의 fetchQuestions 호출용 */
+  onImportDone?: () => void;
+}
 
 const BUCKET = 'satisfaction-files';
 
-export default function SurveyFileUploadSection({ programId }: Props) {
+export default function SurveyFileUploadSection({ programId, onImportDone }: Props) {
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [items, setItems] = useState<SatisfactionSurvey[]>([]);
@@ -105,6 +109,8 @@ export default function SurveyFileUploadSection({ programId }: Props) {
       const importRes = await importSurveyFromXlsx(programId, rows);
       if (importRes.ok) {
         toast.success(`설문 폼에 문항 ${importRes.questionCount}개, 응답 ${importRes.responseCount}건 등록됐어요.`);
+        // STEP-SURVEY-FIX — 부모(SurveyTab)에 자동 갱신 신호
+        onImportDone?.();
       } else if (importRes.warning) {
         console.warn('[survey-file] 설문 폼 자동 등록 경고:', importRes.warning);
         toast.error(`설문 폼 자동 등록 실패: ${importRes.warning}`);

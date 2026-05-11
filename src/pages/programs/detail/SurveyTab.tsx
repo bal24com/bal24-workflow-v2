@@ -311,7 +311,8 @@ export default function SurveyTab({ programId, canEdit }: Props) {
       </section>
 
       {/* STEP-CURRICULUM-ATTEND-SURVEY-FULL — 외부 만족도 파일 업로드·분석 */}
-      <SurveyFileUploadSection programId={programId} />
+      {/* STEP-SURVEY-FIX — xlsx import 후 웹 폼 문항 목록 자동 재조회 */}
+      <SurveyFileUploadSection programId={programId} onImportDone={() => void reload()} />
 
       {/* 하단 — 기존 외부 폼 발송·통계 */}
       <SurveyResultTab programId={programId} />

@@ -110,14 +110,19 @@ Deno.serve(async (req) => {
       return out;
     });
 
-    // 열별 평균 (숫자 열만, '타임스탬프'/'timestamp' 제외)
+    // STEP-SURVEY-FIX — 타임스탬프/응답시간/제출시간 헤더 자동 제외 (한글·영문 변형)
+    const TS_KEYWORDS = ['타임스탬프', 'timestamp', '제출 시간', '제출시간', '응답 시간', '응답시간', '작성일', '응답일자', '응답 일자', 'time', 'date'];
+    const isTimestampHeader = (c: string): boolean => {
+      const lower = c.toLowerCase().trim();
+      return TS_KEYWORDS.some((k) => lower.includes(k.toLowerCase()));
+    };
+
+    // 열별 평균 (xlsx 원본 컬럼 순서 유지, 1~5 범위 숫자만 집계)
     const summary_json: Record<string, number> = {};
-    const columns = Object.keys(rows[0] ?? {}).filter((c) => {
-      const lower = c.toLowerCase();
-      return !lower.includes('타임스탬프') && !lower.includes('timestamp');
-    });
+    const columns = Object.keys(rows[0] ?? {}).filter((c) => !isTimestampHeader(c));
     for (const col of columns) {
-      const vals = numericRows.map((r) => r[col]).filter((v) => typeof v === 'number') as number[];
+      const vals = numericRows.map((r) => r[col])
+        .filter((v): v is number => typeof v === 'number' && v >= 1 && v <= 5);
       if (vals.length > 0) {
         summary_json[col] = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100;
       }

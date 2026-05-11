@@ -1,7 +1,7 @@
 // bal24 v2 — STEP-CURRICULUM-ATTEND-SURVEY-FULL 만족도 분석 결과 카드
 //   STEP-SURVEY-AI — [AI 분석] 버튼 → 항목별·전체 인사이트 (Claude 호출 → satisfaction_surveys UPDATE)
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Star, FileText, ChevronDown, ChevronUp, Trash2, MessageSquare, Sparkles, Loader2, Download, FileBarChart } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { supabase } from '../../../lib/supabase';
@@ -9,6 +9,9 @@ import { callAi } from '../../../lib/aiClient';
 import { useToast } from '../../../contexts/ToastContext';
 import SurveyAiAnalysisPanel from './SurveyAiAnalysisPanel';
 import type { SatisfactionSurvey } from '../../../types/database';
+
+/** STEP-SURVEY-FIX — survey_questions(star, order_index ASC) 기준으로 점수 매칭 */
+interface OrderedQuestion { id: string; question_text: string; order_index: number }
 
 interface Props {
   survey: SatisfactionSurvey;
@@ -35,16 +38,46 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
   const toast = useToast();
   const [expanded, setExpanded] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const items = Object.entries(survey.summary_json ?? {});
+  const [orderedQs, setOrderedQs] = useState<OrderedQuestion[]>([]);
   const overall = survey.avg_overall != null ? Number(survey.avg_overall) : null;
   const hasAi = Boolean(survey.ai_overall || (survey.ai_per_question && Object.keys(survey.ai_per_question).length > 0));
 
-  // STEP-PROGRAM-ENHANCE-FULL — recharts 가로 막대 데이터
+  // STEP-SURVEY-FIX — survey_questions에서 별점(star) 문항을 order_index 순으로 fetch
+  useEffect(() => {
+    if (!programId) { setOrderedQs([]); return; }
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase.from('survey_questions')
+        .select('id, question_text, order_index')
+        .eq('program_id', programId).eq('question_type', 'star')
+        .order('order_index');
+      if (cancelled) return;
+      if (error) {
+        console.warn('[survey-card] survey_questions 조회 경고:', error.message);
+        setOrderedQs([]); return;
+      }
+      setOrderedQs((data ?? []) as OrderedQuestion[]);
+    })();
+    return () => { cancelled = true; };
+  }, [programId]);
+
+  /** STEP-SURVEY-FIX — survey_questions가 있으면 그 순서대로, 없으면 summary_json 순서 fallback */
+  const items: Array<[string, number]> = (() => {
+    const sj = survey.summary_json ?? {};
+    if (orderedQs.length > 0) {
+      return orderedQs
+        .map((q): [string, number | undefined] => [q.question_text, sj[q.question_text]])
+        .filter((e): e is [string, number] => typeof e[1] === 'number');
+    }
+    return Object.entries(sj).filter((e): e is [string, number] => typeof e[1] === 'number');
+  })();
+
+  // STEP-PROGRAM-ENHANCE-FULL — recharts 가로 막대 데이터 (1~5 범위만)
   const chartData = items
-    .filter(([, v]) => typeof v === 'number' && (v as number) <= 5)
+    .filter(([, v]) => v >= 1 && v <= 5)
     .map(([key, value]) => ({
       name: key.length > 24 ? `${key.slice(0, 22)}…` : key,
-      score: Math.round((value as number) * 100) / 100,
+      score: Math.round(value * 100) / 100,
     }));
 
   // STEP-PROGRAM-ENHANCE-FULL — 텍스트 리포트 다운로드
