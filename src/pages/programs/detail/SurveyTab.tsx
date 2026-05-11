@@ -183,7 +183,7 @@ export default function SurveyTab({ programId, canEdit }: Props) {
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
               >
                 <Star size={12} aria-hidden="true" />
-                + 별점 문항
+                별점 문항 추가
               </button>
               <button
                 type="button"
@@ -191,7 +191,7 @@ export default function SurveyTab({ programId, canEdit }: Props) {
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
               >
                 <MessageSquare size={12} aria-hidden="true" />
-                + 서술 문항
+                텍스트 문항 추가
               </button>
             </div>
           )}

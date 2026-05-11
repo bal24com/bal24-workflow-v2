@@ -1,24 +1,27 @@
 // bal24 v2 — STEP-CURRICULUM-ATTEND-SURVEY-FULL 만족도 분석 결과 카드
 //   STEP-SURVEY-AI — [AI 분석] 버튼 → 항목별·전체 인사이트 (Claude 호출 → satisfaction_surveys UPDATE)
+//   STEP-SURVEY-ACCORDION-UI — 문항별 아코디언 + 차트 유형 선택
 
-import { useEffect, useState } from 'react';
-import { Star, FileText, ChevronDown, ChevronUp, Trash2, MessageSquare, Sparkles, Loader2, Download, FileBarChart } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Star, FileText, Trash2, Sparkles, Loader2, Download, FileBarChart,
+  BarChart3, BarChartHorizontal, PieChart as PieIcon,
+} from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { callAi } from '../../../lib/aiClient';
 import { useToast } from '../../../contexts/ToastContext';
 import SurveyAiAnalysisPanel from './SurveyAiAnalysisPanel';
+import SurveyQuestionAccordion, {
+  type AccordionQuestion, type AccordionResponse,
+} from './SurveyQuestionAccordion';
+import { type ChartType } from './SurveyChartPanel';
 import type { SatisfactionSurvey } from '../../../types/database';
-
-/** STEP-SURVEY-FIX — survey_questions(star, order_index ASC) 기준으로 점수 매칭 */
-interface OrderedQuestion { id: string; question_text: string; order_index: number }
 
 interface Props {
   survey: SatisfactionSurvey;
   onDelete?: () => void;
-  /** AI 분석 완료 후 부모(SurveyFileUploadSection) 새로고침 */
   onAnalyzed?: () => void;
-  /** STEP-PROGRAM-ENHANCE-FULL — 결과보고서 탭으로 전송 (program_report_sections.satisfaction) */
+  /** 결과보고서 전송 + survey_questions/responses fetch에 사용 */
   programId?: string;
 }
 
@@ -34,53 +37,61 @@ function formatDateTime(iso: string): string {
   } catch { return iso; }
 }
 
+const CHART_TYPES: { value: ChartType; label: string; Icon: typeof BarChart3 }[] = [
+  { value: 'bar',        label: '세로 막대', Icon: BarChart3 },
+  { value: 'horizontal', label: '가로 막대', Icon: BarChartHorizontal },
+  { value: 'pie',        label: '원형',      Icon: PieIcon },
+];
+
 export default function SurveyResultCard({ survey, onDelete, onAnalyzed, programId }: Props) {
   const toast = useToast();
-  const [expanded, setExpanded] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [orderedQs, setOrderedQs] = useState<OrderedQuestion[]>([]);
+  const [chartType, setChartType] = useState<ChartType>('bar');
+  const [questions, setQuestions] = useState<AccordionQuestion[]>([]);
+  const [responses, setResponses] = useState<AccordionResponse[]>([]);
   const overall = survey.avg_overall != null ? Number(survey.avg_overall) : null;
   const hasAi = Boolean(survey.ai_overall || (survey.ai_per_question && Object.keys(survey.ai_per_question).length > 0));
 
-  // STEP-SURVEY-FIX — survey_questions에서 별점(star) 문항을 order_index 순으로 fetch
+  // STEP-SURVEY-ACCORDION-UI — 문항·응답 fetch (program 단위)
   useEffect(() => {
-    if (!programId) { setOrderedQs([]); return; }
+    if (!programId) { setQuestions([]); setResponses([]); return; }
     let cancelled = false;
     void (async () => {
-      const { data, error } = await supabase.from('survey_questions')
-        .select('id, question_text, order_index')
-        .eq('program_id', programId).eq('question_type', 'star')
-        .order('order_index');
+      const [qRes, rRes] = await Promise.all([
+        supabase.from('survey_questions').select('id, question_text, question_type, order_index')
+          .eq('program_id', programId).order('order_index'),
+        supabase.from('survey_responses').select('question_id, answer_score, answer_text')
+          .eq('program_id', programId),
+      ]);
       if (cancelled) return;
-      if (error) {
-        console.warn('[survey-card] survey_questions 조회 경고:', error.message);
-        setOrderedQs([]); return;
-      }
-      setOrderedQs((data ?? []) as OrderedQuestion[]);
+      if (qRes.error) console.warn('[survey-card] survey_questions 조회 경고:', qRes.error.message);
+      if (rRes.error) console.warn('[survey-card] survey_responses 조회 경고:', rRes.error.message);
+      setQuestions((qRes.data ?? []) as AccordionQuestion[]);
+      setResponses((rRes.data ?? []) as AccordionResponse[]);
     })();
     return () => { cancelled = true; };
   }, [programId]);
 
-  /** STEP-SURVEY-FIX — survey_questions가 있으면 그 순서대로, 없으면 summary_json 순서 fallback */
-  const items: Array<[string, number]> = (() => {
-    const sj = survey.summary_json ?? {};
-    if (orderedQs.length > 0) {
-      return orderedQs
-        .map((q): [string, number | undefined] => [q.question_text, sj[q.question_text]])
-        .filter((e): e is [string, number] => typeof e[1] === 'number');
+  // 문항별 분포·평균 (한 번에 묶음)
+  const perQuestion = useMemo(() => {
+    const map = new Map<string, { count: number; avg: number | null }>();
+    for (const q of questions) {
+      const rs = responses.filter((r) => r.question_id === q.id);
+      const scores = rs.map((r) => r.answer_score).filter((v): v is number => typeof v === 'number');
+      const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+      map.set(q.id, { count: rs.length, avg });
     }
-    return Object.entries(sj).filter((e): e is [string, number] => typeof e[1] === 'number');
-  })();
+    return map;
+  }, [questions, responses]);
 
-  // STEP-PROGRAM-ENHANCE-FULL — recharts 가로 막대 데이터 (1~5 범위만)
-  const chartData = items
-    .filter(([, v]) => v >= 1 && v <= 5)
-    .map(([key, value]) => ({
-      name: key.length > 24 ? `${key.slice(0, 22)}…` : key,
-      score: Math.round(value * 100) / 100,
-    }));
+  // 결과보고서 전송용 — items (star 평균 목록)
+  const items: Array<[string, number]> = useMemo(() => {
+    return questions
+      .filter((q) => q.question_type === 'star')
+      .map((q): [string, number | null] => [q.question_text, perQuestion.get(q.id)?.avg ?? null])
+      .filter((e): e is [string, number] => typeof e[1] === 'number');
+  }, [questions, perQuestion]);
 
-  // STEP-PROGRAM-ENHANCE-FULL — 텍스트 리포트 다운로드
   function handleDownloadReport() {
     const lines = [
       '=== 만족도 조사 분석 리포트 ===',
@@ -89,7 +100,7 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
       `전반적 만족도: ${overall != null ? `${overall.toFixed(2)}/5.0` : '-'}`,
       '',
       '[항목별 평균]',
-      ...items.filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k}: ${(v as number).toFixed(2)}`),
+      ...items.map(([k, v]) => `${k}: ${v.toFixed(2)}`),
       '',
       '[AI 분석 리포트]',
       survey.ai_overall ?? '(아직 생성되지 않음)',
@@ -106,7 +117,6 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
     a.click(); URL.revokeObjectURL(url);
   }
 
-  // STEP-PROGRAM-ENHANCE-FULL — 결과보고서 탭으로 전송 (program_report_sections.satisfaction)
   async function handleSendToReport() {
     if (!programId) { toast.error('프로그램 정보가 없어요.'); return; }
     const aa = survey.ai_analysis;
@@ -115,20 +125,15 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
       `전반적 만족도: ${overall != null ? `${overall.toFixed(2)}/5.0` : '-'}`,
       '',
       '[항목별 평균]',
-      ...items.filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k}: ${(v as number).toFixed(2)}`),
+      ...items.map(([k, v]) => `${k}: ${v.toFixed(2)}`),
       '',
-      // STEP-PROGRAM-UX-B — ai_analysis 5필드를 결과보고서 텍스트에 포함
       aa ? '[AI 종합 분석]' : '',
       aa ? aa.overall : '',
-      aa ? '' : '',
       aa ? '[잘된 점]' : '',
       ...(aa ? aa.strengths.map((s) => `· ${s}`) : []),
-      aa ? '' : '',
       aa ? '[개선 필요]' : '',
       ...(aa ? aa.improvements.map((s) => `· ${s}`) : []),
-      aa ? '' : '',
       aa ? `[핵심 키워드] ${aa.keywords.map((k) => `#${k}`).join(' ')}` : '',
-      aa ? '' : '',
       aa ? `[운영 제언]\n${aa.recommendation}` : '',
       !aa && survey.ai_overall ? `[AI 분석]\n${survey.ai_overall}` : '',
     ].filter(Boolean).join('\n');
@@ -154,7 +159,6 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
         maxTokens: 2048,
       });
       if (!res.ok || !res.text) { toast.error('AI 분석 응답을 받지 못했어요.'); return; }
-      // JSON 추출
       const cleaned = res.text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
       let parsed: { per_question?: Record<string, string>; overall?: string } | null = null;
       try { parsed = JSON.parse(cleaned); }
@@ -163,7 +167,6 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
         if (i >= 0) { try { parsed = JSON.parse(cleaned.slice(i)); } catch { /* noop */ } }
       }
       if (!parsed) { toast.error('AI 응답 JSON 파싱 실패.'); return; }
-
       const { error } = await supabase.from('satisfaction_surveys').update({
         ai_per_question: parsed.per_question ?? {},
         ai_overall: parsed.overall ?? null,
@@ -173,8 +176,7 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
       toast.success('AI 분석이 완료됐어요.');
       onAnalyzed?.();
     } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[survey-ai] 분석 실패:', raw);
+      console.error('[survey-ai] 분석 실패:', err instanceof Error ? err.message : '');
       toast.error('AI 분석 중 오류가 발생했어요.');
     } finally {
       setAnalyzing(false);
@@ -182,34 +184,46 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
   }
 
   return (
-    <section className="rounded-2xl border border-violet-100 bg-white p-4 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-3">
-      <header className="flex items-start justify-between gap-2 flex-wrap">
-        <div className="min-w-0">
+    <section className="rounded-2xl border border-violet-100 bg-white p-4 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-4">
+      <header className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
             <FileText size={14} className="text-violet-500" aria-hidden="true" />
             {survey.file_name ?? '만족도 응답'}
           </p>
           <p className="text-[11px] text-slate-500 mt-0.5">
             {formatDateTime(survey.uploaded_at)} · 응답 <strong className="text-slate-700">{survey.total_count}</strong>건
+            {overall != null && (
+              <>
+                {' · '}
+                <span className="inline-flex items-center gap-0.5 text-orange-600 font-bold">
+                  <Star size={11} className="text-orange-500 fill-orange-400" aria-hidden="true" />
+                  평균 {overall.toFixed(2)}
+                </span>
+              </>
+            )}
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          {overall != null && (
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">전반 평균</p>
-              <p className="text-2xl font-bold text-orange-600 tabular-nums inline-flex items-center gap-1">
-                <Star size={20} className="text-orange-500 fill-orange-400" aria-hidden="true" /> {overall.toFixed(2)}
-              </p>
-            </div>
-          )}
-          {/* STEP-SURVEY-AI — AI 분석 버튼 (박경수님 명시 클릭) */}
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+          {/* STEP-SURVEY-ACCORDION-UI — 차트 유형 선택 */}
+          <div className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+            {CHART_TYPES.map(({ value, label, Icon }) => (
+              <button key={value} type="button" onClick={() => setChartType(value)}
+                aria-pressed={chartType === value} title={label}
+                className={`inline-flex items-center justify-center w-7 h-7 rounded transition-colors ${
+                  chartType === value ? 'bg-violet-600 text-white' : 'text-slate-500 hover:bg-violet-50'
+                }`}>
+                <Icon size={12} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+
           <button type="button" onClick={() => void handleAiAnalyze()} disabled={analyzing}
             title={hasAi ? 'AI 분석 다시 실행' : 'AI로 항목별·전체 분석'}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 disabled:opacity-50">
             {analyzing ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
             {analyzing ? '분석 중…' : hasAi ? 'AI 재분석' : 'AI 분석'}
           </button>
-          {/* STEP-PROGRAM-ENHANCE-FULL — 리포트 다운로드 + 결과보고서 전송 */}
           <button type="button" onClick={handleDownloadReport} title="텍스트 리포트 다운로드"
             className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200">
             <Download size={11} /> 다운로드
@@ -220,10 +234,6 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
               <FileBarChart size={11} /> 보고서로
             </button>
           )}
-          <button type="button" onClick={() => setExpanded((v) => !v)} aria-label={expanded ? '접기' : '펼치기'}
-            className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600">
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
           {onDelete && (
             <button type="button" onClick={onDelete} aria-label="삭제"
               className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500">
@@ -233,95 +243,44 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
         </div>
       </header>
 
-      {expanded && (
-        <>
-          {/* STEP-PROGRAM-ENHANCE-FULL — recharts 가로 막대 차트 */}
-          {chartData.length > 0 && (
-            <div className="rounded-lg border border-slate-100 bg-white p-2">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">항목별 평균 (그래프)</p>
-              <ResponsiveContainer width="100%" height={chartData.length * 32 + 30}>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
-                  <XAxis type="number" domain={[0, 5]} tickCount={6} tick={{ fontSize: 10, fill: '#64748B' }} />
-                  <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10, fill: '#1E1B4B' }} />
-                  <Tooltip formatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v))} />
-                  <Bar dataKey="score" radius={[0, 4, 4, 0]}>
-                    {chartData.map((_, i) => (<Cell key={i} fill="#7C3AED" fillOpacity={0.75} />))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-          {items.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">항목별 평균</p>
-              {items.map(([label, avg]) => {
-                const pct = Math.max(0, Math.min(100, (avg / 5) * 100));
-                return (
-                  <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(120px,180px)_44px] items-center gap-2 text-xs">
-                    <span className="text-slate-700 truncate" title={label}>{label}</span>
-                    <span className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                      <span className="block h-full bg-gradient-to-r from-violet-400 to-orange-400" style={{ width: `${pct}%` }} aria-hidden="true" />
-                    </span>
-                    <span className="font-bold tabular-nums text-orange-600 text-right">{Number(avg).toFixed(2)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {survey.comments && survey.comments.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-                <MessageSquare size={11} aria-hidden="true" /> 자유서술 ({survey.comments.length})
-              </p>
-              <ul className="space-y-1 max-h-[240px] overflow-y-auto rounded-lg bg-slate-50/60 p-2">
-                {survey.comments.map((c, i) => (
-                  <li key={i} className="text-xs text-slate-700 px-2 py-1 rounded bg-white border border-slate-100">
-                    · {c}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {items.length === 0 && (!survey.comments || survey.comments.length === 0) && (
-            <p className="text-xs text-slate-400 italic text-center py-2">분석할 데이터가 없어요.</p>
-          )}
+      {/* 문항별 아코디언 */}
+      {questions.length === 0 ? (
+        <p className="text-xs text-slate-400 italic text-center py-4">
+          설문 문항이 없어요. 파일을 업로드하면 문항이 자동 등록돼요.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {questions.map((q, idx) => {
+            const stats = perQuestion.get(q.id);
+            const qResponses = responses.filter((r) => r.question_id === q.id);
+            return (
+              <SurveyQuestionAccordion
+                key={q.id}
+                index={idx}
+                question={q}
+                responses={qResponses}
+                avg={stats?.avg ?? null}
+                responseCount={stats?.count ?? 0}
+                chartType={chartType}
+              />
+            );
+          })}
+        </div>
+      )}
 
-          {/* STEP-PROGRAM-UX-B — Edge Function이 자동 채운 5필드 종합 분석 */}
-          {survey.ai_analysis && <SurveyAiAnalysisPanel analysis={survey.ai_analysis} />}
+      {/* AI 종합 분석 (5필드 — Edge Function 자동 채움) */}
+      {survey.ai_analysis && <SurveyAiAnalysisPanel analysis={survey.ai_analysis} />}
 
-          {/* STEP-SURVEY-AI — 기존 callAi 항목별 분석 (보조 — ai_analysis 없거나 추가 분석 시) */}
-          {hasAi && !survey.ai_analysis && (
-            <div className="mt-2 space-y-2 rounded-lg bg-violet-50/60 border border-violet-100 p-3">
-              <p className="text-[11px] font-bold text-violet-700 flex items-center gap-1">
-                <Sparkles size={11} aria-hidden="true" /> AI 분석
-                {survey.ai_analyzed_at && (
-                  <span className="text-[10px] text-slate-400 ml-1">
-                    ({new Date(survey.ai_analyzed_at).toLocaleString('ko-KR')})
-                  </span>
-                )}
-              </p>
-              {survey.ai_overall && (
-                <div className="space-y-0.5">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">전체 인사이트</p>
-                  <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{survey.ai_overall}</p>
-                </div>
-              )}
-              {survey.ai_per_question && Object.keys(survey.ai_per_question).length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">항목별 분석</p>
-                  <ul className="space-y-1">
-                    {Object.entries(survey.ai_per_question).map(([q, insight]) => (
-                      <li key={q} className="text-xs">
-                        <span className="font-bold text-violet-700">{q}</span>
-                        <span className="text-slate-700"> — {insight}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+      {/* 기존 callAi 항목별 분석 (보조 — ai_analysis 없을 때만) */}
+      {hasAi && !survey.ai_analysis && (
+        <div className="space-y-2 rounded-lg bg-violet-50/60 border border-violet-100 p-3">
+          <p className="text-[11px] font-bold text-violet-700 flex items-center gap-1">
+            <Sparkles size={11} aria-hidden="true" /> AI 분석
+          </p>
+          {survey.ai_overall && (
+            <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">{survey.ai_overall}</p>
           )}
-        </>
+        </div>
       )}
     </section>
   );
