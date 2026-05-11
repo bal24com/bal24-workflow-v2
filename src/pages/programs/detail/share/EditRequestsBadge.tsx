@@ -43,6 +43,13 @@ export default function EditRequestsBadge({ programId }: Props) {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
+  // STEP-BUGFIX-SATISFY-CURRICULUM — 테이블 미존재 시 조용히 빈 결과 (PGRST205 안전 처리)
+  function isMissingTable(msg: string | null | undefined): boolean {
+    if (!msg) return false;
+    const m = msg.toLowerCase();
+    return m.includes('pgrst205') || (m.includes('could not find the table') && m.includes('schema cache'));
+  }
+
   async function refreshCount() {
     const { count, error } = await supabase
       .from('program_edit_requests')
@@ -50,8 +57,8 @@ export default function EditRequestsBadge({ programId }: Props) {
       .eq('program_id', programId)
       .in('status', ACTIONABLE);
     if (error) {
-      console.error('[program-detail] 수정요청 카운트 실패:', error.message);
-      return;
+      if (!isMissingTable(error.message)) console.error('[program-detail] 수정요청 카운트 실패:', error.message);
+      setPendingCount(0); return;
     }
     setPendingCount(count ?? 0);
   }
@@ -64,6 +71,9 @@ export default function EditRequestsBadge({ programId }: Props) {
       .eq('program_id', programId)
       .order('created_at', { ascending: false });
     if (error) {
+      if (isMissingTable(error.message)) {
+        setList([]); setLoading(false); return;  // 조용히 빈 결과 — 테이블 미적용 환경
+      }
       console.error('[program-detail] 수정요청 목록 조회 실패:', error.message);
       toast.error('수정요청 목록을 불러오지 못했어요.');
       setLoading(false);

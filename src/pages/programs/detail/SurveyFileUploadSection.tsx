@@ -59,8 +59,11 @@ export default function SurveyFileUploadSection({ programId }: Props) {
       const path = `surveys/${programId}/${Date.now()}_${safeBase}.${ext || 'xlsx'}`;
       const up = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type || undefined });
       if (up.error) {
+        const raw = up.error.message.toLowerCase();
         console.error('[survey-file] 업로드 실패:', up.error.message);
-        toast.error('파일 업로드 실패 (satisfaction-files 버킷 생성 확인).');
+        if (raw.includes('bucket not found')) toast.error('satisfaction-files 버킷이 없어요. Supabase Storage에서 생성해 주세요.');
+        else if (raw.includes('row-level security') || raw.includes('not authorized')) toast.error('파일 업로드 권한이 없어요. satisfaction-files 버킷을 Public으로 설정해 주세요.');
+        else toast.error('파일 업로드에 실패했어요.');
         return;
       }
       const fileUrl = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
