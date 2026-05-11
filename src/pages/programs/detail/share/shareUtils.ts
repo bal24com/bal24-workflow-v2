@@ -101,6 +101,15 @@ export async function saveStageDates(
   programId: string,
   dates: SaveDatesPayload,
 ): Promise<boolean> {
+  // STEP-PHASE-DATE-FULL — row 보장 (없으면 seed). 다른 NOT NULL 컬럼은 DB default가 채움
+  const seedRes = await supabase
+    .from('program_share')
+    .upsert({ program_id: programId }, { onConflict: 'program_id', ignoreDuplicates: true });
+  if (seedRes.error) {
+    console.error('[program-share] seed 생성 실패:', seedRes.error.message);
+    return false;
+  }
+
   const safePayload = {
     pre_date:      toDateOrNull(dates.pre_date),
     ready_date:    toDateOrNull(dates.ready_date),

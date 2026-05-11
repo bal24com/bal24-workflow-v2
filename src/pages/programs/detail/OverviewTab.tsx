@@ -16,6 +16,7 @@ import {
   type CurriculumRow,
 } from './programDetailUtils';
 import EditRequestsBadge from './share/EditRequestsBadge';
+import PhaseDateSection from './PhaseDateSection';
 
 interface Props {
   programId: string;
@@ -56,6 +57,7 @@ export default function OverviewTab({ programId, description }: Props) {
   }, [programId, toast]);
 
   return (
+    <div className="flex flex-col gap-4">
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-4">
       {/* 좌: 설명 + 커리큘럼 */}
       <div className="flex flex-col gap-4 min-w-0">
@@ -175,6 +177,10 @@ export default function OverviewTab({ programId, description }: Props) {
           </div>
         </section>
       </div>
+    </div>
+
+    {/* STEP-PHASE-DATE-FULL — 개요 탭 하단에 단계 시작일 편집 카드 (외부공유 연동) */}
+    <PhaseDateSection programId={programId} />
     </div>
   );
 }
