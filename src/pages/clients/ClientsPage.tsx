@@ -59,15 +59,9 @@ function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & Card
   const ceo = c.ceo_name ?? c.representative;
   const industry = [c.business_type, c.business_item].filter(Boolean).join(' · ');
   const bankLine = [c.bank_name, c.bank_account, c.bank_holder].filter(Boolean).join(' ');
-  const primaryContact = c.contacts[0];
 
   return (
-    <Card className="group hover:border-violet-200 hover:shadow-md transition h-full flex flex-col relative">
-      <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(c); }}
-        aria-label="삭제"
-        className="absolute top-2 right-2 p-1.5 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500 bg-white border border-slate-200 opacity-0 group-hover:opacity-100 transition">
-        <Trash2 size={12} />
-      </button>
+    <Card className="group hover:border-violet-200 hover:shadow-md transition min-h-[260px] flex flex-col relative">
       <CardHeader>
         <div className="flex items-start gap-2">
           <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-violet-100 text-violet-600 shrink-0">
@@ -79,7 +73,11 @@ function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & Card
                 {tone.label}
               </span>
             </div>
-            <div className="text-base font-bold text-[#1E1B4B] truncate">{c.name}</div>
+            {/* STEP-CLIENT-EXPERT-CARD — 상호명 + 부서명 병기 */}
+            <div className="text-base font-bold text-[#1E1B4B] truncate">
+              {c.name}
+              {c.department && <span className="ml-1 text-sm font-semibold text-slate-500">· {c.department}</span>}
+            </div>
             {c.business_name && (
               <div className="text-xs text-slate-500 truncate">{c.business_name}</div>
             )}
@@ -120,26 +118,32 @@ function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & Card
             <span className="text-slate-700 truncate">{industry}</span>
           </Line>
         )}
-        {primaryContact && (
-          <Line icon={<Users size={12} aria-hidden="true" />}>
-            <span className="text-slate-500">담당</span>{' '}
-            <span className="text-slate-700 font-medium">{primaryContact.name}</span>
-            {primaryContact.position && <span className="text-slate-500"> · {primaryContact.position}</span>}
-            {c.contacts.length > 1 && (
-              <span className="ml-1 text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">
-                외 {c.contacts.length - 1}명
-              </span>
-            )}
+        {/* STEP-CLIENT-EXPERT-CARD — 담당자 최대 2명 + 연락처 표시 */}
+        {c.contacts.slice(0, 2).map((ct) => (
+          <Line key={ct.id} icon={<Users size={12} aria-hidden="true" />}>
+            <span className="text-slate-700 font-medium">{ct.name}</span>
+            {ct.position && <span className="text-slate-500"> · {ct.position}</span>}
+            {ct.phone_mobile && <span className="text-slate-500"> · {ct.phone_mobile}</span>}
           </Line>
+        ))}
+        {c.contacts.length > 2 && (
+          <p className="text-[10px] text-slate-400 pl-4">외 {c.contacts.length - 2}명</p>
         )}
         {c.note && (
           <p className="text-[11px] text-slate-500 italic line-clamp-1 pt-1">{c.note}</p>
         )}
       </CardContent>
 
+      {/* STEP-CLIENT-EXPERT-CARD — 하단 3 버튼 (보기/수정/삭제) */}
       <div className="flex items-center gap-2 px-5 pb-4">
         <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={() => onView(c)} className="!flex-1">내용보기</Button>
         <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={() => onEdit(c)} className="!flex-1">수정</Button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(c); }}
+          aria-label="삭제"
+          className="inline-flex items-center justify-center gap-1 h-8 px-2.5 rounded-md text-xs font-semibold text-rose-500 border border-rose-200 bg-white hover:bg-rose-50 transition-colors">
+          <Trash2 size={13} aria-hidden="true" />
+          삭제
+        </button>
       </div>
     </Card>
   );

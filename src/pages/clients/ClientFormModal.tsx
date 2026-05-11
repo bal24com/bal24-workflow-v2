@@ -247,8 +247,12 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
       <form id="client-form" onSubmit={handleSubmit} className="space-y-5" noValidate>
         <section className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">기본 정보</h3>
+          {/* STEP-CLIENT-EXPERT-CARD — 상호명+부서명 그룹핑 (한 줄에 인접) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="상호명 (통칭)" required value={form.name} onChange={(e) => update('name', e.target.value)} disabled={submitting} error={errors.name} placeholder="예) 밸런스닷" />
+            <Input label="부서명" value={form.department} onChange={(e) => update('department', e.target.value)} disabled={submitting} placeholder="부서명 (선택)" helperText="해당 고객사 내 부서·팀명" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700">고객 유형</label>
               <select
@@ -262,11 +266,9 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
                 <option value="both">고객사 + 주관기관</option>
               </select>
             </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="법인명 (사업자등록증 상)" value={form.businessName} onChange={(e) => update('businessName', e.target.value)} disabled={submitting} placeholder="예) 주식회사 밸런스닷" />
-            <Input label="대표자명" value={form.ceoName} onChange={(e) => update('ceoName', e.target.value)} disabled={submitting} placeholder="예) 박경수" />
           </div>
+          <Input label="대표자명" value={form.ceoName} onChange={(e) => update('ceoName', e.target.value)} disabled={submitting} placeholder="예) 박경수" />
           <Input
             label="사업자등록번호"
             value={form.businessNumber}
@@ -281,7 +283,6 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
             <Input label="업태" value={form.businessType} onChange={(e) => update('businessType', e.target.value)} disabled={submitting} placeholder="예) 서비스업" />
             <Input label="종목" value={form.businessItem} onChange={(e) => update('businessItem', e.target.value)} disabled={submitting} placeholder="예) 교육서비스" />
           </div>
-          <Input label="부서명" value={form.department} onChange={(e) => update('department', e.target.value)} disabled={submitting} placeholder="부서명 (선택)" helperText="해당 고객사 내 부서·팀명" />
           <Input label="주소" value={form.address} onChange={(e) => update('address', e.target.value)} disabled={submitting} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="대표 전화" type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} disabled={submitting} placeholder="02-0000-0000" />

@@ -2,7 +2,7 @@
 // 카드(기본) / 리스트 + 분야 필터 + 검색 + 신규 등록
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutGrid, List, Plus, Loader2, Search, UserStar, Phone, Mail, Pencil, Trash2 } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, Search, UserStar, Phone, Mail, Pencil, Trash2, Eye } from 'lucide-react';
 import {
   Button,
   Card,
@@ -36,17 +36,8 @@ function expertMatchesField(s: StaffPool, filter: FieldFilter): boolean {
 
 function ExpertGridCard({ s, onEdit, onDelete }: { s: StaffPool; onEdit: () => void; onDelete: () => void }) {
   return (
-    <Card className="group hover:border-primary/30 hover:shadow-md transition h-full relative">
-      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-        <button type="button" onClick={onEdit} aria-label="수정"
-          className="p-1.5 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600 bg-white border border-slate-200">
-          <Pencil size={12} />
-        </button>
-        <button type="button" onClick={onDelete} aria-label="삭제"
-          className="p-1.5 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500 bg-white border border-slate-200">
-          <Trash2 size={12} />
-        </button>
-      </div>
+    // STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일한 min-h
+    <Card className="group hover:border-primary/30 hover:shadow-md transition min-h-[260px] flex flex-col">
       <CardHeader>
         <div className="flex items-start gap-3">
           {s.profile_image_url ? (
@@ -75,7 +66,7 @@ function ExpertGridCard({ s, onEdit, onDelete }: { s: StaffPool; onEdit: () => v
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-1.5 text-xs text-muted">
+      <CardContent className="space-y-1.5 text-xs text-muted flex-1">
         {s.specialty?.length ? (
           <div className="flex flex-wrap gap-1">
             {s.specialty.map((t) => (
@@ -101,6 +92,17 @@ function ExpertGridCard({ s, onEdit, onDelete }: { s: StaffPool; onEdit: () => v
           <p className="text-xs text-muted line-clamp-2 pt-1">{s.main_duties}</p>
         )}
       </CardContent>
+      {/* STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일 3 버튼 (보기/수정/삭제). 별도 detail 모달이 없어 보기=수정 동작 */}
+      <div className="flex items-center gap-2 px-5 pb-4">
+        <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={onEdit} className="!flex-1">내용보기</Button>
+        <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={onEdit} className="!flex-1">수정</Button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          aria-label="삭제"
+          className="inline-flex items-center justify-center gap-1 h-8 px-2.5 rounded-md text-xs font-semibold text-rose-500 border border-rose-200 bg-white hover:bg-rose-50 transition-colors">
+          <Trash2 size={13} aria-hidden="true" />
+          삭제
+        </button>
+      </div>
     </Card>
   );
 }
