@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import SurveyResultCard from './SurveyResultCard';
+import { importSurveyFromXlsx } from './surveyImportUtils';
 import type { SatisfactionSurvey } from '../../../types/database';
 
 interface Props { programId: string }
@@ -99,6 +100,15 @@ export default function SurveyFileUploadSection({ programId }: Props) {
       }
       const total = (data as { total_count?: number } | null)?.total_count ?? rows.length;
       toast.success(`${total}건 응답이 분석되었어요.`);
+
+      // STEP-SURVEY-IMPORT — 분석 완료 후 문항·응답을 survey_questions / survey_responses에 자동 등록
+      const importRes = await importSurveyFromXlsx(programId, rows);
+      if (importRes.ok) {
+        toast.success(`설문 폼에 문항 ${importRes.questionCount}개, 응답 ${importRes.responseCount}건 등록됐어요.`);
+      } else if (importRes.warning) {
+        console.warn('[survey-file] 설문 폼 자동 등록 경고:', importRes.warning);
+        toast.error(`설문 폼 자동 등록 실패: ${importRes.warning}`);
+      }
       void refresh();
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
