@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LayoutGrid, List, Plus, Loader2 } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, Search } from 'lucide-react';
 import {
   Button,
   Card,
@@ -18,7 +18,7 @@ import { BADGE_BASE, PROJECT_STATUS_STYLE } from '../../utils/statusStyles';
 import { getOurRoleLabel, getOurRoleBadgeTone } from '../../constants/projectRoles';
 import EmptyState from '../../components/EmptyState';
 import PageHelpBanner from '../../components/PageHelpBanner';
-import ConsortiumFilterTabs, {
+import {
   type ConsortiumFilter,
   type ConsortiumOption,
 } from '../../components/ConsortiumFilterTabs';
@@ -182,13 +182,17 @@ export default function ProjectsPage() {
   const [filterConsortiumId, setFilterConsortiumId] = useState<ConsortiumFilter>(null);
   const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  // STEP-PROJECT-PAGE-FIX — 프로젝트명 검색
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // STEP-PROJECT-PAGE-FIX — soft-delete된 컨소시엄 제외
       const { data, error } = await supabase
         .from('consortiums')
         .select('id, name')
+        .is('deleted_at', null)
         .in('status', ['구성중', '진행'])
         .order('name', { ascending: true });
       if (cancelled) return;
@@ -243,14 +247,18 @@ export default function ProjectsPage() {
   }, [projects]);
 
   const visible = useMemo(
-    () =>
-      projects.filter((p) => {
+    () => {
+      const q = searchQuery.trim().toLowerCase();
+      return projects.filter((p) => {
         if (filter !== '전체' && p.status !== filter) return false;
         if (filterConsortiumId === 'none' && p.consortium_id) return false;
         if (filterConsortiumId && filterConsortiumId !== 'none' && p.consortium_id !== filterConsortiumId) return false;
+        // STEP-PROJECT-PAGE-FIX — 프로젝트명 검색 (소문자 매칭)
+        if (q && !p.name.toLowerCase().includes(q)) return false;
         return true;
-      }),
-    [projects, filter, filterConsortiumId],
+      });
+    },
+    [projects, filter, filterConsortiumId, searchQuery],
   );
 
   return (
@@ -259,60 +267,66 @@ export default function ProjectsPage() {
         <span aria-hidden="true">📁</span>
         프로젝트
       </h1>
-      <PageHelpBanner
-        lines={[
-          '✦ 단독 용역·사업 단위로 관리. 컨소시엄 사업은 좌측 메뉴 \"컨소시엄\"에서 별도 관리해요.',
-          '✦ 카드/리스트 뷰 + 상태 탭으로 진행 단계별 빠른 필터링',
-          '💡 카드 클릭 → 상세 페이지에서 태스크·프로그램·재무·결과보고서까지 한 번에',
-        ]}
-      />
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <StatusFilterTabs value={filter} onChange={setFilter} counts={counts} />
+      {/* STEP-PROJECT-PAGE-FIX — 안내 박스는 접기로 변경 (공간 확보) */}
+      <details className="group">
+        <summary className="cursor-pointer text-xs text-violet-600 hover:underline list-none inline-flex items-center gap-1">
+          <span className="inline-block transition-transform group-open:rotate-90">›</span>
+          페이지 안내 보기
+        </summary>
+        <div className="mt-2">
+          <PageHelpBanner
+            lines={[
+              '✦ 단독 용역·사업 단위로 관리. 컨소시엄 사업은 좌측 메뉴 "컨소시엄"에서 별도 관리해요.',
+              '✦ 카드/리스트 뷰 + 상태 탭으로 진행 단계별 빠른 필터링',
+              '💡 카드 클릭 → 상세 페이지에서 태스크·프로그램·재무·결과보고서까지 한 번에',
+            ]}
+          />
+        </div>
+      </details>
 
-          <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-              <button
-                type="button"
-                onClick={() => setView('list')}
-                aria-pressed={view === 'list'}
-                aria-label="리스트 보기"
-                className={[
-                  'inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors',
-                  view === 'list' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50',
-                ].join(' ')}
-              >
-                <List size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setView('card')}
-                aria-pressed={view === 'card'}
-                aria-label="카드 보기"
-                className={[
-                  'inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors',
-                  view === 'card' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50',
-                ].join(' ')}
-              >
-                <LayoutGrid size={16} />
-              </button>
-            </div>
+      {/* STEP-PROJECT-PAGE-FIX — 상태탭 + 검색 + 컨소시엄 select + 뷰토글 + 신규등록 한 줄 통합 */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <StatusFilterTabs value={filter} onChange={setFilter} counts={counts} />
 
-            <Button
-              variant="primary"
-              leftIcon={<Plus size={16} />}
-              onClick={() => setModalOpen(true)}
-            >
-              신규 등록
-            </Button>
-          </div>
+        <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+          <Search size={13} className="text-slate-400 shrink-0" aria-hidden="true" />
+          <input type="text" value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="프로젝트명 검색..."
+            className="w-44 text-xs bg-transparent focus:outline-none placeholder:text-slate-400" />
         </div>
 
-        <ConsortiumFilterTabs
-          consortiums={consortiums}
-          value={filterConsortiumId}
-          onChange={setFilterConsortiumId}
-        />
+        <select
+          value={filterConsortiumId === null ? 'all' : filterConsortiumId}
+          onChange={(e) => {
+            const v = e.target.value;
+            setFilterConsortiumId(v === 'all' ? null : (v as ConsortiumFilter));
+          }}
+          className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:border-violet-400">
+          <option value="all">컨소시엄: 전체</option>
+          <option value="none">자체 사업</option>
+          {consortiums.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+
+        <div className="ml-auto flex items-center gap-2">
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+            <button type="button" onClick={() => setView('list')} aria-pressed={view === 'list'} aria-label="리스트 보기"
+              className={['inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors',
+                view === 'list' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'].join(' ')}>
+              <List size={16} />
+            </button>
+            <button type="button" onClick={() => setView('card')} aria-pressed={view === 'card'} aria-label="카드 보기"
+              className={['inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors',
+                view === 'card' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'].join(' ')}>
+              <LayoutGrid size={16} />
+            </button>
+          </div>
+          <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setModalOpen(true)}>
+            신규 등록
+          </Button>
+        </div>
       </div>
 
       {loading ? (
