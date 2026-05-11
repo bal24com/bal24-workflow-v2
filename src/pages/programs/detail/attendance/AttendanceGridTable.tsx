@@ -25,7 +25,7 @@ export default function AttendanceGridTable({ programId, refreshKey }: Props) {
     void (async () => {
       const [pRes, rRes] = await Promise.all([
         supabase.from('program_participants').select('*').eq('program_id', programId).order('name'),
-        supabase.from('attendance_records').select('*').eq('program_id', programId),
+        supabase.from('program_attendance_records').select('*').eq('program_id', programId),
       ]);
       if (cancelled) return;
       if (pRes.error) console.error('[attend-grid] 교육생 조회 실패:', pRes.error.message);

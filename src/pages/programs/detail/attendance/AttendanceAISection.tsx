@@ -90,11 +90,11 @@ export default function AttendanceAISection({ programId, onProcessed }: Props) {
       }
       // 중복 방지 — 동일 (program_id, participant_id, day_label) 기존 row 삭제 후 재삽입
       for (const day of parsed) {
-        const del = await supabase.from('attendance_records').delete()
+        const del = await supabase.from('program_attendance_records').delete()
           .eq('program_id', programId).eq('day_label', day.day_label);
         if (del.error) console.warn('[attend-ai] 기존 row 삭제 경고:', del.error.message);
       }
-      const ins = await supabase.from('attendance_records').insert(records);
+      const ins = await supabase.from('program_attendance_records').insert(records);
       if (ins.error) { console.error('[attend-ai] insert 실패:', ins.error.message); toast.error('출석 기록 저장에 실패했어요.'); return; }
 
       toast.success(`AI 출석 처리 완료 — ${parsed.length}일치 / ${records.length}건 등록`);

@@ -31,8 +31,10 @@ alter table public.program_participants
   add constraint program_participants_status_check
   check (status in ('active','completed','dropped','pending'));
 
--- 3. 차시별 출석 기록 테이블
-create table if not exists public.attendance_records (
+-- 3. 차시별 출석 기록 테이블 (STEP 11-B의 attendance_records와 별도 — 컬럼 충돌 회피)
+--    기존 attendance_records: session_id 기반 (출석 체크인 토큰)
+--    program_attendance_records: program_id + participant_id + day_label 기반 (AI 자동 처리)
+create table if not exists public.program_attendance_records (
   id             uuid primary key default gen_random_uuid(),
   program_id     uuid not null references public.programs(id) on delete cascade,
   curriculum_id  uuid references public.program_curriculum(id) on delete set null,
@@ -43,13 +45,13 @@ create table if not exists public.attendance_records (
   created_at     timestamptz not null default now()
 );
 
-create index if not exists idx_attend_records_program     on public.attendance_records(program_id);
-create index if not exists idx_attend_records_participant on public.attendance_records(participant_id);
-create index if not exists idx_attend_records_day         on public.attendance_records(program_id, day_label);
+create index if not exists idx_prog_attend_program     on public.program_attendance_records(program_id);
+create index if not exists idx_prog_attend_participant on public.program_attendance_records(participant_id);
+create index if not exists idx_prog_attend_day         on public.program_attendance_records(program_id, day_label);
 
-alter table public.attendance_records enable row level security;
-drop policy if exists "attendance_records_authenticated_all" on public.attendance_records;
-create policy "attendance_records_authenticated_all" on public.attendance_records
+alter table public.program_attendance_records enable row level security;
+drop policy if exists "program_attendance_records_authenticated_all" on public.program_attendance_records;
+create policy "program_attendance_records_authenticated_all" on public.program_attendance_records
   for all to authenticated using (true) with check (true);
 
 -- 4. 만족도 — AI 리포트 + 차트 설정
