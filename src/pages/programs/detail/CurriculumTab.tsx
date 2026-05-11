@@ -14,7 +14,11 @@ import CurriculumAiDropZone from './curriculum/CurriculumAiDropZone';
 import CurriculumStaffSection from './curriculum/CurriculumStaffSection';
 import InvitationManagePanel from '../InvitationManagePanel';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
-import type { StaffOption } from './curriculum/CurriculumRowStaffSection';
+import { useCurriculumStaff } from './useCurriculumStaff';
+import {
+  dbAddCurriculum, dbCopyPlannedToActual, dbSwapSessionNo,
+  dbSaveCurriculum, dbRemoveCurriculum, dbPersistOrder,
+} from './curriculumHandlers';
 import type {
   CurriculumType, ProgramCurriculum, InvitationStatus,
 } from '../../../types/database';
@@ -47,26 +51,8 @@ export default function CurriculumTab({ programId, programName }: Props) {
   const [invitationMap, setInvitationMap] = useState<Map<string, InvitationSummary>>(new Map());
   // STEP-CURRICULUM-INSTRUCTOR-VIEW — 강사 배정 현황 새로고침 키
   const [staffSectionKey, setStaffSectionKey] = useState(0);
-  // STEP-PROGRAM-ENHANCE-FULL — staff_pool + profiles 통합 옵션 (N번 fetch 방지)
-  const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const [poolRes, profileRes] = await Promise.all([
-        supabase.from('staff_pool').select('id, name, organization').is('deleted_at', null).order('name'),
-        supabase.from('profiles').select('id, name, department').eq('is_active', true).order('name'),
-      ]);
-      if (cancelled) return;
-      if (poolRes.error)    console.error('[curriculum-tab] staff_pool 조회 실패:', poolRes.error.message);
-      if (profileRes.error) console.error('[curriculum-tab] profiles 조회 실패:', profileRes.error.message);
-      setStaffOptions([
-        ...(poolRes.data    ?? []).map((s): StaffOption => ({ id: s.id, name: s.name, organization: s.organization ?? null, sourceType: 'staff_pool' })),
-        ...(profileRes.data ?? []).map((p): StaffOption => ({ id: p.id, name: p.name, organization: p.department ?? '내부직원', sourceType: 'profile' })),
-      ]);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // STEP-V1-SPLIT-FULL — staff_pool + profiles 통합 옵션 (훅으로 분리)
+  const { staffOptions } = useCurriculumStaff();
 
   function openInvite(curriculumId: string | null, sessionInfo: string) {
     setInviteCurriculumId(curriculumId);
@@ -114,113 +100,62 @@ export default function CurriculumTab({ programId, programName }: Props) {
   }, [programId, refresh]);
 
   async function addCurriculum() {
-    // STEP-CURRICULUM-ATTEND-SURVEY-FULL — 차시 등록 안정화
-    //   1) session_no = 현재 탭 max + 1 (gap 무시 — 단순·안전)
-    //   2) title 기본값 '' (사용자가 직접 입력) — 기존 "{N}차시" 자동값 제거
-    //   3) curriculum_type 명시 포함 (NOT NULL default 'planned' 안전망 + 명시)
-    //   4) 실패 시 toast.error 한글 + 컬럼/권한 분기 메시지
     const nextNo = items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0) + 1;
-    const { data, error } = await supabase
-      .from('program_curriculum')
-      .insert({
-        program_id: programId,
-        session_no: nextNo,
-        curriculum_type: curriculumType,
-        title: '',
-        content: '',
-      })
-      .select('*')
-      .maybeSingle();
-    if (error || !data) {
-      const raw = (error?.message ?? '').toLowerCase();
-      console.error('[curriculum-tab] 차시 추가 실패:', error?.message);
-      const msg = raw.includes('column') && raw.includes('does not exist')
-        ? '커리큘럼 테이블 컬럼이 적용되지 않았어요. Supabase 마이그레이션 실행 필요.'
-        : raw.includes('row-level security') || raw.includes('permission denied')
-          ? '차시 추가 권한이 없어요. 관리자에게 문의해 주세요.'
-          : '차시 추가에 실패했어요. 다시 시도해 주세요.';
-      toast.error(msg);
+    const r = await dbAddCurriculum(programId, curriculumType, nextNo);
+    if (!r.ok) {
+      toast.error(
+        r.kind === 'column' ? '커리큘럼 테이블 컬럼이 적용되지 않았어요. Supabase 마이그레이션 실행 필요.'
+        : r.kind === 'rls'  ? '차시 추가 권한이 없어요. 관리자에게 문의해 주세요.'
+                            : '차시 추가에 실패했어요. 다시 시도해 주세요.',
+      );
       return;
     }
-    setItems((prev) => [...prev, { ...(data as ProgramCurriculum), staff: [] }]);
+    setItems((prev) => [...prev, { ...r.data, staff: [] }]);
     void refresh();
     toast.success('차시를 추가했어요.');
   }
 
-  // STEP-CURRICULUM-FULL — 제안 → 실제 운영 복사 (curriculum_staff 제외)
   async function copyPlannedToActual() {
     setCopying(true);
     try {
-      const planned = await supabase.from('program_curriculum').select('*')
-        .eq('program_id', programId).eq('curriculum_type', 'planned').order('session_no');
-      if (planned.error || !planned.data) { console.error('[curriculum-tab] planned 조회 실패:', planned.error?.message); toast.error('제안 커리큘럼 조회에 실패했어요.'); return; }
-      const rows = planned.data as ProgramCurriculum[];
-      if (rows.length === 0) { toast.error('복사할 제안 차시가 없어요.'); return; }
-      const insertRows = rows.map((r) => ({
-        program_id: programId, session_no: r.session_no, title: r.title,
-        content: r.content ?? null, day_label: r.day_label ?? null,
-        start_time: r.start_time ?? null, end_time: r.end_time ?? null,
-        instructor_name_raw: r.instructor_name_raw ?? null, curriculum_type: 'actual',
-      }));
-      const ins = await supabase.from('program_curriculum').insert(insertRows);
-      if (ins.error) { console.error('[curriculum-tab] actual 복사 실패:', ins.error.message); toast.error('실제 운영으로 복사에 실패했어요.'); return; }
-      toast.success(`${rows.length}개 차시를 실제 운영으로 복사했습니다.`);
+      const cnt = await dbCopyPlannedToActual(programId);
+      if (cnt == null) { toast.error('실제 운영으로 복사에 실패했어요.'); return; }
+      if (cnt === 0)   { toast.error('복사할 제안 차시가 없어요.'); return; }
+      toast.success(`${cnt}개 차시를 실제 운영으로 복사했습니다.`);
       void refresh();
     } finally { setCopying(false); }
   }
 
-  // STEP-CURRICULUM-FULL — actual 탭 ↑↓ swap (임시 unique 충돌 회피 — 3단계 update)
   async function swapWith(idx: number, dir: 'up' | 'down') {
     const j = dir === 'up' ? idx - 1 : idx + 1;
     if (j < 0 || j >= items.length) return;
     const a = items[idx], b = items[j];
-    const tmp = -Math.abs(a.session_no) - 100000;
-    const upd = (id: string, no: number) => supabase.from('program_curriculum').update({ session_no: no }).eq('id', id);
-    for (const [id, no] of [[a.id, tmp], [b.id, a.session_no], [a.id, b.session_no]] as Array<[string, number]>) {
-      const r = await upd(id, no);
-      if (r.error) { console.error('[curriculum-tab] swap 실패:', r.error.message); toast.error('순서 변경 실패'); return; }
-    }
+    const ok = await dbSwapSessionNo(a.id, a.session_no, b.id, b.session_no);
+    if (!ok) { toast.error('순서 변경 실패'); return; }
     void refresh();
   }
 
   async function saveCurriculum(id: string, patch: Partial<ProgramCurriculum>) {
-    const { error } = await supabase.from('program_curriculum').update(patch).eq('id', id);
-    if (error) {
-      console.error('[curriculum-tab] 차시 저장 실패:', error.message);
-      toast.error('차시 저장에 실패했어요.');
-      return;
-    }
+    const ok = await dbSaveCurriculum(id, patch);
+    if (!ok) { toast.error('차시 저장에 실패했어요.'); return; }
     setItems((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     toast.success('차시를 저장했어요.');
   }
 
   async function removeCurriculum(id: string) {
     if (!window.confirm('이 차시와 매칭된 인력 정보를 모두 삭제할까요?')) return;
-    const { error } = await supabase.from('program_curriculum').delete().eq('id', id);
-    if (error) {
-      console.error('[curriculum-tab] 차시 삭제 실패:', error.message);
-      toast.error('차시 삭제에 실패했어요.');
-      return;
-    }
+    const ok = await dbRemoveCurriculum(id);
+    if (!ok) { toast.error('차시 삭제에 실패했어요.'); return; }
     setItems((prev) => prev.filter((c) => c.id !== id));
     toast.success('차시를 삭제했어요.');
   }
 
   async function persistOrder(reordered: CurriculumWithStaff[]) {
     setItems(reordered.map((c, i) => ({ ...c, session_no: i + 1 })));
-    for (let i = 0; i < reordered.length; i += 1) {
-      const c = reordered[i];
-      if (c.session_no === i + 1) continue;
-      const { error } = await supabase
-        .from('program_curriculum')
-        .update({ session_no: i + 1 })
-        .eq('id', c.id);
-      if (error) {
-        console.error('[curriculum-tab] 순서 저장 실패:', error.message);
-        toast.error('순서 저장에 실패했어요.');
-        void refresh();
-        return;
-      }
+    const failId = await dbPersistOrder(reordered);
+    if (failId) {
+      toast.error('순서 저장에 실패했어요.');
+      void refresh();
     }
   }
 

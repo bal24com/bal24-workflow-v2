@@ -9,9 +9,12 @@ import { Modal, Button, Input, FileDropZone } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { extractBusinessCardInfo, ClaudeApiKeyMissingError, ClaudeApiError } from '../../lib/claude';
 import ExpertFormExtSection from './ExpertFormExtSection';
+import {
+  EXPERT_STORAGE_BUCKET, EMPTY_EXPERT_FORM, expertToForm, maskIdNumber,
+  translateInsertError, translateUploadError, uploadResume, buildExpertPayload,
+  type ExpertFormState,
+} from './expertFormUtils';
 import type { CareerItem, CertItem, EducationItem, StaffPool, StaffType } from '../../types/database';
-
-const STORAGE_BUCKET = 'expert-files';
 
 type Props = {
   open: boolean;
@@ -21,69 +24,9 @@ type Props = {
   onCreated: () => void;
 };
 
-type FormState = {
-  name: string;
-  organization: string;
-  position: string;
-  specialty: string;     // 콤마 구분 입력 → 배열로 저장
-  phoneMobile: string;
-  phoneOffice: string;
-  email: string;
-  mainDuties: string;
-  careerSummary: string;
-  bankName: string;
-  bankAccount: string;
-  bankHolder: string;
-  idNumber: string;       // 주민등록번호
-};
-
-const EMPTY: FormState = {
-  name: '', organization: '', position: '', specialty: '',
-  phoneMobile: '', phoneOffice: '', email: '',
-  mainDuties: '', careerSummary: '',
-  bankName: '', bankAccount: '', bankHolder: '',
-  idNumber: '',
-};
-
-function expertToForm(s: StaffPool): FormState {
-  return {
-    name: s.name ?? '', organization: s.organization ?? '', position: s.position ?? '',
-    specialty: (s.specialty ?? []).join(', '),
-    phoneMobile: s.phone_mobile ?? '', phoneOffice: s.phone_office ?? '', email: s.email ?? '',
-    mainDuties: s.main_duties ?? '', careerSummary: s.career_summary ?? '',
-    bankName: s.bank_name ?? '', bankAccount: s.bank_account ?? '', bankHolder: s.bank_holder ?? '',
-    idNumber: s.id_number ?? '',
-  };
-}
-
-function maskIdNumber(raw: string): string {
-  const d = raw.replace(/\D/g, '');
-  if (d.length < 7) return d;
-  return `${d.slice(0, 6)}-${d[6]}******`;
-}
-
-function translateInsertError(raw: string): string {
-  const m = raw.toLowerCase();
-  if (m.includes('column') && m.includes('does not exist')) {
-    return '전문가 테이블 컬럼이 아직 적용되지 않았어요. Supabase에서 마이그레이션을 실행해 주세요.';
-  }
-  if (m.includes('row-level security') || m.includes('permission denied')) {
-    return '전문가를 등록할 권한이 없어요. 관리자에게 문의해 주세요.';
-  }
-  return '전문가 등록 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
-}
-
-function translateUploadError(raw: string): string {
-  const m = raw.toLowerCase();
-  if (m.includes('bucket not found')) return `파일 저장소(${STORAGE_BUCKET})가 없어요. Supabase에서 버킷을 먼저 만들어 주세요.`;
-  if (m.includes('payload too large') || m.includes('exceeded')) return '파일 용량이 너무 커요.';
-  if (m.includes('row-level security') || m.includes('permission denied')) return '파일을 올릴 권한이 없어요.';
-  return '파일 업로드 중 오류가 발생했어요.';
-}
-
 export default function ExpertFormModal({ open, expert, onClose, onCreated }: Props) {
   const isEdit = Boolean(expert);
-  const [form, setForm] = useState<FormState>(EMPTY);
+  const [form, setForm] = useState<ExpertFormState>(EMPTY_EXPERT_FORM);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoName, setPhotoName] = useState<string | null>(null);
 
@@ -119,33 +62,29 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
       setCareers(expert.career_history ?? []);
       setCerts(expert.certifications ?? []);
     } else {
-      setForm(EMPTY); setPhotoUrl(null); setPhotoName(null);
+      setForm(EMPTY_EXPERT_FORM); setPhotoUrl(null); setPhotoName(null);
       setStaffType(''); setResumeUrl('');
       setEducations([]); setCareers([]); setCerts([]);
     }
     setResumeFile(null); setNameError(null); setErrorMsg(null); setInfoMsg(null);
   }, [open, expert]);
 
-  // STEP-DELETE-RESUME-FULL — 이력서 파일을 staff-files 버킷에 업로드 후 publicUrl 반환
+  // STEP-V1-SPLIT-FULL — uploadResume 유틸 호출 wrapper (loading 상태 + 에러 메시지만 컴포넌트가 관리)
   async function uploadResumeIfNeeded(): Promise<string | null> {
-    if (!resumeFile) return resumeUrl || null;
-    if (resumeFile.size > 10 * 1024 * 1024) { setErrorMsg('이력서 파일 용량이 10MB를 초과해요.'); return null; }
     setResumeUploading(true);
     try {
-      const ext = resumeFile.name.includes('.') ? resumeFile.name.split('.').pop() : 'pdf';
-      const safeBase = resumeFile.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 60);
-      const path = `resumes/${Date.now()}_${safeBase}.${ext}`;
-      const up = await supabase.storage.from('staff-files').upload(path, resumeFile, { upsert: false, contentType: resumeFile.type || undefined });
-      if (up.error) {
-        console.error('[experts] 이력서 업로드 실패:', up.error.message);
-        setErrorMsg('이력서 업로드에 실패했어요. (staff-files 버킷이 생성되어 있는지 확인해 주세요)');
+      const r = await uploadResume(resumeFile, resumeUrl);
+      if (!r.ok) {
+        setErrorMsg(r.reason === 'size'
+          ? '이력서 파일 용량이 10MB를 초과해요.'
+          : '이력서 업로드에 실패했어요. (staff-files 버킷이 생성되어 있는지 확인해 주세요)');
         return null;
       }
-      return supabase.storage.from('staff-files').getPublicUrl(path).data.publicUrl;
+      return r.url;
     } finally { setResumeUploading(false); }
   }
 
-  const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+  const update = <K extends keyof ExpertFormState>(key: K, value: ExpertFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -156,9 +95,9 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
       const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 60);
       const path = `profiles/${Date.now()}_${safeBase}${ext ? '.' + ext : ''}`;
-      const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { upsert: false, contentType: file.type || undefined });
+      const { error } = await supabase.storage.from(EXPERT_STORAGE_BUCKET).upload(path, file, { upsert: false, contentType: file.type || undefined });
       if (error) throw error;
-      const { data: pub } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+      const { data: pub } = supabase.storage.from(EXPERT_STORAGE_BUCKET).getPublicUrl(path);
       setPhotoUrl(pub.publicUrl);
       setPhotoName(file.name);
     } catch (err) {
@@ -221,39 +160,11 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
       const finalResumeUrl = await uploadResumeIfNeeded();
       if (resumeFile && finalResumeUrl === null) { setSubmitting(false); return; }
 
-      const specialtyArr = form.specialty
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const idDigits = form.idNumber.replace(/\D/g, '');
-      // 빈 항목 정리 (저장 시 noise 제거)
-      const eduClean = educations.filter((e) => e.school.trim() || e.major.trim() || e.year.trim());
-      const careerClean = careers.filter((c) => c.company.trim() || c.role.trim() || c.period.trim());
-      const certsClean = certs.filter((c) => c.name.trim() || c.issuer.trim() || c.year.trim());
-
-      const payload = {
-        name: form.name.trim(),
-        organization: form.organization.trim() || null,
-        position: form.position.trim() || null,
-        specialty: specialtyArr.length ? specialtyArr : null,
-        phone_mobile: form.phoneMobile.trim() || null,
-        phone_office: form.phoneOffice.trim() || null,
-        email: form.email.trim() || null,
-        main_duties: form.mainDuties.trim() || null,
-        career_summary: form.careerSummary.trim() || null,
-        bank_name: form.bankName.trim() || null,
-        bank_account: form.bankAccount.trim() || null,
-        bank_holder: form.bankHolder.trim() || null,
-        id_number: idDigits || null,
-        profile_image_url: photoUrl,
-        // STEP-EXPERT-CRUD-FULL — 확장 필드
-        staff_type: staffType || null,
-        // STEP-DELETE-RESUME-FULL — 파일 업로드 결과 우선, 없으면 기존 URL 유지
-        resume_url: finalResumeUrl,
-        education_history: eduClean,
-        career_history: careerClean,
-        certifications: certsClean,
-      };
+      const payload = buildExpertPayload({
+        form, photoUrl, staffType,
+        resumeUrl: finalResumeUrl,
+        educations, careers, certs,
+      });
 
       const { error } = isEdit && expert
         ? await supabase.from('staff_pool').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', expert.id)
