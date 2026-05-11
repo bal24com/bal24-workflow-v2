@@ -57,16 +57,28 @@ export default function SurveyFileUploadSection({ programId }: Props) {
       const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 40) || 'survey';
       const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'xlsx')!.replace(/[^a-z]/gi, '').toLowerCase();
       const path = `surveys/${programId}/${Date.now()}_${safeBase}.${ext || 'xlsx'}`;
-      // STEP-CURRICULUM-INVITE-UPLOAD-FIX — contentType 명시 (빈 문자열 시 octet-stream fallback)
-      const contentType = file.type || 'application/octet-stream';
+      // STEP-BUGFIX-SATISFY-UPLOAD — contentType 확장자 기반 fallback (file.type 빈 문자열·잘못된 값 대응)
+      const contentType = file.type
+        || (file.name.toLowerCase().endsWith('.xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : file.name.toLowerCase().endsWith('.xls')  ? 'application/vnd.ms-excel'
+          : file.name.toLowerCase().endsWith('.csv')  ? 'text/csv'
+          : 'application/octet-stream');
       const up = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType });
       if (up.error) {
+        // STEP-BUGFIX-SATISFY-UPLOAD — 실제 에러 객체 전체 출력 + 메시지 분기 세분화
+        console.error('[satisfaction-upload] 실제 에러:', up.error.message, up.error);
         const raw = up.error.message.toLowerCase();
-        console.error('[survey-file] 업로드 실패:', up.error.message);
-        if (raw.includes('bucket not found')) toast.error('satisfaction-files 버킷이 없어요. Supabase Storage에서 생성해 주세요.');
-        else if (raw.includes('row-level security') || raw.includes('not authorized')) toast.error('파일 업로드 권한이 없어요. satisfaction-files 버킷을 Public으로 설정해 주세요.');
-        else if (raw.includes('400') || raw.includes('bad request')) toast.error('파일 형식을 확인해 주세요. xlsx·xls·csv만 지원해요.');
-        else toast.error('파일 업로드에 실패했어요. 다시 시도해 주세요.');
+        if (raw.includes('bucket not found')) {
+          toast.error('satisfaction-files 버킷이 존재하지 않아요. 관리자에게 문의해 주세요.');
+        } else if (raw.includes('mime') || raw.includes('not allowed') || raw.includes('content-type')) {
+          toast.error('지원하지 않는 파일 형식이에요. xlsx·xls·csv만 업로드해 주세요.');
+        } else if (raw.includes('exceeded') || raw.includes('too large') || raw.includes('size')) {
+          toast.error('파일 크기가 너무 커요. 20MB 이하로 업로드해 주세요.');
+        } else if (raw.includes('row-level security') || raw.includes('not authorized') || raw.includes('permission')) {
+          toast.error(`업로드 권한 거부 — RLS 정책 또는 인증 상태를 확인해 주세요. (${up.error.message})`);
+        } else {
+          toast.error(`파일 업로드에 실패했어요. (${up.error.message})`);
+        }
         return;
       }
       const fileUrl = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
