@@ -1,7 +1,7 @@
-// bal24 v2 — STEP-PROGRAM-REPORT-TAB
-// 결과보고서 섹션 카드 (자동집계 버튼 + textarea + 저장 시각)
+// bal24 v2 — STEP-PROGRAM-REPORT-TAB / STEP-PROGRAM-UX-B
+// 결과보고서 섹션 카드 (자동집계 + textarea + 저장 시각 + ↑↓ 순서변경 + 삭제)
 
-import { Loader2, Sparkles, Save } from 'lucide-react';
+import { Loader2, Sparkles, Save, ChevronUp, ChevronDown, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { formatDateKo } from '../../../lib/utils';
 
@@ -18,11 +18,17 @@ interface Props {
   isSaving: boolean;
   isDirty: boolean;
   updatedAt?: string | null;
+  /** STEP-PROGRAM-UX-B — 순서 변경 + 삭제 */
+  onMove?: (dir: 'up' | 'down') => void;
+  onDelete?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
 export default function ReportSectionCard({
   Icon, label, canGenerate, content, onContentChange,
   onGenerate, onSave, isGenerating, isSaving, isDirty, updatedAt,
+  onMove, onDelete, isFirst, isLast,
 }: Props) {
   return (
     <section className={`rounded-2xl border bg-white shadow-[0_4px_16px_rgba(124,58,237,0.06)] p-5 space-y-3 transition-colors ${
@@ -42,6 +48,18 @@ export default function ReportSectionCard({
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {onMove && (
+            <div className="inline-flex items-center mr-1">
+              <button type="button" onClick={() => onMove('up')} disabled={isFirst} aria-label="위로 이동"
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 disabled:opacity-30 transition-colors">
+                <ChevronUp size={14} aria-hidden="true" />
+              </button>
+              <button type="button" onClick={() => onMove('down')} disabled={isLast} aria-label="아래로 이동"
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 disabled:opacity-30 transition-colors">
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>
+            </div>
+          )}
           {canGenerate && (
             <button type="button" onClick={() => void onGenerate()} disabled={isGenerating || isSaving}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-600 border border-violet-200 text-xs font-bold hover:bg-violet-100 disabled:opacity-40">
@@ -54,6 +72,13 @@ export default function ReportSectionCard({
             {isSaving ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : <Save size={11} aria-hidden="true" />}
             {isSaving ? '저장 중…' : '저장'}
           </button>
+          {onDelete && (
+            <button type="button" onClick={onDelete} aria-label="섹션 삭제"
+              title="섹션 삭제"
+              className="p-1.5 rounded hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-colors">
+              <X size={13} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </header>
 

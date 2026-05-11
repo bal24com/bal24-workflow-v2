@@ -359,6 +359,14 @@ export interface SatisfactionSurvey {
   /** STEP-SURVEY-AI — AI 전체 분석 요약 */
   ai_overall?: string | null;
   ai_analyzed_at?: string | null;
+  /** STEP-PROGRAM-UX-B — 종합 분석 (5필드 구조) — Edge Function이 자동 채움 */
+  ai_analysis?: {
+    overall: string;
+    strengths: string[];
+    improvements: string[];
+    keywords: string[];
+    recommendation: string;
+  } | null;
 }
 
 export type CurriculumStaffRole = '강사' | 'FT' | '멘토' | 'TA' | '운영진';
@@ -1225,9 +1233,12 @@ export interface ProgramAttendanceRecord {
 }
 
 /** STEP-PROGRAM-ENHANCE-FULL — 프로그램 단위 결과보고서 섹션 */
-/** STEP-PROGRAM-REPORT-TAB — 'participants' 추가 (교육생 현황 자동집계 섹션) */
+/** STEP-PROGRAM-REPORT-TAB — 'participants' 추가 */
+/** STEP-PROGRAM-UX-B — 'goals' | 'budget' | 'improvements' 추가 (결과보고서 표준 항목) */
 export type ProgramReportSectionKey =
-  | 'overview' | 'outcomes' | 'curriculum' | 'participants' | 'attendance' | 'satisfaction' | 'extra';
+  | 'overview' | 'goals' | 'curriculum' | 'participants' | 'attendance'
+  | 'satisfaction' | 'outcomes' | 'budget' | 'improvements' | 'extra'
+  | string; // STEP-PROGRAM-UX-B — custom_ prefix 키 허용
 
 export interface ProgramReportSection {
   id: string;

@@ -1,16 +1,18 @@
-// bal24 v2 — STEP-PROGRAM-REPORT-TAB
-// 프로그램 결과보고서 탭 — 6섹션 자동집계 + 직접 편집 + 저장 + 전체 다운로드
+// bal24 v2 — STEP-PROGRAM-REPORT-TAB / STEP-PROGRAM-UX-B
+// 결과보고서 탭 — 9 표준 섹션 + 자동집계 + 직접 편집 + 순서 변경 + 추가/삭제
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, FileText, ClipboardCheck, BookOpen, Users2, BarChart3, Award, Download,
+  Loader2, FileText, ClipboardCheck, BookOpen, Users2, BarChart3, Award, Download, Plus,
+  Target, Wallet, TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import ReportSectionCard from './ReportSectionCard';
 import {
-  fetchReportSections, saveReportSection, SECTION_GENERATORS,
+  fetchReportSections, saveReportSection, deleteReportSection, SECTION_GENERATORS,
+  DEFAULT_REPORT_SECTIONS,
 } from './programReportUtils';
 import type { ProgramReportSectionKey } from '../../../types/database';
 
@@ -20,68 +22,87 @@ interface SectionDef {
   key: ProgramReportSectionKey;
   label: string;
   Icon: LucideIcon;
-  /** 자동집계 지원 여부 */
   canGenerate: boolean;
 }
 
-const SECTIONS: SectionDef[] = [
-  { key: 'overview',     label: '사업 개요',     Icon: FileText,        canGenerate: true  },
-  { key: 'curriculum',   label: '커리큘럼 요약', Icon: BookOpen,        canGenerate: true  },
-  { key: 'participants', label: '교육생 현황',   Icon: Users2,          canGenerate: true  },
-  { key: 'attendance',   label: '출석 현황',     Icon: ClipboardCheck,  canGenerate: true  },
-  { key: 'satisfaction', label: '만족도 요약',   Icon: BarChart3,       canGenerate: true  },
-  { key: 'outcomes',     label: '성과 및 결론',  Icon: Award,           canGenerate: true  },
-];
+const STANDARD_ICON: Record<string, LucideIcon> = {
+  overview:     FileText,
+  goals:        Target,
+  curriculum:   BookOpen,
+  participants: Users2,
+  attendance:   ClipboardCheck,
+  satisfaction: BarChart3,
+  outcomes:     Award,
+  budget:       Wallet,
+  improvements: TrendingUp,
+};
 
 interface SectionState {
   content: string;
   updatedAt: string | null;
-  /** 마지막 저장된 본문 (dirty 판정용) */
   baseline: string;
-  /** AI 집계 진행 중 */
   generating: boolean;
-  /** 저장 진행 중 */
   saving: boolean;
 }
 
 const EMPTY_STATE: SectionState = { content: '', updatedAt: null, baseline: '', generating: false, saving: false };
+
+function buildDefs(keys: Array<{ key: ProgramReportSectionKey; label: string }>): SectionDef[] {
+  return keys.map((k) => ({
+    key: k.key, label: k.label,
+    Icon: STANDARD_ICON[k.key] ?? FileText,
+    canGenerate: SECTION_GENERATORS[k.key] != null,
+  }));
+}
 
 export default function ProgramReportTab({ programId }: Props) {
   const toast = useToast();
   const [programName, setProgramName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [savingAll, setSavingAll] = useState(false);
-  const [state, setState] = useState<Record<ProgramReportSectionKey, SectionState>>({
-    overview: EMPTY_STATE, curriculum: EMPTY_STATE, participants: EMPTY_STATE,
-    attendance: EMPTY_STATE, satisfaction: EMPTY_STATE, outcomes: EMPTY_STATE, extra: EMPTY_STATE,
-  });
+  const [sections, setSections] = useState<SectionDef[]>([]);
+  const [state, setState] = useState<Record<string, SectionState>>({});
+  const [deletedKeys, setDeletedKeys] = useState<Set<string>>(new Set());
+  const [addingLabel, setAddingLabel] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    setDeletedKeys(new Set());
     const [rows, prog] = await Promise.all([
       fetchReportSections(programId),
       supabase.from('programs').select('name').eq('id', programId).maybeSingle(),
     ]);
     setProgramName(prog.data?.name ?? '');
-    const next = { ...state };
-    for (const sec of SECTIONS) {
-      const row = rows.find((r) => r.section_key === sec.key);
-      next[sec.key] = {
-        ...EMPTY_STATE,
-        content: row?.content ?? '',
-        baseline: row?.content ?? '',
-        updatedAt: row?.updated_at ?? null,
-      };
+
+    // DB에 있는 섹션 = 우선 순위 (sort_order), 표준에서 빠진 키는 default 순서로 보완
+    const dbKeys = new Set(rows.map((r) => r.section_key));
+    const merged: Array<{ key: ProgramReportSectionKey; label: string }> = [];
+    // 1) DB 행 (sort_order 순) → 라벨은 DEFAULT에서 매칭, 없으면 key 그대로
+    for (const r of rows) {
+      const std = DEFAULT_REPORT_SECTIONS.find((d) => d.key === r.section_key);
+      merged.push({ key: r.section_key, label: std?.label ?? r.section_key });
+    }
+    // 2) DEFAULT 중 DB에 없는 것 → 뒤에 추가
+    for (const d of DEFAULT_REPORT_SECTIONS) {
+      if (!dbKeys.has(d.key)) merged.push(d);
+    }
+
+    const defs = buildDefs(merged);
+    setSections(defs);
+    const next: Record<string, SectionState> = {};
+    for (const def of defs) {
+      const row = rows.find((r) => r.section_key === def.key);
+      next[def.key] = { ...EMPTY_STATE, content: row?.content ?? '', baseline: row?.content ?? '', updatedAt: row?.updated_at ?? null };
     }
     setState(next);
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  function patch(key: ProgramReportSectionKey, partial: Partial<SectionState>) {
-    setState((prev) => ({ ...prev, [key]: { ...prev[key], ...partial } }));
+  function patch(key: string, partial: Partial<SectionState>) {
+    setState((prev) => ({ ...prev, [key]: { ...(prev[key] ?? EMPTY_STATE), ...partial } }));
   }
 
   async function handleGenerate(key: ProgramReportSectionKey) {
@@ -91,7 +112,7 @@ export default function ProgramReportTab({ programId }: Props) {
     try {
       const text = await gen(programId);
       patch(key, { content: text, generating: false });
-      toast.success(`${labelOf(key)} 섹션을 자동집계했어요. [저장]을 눌러 반영하세요.`);
+      toast.success('자동집계 완료. [저장]을 눌러 반영하세요.');
     } catch (err) {
       console.error('[program-report] 자동집계 실패:', err);
       toast.error('자동집계 중 오류가 발생했어요.');
@@ -105,7 +126,7 @@ export default function ProgramReportTab({ programId }: Props) {
       const s = state[key];
       await saveReportSection(programId, key, s.content, sortOrder);
       patch(key, { saving: false, baseline: s.content, updatedAt: new Date().toISOString() });
-      toast.success(`${labelOf(key)} 섹션을 저장했어요.`);
+      toast.success('섹션을 저장했어요.');
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[program-report] 저장 실패:', raw);
@@ -114,21 +135,50 @@ export default function ProgramReportTab({ programId }: Props) {
     }
   }
 
+  function moveSection(idx: number, dir: 'up' | 'down') {
+    setSections((prev) => {
+      const next = [...prev];
+      const j = dir === 'up' ? idx - 1 : idx + 1;
+      if (j < 0 || j >= next.length) return prev;
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+  }
+
+  function handleAddSection() {
+    const label = addingLabel.trim();
+    if (!label) { toast.error('섹션 이름을 입력해 주세요.'); return; }
+    const newKey: ProgramReportSectionKey = `custom_${Date.now()}`;
+    setSections((prev) => [...prev, { key: newKey, label, Icon: FileText, canGenerate: false }]);
+    setState((prev) => ({ ...prev, [newKey]: { ...EMPTY_STATE } }));
+    setAddingLabel(''); setAddOpen(false);
+    toast.success(`"${label}" 섹션을 추가했어요. [전체 저장]을 누르세요.`);
+  }
+
+  function handleDeleteSection(key: ProgramReportSectionKey) {
+    if (!window.confirm('이 섹션을 삭제할까요? (전체 저장 시 DB 반영)')) return;
+    setSections((prev) => prev.filter((s) => s.key !== key));
+    setDeletedKeys((prev) => { const next = new Set(prev); next.add(String(key)); return next; });
+  }
+
   const dirtyKeys = useMemo(
-    () => SECTIONS.filter((s) => state[s.key].content !== state[s.key].baseline).map((s) => s.key),
-    [state],
+    () => sections.filter((s) => (state[s.key]?.content ?? '') !== (state[s.key]?.baseline ?? '')).map((s) => s.key),
+    [state, sections],
   );
 
   async function handleSaveAll() {
-    if (dirtyKeys.length === 0) { toast.success('저장할 변경이 없어요.'); return; }
     setSavingAll(true);
     try {
-      for (let i = 0; i < SECTIONS.length; i += 1) {
-        const sec = SECTIONS[i];
-        if (!dirtyKeys.includes(sec.key)) continue;
-        await saveReportSection(programId, sec.key, state[sec.key].content, i);
+      // 1) 삭제된 섹션 DB 제거
+      for (const k of deletedKeys) {
+        await deleteReportSection(programId, k as ProgramReportSectionKey);
       }
-      toast.success(`${dirtyKeys.length}개 섹션을 저장했어요.`);
+      // 2) 남은 섹션 sort_order = index 로 upsert
+      for (let i = 0; i < sections.length; i += 1) {
+        const sec = sections[i];
+        await saveReportSection(programId, sec.key, state[sec.key]?.content ?? '', i);
+      }
+      toast.success(`${sections.length}개 섹션 + 삭제 ${deletedKeys.size}건 반영했어요.`);
       await refresh();
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
@@ -141,9 +191,9 @@ export default function ProgramReportTab({ programId }: Props) {
 
   function handleDownload() {
     const parts: string[] = [`# ${programName || '프로그램'} 결과보고서`, ''];
-    for (const sec of SECTIONS) {
+    for (const sec of sections) {
       parts.push(`## ${sec.label}`, '');
-      parts.push(state[sec.key].content || '(미입력)', '');
+      parts.push(state[sec.key]?.content || '(미입력)', '');
     }
     const blob = new Blob([parts.join('\n')], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -162,6 +212,8 @@ export default function ProgramReportTab({ programId }: Props) {
     );
   }
 
+  const pendingCount = dirtyKeys.length + deletedKeys.size;
+
   return (
     <div className="space-y-4">
       <header className="flex items-center justify-between gap-2 flex-wrap rounded-2xl border border-violet-100 bg-white px-5 py-4 shadow-[0_4px_16px_rgba(124,58,237,0.04)]">
@@ -172,26 +224,45 @@ export default function ProgramReportTab({ programId }: Props) {
           <div className="min-w-0">
             <p className="text-sm font-bold text-[#1E1B4B] truncate">결과보고서</p>
             <p className="text-[11px] text-slate-500">
-              섹션별 자동집계 후 직접 편집할 수 있어요. {dirtyKeys.length > 0 ? `${dirtyKeys.length}개 섹션이 저장 대기 중이에요.` : '모든 변경이 저장됐어요.'}
+              섹션 9개 표준 + ↑↓ 순서 변경 / + 추가 / × 삭제. {pendingCount > 0 ? `${pendingCount}건 대기 중.` : '모든 변경 저장됨.'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          <button type="button" onClick={() => setAddOpen((v) => !v)}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-violet-200 bg-white text-violet-700 text-xs font-bold hover:bg-violet-50">
+            <Plus size={11} aria-hidden="true" /> 섹션 추가
+          </button>
           <button type="button" onClick={handleDownload}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-violet-200 bg-white text-violet-700 text-xs font-bold hover:bg-violet-50">
-            <Download size={11} aria-hidden="true" /> 텍스트 다운로드
+            <Download size={11} aria-hidden="true" /> 다운로드
           </button>
-          <button type="button" onClick={() => void handleSaveAll()} disabled={savingAll || dirtyKeys.length === 0}
+          <button type="button" onClick={() => void handleSaveAll()} disabled={savingAll}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-40">
             {savingAll ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : null}
-            전체 저장 {dirtyKeys.length > 0 ? `(${dirtyKeys.length})` : ''}
+            전체 저장 {pendingCount > 0 ? `(${pendingCount})` : ''}
           </button>
         </div>
       </header>
 
+      {addOpen && (
+        <div className="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50/40 px-4 py-2.5">
+          <span className="text-xs font-bold text-violet-700 shrink-0">새 섹션</span>
+          <input type="text" value={addingLabel} autoFocus
+            onChange={(e) => setAddingLabel(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAddSection(); if (e.key === 'Escape') { setAddOpen(false); setAddingLabel(''); } }}
+            placeholder="섹션 이름 입력 후 Enter (예: 사진·증빙)"
+            className="flex-1 h-8 px-3 rounded-md border border-violet-200 bg-white text-sm focus:outline-none focus:border-violet-400" />
+          <button type="button" onClick={handleAddSection}
+            className="h-8 px-3 rounded-md text-xs font-bold text-white bg-violet-600 hover:bg-violet-700">추가</button>
+          <button type="button" onClick={() => { setAddOpen(false); setAddingLabel(''); }}
+            className="h-8 px-2 rounded-md text-xs text-slate-500 hover:bg-slate-100">취소</button>
+        </div>
+      )}
+
       <div className="space-y-3">
-        {SECTIONS.map((sec, idx) => {
-          const s = state[sec.key];
+        {sections.map((sec, idx) => {
+          const s = state[sec.key] ?? EMPTY_STATE;
           return (
             <ReportSectionCard
               key={sec.key}
@@ -206,14 +277,14 @@ export default function ProgramReportTab({ programId }: Props) {
               isSaving={s.saving}
               isDirty={s.content !== s.baseline}
               updatedAt={s.updatedAt}
+              onMove={(dir) => moveSection(idx, dir)}
+              onDelete={() => handleDeleteSection(sec.key)}
+              isFirst={idx === 0}
+              isLast={idx === sections.length - 1}
             />
           );
         })}
       </div>
     </div>
   );
-}
-
-function labelOf(key: ProgramReportSectionKey): string {
-  return SECTIONS.find((s) => s.key === key)?.label ?? key;
 }

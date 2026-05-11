@@ -7,6 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { supabase } from '../../../lib/supabase';
 import { callAi } from '../../../lib/aiClient';
 import { useToast } from '../../../contexts/ToastContext';
+import SurveyAiAnalysisPanel from './SurveyAiAnalysisPanel';
 import type { SatisfactionSurvey } from '../../../types/database';
 
 interface Props {
@@ -75,6 +76,7 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
   // STEP-PROGRAM-ENHANCE-FULL — 결과보고서 탭으로 전송 (program_report_sections.satisfaction)
   async function handleSendToReport() {
     if (!programId) { toast.error('프로그램 정보가 없어요.'); return; }
+    const aa = survey.ai_analysis;
     const summary = [
       `만족도 조사 결과 (${survey.total_count}명 응답)`,
       `전반적 만족도: ${overall != null ? `${overall.toFixed(2)}/5.0` : '-'}`,
@@ -82,8 +84,21 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
       '[항목별 평균]',
       ...items.filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k}: ${(v as number).toFixed(2)}`),
       '',
-      survey.ai_overall ? `[AI 분석]\n${survey.ai_overall}` : '',
-    ].join('\n');
+      // STEP-PROGRAM-UX-B — ai_analysis 5필드를 결과보고서 텍스트에 포함
+      aa ? '[AI 종합 분석]' : '',
+      aa ? aa.overall : '',
+      aa ? '' : '',
+      aa ? '[잘된 점]' : '',
+      ...(aa ? aa.strengths.map((s) => `· ${s}`) : []),
+      aa ? '' : '',
+      aa ? '[개선 필요]' : '',
+      ...(aa ? aa.improvements.map((s) => `· ${s}`) : []),
+      aa ? '' : '',
+      aa ? `[핵심 키워드] ${aa.keywords.map((k) => `#${k}`).join(' ')}` : '',
+      aa ? '' : '',
+      aa ? `[운영 제언]\n${aa.recommendation}` : '',
+      !aa && survey.ai_overall ? `[AI 분석]\n${survey.ai_overall}` : '',
+    ].filter(Boolean).join('\n');
     const { error } = await supabase.from('program_report_sections').upsert({
       program_id: programId, section_key: 'satisfaction', content: summary,
       updated_at: new Date().toISOString(),
@@ -238,8 +253,11 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed, program
             <p className="text-xs text-slate-400 italic text-center py-2">분석할 데이터가 없어요.</p>
           )}
 
-          {/* STEP-SURVEY-AI — AI 분석 결과 (항목별 + 전체) */}
-          {hasAi && (
+          {/* STEP-PROGRAM-UX-B — Edge Function이 자동 채운 5필드 종합 분석 */}
+          {survey.ai_analysis && <SurveyAiAnalysisPanel analysis={survey.ai_analysis} />}
+
+          {/* STEP-SURVEY-AI — 기존 callAi 항목별 분석 (보조 — ai_analysis 없거나 추가 분석 시) */}
+          {hasAi && !survey.ai_analysis && (
             <div className="mt-2 space-y-2 rounded-lg bg-violet-50/60 border border-violet-100 p-3">
               <p className="text-[11px] font-bold text-violet-700 flex items-center gap-1">
                 <Sparkles size={11} aria-hidden="true" /> AI 분석

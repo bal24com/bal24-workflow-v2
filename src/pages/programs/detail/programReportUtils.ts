@@ -165,27 +165,75 @@ export async function generateSatisfaction(programId: string): Promise<string> {
 
 export function generateOutcomesPlaceholder(): string {
   return [
-    '■ 주요 성과',
-    '  · ',
+    '■ 주요 성과', '  · ', '',
+    '■ 정성적 효과', '  · ', '',
+    '■ 개선·시사점', '  · ', '',
+    '※ 자동집계 불가 항목입니다. 직접 작성해 주세요.',
+  ].join('\n');
+}
+
+export function generateGoalsPlaceholder(): string {
+  return [
+    '■ 추진 목표', '  · ', '',
+    '■ 기대 효과', '  · ', '',
+    '※ 자동집계 불가 항목입니다. 사업계획서 내용을 참고해 직접 작성해 주세요.',
+  ].join('\n');
+}
+
+export function generateBudgetPlaceholder(): string {
+  return [
+    '■ 총 예산', '  · ', '',
+    '■ 항목별 집행 내역', '  · 강사료: ', '  · 운영비: ', '  · 기자재: ', '  · 기타: ', '',
+    '■ 집행률', '  · ',
     '',
-    '■ 정성적 효과',
-    '  · ',
-    '',
-    '■ 개선·시사점',
-    '  · ',
-    '',
+    '※ 자동집계 불가 항목입니다. 지출 메뉴 데이터를 참고해 작성하거나 직접 입력해 주세요.',
+  ].join('\n');
+}
+
+export function generateImprovementsPlaceholder(): string {
+  return [
+    '■ 운영상 개선점', '  · ', '',
+    '■ 차기 운영 시 반영 사항', '  · ', '',
     '※ 자동집계 불가 항목입니다. 직접 작성해 주세요.',
   ].join('\n');
 }
 
 export type SectionGenerator = (programId: string) => Promise<string>;
 
-export const SECTION_GENERATORS: Record<ProgramReportSectionKey, SectionGenerator | null> = {
+/** STEP-PROGRAM-UX-B — 결과보고서 표준 9섹션 + 자동집계 매핑 */
+export const SECTION_GENERATORS: Record<string, SectionGenerator | null> = {
   overview:     generateOverview,
+  goals:        async () => generateGoalsPlaceholder(),
   curriculum:   generateCurriculum,
   participants: generateParticipants,
   attendance:   generateAttendance,
   satisfaction: generateSatisfaction,
   outcomes:     async () => generateOutcomesPlaceholder(),
+  budget:       async () => generateBudgetPlaceholder(),
+  improvements: async () => generateImprovementsPlaceholder(),
   extra:        null,
 };
+
+/** STEP-PROGRAM-UX-B — 결과보고서 표준 기본 섹션 9개 */
+export const DEFAULT_REPORT_SECTIONS: Array<{ key: ProgramReportSectionKey; label: string }> = [
+  { key: 'overview',     label: '사업 개요' },
+  { key: 'goals',        label: '추진 목표 및 기대 효과' },
+  { key: 'curriculum',   label: '교육 과정 및 운영 내용' },
+  { key: 'participants', label: '교육생 현황 및 참여 실적' },
+  { key: 'attendance',   label: '출석 현황' },
+  { key: 'satisfaction', label: '만족도 조사 결과' },
+  { key: 'outcomes',     label: '주요 성과 및 결론' },
+  { key: 'budget',       label: '예산 집행 현황' },
+  { key: 'improvements', label: '향후 개선 방향' },
+];
+
+/** STEP-PROGRAM-UX-B — 섹션 삭제 (커스텀·표준 모두 지원) */
+export async function deleteReportSection(programId: string, sectionKey: ProgramReportSectionKey): Promise<boolean> {
+  const { error } = await supabase.from('program_report_sections')
+    .delete().eq('program_id', programId).eq('section_key', sectionKey);
+  if (error) {
+    console.error('[program-report] 삭제 실패:', error.message);
+    return false;
+  }
+  return true;
+}

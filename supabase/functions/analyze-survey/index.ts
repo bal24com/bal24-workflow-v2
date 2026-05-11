@@ -1,7 +1,7 @@
-// bal24 v2 — STEP-CURRICULUM-ATTEND-SURVEY-FULL
-// 클라이언트에서 파싱한 엑셀(rows)을 받아 집계 후 satisfaction_surveys INSERT
+// bal24 v2 — STEP-PROGRAM-UX-B
+// 클라이언트에서 파싱한 엑셀(rows)을 받아 집계 + Anthropic AI 종합 분석 후 satisfaction_surveys INSERT
 // 입력: { program_id, file_name, file_url, rows: Record<string, string|number>[] }
-// 출력: { total_count, avg_overall, summary_json, comments }
+// 출력: { total_count, avg_overall, summary_json, comments, ai_analysis }
 
 // @ts-nocheck — Deno Edge Function (Node 타입과 격리)
 
@@ -17,6 +17,79 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_VERSION = '2023-06-01';
+
+interface AiAnalysis {
+  overall: string;
+  strengths: string[];
+  improvements: string[];
+  keywords: string[];
+  recommendation: string;
+}
+
+async function runAiAnalysis(
+  averages: Record<string, number>,
+  freeTexts: string[],
+  apiKey: string,
+): Promise<AiAnalysis | null> {
+  const prompt = `다음은 교육 프로그램 만족도 조사 결과입니다.
+
+[항목별 평균 점수]
+${Object.entries(averages).map(([k, v]) => `- ${k}: ${v.toFixed(2)}점`).join('\n')}
+
+[자유 서술 의견 (상위 20개)]
+${freeTexts.slice(0, 20).join('\n')}
+
+위 데이터를 분석하여 다음 항목을 JSON으로 응답하세요.
+{
+  "overall": "종합 평가 3~5문장",
+  "strengths": ["잘된 점1", "잘된 점2", "잘된 점3"],
+  "improvements": ["개선점1", "개선점2", "개선점3"],
+  "keywords": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5"],
+  "recommendation": "향후 운영 제언 1문단"
+}
+JSON만 응답하고 마크다운 코드블록 없이 순수 JSON만 반환하세요.`;
+
+  try {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      console.error('[analyze-survey] Anthropic HTTP', res.status, t);
+      return null;
+    }
+    const data = await res.json() as { content?: Array<{ type: string; text?: string }> };
+    const text = data.content?.find((c) => c.type === 'text')?.text ?? '';
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+    try {
+      const parsed = JSON.parse(cleaned) as AiAnalysis;
+      if (typeof parsed.overall !== 'string') return null;
+      return parsed;
+    } catch {
+      const i = cleaned.indexOf('{');
+      if (i >= 0) {
+        try { return JSON.parse(cleaned.slice(i)) as AiAnalysis; } catch { return null; }
+      }
+      return null;
+    }
+  } catch (err) {
+    console.error('[analyze-survey] AI 호출 실패:', err instanceof Error ? err.message : String(err));
+    return null;
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -62,6 +135,15 @@ Deno.serve(async (req) => {
       .filter((v) => v != null && String(v).trim() && String(v).toLowerCase() !== 'nan')
       .map((v) => String(v).trim());
 
+    // STEP-PROGRAM-UX-B — Anthropic 종합 분석 (실패해도 수치 분석은 정상 반환)
+    let ai_analysis: AiAnalysis | null = null;
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (apiKey && Object.keys(summary_json).length > 0) {
+      ai_analysis = await runAiAnalysis(summary_json, comments, apiKey);
+    } else if (!apiKey) {
+      console.warn('[analyze-survey] ANTHROPIC_API_KEY 미설정 — AI 분석 건너뜀');
+    }
+
     // DB 저장
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -71,6 +153,9 @@ Deno.serve(async (req) => {
       program_id, file_name, file_url,
       total_count: rows.length, avg_overall,
       summary_json, comments,
+      ai_analysis,
+      ai_overall: ai_analysis?.overall ?? null,
+      ai_analyzed_at: ai_analysis ? new Date().toISOString() : null,
     });
     if (error) {
       console.error('[analyze-survey] insert 실패:', error.message);
@@ -78,7 +163,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      total_count: rows.length, avg_overall, summary_json, comments,
+      total_count: rows.length, avg_overall, summary_json, comments, ai_analysis,
     }), { headers: { ...CORS, 'Content-Type': 'application/json' } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : '알 수 없는 오류';
