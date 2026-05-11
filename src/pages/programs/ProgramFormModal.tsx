@@ -16,7 +16,7 @@ import ProgramAutofillSection from './ProgramAutofillSection';
 import ProgramDescriptionField from './ProgramDescriptionField';
 import PendingSessionsPreview from './PendingSessionsPreview';
 import ProgramTypeSelector from './ProgramTypeSelector';
-import { applyExtractedProgram, insertPendingSessions, type ExtractedProgram, type ExtractedProgramType, type ExtractedSession } from '../../lib/programAutoFill';
+import { applyExtractedProgram, insertPendingSessions, upsertProgramSharePhaseDates, type ExtractedProgram, type ExtractedProgramType, type ExtractedSession, type PhaseDatesPatch } from '../../lib/programAutoFill';
 import { useToast } from '../../contexts/ToastContext';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
 
@@ -58,6 +58,8 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
   const [maxApplicants, setMaxApplicants] = useState('');
   const [grantEnabled, setGrantEnabled] = useState(false);
   const [grantBudget, setGrantBudget] = useState('');
+  // STEP-AUTOFILL-PHASE-DATES — AI 추출 4단계 시작일 (저장 시 program_share upsert)
+  const [phaseDates, setPhaseDates] = useState<PhaseDatesPatch>({});
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
@@ -101,29 +103,14 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
 
   useEffect(() => {
     if (open) return;
-    setName('');
-    setProgramType('education');
-    setStatus('준비');
-    setProjectId(defaultProjectId ?? '');
-    setConsortiumId('');
-    setDisplayOrder('0');
-    setModules([]);
-    setStartDate('');
-    setEndDate('');
-    setVenue('');
-    setCapacity('');
-    setDescription('');
-    setOrgValues(EMPTY_ORG_VALUES);
-    setPendingSessions([]);
-    setVisibility('internal');
-    setApplicationType('open');
-    setApplicationStartDate('');
-    setApplicationEndDate('');
-    setMaxApplicants('');
-    setGrantEnabled(false);
-    setGrantBudget('');
-    setNameError(null);
-    setErrorMsg(null);
+    setName(''); setProgramType('education'); setStatus('준비');
+    setProjectId(defaultProjectId ?? ''); setConsortiumId('');
+    setDisplayOrder('0'); setModules([]);
+    setStartDate(''); setEndDate(''); setVenue(''); setCapacity(''); setDescription('');
+    setOrgValues(EMPTY_ORG_VALUES); setPendingSessions([]); setVisibility('internal');
+    setApplicationType('open'); setApplicationStartDate(''); setApplicationEndDate('');
+    setMaxApplicants(''); setGrantEnabled(false); setGrantBudget(''); setPhaseDates({});
+    setNameError(null); setErrorMsg(null);
   }, [open]);
 
   const handleAutoApply = (prog: ExtractedProgram): number => applyExtractedProgram(prog, {
@@ -136,6 +123,8 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
       maxParticipants: patch.max_participants != null ? String(patch.max_participants) : p.maxParticipants,
     })),
     setPendingSessions,
+    // STEP-AUTOFILL-PHASE-DATES — AI 추출 4 단계 시작일 → state에 저장(프로그램 INSERT 후 program_share upsert)
+    setPhaseDates: (patch) => setPhaseDates((p) => ({ ...p, ...patch })),
   });
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -211,6 +200,9 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
       } else {
         toast.success('프로그램이 등록됐어요.');
       }
+
+      // STEP-AUTOFILL-PHASE-DATES — AI 추출 4단계 시작일을 program_share에 upsert
+      if (createdProgram?.id) await upsertProgramSharePhaseDates(createdProgram.id, phaseDates);
 
       onCreated();
       onClose();

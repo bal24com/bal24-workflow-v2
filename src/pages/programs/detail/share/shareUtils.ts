@@ -90,13 +90,27 @@ export interface SaveDatesPayload {
   result_date: string | null;
 }
 
+/** STEP-AUTOFILL-PHASE-DATES — 빈 문자열도 null로 정규화 (DB date 컬럼 invalid input syntax 방지) */
+function toDateOrNull(v: string | null | undefined): string | null {
+  if (v == null) return null;
+  const t = String(v).trim();
+  return t === '' ? null : t;
+}
+
 export async function saveStageDates(
   programId: string,
   dates: SaveDatesPayload,
 ): Promise<boolean> {
+  const safePayload = {
+    pre_date:      toDateOrNull(dates.pre_date),
+    ready_date:    toDateOrNull(dates.ready_date),
+    progress_date: toDateOrNull(dates.progress_date),
+    result_date:   toDateOrNull(dates.result_date),
+    updated_at: new Date().toISOString(),
+  };
   const { error } = await supabase
     .from('program_share')
-    .update({ ...dates, updated_at: new Date().toISOString() })
+    .update(safePayload)
     .eq('program_id', programId);
   if (error) {
     console.error('[program-share] 단계 날짜 저장 실패:', error.message);
