@@ -90,9 +90,10 @@ export default function CurriculumRowStaffSection({ curriculumId, programId, onC
       data = fb.data as typeof data; error = fb.error;
     }
     if (error) {
+      // STEP-CURRICULUM-INVITE-UPLOAD-FIX — refresh 실패 시 기존 rows 유지 (태그 사라짐 방지)
       console.error('[curriculum-staff-section] 조회 실패:', error.message);
       toast.error('배정 인력을 불러오지 못했어요.');
-      setRows([]); return;
+      return;
     }
     const next: StaffRow[] = ((data ?? []) as StaffJoin[]).map((s) => {
       const sp = pickOne(s.staff_pool);
@@ -111,9 +112,8 @@ export default function CurriculumRowStaffSection({ curriculumId, programId, onC
     return () => { cancelled = true; };
   }, [refresh]);
 
-  // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 23505(unique violation) 명확한 분기
+  // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 23505는 호출부에서 refresh 후 성공 처리하므로 분기 제외
   function translateInsertError(code: string | undefined, msg: string): string {
-    if (code === '23505') return '이미 같은 인력이 이 차시에 배정돼 있어요.';
     if (code === '23514' || msg.toLowerCase().includes('check constraint')) {
       return '데이터 형식 오류예요. 마이그레이션 적용 여부를 확인해 주세요.';
     }
@@ -121,16 +121,32 @@ export default function CurriculumRowStaffSection({ curriculumId, programId, onC
   }
 
   async function handleSelect(role: CurriculumStaffRole, person: SelectedPerson) {
+    // STEP-CURRICULUM-INVITE-UPLOAD-FIX — INSERT 전 중복 체크 (UI에 안 보였던 기존 row 안전 처리)
+    const fkColumn = person.sourceType === 'staff_pool' ? 'staff_pool_id' : 'profile_id';
+    const { data: existing } = await supabase.from('curriculum_staff')
+      .select('id').eq('curriculum_id', curriculumId).eq('role', role).eq(fkColumn, person.id)
+      .maybeSingle();
+    if (existing) {
+      await refresh();
+      toast.success('이미 배정된 인력이에요. 목록을 갱신했어요.');
+      onChanged?.(); return;
+    }
     const payload = {
       curriculum_id: curriculumId,
       staff_pool_id: person.sourceType === 'staff_pool' ? person.id : null,
       profile_id: person.sourceType === 'profile' ? person.id : null,
       role,
     };
-    // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 낙관적 업데이트 (refresh 실패해도 화면 즉시 반영)
+    // 낙관적 업데이트 (refresh 실패해도 화면 즉시 반영)
     const { data, error } = await supabase.from('curriculum_staff').insert(payload).select('id').single();
     if (error) {
       console.error('[curriculum-staff-section] 배정 실패:', error.code, error.message);
+      // 23505 → 중복 체크 race condition. refresh로 동기화 + 성공 처리
+      if (error.code === '23505') {
+        await refresh();
+        toast.success('이미 배정된 인력이에요. 목록을 갱신했어요.');
+        onChanged?.(); return;
+      }
       toast.error(translateInsertError(error.code, error.message));
       return;
     }
@@ -144,16 +160,29 @@ export default function CurriculumRowStaffSection({ curriculumId, programId, onC
     await refresh(); onChanged?.();
   }
 
-  // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 미등록 이름만 등록 (낙관적 업데이트)
+  // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 미등록 이름만 등록 (낙관적 업데이트 + 중복 체크)
   async function handleManualAdd() {
     const name = manualName.trim();
     if (!name) { toast.error('이름을 입력해 주세요.'); return; }
+    const { data: existing } = await supabase.from('curriculum_staff')
+      .select('id').eq('curriculum_id', curriculumId).eq('role', pickRole).eq('instructor_name_raw', name)
+      .maybeSingle();
+    if (existing) {
+      await refresh();
+      toast.success('이미 같은 이름으로 등록돼 있어요. 목록을 갱신했어요.');
+      setManualName(''); setManualOpen(false); onChanged?.(); return;
+    }
     const { data, error } = await supabase.from('curriculum_staff').insert({
       curriculum_id: curriculumId, role: pickRole,
       staff_pool_id: null, profile_id: null, instructor_name_raw: name,
     }).select('id').single();
     if (error) {
       console.error('[curriculum-staff-section] 직접 입력 실패:', error.code, error.message);
+      if (error.code === '23505') {
+        await refresh();
+        toast.success('이미 같은 이름으로 등록돼 있어요. 목록을 갱신했어요.');
+        setManualName(''); setManualOpen(false); onChanged?.(); return;
+      }
       toast.error(translateInsertError(error.code, error.message));
       return;
     }
