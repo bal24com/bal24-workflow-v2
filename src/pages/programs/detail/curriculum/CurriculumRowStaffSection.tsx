@@ -77,9 +77,18 @@ export default function CurriculumRowStaffSection({ curriculumId, programId, onC
   const [inviting, setInviting] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const { data, error } = await supabase.from('curriculum_staff')
+    // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 1차 시도(instructor_name_raw 포함)
+    let { data, error } = await supabase.from('curriculum_staff')
       .select('id, role, staff_pool_id, profile_id, instructor_name_raw, staff_pool:staff_pool(id,name), profile:profiles(id,name)')
       .eq('curriculum_id', curriculumId);
+    // 컬럼 미존재 fallback — 마이그레이션 미실행 환경에서 setRows([]) 되어 태그 사라짐 방지
+    if (error && (error.message ?? '').toLowerCase().includes('instructor_name_raw')) {
+      console.warn('[curriculum-staff-section] instructor_name_raw 컬럼 미존재 — 마이그레이션 필요');
+      const fb = await supabase.from('curriculum_staff')
+        .select('id, role, staff_pool_id, profile_id, staff_pool:staff_pool(id,name), profile:profiles(id,name)')
+        .eq('curriculum_id', curriculumId);
+      data = fb.data as typeof data; error = fb.error;
+    }
     if (error) {
       console.error('[curriculum-staff-section] 조회 실패:', error.message);
       toast.error('배정 인력을 불러오지 못했어요.');
@@ -102,6 +111,15 @@ export default function CurriculumRowStaffSection({ curriculumId, programId, onC
     return () => { cancelled = true; };
   }, [refresh]);
 
+  // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 23505(unique violation) 명확한 분기
+  function translateInsertError(code: string | undefined, msg: string): string {
+    if (code === '23505') return '이미 같은 인력이 이 차시에 배정돼 있어요.';
+    if (code === '23514' || msg.toLowerCase().includes('check constraint')) {
+      return '데이터 형식 오류예요. 마이그레이션 적용 여부를 확인해 주세요.';
+    }
+    return '배정에 실패했어요.';
+  }
+
   async function handleSelect(role: CurriculumStaffRole, person: SelectedPerson) {
     const payload = {
       curriculum_id: curriculumId,
@@ -109,28 +127,38 @@ export default function CurriculumRowStaffSection({ curriculumId, programId, onC
       profile_id: person.sourceType === 'profile' ? person.id : null,
       role,
     };
-    const { error } = await supabase.from('curriculum_staff').insert(payload);
+    // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 낙관적 업데이트 (refresh 실패해도 화면 즉시 반영)
+    const { data, error } = await supabase.from('curriculum_staff').insert(payload).select('id').single();
     if (error) {
-      console.error('[curriculum-staff-section] 배정 실패:', error.message);
-      toast.error('배정에 실패했어요. 동일 인력이 이미 배정됐는지 확인해 주세요.');
+      console.error('[curriculum-staff-section] 배정 실패:', error.code, error.message);
+      toast.error(translateInsertError(error.code, error.message));
       return;
+    }
+    if (data?.id) {
+      setRows((prev) => [...prev, {
+        id: data.id, role, source: person.sourceType === 'staff_pool' ? 'external' : 'internal',
+        sourceId: person.id, name: person.name,
+      }]);
     }
     toast.success(`${person.name}님을 ${role}로 배정했어요.`);
     await refresh(); onChanged?.();
   }
 
-  // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 미등록 이름만 등록
+  // STEP-CURRICULUM-INVITE-UPLOAD-FIX — 미등록 이름만 등록 (낙관적 업데이트)
   async function handleManualAdd() {
     const name = manualName.trim();
     if (!name) { toast.error('이름을 입력해 주세요.'); return; }
-    const { error } = await supabase.from('curriculum_staff').insert({
+    const { data, error } = await supabase.from('curriculum_staff').insert({
       curriculum_id: curriculumId, role: pickRole,
       staff_pool_id: null, profile_id: null, instructor_name_raw: name,
-    });
+    }).select('id').single();
     if (error) {
-      console.error('[curriculum-staff-section] 직접 입력 실패:', error.message);
-      toast.error('등록에 실패했어요. 마이그레이션이 적용됐는지 확인해 주세요.');
+      console.error('[curriculum-staff-section] 직접 입력 실패:', error.code, error.message);
+      toast.error(translateInsertError(error.code, error.message));
       return;
+    }
+    if (data?.id) {
+      setRows((prev) => [...prev, { id: data.id, role: pickRole, source: 'manual', sourceId: '', name }]);
     }
     toast.success(`${name}님을 ${pickRole}(미등록)로 등록했어요.`);
     setManualName(''); setManualOpen(false);
