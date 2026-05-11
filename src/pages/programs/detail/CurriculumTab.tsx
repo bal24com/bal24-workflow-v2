@@ -47,17 +47,24 @@ export default function CurriculumTab({ programId, programName }: Props) {
   const [invitationMap, setInvitationMap] = useState<Map<string, InvitationSummary>>(new Map());
   // STEP-CURRICULUM-INSTRUCTOR-VIEW — 강사 배정 현황 새로고침 키
   const [staffSectionKey, setStaffSectionKey] = useState(0);
-  // STEP-PROGRAM-ENHANCE-FULL — staff_pool 옵션 (N번 fetch 방지 — CurriculumTab 마운트 시 1회)
+  // STEP-PROGRAM-ENHANCE-FULL — staff_pool + profiles 통합 옵션 (N번 fetch 방지)
   const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    void supabase.from('staff_pool').select('id, name, organization').is('deleted_at', null).order('name')
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) { console.error('[curriculum-tab] staff_pool 조회 실패:', error.message); return; }
-        setStaffOptions((data ?? []) as StaffOption[]);
-      });
+    void (async () => {
+      const [poolRes, profileRes] = await Promise.all([
+        supabase.from('staff_pool').select('id, name, organization').is('deleted_at', null).order('name'),
+        supabase.from('profiles').select('id, name, department').eq('is_active', true).order('name'),
+      ]);
+      if (cancelled) return;
+      if (poolRes.error)    console.error('[curriculum-tab] staff_pool 조회 실패:', poolRes.error.message);
+      if (profileRes.error) console.error('[curriculum-tab] profiles 조회 실패:', profileRes.error.message);
+      setStaffOptions([
+        ...(poolRes.data    ?? []).map((s): StaffOption => ({ id: s.id, name: s.name, organization: s.organization ?? null, sourceType: 'staff_pool' })),
+        ...(profileRes.data ?? []).map((p): StaffOption => ({ id: p.id, name: p.name, organization: p.department ?? '내부직원', sourceType: 'profile' })),
+      ]);
+    })();
     return () => { cancelled = true; };
   }, []);
 
@@ -277,11 +284,9 @@ export default function CurriculumTab({ programId, programName }: Props) {
 
       {/* AI 드롭존 — planned 탭에만 노출 */}
       {curriculumType === 'planned' && (
-        <CurriculumAiDropZone
-          programId={programId}
+        <CurriculumAiDropZone programId={programId}
           lastSessionNo={items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0)}
-          onSessionsInserted={() => void refresh()}
-        />
+          onSessionsInserted={() => void refresh()} />
       )}
 
       {loading ? (
@@ -306,16 +311,9 @@ export default function CurriculumTab({ programId, programName }: Props) {
       ) : (
         <>
           <div className="grid grid-cols-[28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            <span aria-hidden="true" />
-            <span className="text-center">#</span>
-            <span>일자</span>
-            <span>시작</span>
-            <span>종료</span>
-            <span>주제·차시명</span>
-            <span>초대</span>
-            <span aria-hidden="true" />
-            <span aria-hidden="true" />
-            <span aria-hidden="true" />
+            {['', '#', '일자', '시작', '종료', '주제·차시명', '초대', '', '', ''].map((label, i) => (
+              <span key={i} className={i === 1 ? 'text-center' : undefined} aria-hidden={label ? undefined : true}>{label}</span>
+            ))}
           </div>
           <div className="flex flex-col gap-1.5">
             {items.map((c, idx) => (

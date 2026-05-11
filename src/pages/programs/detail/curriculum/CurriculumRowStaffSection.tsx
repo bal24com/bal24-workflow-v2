@@ -23,6 +23,8 @@ export interface StaffOption {
   id: string;
   name: string;
   organization?: string | null;
+  /** STEP-CURRICULUM-INTERNAL-STAFF — 'staff_pool'(전문가) / 'profile'(내부직원) */
+  sourceType: 'staff_pool' | 'profile';
 }
 
 interface Props {
@@ -285,15 +287,20 @@ export default function CurriculumRowStaffSection({ curriculumId, programId, onC
         {staffOptions.length > 0 && (
           <select
             onChange={(e) => {
-              const opt = staffOptions.find((s) => s.id === e.target.value);
-              if (opt) void handleSelect(pickRole, { sourceType: 'staff_pool', id: opt.id, name: opt.name, organization: opt.organization ?? undefined });
+              const [src, id] = e.target.value.split(':');
+              const opt = staffOptions.find((s) => s.id === id && s.sourceType === src);
+              if (opt) void handleSelect(pickRole, { sourceType: opt.sourceType, id: opt.id, name: opt.name, organization: opt.organization ?? undefined });
               e.target.value = '';
             }}
-            className="h-7 px-2 rounded-md border border-slate-200 bg-white text-[11px] focus:outline-none focus:border-violet-400 max-w-[160px]">
-            <option value="">+ 전문가 선택</option>
+            className="h-7 px-2 rounded-md border border-slate-200 bg-white text-[11px] focus:outline-none focus:border-violet-400 max-w-[180px]">
+            <option value="">+ 인력 선택</option>
             {staffOptions
               .filter((s) => !rows.some((r) => r.sourceId === s.id))
-              .map((s) => (<option key={s.id} value={s.id}>{s.name}{s.organization ? ` (${s.organization})` : ''}</option>))}
+              .map((s) => (
+                <option key={`${s.sourceType}:${s.id}`} value={`${s.sourceType}:${s.id}`}>
+                  [{s.sourceType === 'profile' ? '팀원' : '전문가'}] {s.name}{s.organization ? ` · ${s.organization}` : ''}
+                </option>
+              ))}
           </select>
         )}
         <button type="button" onClick={() => setModalOpen(true)}
