@@ -15,6 +15,8 @@ interface InvitationSummary { id: string; name: string; status: InvitationStatus
 
 interface Props {
   item: CurriculumWithStaff;
+  /** STEP-CURRICULUM-INVITE-UPLOAD-FIX — 미등록 인력 초대 링크 생성용 */
+  programId?: string;
   /** STEP-CURRICULUM-INSTRUCTOR-FIX — 차시별 외부 강사 초대 (instructor_invitations) */
   invitation?: InvitationSummary | null;
   onSave: (patch: Partial<ProgramCurriculum>) => Promise<void>;
@@ -84,7 +86,7 @@ function isEqual(a: Draft, b: Draft): boolean {
 }
 
 export default function CurriculumRow({
-  item, invitation, onSave, onDelete, onRequestInstructor, onStaffChanged,
+  item, programId, invitation, onSave, onDelete, onRequestInstructor, onStaffChanged,
   canReorder, onMoveUp, onMoveDown, isFirst, isLast,
   onDragStart, onDragEnter, onDragEnd, onDragOver, isDragging,
   staffOptions,
@@ -213,7 +215,7 @@ export default function CurriculumRow({
 
       {/* STEP-CURRICULUM-INLINE-ROLE — 행3: 인력 배정 (항상 노출, 4역할 콤보+검색) */}
       <div className="px-2 pb-2">
-        <CurriculumRowStaffSection curriculumId={item.id} onChanged={onStaffChanged} staffOptions={staffOptions} />
+        <CurriculumRowStaffSection curriculumId={item.id} programId={programId} onChanged={onStaffChanged} staffOptions={staffOptions} />
       </div>
 
       {/* 펼침 영역 — 날짜·장소·저장 (선택) */}

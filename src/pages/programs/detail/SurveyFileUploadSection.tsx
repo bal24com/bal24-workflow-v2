@@ -57,13 +57,16 @@ export default function SurveyFileUploadSection({ programId }: Props) {
       const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 40) || 'survey';
       const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'xlsx')!.replace(/[^a-z]/gi, '').toLowerCase();
       const path = `surveys/${programId}/${Date.now()}_${safeBase}.${ext || 'xlsx'}`;
-      const up = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type || undefined });
+      // STEP-CURRICULUM-INVITE-UPLOAD-FIX — contentType 명시 (빈 문자열 시 octet-stream fallback)
+      const contentType = file.type || 'application/octet-stream';
+      const up = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType });
       if (up.error) {
         const raw = up.error.message.toLowerCase();
         console.error('[survey-file] 업로드 실패:', up.error.message);
         if (raw.includes('bucket not found')) toast.error('satisfaction-files 버킷이 없어요. Supabase Storage에서 생성해 주세요.');
         else if (raw.includes('row-level security') || raw.includes('not authorized')) toast.error('파일 업로드 권한이 없어요. satisfaction-files 버킷을 Public으로 설정해 주세요.');
-        else toast.error('파일 업로드에 실패했어요.');
+        else if (raw.includes('400') || raw.includes('bad request')) toast.error('파일 형식을 확인해 주세요. xlsx·xls·csv만 지원해요.');
+        else toast.error('파일 업로드에 실패했어요. 다시 시도해 주세요.');
         return;
       }
       const fileUrl = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
@@ -74,7 +77,12 @@ export default function SurveyFileUploadSection({ programId }: Props) {
       });
       if (error) {
         console.error('[survey-file] 분석 실패:', error.message);
-        toast.error('분석 중 오류가 발생했어요. (Edge Function 배포 확인)');
+        const raw = (error.message ?? '').toLowerCase();
+        if (raw.includes('not found') || raw.includes('404')) {
+          toast.error('analyze-survey Edge Function이 배포되지 않았어요. 관리자에게 문의해 주세요.');
+        } else {
+          toast.error('분석 중 오류가 발생했어요. 다시 시도해 주세요.');
+        }
         return;
       }
       const total = (data as { total_count?: number } | null)?.total_count ?? rows.length;

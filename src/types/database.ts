@@ -367,10 +367,12 @@ export type CurriculumStaffStatus = '대기' | '수락' | '거절';
 export interface CurriculumStaff {
   id: string;
   curriculum_id: string;
-  /** 외부 전문가 (정산 연동) — profile_id와 둘 중 하나만 값 */
+  /** 외부 전문가 (정산 연동) — profile_id/instructor_name_raw 셋 중 하나만 값 */
   staff_pool_id?: string | null;
-  /** 내부 직원 (급여 별도) — staff_pool_id와 둘 중 하나만 값 */
+  /** 내부 직원 (급여 별도) — staff_pool_id/instructor_name_raw 셋 중 하나만 값 */
   profile_id?: string | null;
+  /** STEP-CURRICULUM-INVITE-UPLOAD-FIX — 미등록 인력 이름만 보관 (staff_pool_id·profile_id 둘 다 null일 때) */
+  instructor_name_raw?: string | null;
   role: CurriculumStaffRole;
   fee?: number | null;
   note?: string | null;

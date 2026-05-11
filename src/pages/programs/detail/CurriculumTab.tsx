@@ -322,6 +322,7 @@ export default function CurriculumTab({ programId, programName }: Props) {
               <CurriculumRow
                 key={c.id}
                 item={c}
+                programId={programId}
                 invitation={invitationMap.get(c.id) ?? null}
                 onSave={(patch) => saveCurriculum(c.id, patch)}
                 onDelete={() => removeCurriculum(c.id)}
