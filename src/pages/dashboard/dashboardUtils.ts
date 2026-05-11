@@ -96,8 +96,9 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
   const prevRange = monthBounds(prevYear, prevMonth);
   const today = todayIso();
 
+  // STEP-DASHBOARD-FIX — 종료/취소 제외 + '준비' 포함 (착수 전 프로그램도 활성으로 간주)
   const ACTIVE_PROJECT_STATUS: ProjectStatus[] = ['진행', '정산'];
-  const ACTIVE_PROGRAM_STATUS: ProgramStatus[] = ['진행'];
+  const ACTIVE_PROGRAM_STATUS: ProgramStatus[] = ['준비', '진행'];
   const OPEN_TASK_STATUS: TaskStatus[] = ['인식', '실행', '검토'];
 
   const [projRes, thisIncomeRes, prevIncomeRes, pendingRes, programRes, todayDueRes, overdueRes] =
@@ -105,6 +106,7 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
       supabase
         .from('projects')
         .select('id', { count: 'exact', head: true })
+        .is('deleted_at', null)
         .in('status', ACTIVE_PROJECT_STATUS),
       supabase
         .from('income')
@@ -126,6 +128,7 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
       supabase
         .from('programs')
         .select('id', { count: 'exact', head: true })
+        .is('deleted_at', null)
         .in('status', ACTIVE_PROGRAM_STATUS),
       supabase
         .from('tasks')
