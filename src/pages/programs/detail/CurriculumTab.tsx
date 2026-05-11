@@ -14,6 +14,7 @@ import CurriculumAiDropZone from './curriculum/CurriculumAiDropZone';
 import CurriculumStaffSection from './curriculum/CurriculumStaffSection';
 import InvitationManagePanel from '../InvitationManagePanel';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
+import type { StaffOption } from './curriculum/CurriculumRowStaffSection';
 import type {
   CurriculumType, ProgramCurriculum, InvitationStatus,
 } from '../../../types/database';
@@ -35,8 +36,7 @@ export default function CurriculumTab({ programId, programName }: Props) {
   const [curriculumType, setCurriculumType] = useState<CurriculumType>('planned');
   const [counts, setCounts] = useState({ planned: 0, actual: 0 });
   const [copying, setCopying] = useState(false);
-  const [saveTplOpen, setSaveTplOpen] = useState(false);
-  const [loadTplOpen, setLoadTplOpen] = useState(false);
+  const [saveTplOpen, setSaveTplOpen] = useState(false); const [loadTplOpen, setLoadTplOpen] = useState(false);
   const [aiCurriculumOpen, setAiCurriculumOpen] = useState(false);
   // STEP-INSTRUCTOR-INVITE-A — 강사 초대 패널
   const [invitePanelOpen, setInvitePanelOpen] = useState(false);
@@ -47,6 +47,19 @@ export default function CurriculumTab({ programId, programName }: Props) {
   const [invitationMap, setInvitationMap] = useState<Map<string, InvitationSummary>>(new Map());
   // STEP-CURRICULUM-INSTRUCTOR-VIEW — 강사 배정 현황 새로고침 키
   const [staffSectionKey, setStaffSectionKey] = useState(0);
+  // STEP-PROGRAM-ENHANCE-FULL — staff_pool 옵션 (N번 fetch 방지 — CurriculumTab 마운트 시 1회)
+  const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void supabase.from('staff_pool').select('id, name, organization').is('deleted_at', null).order('name')
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { console.error('[curriculum-tab] staff_pool 조회 실패:', error.message); return; }
+        setStaffOptions((data ?? []) as StaffOption[]);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   function openInvite(curriculumId: string | null, sessionInfo: string) {
     setInviteCurriculumId(curriculumId);
@@ -133,46 +146,33 @@ export default function CurriculumTab({ programId, programName }: Props) {
     try {
       const planned = await supabase.from('program_curriculum').select('*')
         .eq('program_id', programId).eq('curriculum_type', 'planned').order('session_no');
-      if (planned.error || !planned.data) {
-        console.error('[curriculum-tab] planned 조회 실패:', planned.error?.message);
-        toast.error('제안 커리큘럼 조회에 실패했어요.'); return;
-      }
+      if (planned.error || !planned.data) { console.error('[curriculum-tab] planned 조회 실패:', planned.error?.message); toast.error('제안 커리큘럼 조회에 실패했어요.'); return; }
       const rows = planned.data as ProgramCurriculum[];
       if (rows.length === 0) { toast.error('복사할 제안 차시가 없어요.'); return; }
       const insertRows = rows.map((r) => ({
-        program_id: programId, session_no: r.session_no,
-        title: r.title, content: r.content ?? null,
-        day_label: r.day_label ?? null,
+        program_id: programId, session_no: r.session_no, title: r.title,
+        content: r.content ?? null, day_label: r.day_label ?? null,
         start_time: r.start_time ?? null, end_time: r.end_time ?? null,
-        instructor_name_raw: r.instructor_name_raw ?? null,
-        curriculum_type: 'actual',
+        instructor_name_raw: r.instructor_name_raw ?? null, curriculum_type: 'actual',
       }));
       const ins = await supabase.from('program_curriculum').insert(insertRows);
-      if (ins.error) {
-        console.error('[curriculum-tab] actual 복사 실패:', ins.error.message);
-        toast.error('실제 운영으로 복사에 실패했어요.'); return;
-      }
+      if (ins.error) { console.error('[curriculum-tab] actual 복사 실패:', ins.error.message); toast.error('실제 운영으로 복사에 실패했어요.'); return; }
       toast.success(`${rows.length}개 차시를 실제 운영으로 복사했습니다.`);
       void refresh();
-    } finally {
-      setCopying(false);
-    }
+    } finally { setCopying(false); }
   }
 
-  // STEP-CURRICULUM-FULL — actual 탭에서 ↑↓로 인접 row session_no swap
+  // STEP-CURRICULUM-FULL — actual 탭 ↑↓ swap (임시 unique 충돌 회피 — 3단계 update)
   async function swapWith(idx: number, dir: 'up' | 'down') {
     const j = dir === 'up' ? idx - 1 : idx + 1;
     if (j < 0 || j >= items.length) return;
-    const a = items[idx]; const b = items[j];
-    const aNew = b.session_no; const bNew = a.session_no;
-    // 임시 unique 충돌 회피: 두 단계 update (a → -tmp, b → aNew, a → bNew)
+    const a = items[idx], b = items[j];
     const tmp = -Math.abs(a.session_no) - 100000;
-    const r1 = await supabase.from('program_curriculum').update({ session_no: tmp }).eq('id', a.id);
-    if (r1.error) { console.error('[curriculum-tab] swap-1 실패:', r1.error.message); toast.error('순서 변경 실패'); return; }
-    const r2 = await supabase.from('program_curriculum').update({ session_no: bNew }).eq('id', b.id);
-    if (r2.error) { console.error('[curriculum-tab] swap-2 실패:', r2.error.message); toast.error('순서 변경 실패'); return; }
-    const r3 = await supabase.from('program_curriculum').update({ session_no: aNew }).eq('id', a.id);
-    if (r3.error) { console.error('[curriculum-tab] swap-3 실패:', r3.error.message); toast.error('순서 변경 실패'); return; }
+    const upd = (id: string, no: number) => supabase.from('program_curriculum').update({ session_no: no }).eq('id', id);
+    for (const [id, no] of [[a.id, tmp], [b.id, a.session_no], [a.id, b.session_no]] as Array<[string, number]>) {
+      const r = await upd(id, no);
+      if (r.error) { console.error('[curriculum-tab] swap 실패:', r.error.message); toast.error('순서 변경 실패'); return; }
+    }
     void refresh();
   }
 
@@ -337,6 +337,7 @@ export default function CurriculumTab({ programId, programName }: Props) {
                 onDragEnd={() => void handleDragEnd()}
                 onDragOver={(e) => e.preventDefault()}
                 isDragging={dragId === c.id}
+                staffOptions={staffOptions}
               />
             ))}
           </div>

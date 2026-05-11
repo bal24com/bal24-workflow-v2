@@ -7,7 +7,7 @@ import {
   ChevronDown, ChevronRight, GripVertical, Trash2, Save, RotateCcw, Send, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import DateTimePicker from '../../../../components/ui/DateTimePicker';
-import CurriculumRowStaffSection from './CurriculumRowStaffSection';
+import CurriculumRowStaffSection, { type StaffOption } from './CurriculumRowStaffSection';
 import { computeDuration, padTime, trimTime, type CurriculumWithStaff } from './curriculumTabUtils';
 import type { ProgramCurriculum, InvitationStatus } from '../../../../types/database';
 
@@ -34,6 +34,8 @@ interface Props {
   onDragEnd: () => void;
   onDragOver: (e: React.DragEvent) => void;
   isDragging: boolean;
+  /** STEP-PROGRAM-ENHANCE-FULL — 부모에서 1회 fetch한 staff_pool 옵션 */
+  staffOptions?: StaffOption[];
 }
 
 const INVITE_BADGE: Record<InvitationStatus, string> = {
@@ -85,6 +87,7 @@ export default function CurriculumRow({
   item, invitation, onSave, onDelete, onRequestInstructor, onStaffChanged,
   canReorder, onMoveUp, onMoveDown, isFirst, isLast,
   onDragStart, onDragEnter, onDragEnd, onDragOver, isDragging,
+  staffOptions,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => toDraft(item));
@@ -210,7 +213,7 @@ export default function CurriculumRow({
 
       {/* STEP-CURRICULUM-INLINE-ROLE — 행3: 인력 배정 (항상 노출, 4역할 콤보+검색) */}
       <div className="px-2 pb-2">
-        <CurriculumRowStaffSection curriculumId={item.id} onChanged={onStaffChanged} />
+        <CurriculumRowStaffSection curriculumId={item.id} onChanged={onStaffChanged} staffOptions={staffOptions} />
       </div>
 
       {/* 펼침 영역 — 날짜·장소·저장 (선택) */}

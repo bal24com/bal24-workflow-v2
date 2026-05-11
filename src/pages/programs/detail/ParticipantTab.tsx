@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Plus, Loader2, Copy, Trash2, CheckCircle2, FileUp, Search, FileText,
+  Plus, Loader2, FileUp, Search, FileText, Download,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Modal, Button, Input } from '../../../components/ui';
 import ParticipantDocImportModal from './ParticipantDocImportModal';
+import ParticipantEditableTable from './ParticipantEditableTable';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import {
@@ -112,37 +114,7 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
     }
   }
 
-  async function handleCopy(p: ProgramParticipant) {
-    const ok = await copyParticipantLink(p.access_token);
-    if (ok) toast.success('링크가 복사됐어요.');
-    else toast.error('링크 복사에 실패했어요.');
-  }
-
-  async function handleComplete(p: ProgramParticipant) {
-    const { error } = await supabase
-      .from('program_participants')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', p.id);
-    if (error) {
-      console.error('[participant-tab] 수료 처리 실패:', error.message);
-      toast.error('수료 처리에 실패했어요.');
-      return;
-    }
-    await reload();
-    toast.success('수료 처리됐어요.');
-  }
-
-  async function handleDelete(p: ProgramParticipant) {
-    if (!window.confirm(`"${p.name}" 참여자를 삭제할까요?`)) return;
-    const { error } = await supabase.from('program_participants').delete().eq('id', p.id);
-    if (error) {
-      console.error('[participant-tab] 삭제 실패:', error.message);
-      toast.error('삭제에 실패했어요.');
-      return;
-    }
-    await reload();
-    toast.success('삭제됐어요.');
-  }
+  // STEP-PROGRAM-ENHANCE-FULL — 행별 액션(편집/수료/삭제/복사)은 ParticipantEditableTable로 이관
 
   function runCsvParse() {
     const rows = parseParticipantCSV(csvText);
@@ -194,20 +166,31 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
 
       {/* 툴바 */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {canEdit && (
             <>
-              <Button variant="primary" size="sm" leftIcon={<Plus size={14} />} onClick={() => setAddOpen(true)}>
-                참여자 추가
-              </Button>
-              <Button variant="outline" size="sm" leftIcon={<FileUp size={14} />} onClick={() => setBulkOpen(true)}>
-                CSV 일괄 등록
-              </Button>
-              <Button variant="outline" size="sm" leftIcon={<FileText size={14} />} onClick={() => setDocOpen(true)}>
-                문서로 등록
-              </Button>
+              <Button variant="primary" size="sm" leftIcon={<Plus size={14} />} onClick={() => setAddOpen(true)}>참여자 추가</Button>
+              <Button variant="outline" size="sm" leftIcon={<FileUp size={14} />} onClick={() => setBulkOpen(true)}>CSV 일괄 등록</Button>
+              <Button variant="outline" size="sm" leftIcon={<FileText size={14} />} onClick={() => setDocOpen(true)}>문서로 등록</Button>
             </>
           )}
+          {/* STEP-PROGRAM-ENHANCE-FULL — xlsx 다운로드 */}
+          <Button variant="outline" size="sm" leftIcon={<Download size={14} />}
+            disabled={list.length === 0}
+            onClick={() => {
+              const rows = list.map((p, i) => ({
+                '번호': i + 1, '이름': p.name, '소속': p.organization ?? '',
+                '연락처': p.phone ?? '', '이메일': p.email ?? '',
+                '주민번호': p.id_number ? p.id_number.replace(/^(\d{6})(\d)\d*$/, '$1-$2******') : '',
+                '상태': p.status,
+              }));
+              const ws = XLSX.utils.json_to_sheet(rows);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, '교육생명단');
+              XLSX.writeFile(wb, `participants_${programId.slice(0,8)}.xlsx`);
+            }}>
+            엑셀 다운로드
+          </Button>
         </div>
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -254,44 +237,8 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
           {list.length === 0 ? '등록된 참여자가 없어요.' : '검색 결과가 없어요.'}
         </p>
       ) : (
-        <ul className="space-y-1.5">
-          {visible.map((p) => (
-            <li key={p.id} className="grid grid-cols-[minmax(0,1.2fr)_60px_minmax(0,1fr)_minmax(0,1.2fr)_70px_minmax(140px,auto)] items-center gap-2 px-3 py-2 rounded-xl border border-slate-100 bg-white">
-              <div className="min-w-0">
-                <div className="text-sm font-bold text-slate-800 truncate">{p.name}</div>
-                {p.memo && <div className="text-[10px] text-slate-400 truncate">{p.memo}</div>}
-              </div>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded text-center ${PARTICIPANT_ROLE_BADGE[p.role]}`}>
-                {PARTICIPANT_ROLE_LABEL[p.role]}
-              </span>
-              <span className="text-xs text-slate-500 truncate">{p.phone ?? '-'}</span>
-              <span className="text-xs text-slate-500 truncate">{p.email ?? '-'}</span>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded text-center ${
-                p.status === 'completed' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-              }`}>
-                {p.status === 'completed' ? '수료' : '참여중'}
-              </span>
-              <div className="flex items-center justify-end gap-1">
-                <button type="button" onClick={() => void handleCopy(p)} aria-label="링크 복사"
-                  className="inline-flex items-center gap-0.5 px-2 py-1 rounded text-[10px] text-violet-700 hover:bg-violet-50">
-                  <Copy size={11} aria-hidden="true" /> 링크
-                </button>
-                {canEdit && p.status !== 'completed' && (
-                  <button type="button" onClick={() => void handleComplete(p)} aria-label="수료 처리"
-                    className="p-1 rounded text-emerald-600 hover:bg-emerald-50" title="수료 처리">
-                    <CheckCircle2 size={12} aria-hidden="true" />
-                  </button>
-                )}
-                {canEdit && (
-                  <button type="button" onClick={() => void handleDelete(p)} aria-label="삭제"
-                    className="p-1 rounded text-slate-400 hover:bg-rose-50 hover:text-rose-500" title="삭제">
-                    <Trash2 size={12} aria-hidden="true" />
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+        // STEP-PROGRAM-ENHANCE-FULL — 인라인 편집 테이블 (이름·소속·연락처·주민번호·상태)
+        <ParticipantEditableTable list={visible} canEdit={canEdit} onChanged={() => void reload()} />
       )}
 
       {/* CSV 일괄 등록 모달 */}

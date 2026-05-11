@@ -17,10 +17,19 @@ interface StaffRow {
   name: string;
 }
 
+/** STEP-PROGRAM-ENHANCE-FULL — 부모(CurriculumTab)가 1회 fetch한 staff_pool 옵션 */
+export interface StaffOption {
+  id: string;
+  name: string;
+  organization?: string | null;
+}
+
 interface Props {
   curriculumId: string;
   /** 부모가 등록·삭제 시 사용하는 옵션 콜백 (외부 토스트 등) */
   onChanged?: () => void;
+  /** STEP-PROGRAM-ENHANCE-FULL — staff_pool 인라인 select용 옵션 (N번 fetch 방지) */
+  staffOptions?: StaffOption[];
 }
 
 // 운영진 제외 4역할 (박경수님 요청 — 강사·멘토·FT·TA만)
@@ -47,7 +56,7 @@ function pickOne<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? v[0] ?? null : v;
 }
 
-export default function CurriculumRowStaffSection({ curriculumId, onChanged }: Props) {
+export default function CurriculumRowStaffSection({ curriculumId, onChanged, staffOptions = [] }: Props) {
   const toast = useToast();
   const [rows, setRows] = useState<StaffRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,15 +158,30 @@ export default function CurriculumRowStaffSection({ curriculumId, onChanged }: P
         <span className="text-[11px] text-slate-400 italic">배정된 인력이 없어요.</span>
       )}
 
-      {/* 콤보 + 추가 버튼 — 박경수님 옵션 B: 한 줄 컴팩트 UI */}
-      <div className="inline-flex items-center gap-1 ml-auto">
+      {/* 콤보 + 인라인 select + 모달 검색 — 박경수님 spec: 빠른 선택 + 상세 검색 둘 다 */}
+      <div className="inline-flex items-center gap-1 ml-auto flex-wrap">
         <select value={pickRole} onChange={(e) => setPickRole(e.target.value as CurriculumStaffRole)}
           className="h-7 px-2 rounded-md border border-violet-200 bg-white text-[11px] font-semibold text-violet-700 focus:outline-none focus:border-violet-400">
           {ROLES.map((r) => (<option key={r} value={r}>{r}</option>))}
         </select>
+        {/* STEP-PROGRAM-ENHANCE-FULL — 인라인 staff_pool 빠른 선택 */}
+        {staffOptions.length > 0 && (
+          <select
+            onChange={(e) => {
+              const opt = staffOptions.find((s) => s.id === e.target.value);
+              if (opt) void handleSelect(pickRole, { sourceType: 'staff_pool', id: opt.id, name: opt.name, organization: opt.organization ?? undefined });
+              e.target.value = '';
+            }}
+            className="h-7 px-2 rounded-md border border-slate-200 bg-white text-[11px] focus:outline-none focus:border-violet-400 max-w-[160px]">
+            <option value="">+ 전문가 선택</option>
+            {staffOptions
+              .filter((s) => !rows.some((r) => r.sourceId === s.id))
+              .map((s) => (<option key={s.id} value={s.id}>{s.name}{s.organization ? ` (${s.organization})` : ''}</option>))}
+          </select>
+        )}
         <button type="button" onClick={() => setModalOpen(true)}
           className="inline-flex items-center gap-0.5 h-7 px-2.5 rounded-md text-[11px] font-bold text-white bg-violet-600 hover:bg-violet-700">
-          <Plus size={10} aria-hidden="true" /> 검색·추가
+          <Plus size={10} aria-hidden="true" /> 상세 검색
         </button>
       </div>
 

@@ -121,7 +121,7 @@ export default function SurveyFileUploadSection({ programId }: Props) {
       ) : (
         <div className="space-y-2.5">
           {items.map((s) => (
-            <SurveyResultCard key={s.id} survey={s}
+            <SurveyResultCard key={s.id} survey={s} programId={programId}
               onDelete={() => void handleDelete(s)}
               onAnalyzed={() => void refresh()} />
           ))}

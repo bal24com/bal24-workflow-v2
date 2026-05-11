@@ -2,7 +2,8 @@
 //   STEP-SURVEY-AI — [AI 분석] 버튼 → 항목별·전체 인사이트 (Claude 호출 → satisfaction_surveys UPDATE)
 
 import { useState } from 'react';
-import { Star, FileText, ChevronDown, ChevronUp, Trash2, MessageSquare, Sparkles, Loader2 } from 'lucide-react';
+import { Star, FileText, ChevronDown, ChevronUp, Trash2, MessageSquare, Sparkles, Loader2, Download, FileBarChart } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { supabase } from '../../../lib/supabase';
 import { callAi } from '../../../lib/aiClient';
 import { useToast } from '../../../contexts/ToastContext';
@@ -13,6 +14,8 @@ interface Props {
   onDelete?: () => void;
   /** AI 분석 완료 후 부모(SurveyFileUploadSection) 새로고침 */
   onAnalyzed?: () => void;
+  /** STEP-PROGRAM-ENHANCE-FULL — 결과보고서 탭으로 전송 (program_report_sections.satisfaction) */
+  programId?: string;
 }
 
 const AI_SYSTEM = `너는 교육·캠프 만족도 설문 분석가야. 응답 데이터를 받아 JSON으로만 반환해.
@@ -27,13 +30,67 @@ function formatDateTime(iso: string): string {
   } catch { return iso; }
 }
 
-export default function SurveyResultCard({ survey, onDelete, onAnalyzed }: Props) {
+export default function SurveyResultCard({ survey, onDelete, onAnalyzed, programId }: Props) {
   const toast = useToast();
   const [expanded, setExpanded] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const items = Object.entries(survey.summary_json ?? {});
   const overall = survey.avg_overall != null ? Number(survey.avg_overall) : null;
   const hasAi = Boolean(survey.ai_overall || (survey.ai_per_question && Object.keys(survey.ai_per_question).length > 0));
+
+  // STEP-PROGRAM-ENHANCE-FULL — recharts 가로 막대 데이터
+  const chartData = items
+    .filter(([, v]) => typeof v === 'number' && (v as number) <= 5)
+    .map(([key, value]) => ({
+      name: key.length > 24 ? `${key.slice(0, 22)}…` : key,
+      score: Math.round((value as number) * 100) / 100,
+    }));
+
+  // STEP-PROGRAM-ENHANCE-FULL — 텍스트 리포트 다운로드
+  function handleDownloadReport() {
+    const lines = [
+      '=== 만족도 조사 분석 리포트 ===',
+      `파일: ${survey.file_name ?? '(이름 없음)'}`,
+      `총 응답: ${survey.total_count}명`,
+      `전반적 만족도: ${overall != null ? `${overall.toFixed(2)}/5.0` : '-'}`,
+      '',
+      '[항목별 평균]',
+      ...items.filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k}: ${(v as number).toFixed(2)}`),
+      '',
+      '[AI 분석 리포트]',
+      survey.ai_overall ?? '(아직 생성되지 않음)',
+      '',
+      ...(survey.ai_per_question ? ['[항목별 AI 분석]', ...Object.entries(survey.ai_per_question).map(([q, ins]) => `- ${q}: ${ins}`)] : []),
+      '',
+      '[자유서술]',
+      ...(survey.comments ?? []).map((c) => `· ${c}`),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `satisfaction_${survey.id.slice(0, 8)}.txt`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  // STEP-PROGRAM-ENHANCE-FULL — 결과보고서 탭으로 전송 (program_report_sections.satisfaction)
+  async function handleSendToReport() {
+    if (!programId) { toast.error('프로그램 정보가 없어요.'); return; }
+    const summary = [
+      `만족도 조사 결과 (${survey.total_count}명 응답)`,
+      `전반적 만족도: ${overall != null ? `${overall.toFixed(2)}/5.0` : '-'}`,
+      '',
+      '[항목별 평균]',
+      ...items.filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k}: ${(v as number).toFixed(2)}`),
+      '',
+      survey.ai_overall ? `[AI 분석]\n${survey.ai_overall}` : '',
+    ].join('\n');
+    const { error } = await supabase.from('program_report_sections').upsert({
+      program_id: programId, section_key: 'satisfaction', content: summary,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'program_id,section_key' });
+    if (error) { console.error('[survey→report]', error.message); toast.error('결과보고서 전송에 실패했어요.'); return; }
+    toast.success('결과보고서 탭에 반영했어요.');
+  }
 
   async function handleAiAnalyze() {
     setAnalyzing(true);
@@ -104,6 +161,17 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed }: Props
             {analyzing ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
             {analyzing ? '분석 중…' : hasAi ? 'AI 재분석' : 'AI 분석'}
           </button>
+          {/* STEP-PROGRAM-ENHANCE-FULL — 리포트 다운로드 + 결과보고서 전송 */}
+          <button type="button" onClick={handleDownloadReport} title="텍스트 리포트 다운로드"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200">
+            <Download size={11} /> 다운로드
+          </button>
+          {programId && (
+            <button type="button" onClick={() => void handleSendToReport()} title="결과보고서 탭으로 전송"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200">
+              <FileBarChart size={11} /> 보고서로
+            </button>
+          )}
           <button type="button" onClick={() => setExpanded((v) => !v)} aria-label={expanded ? '접기' : '펼치기'}
             className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600">
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -119,6 +187,22 @@ export default function SurveyResultCard({ survey, onDelete, onAnalyzed }: Props
 
       {expanded && (
         <>
+          {/* STEP-PROGRAM-ENHANCE-FULL — recharts 가로 막대 차트 */}
+          {chartData.length > 0 && (
+            <div className="rounded-lg border border-slate-100 bg-white p-2">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">항목별 평균 (그래프)</p>
+              <ResponsiveContainer width="100%" height={chartData.length * 32 + 30}>
+                <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+                  <XAxis type="number" domain={[0, 5]} tickCount={6} tick={{ fontSize: 10, fill: '#64748B' }} />
+                  <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10, fill: '#1E1B4B' }} />
+                  <Tooltip formatter={(v) => (typeof v === 'number' ? v.toFixed(2) : String(v))} />
+                  <Bar dataKey="score" radius={[0, 4, 4, 0]}>
+                    {chartData.map((_, i) => (<Cell key={i} fill="#7C3AED" fillOpacity={0.75} />))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
           {items.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">항목별 평균</p>

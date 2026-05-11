@@ -1185,7 +1185,8 @@ export interface FinalReportPhoto {
 
 // ─── STEP-PARTICIPANT-PORTAL 참여자 통합 토큰 ─────────────
 export type ParticipantRole = 'participant' | 'mentor' | 'client' | 'ta' | 'observer';
-export type ParticipantStatus = 'active' | 'inactive' | 'completed';
+/** STEP-PROGRAM-ENHANCE-FULL — 'pending'·'dropped' 추가 */
+export type ParticipantStatus = 'active' | 'inactive' | 'completed' | 'pending' | 'dropped';
 
 export interface ProgramParticipant {
   id: string;
@@ -1194,6 +1195,10 @@ export interface ProgramParticipant {
   name: string;
   email?: string | null;
   phone?: string | null;
+  /** STEP-PROGRAM-ENHANCE-FULL — 소속 */
+  organization?: string | null;
+  /** STEP-PROGRAM-ENHANCE-FULL — 주민번호 (마스킹 표시, 평문 저장은 RLS로 보호) */
+  id_number?: string | null;
   role: ParticipantRole;
   access_token: string;
   token_expires_at?: string | null;
@@ -1202,6 +1207,31 @@ export interface ProgramParticipant {
   memo?: string | null;
   created_by?: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+/** STEP-PROGRAM-ENHANCE-FULL — 차시별 출석 (AI 자동 처리 결과 포함) */
+export interface ProgramAttendanceRecord {
+  id: string;
+  program_id: string;
+  curriculum_id?: string | null;
+  participant_id?: string | null;
+  day_label?: string | null;
+  is_present: boolean;
+  note?: string | null;
+  created_at: string;
+}
+
+/** STEP-PROGRAM-ENHANCE-FULL — 프로그램 단위 결과보고서 섹션 */
+export type ProgramReportSectionKey =
+  | 'overview' | 'outcomes' | 'curriculum' | 'attendance' | 'satisfaction' | 'extra';
+
+export interface ProgramReportSection {
+  id: string;
+  program_id: string;
+  section_key: ProgramReportSectionKey;
+  content?: string | null;
+  sort_order: number;
   updated_at: string;
 }
 
