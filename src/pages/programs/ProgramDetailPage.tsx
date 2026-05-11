@@ -38,7 +38,8 @@ type DetailProgram = Program & {
 };
 
 // STEP-PROGRAM-TABS-CONSOLIDATE — 9 탭 (STEP-PROGRAM-REPORT-TAB에서 'final-report' 추가)
-type TabKey = 'overview' | 'curriculum' | 'participants' | 'attendance' | 'instructor' | 'report' | 'final-report' | 'grant' | 'settings';
+// STEP-PROGRAM-UX-A — 'attendance' → 'activity-log' (출석은 교육생 탭으로 이동, 본 탭은 일지·수료증 전담)
+type TabKey = 'overview' | 'curriculum' | 'participants' | 'activity-log' | 'instructor' | 'report' | 'final-report' | 'grant' | 'settings';
 
 interface AuthCtx {
   isPM: boolean; isStaff: boolean; isMember: boolean; isPartner: boolean;
@@ -57,8 +58,8 @@ const TABS: TabDef[] = [
   { key: 'overview',     label: '개요',         Icon: Info },
   { key: 'curriculum',   label: '커리큘럼',     Icon: BookOpen,        hide: (c) => c.isMember || c.isPartner },
   { key: 'participants', label: '교육생',       Icon: Users2,          hide: (c) => c.isMember || c.isPartner },
-  // STEP-CURRICULUM-ATTEND-SURVEY-FULL — 출석/보고 탭은 데이터 없으면 비-PM에게 자동 숨김
-  { key: 'attendance',   label: '출석',         Icon: ClipboardCheck,
+  // STEP-PROGRAM-UX-A — 출석은 교육생 탭으로 통합, 본 탭은 '일지·수료증' 전담
+  { key: 'activity-log', label: '일지·수료증',  Icon: ClipboardCheck,
     hide: (c) => c.isMember || c.isPartner || (!c.isPM && !c.hasAttendData) },
   { key: 'instructor',   label: '강사',         Icon: Mic2 },
   { key: 'report',       label: '만족도·보고',  Icon: FileBarChart,
@@ -286,7 +287,7 @@ export default function ProgramDetailPage() {
         )}
         {tab === 'curriculum'   && <CurriculumTab programId={programId} programName={program.name} />}
         {tab === 'participants' && <ParticipantManageTab programId={programId} programName={program.name} canEdit={isStaff} />}
-        {tab === 'attendance'   && <AttendanceLogTab programId={programId} />}
+        {tab === 'activity-log' && <AttendanceLogTab programId={programId} />}
         {tab === 'instructor'   && <InstructorManageTab programId={programId} isPartner={isPartner} />}
         {tab === 'report'       && <ReportManageTab programId={programId} isPartner={isPartner} isMember={isMember} isStaff={isStaff} applicationType={program.application_type} />}
         {tab === 'final-report' && <ProgramReportTab programId={programId} />}

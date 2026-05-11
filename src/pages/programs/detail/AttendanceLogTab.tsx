@@ -1,27 +1,20 @@
-// bal24 v2 — 프로그램 상세 · 출석·일지 탭 (Stage 11-② 강화)
-// 3 sub 섹션: 출석 / 일지 / 수료증 (sub 탭 전환).
+// bal24 v2 — 프로그램 상세 · 일지·수료증 탭
+// STEP-PROGRAM-UX-A — 출석 sub-tab은 ParticipantManageTab(교육생)으로 이동. 일지·수료증만 잔여.
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Loader2, ClipboardCheck, ListChecks, Plus, Award,
-} from 'lucide-react';
+import { Loader2, ListChecks, Plus, Award } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 import { formatDateKo } from '../../../lib/utils';
 import {
   fetchProgramActivities, activityLogTypeLabel, type ActivityRow,
 } from './programDetailUtils';
-import SessionManagePanel from './attendance/SessionManagePanel';
 import CertificateIssuePanel from './attendance/CertificateIssuePanel';
-import AttendanceLinkSection from './attendance/AttendanceLinkSection';
-import AttendanceAISection from './attendance/AttendanceAISection';
-import AttendanceGridTable from './attendance/AttendanceGridTable';
 import type { ActivityLogType } from '../../../types/database';
 
-type SubTab = 'attendance' | 'log' | 'certificate';
+type SubTab = 'log' | 'certificate';
 
-const SUB_TABS: { key: SubTab; label: string; Icon: typeof ClipboardCheck }[] = [
-  { key: 'attendance',  label: '출석',     Icon: ClipboardCheck },
+const SUB_TABS: { key: SubTab; label: string; Icon: typeof ListChecks }[] = [
   { key: 'log',         label: '일지',     Icon: ListChecks },
   { key: 'certificate', label: '수료증',   Icon: Award },
 ];
@@ -36,15 +29,13 @@ const TYPE_STYLE: Record<ActivityLogType, string> = {
 };
 
 export default function AttendanceLogTab({ programId }: { programId: string }) {
-  const [sub, setSub] = useState<SubTab>('attendance');
-  const [gridKey, setGridKey] = useState(0);
+  const [sub, setSub] = useState<SubTab>('log');
 
   return (
     <div className="flex flex-col gap-3">
-      {/* sub 탭 */}
       <nav
         role="tablist"
-        aria-label="출석·일지 sub 탭"
+        aria-label="일지·수료증 sub 탭"
         className="inline-flex items-center bg-violet-50 rounded-full p-0.5 border border-violet-100 self-start"
       >
         {SUB_TABS.map(({ key, label, Icon }) => {
@@ -66,32 +57,6 @@ export default function AttendanceLogTab({ programId }: { programId: string }) {
           );
         })}
       </nav>
-
-      {/* sub 본문 */}
-      {sub === 'attendance' && (
-        <>
-          {/* STEP-PROGRAM-ENHANCE-FULL — AI 출석 자동 처리 + 출석표 */}
-          <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-3">
-            <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
-              <ClipboardCheck size={16} className="text-violet-500" aria-hidden="true" />
-              AI 출석 자동 처리
-            </h3>
-            <AttendanceAISection programId={programId} onProcessed={() => setGridKey((k) => k + 1)} />
-          </section>
-          <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-3">
-            <h3 className="text-sm font-bold text-[#1E1B4B]">출석 현황</h3>
-            <AttendanceGridTable programId={programId} refreshKey={gridKey} />
-          </section>
-          {/* STEP-CURRICULUM-ATTEND-SURVEY-FULL — 차시별 외부 출석 링크·파일 */}
-          <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-2">
-            <h3 className="text-sm font-bold text-[#1E1B4B]">차시별 출석 링크·파일</h3>
-            <AttendanceLinkSection programId={programId} />
-          </section>
-          <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
-            <SessionManagePanel programId={programId} />
-          </section>
-        </>
-      )}
 
       {sub === 'log' && <ActivityLogSection programId={programId} />}
 
@@ -168,8 +133,8 @@ function ActivityLogSection({ programId }: { programId: string }) {
               </div>
               <p className="mt-1 text-xs font-semibold text-[#1E1B4B] line-clamp-2">{a.title}</p>
               <div className="mt-0.5 flex items-center gap-2 text-[10px] text-slate-400">
-                {a.duration_hours != null && <span>⏱ {a.duration_hours}h</span>}
-                {a.attendee_count != null && <span>👥 {a.attendee_count}명</span>}
+                {a.duration_hours != null && <span>· {a.duration_hours}h</span>}
+                {a.attendee_count != null && <span>· {a.attendee_count}명</span>}
               </div>
             </li>
           ))}
