@@ -30,6 +30,8 @@ type MenuItem = {
   to: string;
   label: string;
   Icon: LucideIcon;
+  /** STEP-SIDEBAR-PROGRAM-RESTORE — 상위 항목의 하위 메뉴로 들여쓰기 표시 */
+  nested?: boolean;
 };
 
 type MenuSection = {
@@ -50,6 +52,8 @@ const SECTIONS: MenuSection[] = [
     heading: '사업',
     items: [
       { to: '/projects',   label: '프로젝트', Icon: FolderKanban },
+      // STEP-SIDEBAR-PROGRAM-RESTORE — 프로젝트 하위 메뉴로 들여쓰기 표시
+      { to: '/programs',   label: '프로그램', Icon: BookOpen, nested: true },
       { to: '/consortium', label: '컨소시엄', Icon: Building2 },
     ],
   },
@@ -100,6 +104,8 @@ const PARTNER_SECTIONS: MenuSection[] = [
     heading: '사업',
     items: [
       { to: '/projects',   label: '프로젝트', Icon: FolderKanban },
+      // STEP-SIDEBAR-PROGRAM-RESTORE — PARTNER 사이드바도 동일하게 프로그램 하위 추가
+      { to: '/programs',   label: '프로그램', Icon: BookOpen, nested: true },
       { to: '/consortium', label: '컨소시엄', Icon: Building2 },
     ],
   },
@@ -150,20 +156,25 @@ const FINANCE_SECTIONS: MenuSection[] = [
   },
 ];
 
-function MenuLink({ to, label, Icon }: MenuItem) {
+function MenuLink({ to, label, Icon, nested }: MenuItem) {
   return (
     <NavLink
       to={to}
       className={({ isActive }) =>
         [
-          'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+          'flex items-center gap-3 py-2 rounded-lg text-sm transition-colors',
+          // STEP-SIDEBAR-PROGRAM-RESTORE — nested 항목은 왼쪽 들여쓰기 + 트리 가지 표시
+          nested ? 'pl-8 pr-3 relative' : 'px-3',
           isActive
             ? 'bg-primary/20 text-white font-semibold'
             : 'text-slate-300 hover:bg-white/5 hover:text-white',
         ].join(' ')
       }
     >
-      <Icon size={18} aria-hidden="true" />
+      {nested && (
+        <span aria-hidden="true" className="absolute left-4 top-0 bottom-1/2 border-l border-b border-white/20 w-2.5 rounded-bl" />
+      )}
+      <Icon size={16} aria-hidden="true" />
       <span>{label}</span>
     </NavLink>
   );
