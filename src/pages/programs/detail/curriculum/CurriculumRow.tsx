@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import {
   ChevronDown, ChevronRight, GripVertical, Trash2, Save, RotateCcw, Send, ArrowUp, ArrowDown,
 } from 'lucide-react';
-import DateTimePicker from '../../../../components/ui/DateTimePicker';
 import CurriculumRowStaffSection, { type StaffOption } from './CurriculumRowStaffSection';
 import { computeDuration, padTime, trimTime, type CurriculumWithStaff } from './curriculumTabUtils';
 import type { ProgramCurriculum, InvitationStatus } from '../../../../types/database';
@@ -164,10 +163,13 @@ export default function CurriculumRow({
           onChange={(e) => patchDraft('day_label', e.target.value || null)}
           placeholder="1일차"
           className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400" />
-        <DateTimePicker mode="time" value={draft.start_time}
-          onChange={(v) => patchDraft('start_time', v)} placeholder="시작" />
-        <DateTimePicker mode="time" value={draft.end_time}
-          onChange={(v) => patchDraft('end_time', v)} placeholder="종료" />
+        {/* STEP-CURRICULUM-INVITE-UPLOAD-FIX — 네이티브 time input (커스텀 팝업 오버레이 문제 회피) */}
+        <input type="time" value={draft.start_time ?? ''} aria-label="시작 시간"
+          onChange={(e) => patchDraft('start_time', e.target.value || null)}
+          className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 tabular-nums" />
+        <input type="time" value={draft.end_time ?? ''} aria-label="종료 시간"
+          onChange={(e) => patchDraft('end_time', e.target.value || null)}
+          className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 tabular-nums" />
         <input type="text" value={draft.title}
           onChange={(e) => patchDraft('title', e.target.value)}
           placeholder="주제·차시명"
