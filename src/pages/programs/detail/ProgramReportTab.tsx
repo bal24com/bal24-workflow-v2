@@ -14,6 +14,7 @@ import {
   fetchReportSections, saveReportSection, deleteReportSection, SECTION_GENERATORS,
   DEFAULT_REPORT_SECTIONS,
 } from './programReportUtils';
+import ReportReviewTab from './ReportReviewTab';
 import type { ProgramReportSectionKey } from '../../../types/database';
 
 interface Props { programId: string }
@@ -285,6 +286,13 @@ export default function ProgramReportTab({ programId }: Props) {
           );
         })}
       </div>
+
+      {/* STEP-TAB-RESTRUCTURE-A — 만족도·보고 탭의 [사업보고 검수] 흡수 */}
+      <hr className="my-2 border-violet-100" />
+      <section className="space-y-3">
+        <h3 className="text-base font-semibold text-[#1E1B4B]">사업보고 검수</h3>
+        <ReportReviewTab programId={programId} />
+      </section>
     </div>
   );
 }
