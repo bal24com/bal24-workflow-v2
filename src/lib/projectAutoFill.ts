@@ -109,7 +109,8 @@ function normalize(r: Partial<ProjectAutoFillResult>): ProjectAutoFillResult {
 export async function extractProjectFromDoc(file: File): Promise<ProjectAutoFillResult> {
   const kind = classifyFile(file);
   try {
-    if (kind !== 'unknown') {
+    // STEP-PROJECT-AUTOFILL-FIX — PDF/이미지는 fileToText 처리 불가 → callAiWithFile(멀티모달)로 라우팅
+    if (kind !== 'unknown' && kind !== 'pdf' && kind !== 'image') {
       const doc = await fileToText(file);
       if (!doc?.text) return EMPTY;
       const trimmed = trimText(doc.text);
