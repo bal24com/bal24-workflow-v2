@@ -1225,8 +1225,9 @@ export interface ProgramAttendanceRecord {
 }
 
 /** STEP-PROGRAM-ENHANCE-FULL — 프로그램 단위 결과보고서 섹션 */
+/** STEP-PROGRAM-REPORT-TAB — 'participants' 추가 (교육생 현황 자동집계 섹션) */
 export type ProgramReportSectionKey =
-  | 'overview' | 'outcomes' | 'curriculum' | 'attendance' | 'satisfaction' | 'extra';
+  | 'overview' | 'outcomes' | 'curriculum' | 'participants' | 'attendance' | 'satisfaction' | 'extra';
 
 export interface ProgramReportSection {
   id: string;

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, ClipboardCheck, Info, Loader2, Mic2, Pencil, FileBarChart, BookOpen, Users2, Award, Settings,
+  ArrowLeft, ClipboardCheck, Info, Loader2, Mic2, Pencil, FileBarChart, BookOpen, Users2, Award, Settings, FileText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -26,6 +26,7 @@ import ProgramInstructorSummaryCard from './detail/overview/ProgramInstructorSum
 import ParticipantManageTab from './detail/ParticipantManageTab';
 import InstructorManageTab from './detail/InstructorManageTab';
 import ReportManageTab from './detail/ReportManageTab';
+import ProgramReportTab from './detail/ProgramReportTab';
 import GrantManageTab from './detail/GrantManageTab';
 import SettingsShareTab from './detail/SettingsShareTab';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -36,8 +37,8 @@ type DetailProgram = Program & {
   project?: { id: string; name: string; status: string } | null;
 };
 
-// STEP-PROGRAM-TABS-CONSOLIDATE — 8 탭 단일 정의
-type TabKey = 'overview' | 'curriculum' | 'participants' | 'attendance' | 'instructor' | 'report' | 'grant' | 'settings';
+// STEP-PROGRAM-TABS-CONSOLIDATE — 9 탭 (STEP-PROGRAM-REPORT-TAB에서 'final-report' 추가)
+type TabKey = 'overview' | 'curriculum' | 'participants' | 'attendance' | 'instructor' | 'report' | 'final-report' | 'grant' | 'settings';
 
 interface AuthCtx {
   isPM: boolean; isStaff: boolean; isMember: boolean; isPartner: boolean;
@@ -62,6 +63,8 @@ const TABS: TabDef[] = [
   { key: 'instructor',   label: '강사',         Icon: Mic2 },
   { key: 'report',       label: '만족도·보고',  Icon: FileBarChart,
     hide: (c) => !c.isPM && !c.hasSurveyData && (c.isMember || c.isPartner) },
+  // STEP-PROGRAM-REPORT-TAB — 결과보고서 (6섹션 자동집계·편집)
+  { key: 'final-report', label: '결과보고서',   Icon: FileText,        hide: (c) => c.isMember || c.isPartner },
   { key: 'grant',        label: '지원금',       Icon: Award,           hide: (c) => !c.isPM },
   { key: 'settings',     label: '설정·공유',    Icon: Settings,        hide: (c) => !c.isPM },
 ];
@@ -286,6 +289,7 @@ export default function ProgramDetailPage() {
         {tab === 'attendance'   && <AttendanceLogTab programId={programId} />}
         {tab === 'instructor'   && <InstructorManageTab programId={programId} isPartner={isPartner} />}
         {tab === 'report'       && <ReportManageTab programId={programId} isPartner={isPartner} isMember={isMember} isStaff={isStaff} applicationType={program.application_type} />}
+        {tab === 'final-report' && <ProgramReportTab programId={programId} />}
         {tab === 'grant'        && <GrantManageTab programId={programId} consortiumId={program.consortium_id ?? null} isPM={isPM} applicationType={program.application_type} hasConsortium={Boolean(program.consortium_id)} />}
         {tab === 'settings'     && <SettingsShareTab programId={programId} />}
       </div>
