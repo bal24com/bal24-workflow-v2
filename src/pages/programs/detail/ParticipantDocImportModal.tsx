@@ -65,7 +65,8 @@ export default function ParticipantDocImportModal({ open, programId, onSuccess, 
     try {
       const kind = classifyFile(file);
       let raw = '';
-      if (kind !== 'unknown') {
+      // STEP-PARTICIPANT-PDF-FIX — PDF/이미지/unknown은 멀티모달, 그 외만 텍스트 추출
+      if (kind !== 'unknown' && kind !== 'pdf' && kind !== 'image') {
         const doc = await fileToText(file);
         if (doc?.text) {
           const r = await callAi({
@@ -90,9 +91,10 @@ export default function ParticipantDocImportModal({ open, programId, onSuccess, 
       setRows(persons.map((p) => ({ ...p, selected: true })));
       toast.success(`${persons.length}명을 추출했어요. 검토 후 등록해 주세요.`);
     } catch (err) {
-      const r = err instanceof Error ? err.message : '';
-      console.error('[participant-doc-import] AI 추출 실패:', r);
-      toast.error('AI 추출 중 오류가 발생했어요.');
+      // STEP-PARTICIPANT-PDF-FIX — 실제 원인 토스트로 노출 (silent fail 차단)
+      const msg = err instanceof Error ? err.message : '알 수 없는 오류';
+      console.error('[participant-doc-import] AI 추출 실패:', msg);
+      toast.error(`명단 추출 실패: ${msg}`);
     } finally {
       setExtracting(false);
     }
