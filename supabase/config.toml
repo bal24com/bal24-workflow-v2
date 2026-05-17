@@ -1,0 +1,16 @@
+# bal24 v2 — Supabase 프로젝트 설정 (Edge Function JWT 검증 정책 명시)
+# SECURITY-EDGE-FUNCTION-AUTH — anon JWT 만으로는 호출 불가하도록 verify_jwt: true 명시
+
+project_id = "clsljkxvgmqwenettkrz"
+
+[functions.ai-chat]
+verify_jwt = true
+
+[functions.analyze-survey]
+verify_jwt = true
+
+[functions.send-invite]
+verify_jwt = true
+
+[functions.send-notification]
+verify_jwt = true

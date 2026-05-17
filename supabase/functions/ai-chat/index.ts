@@ -4,6 +4,8 @@
 
 // @ts-expect-error — Deno 런타임 import
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
+// @ts-expect-error — Supabase JS (jsr — Supabase 공식 권장 Deno 패키지)
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 import type {
   AiChatRequest, AiChatResponse, AiModel,
 } from './types.ts';
@@ -134,6 +136,33 @@ serve(async (req: Request) => {
   }
   if (req.method !== 'POST') {
     return jsonResponse({ ok: false, error: 'POST 만 허용됩니다.' }, 405);
+  }
+
+  // SECURITY-EDGE-FUNCTION-AUTH — 로그인 사용자만 호출 허용 (anon JWT 차단)
+  // anon key 로 만든 JWT 는 user 가 null 이므로 401 반환 → ANTHROPIC_API_KEY 도용 경로 차단
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!jwt) {
+    return jsonResponse({ ok: false, error: '로그인이 필요해요.' }, 401);
+  }
+  try {
+    // @ts-expect-error — Deno
+    const supaUrl = Deno.env.get('SUPABASE_URL');
+    // @ts-expect-error — Deno
+    const supaAnon = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supaUrl || !supaAnon) {
+      console.error('[ai-chat] SUPABASE_URL / SUPABASE_ANON_KEY secret 미설정');
+      return jsonResponse({ ok: false, error: '서버 설정 오류예요. 관리자에게 문의해 주세요.' }, 500);
+    }
+    const supa = createClient(supaUrl, supaAnon, { global: { headers: { Authorization: `Bearer ${jwt}` } } });
+    const { data: userData, error: userErr } = await supa.auth.getUser(jwt);
+    if (userErr || !userData?.user) {
+      return jsonResponse({ ok: false, error: '로그인 인증에 실패했어요. 다시 로그인해 주세요.' }, 401);
+    }
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    console.error('[ai-chat] 인증 검증 실패:', raw);
+    return jsonResponse({ ok: false, error: '인증 처리 중 오류가 발생했어요.' }, 500);
   }
 
   // @ts-expect-error — Deno

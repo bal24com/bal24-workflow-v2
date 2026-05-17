@@ -5,7 +5,7 @@
 
 // @ts-nocheck — Deno Edge Function (Node 타입과 격리)
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const SCORE_MAP: Record<string, number> = {
   '매우 만족': 5, '만족': 4, '보통': 3, '불만족': 2, '매우 불만족': 1,
@@ -94,6 +94,24 @@ JSON만 응답하고 마크다운 코드블록 없이 순수 JSON만 반환하�
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   try {
+    // SECURITY-EDGE-FUNCTION-AUTH — 로그인 사용자만 호출 허용 (anon JWT 차단)
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: '로그인이 필요해요.' }), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json' } });
+    }
+    const supaAnon = Deno.env.get('SUPABASE_ANON_KEY');
+    const supaUrl = Deno.env.get('SUPABASE_URL');
+    if (!supaAnon || !supaUrl) {
+      console.error('[analyze-survey] SUPABASE_URL / SUPABASE_ANON_KEY secret 미설정');
+      return new Response(JSON.stringify({ error: '서버 설정 오류예요.' }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } });
+    }
+    const authClient = createClient(supaUrl, supaAnon, { global: { headers: { Authorization: `Bearer ${jwt}` } } });
+    const { data: userData, error: userErr } = await authClient.auth.getUser(jwt);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: '로그인 인증에 실패했어요.' }), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json' } });
+    }
+
     const { program_id, file_name, file_url, rows } = await req.json();
     if (!program_id || !Array.isArray(rows) || rows.length === 0) {
       return new Response(JSON.stringify({ error: '응답 데이터가 비어 있어요.' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } });
