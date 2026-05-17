@@ -108,22 +108,28 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  // STEP-AUTOFILL-CARD-FULL — 명함 인식 결과 폼·연락처에 적용
+  // STEP-AUTOFILL-CARD-FIX — 명함 인식 결과 폼·연락처에 적용 (대표자명·사업자번호·담당자 휴대폰 보강)
   const handleCardApply = (ex: ClientCardExtracted) => {
     setForm((prev) => ({
       ...prev,
-      name:       prev.name.trim()       || ex.name        || prev.name,
-      department: prev.department.trim() || ex.department  || prev.department,
-      address:    prev.address.trim()    || ex.address     || prev.address,
+      name:           prev.name.trim()           || ex.name           || prev.name,
+      department:     prev.department.trim()     || ex.department     || prev.department,
+      address:        prev.address.trim()        || ex.address        || prev.address,
+      ceoName:        prev.ceoName.trim()        || ex.representative || prev.ceoName,
+      businessNumber: prev.businessNumber.trim() || (ex.business_no ? formatBusinessNumber(ex.business_no) : '') || prev.businessNumber,
+      phone:          prev.phone.trim()          || ex.phone          || prev.phone,
+      email:          prev.email.trim()          || ex.email          || prev.email,
     }));
-    if (ex.contact_name || ex.phone || ex.email) {
+    const contactPhone = ex.contact_phone || ex.phone;
+    const contactEmail = ex.contact_email || ex.email;
+    if (ex.contact_name || contactPhone || contactEmail) {
       setContacts((prev) => {
         const newContact: ContactDraft = {
           ...makeContact(),
           name: ex.contact_name ?? '',
           position: ex.contact_title ?? '',
-          phoneMobile: ex.phone ?? '',
-          email: ex.email ?? '',
+          phoneMobile: contactPhone ?? '',
+          email: contactEmail ?? '',
         };
         // 첫 행이 비어있으면 교체, 아니면 append
         const first = prev[0];
