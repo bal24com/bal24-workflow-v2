@@ -71,6 +71,20 @@ export interface MentoringFeedback {
   submitted_at: string;
 }
 
+/** STEP-MENTOR-PORTAL-FULL — 외부 포털에서 멘토가 작성하는 일지 */
+export interface MentoringLog {
+  id: string;
+  assignment_id: string | null;
+  program_id: string | null;
+  log_date: string;          // YYYY-MM-DD
+  session_no: number | null;
+  mentee_ids: string[];
+  content: string;
+  next_plan: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** 지급 계산 — 완료 회수 기반 */
 export function calcMentoringPay(a: MentoringAssignment, completedCount: number) {
   const base =

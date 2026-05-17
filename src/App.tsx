@@ -62,6 +62,7 @@ const StudentSharePage      = lazy(() => import('./pages/share-portal/StudentSha
 const ExpertSharePage       = lazy(() => import('./pages/share-portal/ExpertSharePage'));
 const MentoringMentorPage   = lazy(() => import('./pages/mentoring/MentoringMentorPage'));
 const MentoringStudentPage  = lazy(() => import('./pages/mentoring/MentoringStudentPage'));
+const MentorPortalPage      = lazy(() => import('./pages/mentor-portal/MentorPortalPage'));
 const MyPage                = lazy(() => import('./pages/mypage/MyPage'));
 const MemberInvitePage      = lazy(() => import('./pages/invite/MemberInvitePage'));
 const EvaluatePage          = lazy(() => import('./pages/evaluate/EvaluatePage'));
@@ -123,6 +124,8 @@ export default function App() {
             <Route path="/share/expert/:token" element={<ExpertSharePage />} />
             <Route path="/mentoring-mentor/:token" element={<MentoringMentorPage />} />
             <Route path="/mentoring-student/:token" element={<MentoringStudentPage />} />
+            {/* STEP-MENTOR-PORTAL-FULL — 미등록 멘토 초대 토큰 기반 외부 포털 */}
+            <Route path="/mentor-invite/:token" element={<MentorPortalPage />} />
             <Route path="/my/:token" element={<MyPage />} />
             <Route path="/invite/member/:token" element={<MemberInvitePage />} />
             <Route path="/evaluate/:token" element={<EvaluatePage />} />

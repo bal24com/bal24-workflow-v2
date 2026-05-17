@@ -2,7 +2,8 @@
 // 현황 카드 4개 + 보고서 목록 테이블 (멘토 필터 + 보고서/배정 추가).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, FileDown, Loader2, Plus, Users2, UserCheck, UserX, MessageSquare } from 'lucide-react';
+import { Copy, FileDown, Loader2, Plus, Users2, UserCheck, UserX, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import MentoringLogCard from './MentoringLogCard';
 import { Button, Card, CardContent } from '../../../components/ui';
 import EmptyState from '../../../components/EmptyState';
 import { supabase } from '../../../lib/supabase';
@@ -35,6 +36,8 @@ export default function MentoringTab({ programId }: Props) {
     mentorName: string;
     session: MentoringSession | null;
   } | null>(null);
+  // STEP-MENTOR-PORTAL-FULL — 카드 펼침 상태 (lazy fetch 트리거)
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -264,8 +267,19 @@ export default function MentoringTab({ programId }: Props) {
                         >
                           보고서 추가
                         </button>
+                        {/* STEP-MENTOR-PORTAL-FULL — 펼침 토글 */}
+                        <button type="button"
+                          onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}
+                          aria-label={expandedId === a.id ? '접기' : '펼치기'}
+                          className="inline-flex items-center justify-center w-6 h-6 rounded text-slate-500 hover:bg-violet-100 hover:text-violet-700">
+                          {expandedId === a.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                        </button>
                       </div>
                     </div>
+                    {/* STEP-MENTOR-PORTAL-FULL — 펼친 영역 (멘티 + 최근 일지 3건) */}
+                    {expandedId === a.id && (
+                      <MentoringLogCard assignmentId={a.id} menteeIds={a.mentee_ids ?? []} />
+                    )}
                   </li>
                 );
               })}
