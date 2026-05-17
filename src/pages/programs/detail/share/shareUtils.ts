@@ -97,35 +97,33 @@ function toDateOrNull(v: string | null | undefined): string | null {
   return t === '' ? null : t;
 }
 
+export interface SaveDatesResult {
+  ok: boolean;
+  error?: string;
+}
+
 export async function saveStageDates(
   programId: string,
   dates: SaveDatesPayload,
-): Promise<boolean> {
-  // STEP-PHASE-DATE-FULL — row 보장 (없으면 seed). 다른 NOT NULL 컬럼은 DB default가 채움
-  const seedRes = await supabase
-    .from('program_share')
-    .upsert({ program_id: programId }, { onConflict: 'program_id', ignoreDuplicates: true });
-  if (seedRes.error) {
-    console.error('[program-share] seed 생성 실패:', seedRes.error.message);
-    return false;
-  }
-
+): Promise<SaveDatesResult> {
+  // STEP-PHASE-DATE-FIX — seed + update 2단계를 단일 upsert로 단순화
+  // 다른 NOT NULL 컬럼(client_token 등)은 DB default가 채워 주므로 신규 row도 안전.
   const safePayload = {
+    program_id:    programId,
     pre_date:      toDateOrNull(dates.pre_date),
     ready_date:    toDateOrNull(dates.ready_date),
     progress_date: toDateOrNull(dates.progress_date),
     result_date:   toDateOrNull(dates.result_date),
-    updated_at: new Date().toISOString(),
+    updated_at:    new Date().toISOString(),
   };
   const { error } = await supabase
     .from('program_share')
-    .update(safePayload)
-    .eq('program_id', programId);
+    .upsert(safePayload, { onConflict: 'program_id' });
   if (error) {
-    console.error('[program-share] 단계 날짜 저장 실패:', error.message);
-    return false;
+    console.error('[program-share] 단계 날짜 저장 실패:', error.message, error);
+    return { ok: false, error: error.message || '알 수 없는 오류' };
   }
-  return true;
+  return { ok: true };
 }
 
 export async function toggleItemVisibility(

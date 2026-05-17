@@ -131,9 +131,10 @@ export default function ShareTab({ programId }: { programId: string }) {
   async function handleSaveDates() {
     setSavingDates(true);
     try {
-      const ok = await saveStageDates(programId, draftDates);
-      if (!ok) {
-        toast.error('단계 날짜 저장에 실패했어요.');
+      const res = await saveStageDates(programId, draftDates);
+      if (!res.ok) {
+        // STEP-PHASE-DATE-FIX — 진단을 위해 raw 에러 메시지 노출
+        toast.error(`단계 날짜 저장 실패: ${res.error ?? '알 수 없는 오류'}`);
         return;
       }
       toast.success('단계 날짜를 저장했어요.');
