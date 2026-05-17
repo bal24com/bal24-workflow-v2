@@ -8,6 +8,7 @@ import BasicInfoItem from './items/BasicInfoItem';
 import CurriculumItem from './items/CurriculumItem';
 import InstructorsItem from './items/InstructorsItem';
 import MaterialsItem from './items/MaterialsItem';
+import PortalProgressItem from './items/PortalProgressItem';
 import SurveyViewItem from './items/SurveyViewItem';
 import EditRequestItem from './items/EditRequestItem';
 import FeedbackCommentsItem from './items/FeedbackCommentsItem';
@@ -73,6 +74,8 @@ export default function ClientSharePage() {
                   return <InstructorsItem key={item} programId={ctx.program.id} />;
                 case 'materials':
                   return <MaterialsItem key={item} files={getPublicMaterials(ctx.program)} />;
+                case 'portal_progress':
+                  return <PortalProgressItem key={item} programId={ctx.program.id} />;
                 case 'survey_view':
                   return <SurveyViewItem key={item} programId={ctx.program.id} />;
                 case 'edit_request':
