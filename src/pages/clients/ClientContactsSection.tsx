@@ -9,7 +9,7 @@ import {
   extractBusinessCardInfo,
   ClaudeApiKeyMissingError,
   ClaudeApiError,
-} from '../../lib/claude';
+} from '../../lib/businessCardScan';
 import type { Profile } from '../../types/database';
 import ContactRow, { makeContact, type ContactDraft } from './ContactRow';
 

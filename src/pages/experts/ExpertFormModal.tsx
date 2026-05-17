@@ -7,7 +7,7 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { ScanLine, Loader2 } from 'lucide-react';
 import { Modal, Button, Input, FileDropZone } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import { extractBusinessCardInfo, ClaudeApiKeyMissingError, ClaudeApiError } from '../../lib/claude';
+import { extractBusinessCardInfo, ClaudeApiKeyMissingError, ClaudeApiError } from '../../lib/businessCardScan';
 import ExpertFormExtSection from './ExpertFormExtSection';
 import {
   EXPERT_STORAGE_BUCKET, EMPTY_EXPERT_FORM, expertToForm, maskIdNumber,
