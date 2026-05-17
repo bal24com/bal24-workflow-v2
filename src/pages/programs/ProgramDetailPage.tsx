@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Info, Loader2, Mic2, Pencil, FileBarChart, BookOpen, Users2, Settings, FileText,
+  ArrowLeft, Info, Loader2, Mic2, Pencil, FileBarChart, BookOpen, Users2, Settings, FileText, MessageSquare,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -26,6 +26,7 @@ import ParticipantManageTab from './detail/ParticipantManageTab';
 import InstructorManageTab from './detail/InstructorManageTab';
 import ReportManageTab from './detail/ReportManageTab';
 import ProgramReportTab from './detail/ProgramReportTab';
+import MentoringTab from './detail/MentoringTab';
 import SettingsShareTab from './detail/SettingsShareTab';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { usePartnerProfile } from '../../hooks/usePartnerProfile';
@@ -37,8 +38,9 @@ type DetailProgram = Program & {
 
 // STEP-PROGRAM-TABS-CONSOLIDATE — 9 탭 (STEP-PROGRAM-REPORT-TAB에서 'final-report' 추가)
 // STEP-PROGRAM-UX-A — 'attendance' → 'activity-log' (출석은 교육생 탭으로 이동)
-// STEP-TAB-RESTRUCTURE-B — 'activity-log' / 'grant' 제거 → 설정·공유 sub로 이동 (7 탭)
-type TabKey = 'overview' | 'curriculum' | 'participants' | 'instructor' | 'report' | 'final-report' | 'settings';
+// STEP-TAB-RESTRUCTURE-B — 'activity-log' / 'grant' 제거 → 설정·공유 sub로 이동
+// STEP-MENTORING-FULL — 'mentoring' 메인 탭 추가 (강사·만족도 사이) — 8 탭
+type TabKey = 'overview' | 'curriculum' | 'participants' | 'instructor' | 'mentoring' | 'report' | 'final-report' | 'settings';
 
 interface AuthCtx {
   isPM: boolean; isStaff: boolean; isMember: boolean; isPartner: boolean;
@@ -58,6 +60,8 @@ const TABS: TabDef[] = [
   { key: 'curriculum',   label: '커리큘럼',     Icon: BookOpen,        hide: (c) => c.isMember || c.isPartner },
   { key: 'participants', label: '교육생',       Icon: Users2,          hide: (c) => c.isMember || c.isPartner },
   { key: 'instructor',   label: '강사',         Icon: Mic2 },
+  // STEP-MENTORING-FULL — 멘토링 메인 탭 (PM/Staff)
+  { key: 'mentoring',    label: '멘토링',       Icon: MessageSquare,   hide: (c) => c.isMember || c.isPartner },
   { key: 'report',       label: '만족도·보고',  Icon: FileBarChart,
     hide: (c) => !c.isPM && !c.hasSurveyData && (c.isMember || c.isPartner) },
   // STEP-PROGRAM-REPORT-TAB — 결과보고서 (6섹션 자동집계·편집)
@@ -284,6 +288,7 @@ export default function ProgramDetailPage() {
         {tab === 'curriculum'   && <CurriculumTab programId={programId} programName={program.name} />}
         {tab === 'participants' && <ParticipantManageTab programId={programId} programName={program.name} canEdit={isStaff} />}
         {tab === 'instructor'   && <InstructorManageTab programId={programId} isPartner={isPartner} />}
+        {tab === 'mentoring'    && <MentoringTab programId={programId} />}
         {tab === 'report'       && <ReportManageTab programId={programId} isPartner={isPartner} isMember={isMember} isStaff={isStaff} applicationType={program.application_type} />}
         {tab === 'final-report' && <ProgramReportTab programId={programId} />}
         {tab === 'settings'     && (

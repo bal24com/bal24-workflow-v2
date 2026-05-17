@@ -17,6 +17,10 @@ export interface MentoringAssignment {
   program_id: string;
   mentor_pool_id: string | null;
   mentor_profile_id: string | null;
+  /** STEP-MENTORING-FULL — 미등록 멘토 이름 (pool/profile null일 때) */
+  mentor_name_raw?: string | null;
+  /** STEP-MENTORING-FULL — 외부 멘토 초대 토큰 */
+  mentor_invite_token?: string | null;
   mentee_ids: string[] | null;
   meet_type: MentoringMeetType | null;
   pay_type: MentoringPayType | null;
@@ -99,9 +103,14 @@ export function formatDuration(min: number | null | undefined): string {
   return `${m}분`;
 }
 
-/** 멘토 이름 — 외부/내부 자동 분기 */
+/** 멘토 이름 — 외부/내부/미등록 자동 분기 */
 export function getMentorName(a: MentoringAssignment): string {
-  return a.mentor_pool?.name ?? a.mentor_profile?.name ?? '미배정';
+  return a.mentor_pool?.name ?? a.mentor_profile?.name ?? a.mentor_name_raw ?? '미배정';
+}
+
+/** STEP-MENTORING-FULL — 미등록 멘토 여부 (pool·profile 둘 다 null) */
+export function isUnregisteredMentor(a: MentoringAssignment): boolean {
+  return !a.mentor_pool_id && !a.mentor_profile_id && !!a.mentor_name_raw;
 }
 
 /** 멘토 전문분야 라벨 */

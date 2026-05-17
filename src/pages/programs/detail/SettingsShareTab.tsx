@@ -1,12 +1,11 @@
 // bal24 v2 — 설정·공유 통합 탭
 // STEP-TAB-RESTRUCTURE-B — '일지·수료증' / '지원금' / '수료 기준' 흡수
-//   sub-toggle: [외부 공유] [파일] [일지·수료증] [지원금?] [멘토링] [수료 기준]
+// STEP-MENTORING-FULL — '멘토링' sub 제거 (메인 탭으로 승격)
 
 import { useState } from 'react';
 import SubToggle from './SubToggle';
 import ShareTab from './ShareTab';
 import ProgramFilesTab from './ProgramFilesTab';
-import MentoringTab from './MentoringTab';
 import AttendanceLogTab from './AttendanceLogTab';
 import GrantManageTab from './GrantManageTab';
 import CompletionThresholdPanel from './CompletionThresholdPanel';
@@ -19,7 +18,7 @@ interface Props {
   hasConsortium: boolean;
 }
 
-type SubKey = 'share' | 'files' | 'activity' | 'grant' | 'mentoring' | 'completion';
+type SubKey = 'share' | 'files' | 'activity' | 'grant' | 'completion';
 
 export default function SettingsShareTab({ programId, isPM, consortiumId, applicationType, hasConsortium }: Props) {
   const items: { key: SubKey; label: string }[] = [
@@ -27,7 +26,6 @@ export default function SettingsShareTab({ programId, isPM, consortiumId, applic
     { key: 'files',      label: '파일' },
     { key: 'activity',   label: '일지·수료증' },
     ...(isPM ? [{ key: 'grant' as const, label: '지원금' }] : []),
-    { key: 'mentoring',  label: '멘토링' },
     { key: 'completion', label: '수료 기준' },
   ];
   const [sub, setSub] = useState<SubKey>('share');
@@ -46,7 +44,6 @@ export default function SettingsShareTab({ programId, isPM, consortiumId, applic
           hasConsortium={hasConsortium}
         />
       )}
-      {sub === 'mentoring'  && <MentoringTab programId={programId} />}
       {sub === 'completion' && <CompletionThresholdPanel programId={programId} />}
     </div>
   );

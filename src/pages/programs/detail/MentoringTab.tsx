@@ -12,7 +12,7 @@ import { formatDateKo } from '../../../lib/utils';
 import {
   fetchMentoringAssignments, downloadSessionAsWord, countCompletedSessions,
 } from './mentoringUtils';
-import { formatDuration, getMentorName } from '../../../types/mentoring';
+import { formatDuration, getMentorName, isUnregisteredMentor } from '../../../types/mentoring';
 import type {
   MentoringAssignment, MentoringSession,
 } from '../../../types/mentoring';
@@ -217,11 +217,34 @@ export default function MentoringTab({ programId }: Props) {
               {assignments.map((a) => {
                 const completed = countCompletedSessions(a.sessions);
                 const planned = a.session_count ?? 0;
+                const menteeCount = a.mentee_ids?.length ?? 0;
+                const unregistered = isUnregisteredMentor(a);
                 return (
                   <li key={a.id} className="rounded-xl border border-violet-100 bg-violet-50/30 p-3 flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-[#1E1B4B] truncate">{getMentorName(a)}</span>
+                      <span className="text-sm font-bold text-[#1E1B4B] truncate inline-flex items-center gap-1">
+                        {getMentorName(a)}
+                        {/* STEP-MENTORING-FULL — 미등록 멘토 표시 */}
+                        {unregistered && (
+                          <span className="text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded px-1 py-0.5">미등록</span>
+                        )}
+                      </span>
                       <span className="text-[10px] text-slate-500 shrink-0">{a.meet_type ?? '-'} · {a.pay_type ?? '-'}</span>
+                    </div>
+                    {/* STEP-MENTORING-FULL — 담당 멘티 수 + 미등록 멘토 초대 링크 */}
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-slate-500">
+                        담당 멘티 <strong className="text-slate-700 tabular-nums">{menteeCount}</strong>명
+                        {menteeCount === 0 && <span className="ml-1 text-slate-400 italic">(미지정)</span>}
+                      </span>
+                      {unregistered && a.mentor_invite_token && (
+                        <button type="button"
+                          onClick={() => void copyToClipboard(`${window.location.origin}/mentor-invite/${a.mentor_invite_token}`)
+                            .then((ok) => toast.success(ok ? '초대 링크 복사됨' : '복사 실패'))}
+                          className="text-violet-600 hover:underline font-semibold">
+                          초대 링크 복사
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-500">
                       <span>완료 {completed}/{planned}회 · 원천 {a.tax_type}</span>
