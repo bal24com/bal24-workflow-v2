@@ -2,7 +2,7 @@
 // 카드(기본) / 리스트 + 분야 필터 + 검색 + 신규 등록
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutGrid, List, Plus, Loader2, Search, UserStar, Phone, Mail, Pencil, Trash2, Eye } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, Search, UserStar, Phone, Mail, Pencil, Trash2, Eye, Link2 } from 'lucide-react';
 import {
   Button,
   Card,
@@ -15,6 +15,7 @@ import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
 import { softDelete } from '../../lib/softDeleteUtils';
+import { copyToClipboard } from '../../lib/clipboard';
 import type { StaffPool } from '../../types/database';
 import ExpertFormModal from './ExpertFormModal';
 
@@ -34,7 +35,7 @@ function expertMatchesField(s: StaffPool, filter: FieldFilter): boolean {
   return tags.includes(filter);
 }
 
-function ExpertGridCard({ s, onEdit, onDelete }: { s: StaffPool; onEdit: () => void; onDelete: () => void }) {
+function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void }) {
   return (
     // STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일한 min-h
     <Card className="group hover:border-primary/30 hover:shadow-md transition min-h-[260px] flex flex-col">
@@ -92,22 +93,26 @@ function ExpertGridCard({ s, onEdit, onDelete }: { s: StaffPool; onEdit: () => v
           <p className="text-xs text-muted line-clamp-2 pt-1">{s.main_duties}</p>
         )}
       </CardContent>
-      {/* STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일 3 버튼 (보기/수정/삭제). 별도 detail 모달이 없어 보기=수정 동작 */}
+      {/* STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일 3 버튼 + STEP-STAFF-PORTAL-P2 포털 링크 복사 */}
       <div className="flex items-center gap-2 px-5 pb-4">
         <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={onEdit} className="!flex-1">내용보기</Button>
         <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={onEdit} className="!flex-1">수정</Button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onCopyPortal(); }}
+          aria-label="강사 포털 링크 복사" title="강사 포털 링크 복사"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-violet-600 border border-violet-200 bg-white hover:bg-violet-50 transition-colors">
+          <Link2 size={13} aria-hidden="true" />
+        </button>
         <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(); }}
           aria-label="삭제"
-          className="inline-flex items-center justify-center gap-1 h-8 px-2.5 rounded-md text-xs font-semibold text-rose-500 border border-rose-200 bg-white hover:bg-rose-50 transition-colors">
+          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-rose-500 border border-rose-200 bg-white hover:bg-rose-50 transition-colors">
           <Trash2 size={13} aria-hidden="true" />
-          삭제
         </button>
       </div>
     </Card>
   );
 }
 
-function ExpertListRow({ s, onEdit, onDelete }: { s: StaffPool; onEdit: () => void; onDelete: () => void }) {
+function ExpertListRow({ s, onEdit, onDelete, onCopyPortal }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void }) {
   return (
     <li className="group flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition relative">
       {s.profile_image_url ? (
@@ -153,6 +158,11 @@ function ExpertListRow({ s, onEdit, onDelete }: { s: StaffPool; onEdit: () => vo
         <button type="button" onClick={onEdit} aria-label="수정"
           className="p-1.5 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600">
           <Pencil size={12} />
+        </button>
+        {/* STEP-STAFF-PORTAL-P2 — 강사 포털 링크 복사 */}
+        <button type="button" onClick={onCopyPortal} aria-label="강사 포털 링크 복사" title="강사 포털 링크 복사"
+          className="p-1.5 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600">
+          <Link2 size={12} />
         </button>
         <button type="button" onClick={onDelete} aria-label="삭제"
           className="p-1.5 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500">
@@ -202,6 +212,19 @@ export default function ExpertsPage() {
   useEffect(() => {
     void fetchExperts();
   }, [fetchExperts]);
+
+  // STEP-STAFF-PORTAL-P2 — 강사 포털 영구 링크 복사
+  const handleCopyPortalLink = async (s: StaffPool) => {
+    const token = s.staff_portal_token;
+    if (!token) {
+      toast.error('포털 토큰이 아직 발급되지 않았어요. Supabase 마이그레이션 후 잠시 기다려 주세요.');
+      return;
+    }
+    const link = `${window.location.origin}/staff-portal/${token}`;
+    const ok = await copyToClipboard(link);
+    if (ok) toast.success(`${s.name}님 포털 링크가 복사됐어요.`);
+    else toast.error('링크 복사에 실패했어요.');
+  };
 
   // STEP-EXPERT-CRUD-FULL — soft-delete (휴지통 30일 보관)
   const handleDelete = async (s: StaffPool) => {
@@ -320,7 +343,8 @@ export default function ExpertsPage() {
           {visible.map((s) => (
             <ExpertGridCard key={s.id} s={s}
               onEdit={() => { setEditTarget(s); setModalOpen(true); }}
-              onDelete={() => void handleDelete(s)} />
+              onDelete={() => void handleDelete(s)}
+              onCopyPortal={() => void handleCopyPortalLink(s)} />
           ))}
         </div>
       ) : (
@@ -328,7 +352,8 @@ export default function ExpertsPage() {
           {visible.map((s) => (
             <ExpertListRow key={s.id} s={s}
               onEdit={() => { setEditTarget(s); setModalOpen(true); }}
-              onDelete={() => void handleDelete(s)} />
+              onDelete={() => void handleDelete(s)}
+              onCopyPortal={() => void handleCopyPortalLink(s)} />
           ))}
         </ul>
       )}

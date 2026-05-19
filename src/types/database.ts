@@ -58,6 +58,8 @@ export interface Profile {
   is_active: boolean;
   /** STEP-PROGRAM-ASSIGNMENT — MEMBER 의 소속 참여사 ID (consortium_members FK) */
   consortium_member_id?: string | null;
+  /** STEP-STAFF-PORTAL — 내부 직원 강사 겸임용 영구 포털 토큰 */
+  staff_portal_token?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -137,6 +139,8 @@ export interface StaffPool {
   certifications?: CertItem[];
   resume_url?: string | null;
   deleted_at?: string | null;
+  /** STEP-STAFF-PORTAL — 외부 강사 영구 포털 토큰 (/staff-portal/:token) */
+  staff_portal_token?: string | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
