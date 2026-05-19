@@ -2,7 +2,7 @@
 // 테이블형 차시 + DateTimePicker + 매칭 모달 + 드래그 정렬.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Sparkles, Upload, Save, Download, UserPlus, Copy } from 'lucide-react';
+import { Loader2, Plus, Sparkles, Upload, Save, Download, UserPlus, Copy, Trash2 } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 import { supabase } from '../../../lib/supabase';
 import SubToggle from './SubToggle';
@@ -53,6 +53,38 @@ export default function CurriculumTab({ programId, programName }: Props) {
   const [staffSectionKey, setStaffSectionKey] = useState(0);
   // STEP-V1-SPLIT-FULL — staff_pool + profiles 통합 옵션 (훅으로 분리)
   const { staffOptions } = useCurriculumStaff();
+  // STEP-CURRICULUM-BULK-DELETE — 다중 선택 일괄 삭제
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const allSelected = items.length > 0 && selectedIds.size === items.length;
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds(new Set());
+    else setSelectedIds(new Set(items.map((c) => c.id)));
+  };
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`${selectedIds.size}개 차시를 삭제할까요? 매칭된 인력 정보도 함께 삭제되며 되돌릴 수 없어요.`)) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from('program_curriculum').delete().in('id', ids);
+    setBulkDeleting(false);
+    if (error) {
+      console.error('[curriculum-tab] 일괄 삭제 실패:', error.message);
+      toast.error('삭제 중 오류가 발생했어요.');
+      return;
+    }
+    toast.success(`${ids.length}개 차시를 삭제했어요.`);
+    setSelectedIds(new Set());
+    void refresh();
+  }
 
   function openInvite(curriculumId: string | null, sessionInfo: string) {
     setInviteCurriculumId(curriculumId);
@@ -245,7 +277,11 @@ export default function CurriculumTab({ programId, programName }: Props) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-[28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className="grid grid-cols-[28px_28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            {/* STEP-CURRICULUM-BULK-DELETE — 전체 선택 체크박스 */}
+            <input type="checkbox" checked={allSelected} onChange={toggleAll}
+              aria-label="전체 선택"
+              className="w-3.5 h-3.5 rounded border-violet-300 text-violet-600 focus:ring-violet-400 mx-auto cursor-pointer" />
             {['', '#', '일자', '시작', '종료', '주제·차시명', '초대', '', '', ''].map((label, i) => (
               <span key={i} className={i === 1 ? 'text-center' : undefined} aria-hidden={label ? undefined : true}>{label}</span>
             ))}
@@ -272,6 +308,8 @@ export default function CurriculumTab({ programId, programName }: Props) {
                 onDragOver={(e) => e.preventDefault()}
                 isDragging={dragId === c.id}
                 staffOptions={staffOptions}
+                checked={selectedIds.has(c.id)}
+                onCheckToggle={() => toggleOne(c.id)}
               />
             ))}
           </div>
@@ -315,6 +353,22 @@ export default function CurriculumTab({ programId, programName }: Props) {
         nextSessionNo={items.reduce((m, c) => (c.session_no > m ? c.session_no : m), 0) + 1}
         onSaved={() => void refresh()}
       />
+
+      {/* STEP-CURRICULUM-BULK-DELETE — 하단 fixed 액션 바 */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl">
+          <span className="text-sm font-semibold tabular-nums">{selectedIds.size}개 선택됨</span>
+          <button type="button" onClick={() => void handleBulkDelete()} disabled={bulkDeleting}
+            className="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm px-4 py-1.5 rounded-lg font-medium transition-colors">
+            {bulkDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} aria-hidden="true" />}
+            선택 삭제
+          </button>
+          <button type="button" onClick={clearSelection} disabled={bulkDeleting}
+            className="text-slate-300 hover:text-white text-sm px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+            취소
+          </button>
+        </div>
+      )}
 
       <InvitationManagePanel
         open={invitePanelOpen}

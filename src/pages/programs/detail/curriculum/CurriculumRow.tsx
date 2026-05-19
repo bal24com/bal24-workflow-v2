@@ -3,6 +3,7 @@
 // draft state 사용 — onChange는 draft만, [저장] 버튼 클릭 시에만 DB UPDATE.
 
 import { useEffect, useState } from 'react';
+// STEP-CURRICULUM-BULK-DELETE — checked/onCheckToggle prop 추가 (일괄 삭제용)
 import {
   ChevronDown, ChevronRight, GripVertical, Trash2, Save, RotateCcw, Send, ArrowUp, ArrowDown,
 } from 'lucide-react';
@@ -37,6 +38,9 @@ interface Props {
   isDragging: boolean;
   /** STEP-PROGRAM-ENHANCE-FULL — 부모에서 1회 fetch한 staff_pool 옵션 */
   staffOptions?: StaffOption[];
+  /** STEP-CURRICULUM-BULK-DELETE — 일괄 삭제용 체크박스 상태/토글 */
+  checked?: boolean;
+  onCheckToggle?: () => void;
 }
 
 const INVITE_BADGE: Record<InvitationStatus, string> = {
@@ -89,6 +93,7 @@ export default function CurriculumRow({
   canReorder, onMoveUp, onMoveDown, isFirst, isLast,
   onDragStart, onDragEnter, onDragEnd, onDragOver, isDragging,
   staffOptions,
+  checked, onCheckToggle,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => toDraft(item));
@@ -150,8 +155,14 @@ export default function CurriculumRow({
             : 'border-violet-100'
       } bg-white overflow-hidden transition-colors`}
     >
-      {/* 행1 — 헤더 (번호·일차·시간·주제·invitation·↑↓·펼침·삭제) */}
-      <div className="grid grid-cols-[28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-2">
+      {/* 행1 — 헤더 (체크박스·핸들·번호·일차·시간·주제·invitation·↑↓·펼침·삭제) */}
+      <div className="grid grid-cols-[28px_28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-2">
+        {/* STEP-CURRICULUM-BULK-DELETE — 행 선택 체크박스 */}
+        {onCheckToggle ? (
+          <input type="checkbox" checked={checked ?? false} onChange={onCheckToggle}
+            aria-label="차시 선택"
+            className="w-3.5 h-3.5 rounded border-violet-300 text-violet-600 focus:ring-violet-400 mx-auto cursor-pointer" />
+        ) : <span aria-hidden="true" />}
         <button type="button" aria-label="순서 변경 핸들"
           className="cursor-grab active:cursor-grabbing inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:bg-slate-100">
           <GripVertical size={13} aria-hidden="true" />
