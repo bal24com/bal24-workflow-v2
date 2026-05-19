@@ -13,9 +13,13 @@ import { fetchProgramKpis, type ProgramKpis } from './programDetailUtils';
 import EditRequestsBadge from './share/EditRequestsBadge';
 import PhaseDateSection from './PhaseDateSection';
 
-interface Props { programId: string }
+interface Props {
+  programId: string;
+  /** STEP-OVERVIEW-CARD-FIX — 교육 종료일 지나면 자동 '결과' 단계 판정 */
+  programEndDate?: string | null;
+}
 
-export default function OverviewTab({ programId }: Props) {
+export default function OverviewTab({ programId, programEndDate }: Props) {
   const toast = useToast();
   const [kpis, setKpis] = useState<ProgramKpis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,11 +46,25 @@ export default function OverviewTab({ programId }: Props) {
   }, [programId, toast]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* 좌: 단계 시작일 */}
-      <PhaseDateSection programId={programId} />
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      {/* 좌: 단계 시작일 + 빠른 액션 (좌측 컬럼 비율 보정) */}
+      <div className="flex flex-col gap-4">
+        <PhaseDateSection programId={programId} programEndDate={programEndDate} />
+        <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
+          <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
+            <Calendar size={16} className="text-orange-500" aria-hidden="true" />
+            빠른 액션
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            <QuickLink to="/attendance" label="출석 세션" />
+            <QuickLink to="/forms" label="외부 폼" />
+            <QuickLink to="/applications" label="신청 검토" />
+            <QuickLink to="/activity-logs" label="일지 작성" />
+          </div>
+        </section>
+      </div>
 
-      {/* 우: 통계 KPI + 빠른 액션 + 수정요청 */}
+      {/* 우: 통계 KPI + 수정요청 */}
       <div className="flex flex-col gap-4">
         <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
           <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
@@ -68,19 +86,6 @@ export default function OverviewTab({ programId }: Props) {
         </section>
 
         <EditRequestsBadge programId={programId} />
-
-        <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
-          <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
-            <Calendar size={16} className="text-orange-500" aria-hidden="true" />
-            빠른 액션
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            <QuickLink to="/attendance" label="출석 세션" />
-            <QuickLink to="/forms" label="외부 폼" />
-            <QuickLink to="/applications" label="신청 검토" />
-            <QuickLink to="/activity-logs" label="일지 작성" />
-          </div>
-        </section>
       </div>
     </div>
   );

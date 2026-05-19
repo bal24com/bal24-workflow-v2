@@ -18,12 +18,16 @@ export function defaultVisibility(): ShareVisibility {
   return v;
 }
 
-/** 4 날짜 기준 현재 단계 자동 판별 (Q3: 시작일 기준) */
+/** 4 날짜 기준 현재 단계 자동 판별 (Q3: 시작일 기준).
+ *  STEP-OVERVIEW-CARD-FIX — programEndDate 지나면 result_date 미설정이어도 자동 result. */
 export function detectStage(
   now: string,
   dates: Pick<ProgramShare, 'pre_date' | 'ready_date' | 'progress_date' | 'result_date'>,
+  programEndDate?: string | null,
 ): ShareStage {
   if (dates.result_date && now >= dates.result_date) return 'result';
+  // 교육 종료일 다음 날부터는 결과 단계로 자동 전환
+  if (programEndDate && now > programEndDate) return 'result';
   if (dates.progress_date && now >= dates.progress_date) return 'progress';
   if (dates.ready_date && now >= dates.ready_date) return 'ready';
   if (dates.pre_date && now >= dates.pre_date) return 'pre';

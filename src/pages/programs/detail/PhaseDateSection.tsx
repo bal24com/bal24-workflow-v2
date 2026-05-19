@@ -11,14 +11,18 @@ import {
 } from './share/shareUtils';
 import type { ProgramShare } from '../../../types/database';
 
-interface Props { programId: string }
+interface Props {
+  programId: string;
+  /** STEP-OVERVIEW-CARD-FIX — 교육 종료일 (지나면 자동 result 단계) */
+  programEndDate?: string | null;
+}
 
 function todayIso(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export default function PhaseDateSection({ programId }: Props) {
+export default function PhaseDateSection({ programId, programEndDate }: Props) {
   const toast = useToast();
   const [share, setShare] = useState<ProgramShare | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +55,10 @@ export default function PhaseDateSection({ programId }: Props) {
   }
 
   const now = todayIso();
-  const currentStage = useMemo(() => share ? detectStage(now, share) : 'before', [share, now]);
+  const currentStage = useMemo(
+    () => share ? detectStage(now, share, programEndDate ?? null) : 'before',
+    [share, now, programEndDate],
+  );
   const stageDescription = useMemo(
     () => share ? describeCurrentStage(currentStage, share, now) : '',
     [share, currentStage, now],
