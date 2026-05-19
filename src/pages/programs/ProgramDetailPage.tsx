@@ -21,7 +21,7 @@ import ProgramDeleteButton from './ProgramDeleteButton';
 import ProgramOverviewCard from './detail/overview/ProgramOverviewCard';
 import ProgramCurriculumSummaryCard from './detail/overview/ProgramCurriculumSummaryCard';
 import ProgramParticipantSummaryCard from './detail/overview/ProgramParticipantSummaryCard';
-import ProgramInstructorSummaryCard from './detail/overview/ProgramInstructorSummaryCard';
+// STEP-OVERVIEW-CARD-FIX — ProgramInstructorSummaryCard 제거 (강사 정보를 커리큘럼 카드에 통합)
 import ParticipantManageTab from './detail/ParticipantManageTab';
 import InstructorManageTab from './detail/InstructorManageTab';
 import ReportManageTab from './detail/ReportManageTab';
@@ -275,14 +275,14 @@ export default function ProgramDetailPage() {
 
       <div role="tabpanel">
         {tab === 'overview' && (
+          // STEP-OVERVIEW-CARD-FIX — 단계 시작일+KPI 상단으로 + 강사 요약 카드 제거 + OverviewTab 슬림화
           <div className="space-y-4">
             <ProgramOverviewCard program={program} />
+            <OverviewTab programId={programId} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ProgramCurriculumSummaryCard programId={programId} />
               <ProgramParticipantSummaryCard programId={programId} />
             </div>
-            <ProgramInstructorSummaryCard programId={programId} />
-            <OverviewTab programId={programId} description={program.description ?? null} />
           </div>
         )}
         {tab === 'curriculum'   && <CurriculumTab programId={programId} programName={program.name} onSwitchToInstructorTab={() => setTab('instructor')} />}

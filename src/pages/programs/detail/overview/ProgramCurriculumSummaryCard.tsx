@@ -13,7 +13,23 @@ interface Props {
   refreshKey?: number;
 }
 
-type CurriculumSummary = Pick<ProgramCurriculum, 'id' | 'session_no' | 'title' | 'day_label' | 'start_time' | 'end_time'>;
+type CurriculumSummary = Pick<ProgramCurriculum, 'id' | 'session_no' | 'title' | 'day_label' | 'start_time' | 'end_time'> & {
+  instructorName: string | null;
+};
+
+interface StaffJoin {
+  curriculum_id: string;
+  role: string;
+  instructor_name_raw: string | null;
+  staff_pool: { name: string } | { name: string }[] | null;
+  profile: { name: string } | { name: string }[] | null;
+}
+
+function pickName(s: StaffJoin): string | null {
+  const sp = Array.isArray(s.staff_pool) ? s.staff_pool[0] : s.staff_pool;
+  const pf = Array.isArray(s.profile) ? s.profile[0] : s.profile;
+  return sp?.name ?? pf?.name ?? s.instructor_name_raw ?? null;
+}
 
 export default function ProgramCurriculumSummaryCard({ programId, refreshKey }: Props) {
   const [sessions, setSessions] = useState<CurriculumSummary[]>([]);
@@ -27,7 +43,28 @@ export default function ProgramCurriculumSummaryCard({ programId, refreshKey }: 
       .eq('program_id', programId)
       .order('session_no');
     if (error) console.error('[overview-curriculum] 조회 실패:', error.message);
-    setSessions((data ?? []) as CurriculumSummary[]);
+    const rows = (data ?? []) as Array<Omit<CurriculumSummary, 'instructorName'>>;
+    // STEP-OVERVIEW-CARD-FIX — curriculum_staff에서 강사 이름 매핑
+    let instructorMap = new Map<string, string>();
+    if (rows.length > 0) {
+      const curIds = rows.map((r) => r.id);
+      const { data: cs, error: csErr } = await supabase.from('curriculum_staff')
+        .select('curriculum_id, role, instructor_name_raw, staff_pool:staff_pool(name), profile:profiles(name)')
+        .in('curriculum_id', curIds);
+      if (csErr) console.warn('[overview-curriculum] 강사 조회 경고:', csErr.message);
+      // role='강사' 우선, 없으면 첫 번째
+      const byCur = new Map<string, StaffJoin[]>();
+      ((cs ?? []) as unknown as StaffJoin[]).forEach((s) => {
+        const arr = byCur.get(s.curriculum_id) ?? [];
+        arr.push(s); byCur.set(s.curriculum_id, arr);
+      });
+      byCur.forEach((arr, curId) => {
+        const target = arr.find((s) => s.role === '강사') ?? arr[0];
+        const name = pickName(target);
+        if (name) instructorMap.set(curId, name);
+      });
+    }
+    setSessions(rows.map((r) => ({ ...r, instructorName: instructorMap.get(r.id) ?? null })));
   }, [programId]);
 
   useEffect(() => {
@@ -67,8 +104,9 @@ export default function ProgramCurriculumSummaryCard({ programId, refreshKey }: 
           </div>
         ) : (
           <div className="divide-y divide-slate-100 -mx-2">
+            {/* STEP-OVERVIEW-CARD-FIX — 강사 컬럼 추가 */}
             {displayed.map((s) => (
-              <div key={s.id} className="grid grid-cols-[60px_minmax(80px,100px)_1fr] items-center gap-2 px-2 py-1.5 text-xs">
+              <div key={s.id} className="grid grid-cols-[52px_minmax(80px,95px)_1fr_minmax(70px,90px)] items-center gap-2 px-2 py-1.5 text-xs">
                 <span className="text-slate-400 font-bold tabular-nums">
                   {s.day_label ?? `${s.session_no}차시`}
                 </span>
@@ -76,6 +114,9 @@ export default function ProgramCurriculumSummaryCard({ programId, refreshKey }: 
                   {s.start_time && s.end_time ? `${s.start_time.slice(0, 5)}~${s.end_time.slice(0, 5)}` : '—'}
                 </span>
                 <span className="font-medium text-slate-700 truncate">{s.title}</span>
+                <span className={`text-[11px] truncate text-right ${s.instructorName ? 'text-violet-700 font-semibold' : 'text-slate-300 italic'}`}>
+                  {s.instructorName ?? '미배정'}
+                </span>
               </div>
             ))}
             {sessions.length > 5 && (
