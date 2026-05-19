@@ -11,6 +11,7 @@ import StaffLectureTab from './tabs/StaffLectureTab';
 import StaffLogTab from './tabs/StaffLogTab';
 import StaffScheduleTab from './tabs/StaffScheduleTab';
 import StaffMaterialsTab from './tabs/StaffMaterialsTab';
+import StaffInfoEditModal from './StaffInfoEditModal';
 import { resolveStaffByToken, type StaffPortalIdentity } from './staffPortalUtils';
 
 const TABS = [
@@ -28,6 +29,8 @@ export default function StaffPortalPage() {
   const [staff, setStaff] = useState<StaffPortalIdentity | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  // STEP-STAFF-PORTAL-P5 — 내 정보 수정 모달
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     if (!token) { setLoading(false); return; }
@@ -63,7 +66,7 @@ export default function StaffPortalPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <StaffPortalHeader staff={staff} />
+      <StaffPortalHeader staff={staff} onEditInfo={() => setInfoOpen(true)} />
 
       {/* 탭 메뉴 — 모바일 가로 스크롤 + sticky */}
       <nav role="tablist" aria-label="강사 포털 탭"
@@ -93,6 +96,11 @@ export default function StaffPortalPage() {
         {activeTab === 'schedule'  && <StaffScheduleTab staff={staff} />}
         {activeTab === 'materials' && <StaffMaterialsTab staff={staff} />}
       </div>
+
+      {/* STEP-STAFF-PORTAL-P5 — 내 정보 수정 모달 */}
+      <StaffInfoEditModal open={infoOpen} staff={staff}
+        onClose={() => setInfoOpen(false)}
+        onSaved={(next) => setStaff({ ...staff, name: next.name, affiliation: next.affiliation })} />
     </div>
   );
 }

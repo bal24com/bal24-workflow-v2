@@ -50,7 +50,8 @@ export default function InvitationManagePanel({
   const toast = useToast();
   const { profile, isPM } = useUserProfile();
   const [invitations, setInvitations] = useState<InstructorInvitation[]>([]);
-  const [experts, setExperts] = useState<Pick<StaffPool, 'id' | 'name' | 'phone' | 'email'>[]>([]);
+  // STEP-STAFF-PORTAL-P5 — staff_portal_token 포함 (초대 메시지에 포털 링크 자동 첨부용)
+  const [experts, setExperts] = useState<Pick<StaffPool, 'id' | 'name' | 'phone' | 'email' | 'staff_portal_token'>[]>([]);
   const [submittedMap, setSubmittedMap] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export default function InvitationManagePanel({
         supabase.from('instructor_invitations').select('*')
           .eq('program_id', programId)
           .order('invited_at', { ascending: false }),
-        supabase.from('staff_pool').select('id, name, phone, email').order('name'),
+        supabase.from('staff_pool').select('id, name, phone, email, staff_portal_token').order('name'),
       ]);
       if (invR.error) throw invR.error;
       if (expR.error) console.error('[invite-manage] staff 조회 실패:', expR.error.message);

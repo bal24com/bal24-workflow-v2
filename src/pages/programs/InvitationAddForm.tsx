@@ -9,13 +9,23 @@ import type { InvitationRole, StaffPool } from '../../types/database';
 
 interface Props {
   programId: string;
-  experts: Pick<StaffPool, 'id' | 'name' | 'phone' | 'email'>[];
+  experts: Pick<StaffPool, 'id' | 'name' | 'phone' | 'email' | 'staff_portal_token'>[];
   defaultCurriculumId?: string | null;
   defaultSessionInfo?: string;
   /** STEP-CURRICULUM-INSTRUCTOR-VIEW — 강사 요청 진입 시 메시지 자동 prefill */
   defaultMessage?: string;
   onSubmitted: () => void;
   onCancel: () => void;
+}
+
+/** STEP-STAFF-PORTAL-P5 — 메시지에 강사 포털 링크 자동 첨부 (이미 포함되어 있으면 그대로) */
+function appendPortalLink(message: string, portalToken: string | null | undefined): string {
+  if (!portalToken) return message;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const link = `${origin}/staff-portal/${portalToken}`;
+  if (message.includes(link)) return message;
+  const portalLine = `\n\n강사 포털 (일정·일지·자료 통합 관리): ${link}`;
+  return message.trim() ? `${message.trim()}${portalLine}` : `안녕하세요. 강의 참여를 요청드립니다.${portalLine}`;
 }
 
 function translateError(raw: string): string {
@@ -56,6 +66,8 @@ export default function InvitationAddForm({
       if (!name.trim()) setName(e.name);
       if (!phone.trim() && e.phone) setPhone(e.phone);
       if (!email.trim() && e.email) setEmail(e.email);
+      // STEP-STAFF-PORTAL-P5 — 포털 링크 자동 첨부 (사용자가 직접 편집 가능)
+      setInviteMessage((prev) => appendPortalLink(prev, e.staff_portal_token ?? null));
     }
   };
 

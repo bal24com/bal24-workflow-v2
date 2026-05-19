@@ -5,9 +5,10 @@ import type { StaffPortalIdentity } from './staffPortalUtils';
 
 interface Props {
   staff: StaffPortalIdentity;
+  onEditInfo: () => void;
 }
 
-export default function StaffPortalHeader({ staff }: Props) {
+export default function StaffPortalHeader({ staff, onEditInfo }: Props) {
   return (
     <header className="bg-white border-b border-slate-200 px-4 py-4">
       <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
@@ -18,9 +19,8 @@ export default function StaffPortalHeader({ staff }: Props) {
             <p className="text-sm text-slate-500 truncate">{staff.affiliation}</p>
           )}
         </div>
-        <button type="button" disabled
-          className="shrink-0 text-xs text-slate-400 border border-slate-200 rounded-lg px-3 py-1.5 cursor-not-allowed"
-          title="P3에서 구현 예정">
+        <button type="button" onClick={onEditInfo}
+          className="shrink-0 text-xs text-violet-700 border border-violet-200 bg-white rounded-lg px-3 py-1.5 hover:bg-violet-50 transition-colors">
           내 정보
         </button>
       </div>
