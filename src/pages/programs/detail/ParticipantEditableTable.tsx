@@ -11,6 +11,11 @@ interface Props {
   list: ProgramParticipant[];
   canEdit: boolean;
   onChanged: () => void;
+  // STEP-PARTICIPANT-BULK-DELETE — 다중 선택 prop
+  selectedIds?: Set<string>;
+  onToggleOne?: (id: string) => void;
+  allSelected?: boolean;
+  onToggleAll?: () => void;
 }
 
 interface Edit {
@@ -46,7 +51,11 @@ function fromRow(p: ProgramParticipant): Edit {
   };
 }
 
-export default function ParticipantEditableTable({ list, canEdit, onChanged }: Props) {
+export default function ParticipantEditableTable({
+  list, canEdit, onChanged,
+  selectedIds, onToggleOne, allSelected, onToggleAll,
+}: Props) {
+  const bulkEnabled = !!onToggleOne;
   const toast = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Edit | null>(null);
@@ -85,6 +94,13 @@ export default function ParticipantEditableTable({ list, canEdit, onChanged }: P
       <table className="w-full text-xs">
         <thead className="bg-violet-50/40 text-[10px] uppercase tracking-wide text-slate-500">
           <tr>
+            {bulkEnabled && (
+              <th className="px-2 py-2 text-center font-bold w-8">
+                <input type="checkbox" checked={!!allSelected} onChange={onToggleAll}
+                  aria-label="전체 선택"
+                  className="w-3.5 h-3.5 rounded border-violet-300 text-violet-600 focus:ring-violet-400 cursor-pointer" />
+              </th>
+            )}
             <th className="px-2 py-2 text-center font-bold w-10">#</th>
             <th className="px-2 py-2 text-left font-bold">이름</th>
             <th className="px-2 py-2 text-left font-bold">소속</th>
@@ -99,6 +115,13 @@ export default function ParticipantEditableTable({ list, canEdit, onChanged }: P
             const isEd = editingId === p.id && form;
             return (
               <tr key={p.id} className={isEd ? 'bg-violet-50/40' : 'hover:bg-violet-50/20'}>
+                {bulkEnabled && (
+                  <td className="px-2 py-1.5 text-center">
+                    <input type="checkbox" checked={selectedIds?.has(p.id) ?? false}
+                      onChange={() => onToggleOne?.(p.id)} aria-label={`${p.name} 선택`}
+                      className="w-3.5 h-3.5 rounded border-violet-300 text-violet-600 focus:ring-violet-400 cursor-pointer" />
+                  </td>
+                )}
                 <td className="px-2 py-1.5 text-center text-slate-400 tabular-nums">{idx + 1}</td>
                 {isEd && form ? (
                   <>

@@ -3,10 +3,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, CheckCircle2, XCircle, Clock, Trophy, Users2, UserPlus, Mail,
+  Loader2, CheckCircle2, XCircle, Clock, Trophy, Users2, UserPlus, Mail, Search, Trash2,
 } from 'lucide-react';
 import { Button } from '../../../components/ui';
 import EmptyState from '../../../components/EmptyState';
+import { useBulkSelect } from '../../../hooks/useBulkSelect';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { formatDateKo } from '../../../lib/utils';
@@ -52,9 +53,10 @@ export default function ApplicationTab({ programId }: Props) {
   const [invitedEmails, setInvitedEmails] = useState<Set<string>>(new Set());
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>('all');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [detailTarget, setDetailTarget] = useState<ParticipantApplication | null>(null);
   // STEP-REJECTION-REASON-UI — 탈락 사유 모달 상태 (단건 또는 일괄)
   const [rejectTarget, setRejectTarget] = useState<{ kind: 'single'; app: ParticipantApplication } | { kind: 'bulk'; ids: string[] } | null>(null);
@@ -85,7 +87,6 @@ export default function ApplicationTab({ programId }: Props) {
     } else {
       setInvitedEmails(new Set());
     }
-    setSelectedIds(new Set());
     setLoading(false);
   }, [programId]);
 
@@ -107,26 +108,13 @@ export default function ApplicationTab({ programId }: Props) {
   }, [items]);
 
   const visible = useMemo(() => {
-    if (filter === 'all') return items;
-    return items.filter((a) => a.status === filter);
-  }, [items, filter]);
+    const base = filter === 'all' ? items : items.filter((a) => a.status === filter);
+    const q = search.trim().toLowerCase();
+    return q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
+  }, [items, filter, search]);
 
-  const allChecked = visible.length > 0 && visible.every((a) => selectedIds.has(a.id));
-  const toggleAll = () => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      visible.forEach((a) => allChecked ? next.delete(a.id) : next.add(a.id));
-      return next;
-    });
-  };
-  const toggleOne = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  // STEP-PARTICIPANT-BULK-DELETE — 공통 훅 사용
+  const { selectedIds, allSelected: allChecked, toggleAll, toggleOne, clearSelection } = useBulkSelect(visible);
 
   // STEP-MEMBER-INVITE-REPORT — 합격자 MEMBER 초대 (UI 래퍼 — 핵심 로직은 utils 에)
   async function inviteAsMember(app: ParticipantApplication) {
@@ -181,6 +169,24 @@ export default function ApplicationTab({ programId }: Props) {
     await refresh();
   }
 
+  // STEP-PARTICIPANT-BULK-DELETE — 신청자 행 일괄 삭제
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`${selectedIds.size}건의 신청을 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from('participant_applications').delete().in('id', ids);
+    setBulkDeleting(false);
+    if (error) {
+      console.error('[application-tab] 일괄 삭제 실패:', error.message);
+      toast.error('삭제 중 오류가 발생했어요.');
+      return;
+    }
+    toast.success(`${ids.length}건을 삭제했어요.`);
+    clearSelection();
+    await refresh();
+  }
+
   async function handleBulkStatus(next: ParticipantStatus) {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) { toast.error('선택된 신청자가 없어요.'); return; }
@@ -229,38 +235,43 @@ export default function ApplicationTab({ programId }: Props) {
   return (
     <div className="space-y-4">
       {/* STEP-APPLICATION-CAPACITY — 정원 현황 (max_applicants 있을 때만) */}
-      {maxApplicants && maxApplicants > 0 && (() => {
-        const validCount = items.filter((a) => a.status !== 'withdrawn' && a.status !== 'rejected').length;
-        const isFull = validCount >= maxApplicants;
+      {(maxApplicants ?? 0) > 0 && (() => {
+        const v = items.filter((a) => a.status !== 'withdrawn' && a.status !== 'rejected').length;
+        const full = v >= (maxApplicants ?? 0);
         return (
           <div className="flex items-center gap-2 text-sm rounded-xl border border-violet-100 bg-violet-50/40 px-3 py-2">
             <span className="text-slate-500">정원</span>
-            <span className="font-bold text-[#1E1B4B] tabular-nums">
-              {validCount} / {maxApplicants}명
-            </span>
-            {isFull ? (
-              <span className="text-[10px] font-semibold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full">마감</span>
-            ) : (
-              <span className="text-[10px] text-slate-500">남은 자리 {maxApplicants - validCount}명</span>
-            )}
+            <span className="font-bold text-[#1E1B4B] tabular-nums">{v} / {maxApplicants}명</span>
+            {full
+              ? <span className="text-[10px] font-semibold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full">마감</span>
+              : <span className="text-[10px] text-slate-500">남은 자리 {(maxApplicants ?? 0) - v}명</span>}
           </div>
         );
       })()}
 
-      {/* 헤더 */}
+      {/* 헤더 — STEP-PARTICIPANT-BULK-DELETE: 검색 input + 일괄 처리 + 일괄 삭제 */}
       <header className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-base font-bold text-[#1E1B4B] flex items-center gap-1.5">
           <Users2 size={18} className="text-violet-600" aria-hidden="true" />
           신청자 ({items.length})
         </h2>
-        {selectedIds.size > 0 && (
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-slate-500">{selectedIds.size}명 선택</span>
-            <Button variant="outline" size="sm" leftIcon={<Clock size={12} />} onClick={() => void handleBulkStatus('reviewing')} disabled={acting}>일괄 검토중</Button>
-            <Button variant="outline" size="sm" leftIcon={<CheckCircle2 size={12} />} onClick={() => void handleBulkStatus('accepted')} disabled={acting} className="!border-emerald-200 !text-emerald-700 hover:!bg-emerald-50">일괄 합격</Button>
-            <Button variant="outline" size="sm" leftIcon={<XCircle size={12} />} onClick={() => void handleBulkStatus('rejected')} disabled={acting} className="!border-rose-200 !text-rose-700 hover:!bg-rose-50">일괄 탈락</Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="이름 검색…"
+              className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-violet-400" />
           </div>
-        )}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-slate-500">{selectedIds.size}명 선택</span>
+              <Button variant="outline" size="sm" leftIcon={<Clock size={12} />} onClick={() => void handleBulkStatus('reviewing')} disabled={acting || bulkDeleting}>일괄 검토중</Button>
+              <Button variant="outline" size="sm" leftIcon={<CheckCircle2 size={12} />} onClick={() => void handleBulkStatus('accepted')} disabled={acting || bulkDeleting} className="!border-emerald-200 !text-emerald-700 hover:!bg-emerald-50">일괄 합격</Button>
+              <Button variant="outline" size="sm" leftIcon={<XCircle size={12} />} onClick={() => void handleBulkStatus('rejected')} disabled={acting || bulkDeleting} className="!border-rose-200 !text-rose-700 hover:!bg-rose-50">일괄 탈락</Button>
+              <Button variant="outline" size="sm" leftIcon={bulkDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} onClick={() => void handleBulkDelete()} disabled={acting || bulkDeleting} className="!border-red-300 !text-red-700 hover:!bg-red-50">일괄 삭제</Button>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* 필터 탭 */}
@@ -268,22 +279,10 @@ export default function ApplicationTab({ programId }: Props) {
         {FILTER_TABS.map((t) => {
           const active = filter === t.key;
           return (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setFilter(t.key)}
-              className={[
-                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors',
-                active ? 'bg-violet-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50',
-              ].join(' ')}
-            >
+            <button key={t.key} type="button" role="tab" aria-selected={active} onClick={() => setFilter(t.key)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${active ? 'bg-violet-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
               {t.label}
-              <span className={['inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded text-[10px]',
-                active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'].join(' ')}>
-                {counts[t.key]}
-              </span>
+              <span className={`inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{counts[t.key]}</span>
             </button>
           );
         })}

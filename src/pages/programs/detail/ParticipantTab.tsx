@@ -8,6 +8,8 @@ import * as XLSX from 'xlsx';
 import { Modal, Button, Input } from '../../../components/ui';
 import ParticipantDocImportModal from './ParticipantDocImportModal';
 import ParticipantEditableTable from './ParticipantEditableTable';
+import BulkActionBar from '../../../components/BulkActionBar';
+import { useBulkSelect } from '../../../hooks/useBulkSelect';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import {
@@ -83,6 +85,26 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
   const visible = search.trim()
     ? list.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
     : list;
+
+  // STEP-PARTICIPANT-BULK-DELETE — 다중 선택 일괄 삭제
+  const { selectedIds, allSelected, toggleAll, toggleOne, clearSelection } = useBulkSelect(visible);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`${selectedIds.size}명의 교육생을 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from('program_participants').delete().in('id', ids);
+    setBulkDeleting(false);
+    if (error) {
+      console.error('[participant-tab] 일괄 삭제 실패:', error.message);
+      toast.error('삭제 중 오류가 발생했어요.');
+      return;
+    }
+    toast.success(`${ids.length}명을 삭제했어요.`);
+    clearSelection();
+    void reload();
+  }
 
   async function handleAdd() {
     if (!form.name.trim()) { toast.error('이름을 입력해 주세요.'); return; }
@@ -238,7 +260,18 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
         </p>
       ) : (
         // STEP-PROGRAM-ENHANCE-FULL — 인라인 편집 테이블 (이름·소속·연락처·주민번호·상태)
-        <ParticipantEditableTable list={visible} canEdit={canEdit} onChanged={() => void reload()} />
+        // STEP-PARTICIPANT-BULK-DELETE — 다중 선택 prop 추가
+        <ParticipantEditableTable list={visible} canEdit={canEdit} onChanged={() => void reload()}
+          selectedIds={canEdit ? selectedIds : undefined}
+          onToggleOne={canEdit ? toggleOne : undefined}
+          allSelected={canEdit ? allSelected : undefined}
+          onToggleAll={canEdit ? toggleAll : undefined} />
+      )}
+
+      {/* STEP-PARTICIPANT-BULK-DELETE — 하단 fixed 액션 바 */}
+      {canEdit && (
+        <BulkActionBar count={selectedIds.size} busy={bulkDeleting} itemLabel="명"
+          onDelete={() => void handleBulkDelete()} onCancel={clearSelection} />
       )}
 
       {/* CSV 일괄 등록 모달 */}
