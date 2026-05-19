@@ -8,6 +8,9 @@ import StaffPortalHeader from './StaffPortalHeader';
 import StaffOverviewTab from './tabs/StaffOverviewTab';
 import StaffMentoringTab from './tabs/StaffMentoringTab';
 import StaffLectureTab from './tabs/StaffLectureTab';
+import StaffLogTab from './tabs/StaffLogTab';
+import StaffScheduleTab from './tabs/StaffScheduleTab';
+import StaffMaterialsTab from './tabs/StaffMaterialsTab';
 import { resolveStaffByToken, type StaffPortalIdentity } from './staffPortalUtils';
 
 const TABS = [
@@ -86,19 +89,10 @@ export default function StaffPortalPage() {
         {activeTab === 'overview'  && <StaffOverviewTab staff={staff} />}
         {activeTab === 'mentoring' && <StaffMentoringTab staff={staff} />}
         {activeTab === 'lecture'   && <StaffLectureTab staff={staff} />}
-        {activeTab === 'log'       && <PlaceholderTab label="일지" phase="P4" />}
-        {activeTab === 'schedule'  && <PlaceholderTab label="일정" phase="P4" />}
-        {activeTab === 'materials' && <PlaceholderTab label="자료" phase="P4" />}
+        {activeTab === 'log'       && <StaffLogTab staff={staff} />}
+        {activeTab === 'schedule'  && <StaffScheduleTab staff={staff} />}
+        {activeTab === 'materials' && <StaffMaterialsTab staff={staff} />}
       </div>
-    </div>
-  );
-}
-
-function PlaceholderTab({ label, phase }: { label: string; phase: string }) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 px-4 py-12 text-center">
-      <p className="text-slate-600 font-semibold">{label} 탭 — 준비 중</p>
-      <p className="text-xs text-slate-400 mt-1">{phase} 단계에서 구현 예정이에요.</p>
     </div>
   );
 }

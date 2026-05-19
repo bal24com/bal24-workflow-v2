@@ -2,7 +2,7 @@
 // 카드(기본) / 리스트 + 분야 필터 + 검색 + 신규 등록
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutGrid, List, Plus, Loader2, Search, UserStar, Phone, Mail, Pencil, Trash2, Eye, Link2 } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, Search, UserStar, Phone, Mail, Pencil, Trash2, Eye, Link2, Activity } from 'lucide-react';
 import {
   Button,
   Card,
@@ -18,6 +18,7 @@ import { softDelete } from '../../lib/softDeleteUtils';
 import { copyToClipboard } from '../../lib/clipboard';
 import type { StaffPool } from '../../types/database';
 import ExpertFormModal from './ExpertFormModal';
+import ExpertActivityDrawer from './ExpertActivityDrawer';
 
 type ViewMode = 'card' | 'list';
 type FieldFilter = '전체' | '교육' | '컨설팅' | '행사' | '기타';
@@ -35,7 +36,7 @@ function expertMatchesField(s: StaffPool, filter: FieldFilter): boolean {
   return tags.includes(filter);
 }
 
-function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void }) {
+function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void; onShowActivity: () => void }) {
   return (
     // STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일한 min-h
     <Card className="group hover:border-primary/30 hover:shadow-md transition min-h-[260px] flex flex-col">
@@ -97,6 +98,11 @@ function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal }: { s: StaffPool; o
       <div className="flex items-center gap-2 px-5 pb-4">
         <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={onEdit} className="!flex-1">내용보기</Button>
         <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={onEdit} className="!flex-1">수정</Button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onShowActivity(); }}
+          aria-label="활동 이력" title="활동 이력"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-cyan-600 border border-cyan-200 bg-white hover:bg-cyan-50 transition-colors">
+          <Activity size={13} aria-hidden="true" />
+        </button>
         <button type="button" onClick={(e) => { e.stopPropagation(); onCopyPortal(); }}
           aria-label="강사 포털 링크 복사" title="강사 포털 링크 복사"
           className="inline-flex items-center justify-center w-8 h-8 rounded-md text-violet-600 border border-violet-200 bg-white hover:bg-violet-50 transition-colors">
@@ -112,7 +118,7 @@ function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal }: { s: StaffPool; o
   );
 }
 
-function ExpertListRow({ s, onEdit, onDelete, onCopyPortal }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void }) {
+function ExpertListRow({ s, onEdit, onDelete, onCopyPortal, onShowActivity }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void; onShowActivity: () => void }) {
   return (
     <li className="group flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition relative">
       {s.profile_image_url ? (
@@ -159,6 +165,11 @@ function ExpertListRow({ s, onEdit, onDelete, onCopyPortal }: { s: StaffPool; on
           className="p-1.5 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600">
           <Pencil size={12} />
         </button>
+        {/* STEP-STAFF-PORTAL-P4 — 활동 이력 드로어 */}
+        <button type="button" onClick={onShowActivity} aria-label="활동 이력" title="활동 이력"
+          className="p-1.5 rounded-md text-slate-400 hover:bg-cyan-50 hover:text-cyan-600">
+          <Activity size={12} />
+        </button>
         {/* STEP-STAFF-PORTAL-P2 — 강사 포털 링크 복사 */}
         <button type="button" onClick={onCopyPortal} aria-label="강사 포털 링크 복사" title="강사 포털 링크 복사"
           className="p-1.5 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600">
@@ -183,6 +194,8 @@ export default function ExpertsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   // STEP-EXPERT-CRUD-FULL — 수정 대상 (null = 신규 등록)
   const [editTarget, setEditTarget] = useState<StaffPool | null>(null);
+  // STEP-STAFF-PORTAL-P4 — 활동 이력 드로어 대상
+  const [activityTarget, setActivityTarget] = useState<StaffPool | null>(null);
 
   const fetchExperts = useCallback(async () => {
     setLoading(true);
@@ -344,7 +357,8 @@ export default function ExpertsPage() {
             <ExpertGridCard key={s.id} s={s}
               onEdit={() => { setEditTarget(s); setModalOpen(true); }}
               onDelete={() => void handleDelete(s)}
-              onCopyPortal={() => void handleCopyPortalLink(s)} />
+              onCopyPortal={() => void handleCopyPortalLink(s)}
+              onShowActivity={() => setActivityTarget(s)} />
           ))}
         </div>
       ) : (
@@ -353,7 +367,8 @@ export default function ExpertsPage() {
             <ExpertListRow key={s.id} s={s}
               onEdit={() => { setEditTarget(s); setModalOpen(true); }}
               onDelete={() => void handleDelete(s)}
-              onCopyPortal={() => void handleCopyPortalLink(s)} />
+              onCopyPortal={() => void handleCopyPortalLink(s)}
+              onShowActivity={() => setActivityTarget(s)} />
           ))}
         </ul>
       )}
@@ -364,6 +379,9 @@ export default function ExpertsPage() {
         onClose={() => { setModalOpen(false); setEditTarget(null); }}
         onCreated={() => void fetchExperts()}
       />
+
+      {/* STEP-STAFF-PORTAL-P4 — 활동 이력 드로어 */}
+      <ExpertActivityDrawer expert={activityTarget} onClose={() => setActivityTarget(null)} />
     </div>
   );
 }
