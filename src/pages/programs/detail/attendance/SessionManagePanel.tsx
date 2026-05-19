@@ -3,13 +3,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Plus, Loader2, Calendar, Clock, Users, Copy, ExternalLink, Trash2, ChevronDown, ChevronRight,
+  Plus, Loader2, Calendar, Clock, Users, Copy, ExternalLink, Trash2, ChevronDown, ChevronRight, Search,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
 import { copyToClipboard } from '../../../../lib/clipboard';
 import { formatDateKo } from '../../../../lib/utils';
+import BulkActionBar from '../../../../components/BulkActionBar';
+import { useBulkSelect } from '../../../../hooks/useBulkSelect';
 import type {
   AttendanceCheckStatus, AttendanceSession,
 } from '../../../../types/database';
@@ -46,6 +48,29 @@ export default function SessionManagePanel({ programId }: Props) {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // STEP-PARTICIPANT-BULK-DELETE — 검색 + 다중 선택
+  const [search, setSearch] = useState('');
+  const visible = search.trim()
+    ? sessions.filter((s) => s.title.toLowerCase().includes(search.trim().toLowerCase()))
+    : sessions;
+  const { selectedIds, allSelected, toggleAll, toggleOne, clearSelection } = useBulkSelect(visible);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`${selectedIds.size}개 세션과 출석 기록을 모두 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from('attendance_sessions').delete().in('id', ids);
+    setBulkDeleting(false);
+    if (error) {
+      console.error('[session-manage] 일괄 삭제 실패:', error.message);
+      toast.error('삭제 중 오류가 발생했어요.');
+      return;
+    }
+    toast.success(`${ids.length}개 세션을 삭제했어요.`);
+    clearSelection();
+    void refresh();
+  }
 
   const refresh = useCallback(async () => {
     const { data, error } = await supabase
@@ -154,41 +179,51 @@ export default function SessionManagePanel({ programId }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-2 flex-wrap">
         <p className="text-[11px] text-slate-500">
           세션마다 학생/강사/TA 3 토큰 자동 발급. 클릭하여 펼치면 O/△/X 매트릭스 미리보기.
         </p>
-        <button
-          type="button"
-          onClick={() => void addSession()}
-          disabled={creating}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50 transition-colors"
-        >
-          {creating ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <Plus size={12} aria-hidden="true" />}
-          세션 추가
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* STEP-PARTICIPANT-BULK-DELETE — 검색 + 전체 선택 */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="세션명 검색…"
+              className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-violet-400" />
+          </div>
+          {visible.length > 0 && (
+            <label className="inline-flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                className="w-3.5 h-3.5 rounded border-violet-300 text-violet-600 focus:ring-violet-400" />
+              전체 선택
+            </label>
+          )}
+          <button type="button" onClick={() => void addSession()} disabled={creating}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50 transition-colors">
+            {creating ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <Plus size={12} aria-hidden="true" />}
+            세션 추가
+          </button>
+        </div>
       </header>
 
-      {sessions.length === 0 ? (
+      {visible.length === 0 ? (
         <p className="text-sm text-slate-400 italic text-center py-6">
-          등록된 출석 세션이 없어요. "세션 추가"로 시작하세요.
+          {sessions.length === 0 ? '등록된 출석 세션이 없어요. "세션 추가"로 시작하세요.' : '검색 결과가 없어요.'}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {sessions.map((s) => {
+          {visible.map((s) => {
             const isOpen = openId === s.id;
             return (
-              <li
-                key={s.id}
-                className="rounded-xl border border-violet-100 bg-white overflow-hidden"
-              >
+              <li key={s.id} className="rounded-xl border border-violet-100 bg-white overflow-hidden">
                 <header className="flex items-center gap-2 px-3 py-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setOpenId(isOpen ? null : s.id)}
+                  {/* STEP-PARTICIPANT-BULK-DELETE — 세션 선택 체크박스 */}
+                  <input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggleOne(s.id)}
+                    aria-label={`${s.title} 선택`}
+                    className="w-3.5 h-3.5 shrink-0 rounded border-violet-300 text-violet-600 focus:ring-violet-400 cursor-pointer" />
+                  <button type="button" onClick={() => setOpenId(isOpen ? null : s.id)}
                     className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md text-violet-600 hover:bg-violet-50"
-                    aria-label={isOpen ? '접기' : '펼치기'}
-                  >
+                    aria-label={isOpen ? '접기' : '펼치기'}>
                     {isOpen ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
                   </button>
                   <span className="inline-flex items-center justify-center min-w-[2.5rem] h-6 px-2 rounded-md bg-violet-100 text-violet-700 text-[11px] font-bold tabular-nums">
@@ -276,6 +311,10 @@ export default function SessionManagePanel({ programId }: Props) {
           })}
         </ul>
       )}
+
+      {/* STEP-PARTICIPANT-BULK-DELETE — 하단 fixed 액션 바 */}
+      <BulkActionBar count={selectedIds.size} busy={bulkDeleting} itemLabel="개"
+        onDelete={() => void handleBulkDelete()} onCancel={clearSelection} />
     </div>
   );
 }

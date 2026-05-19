@@ -3,20 +3,17 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Loader2, Megaphone, ChevronDown, ChevronRight, Check, X, RotateCcw,
-  Phone, Mail, ExternalLink, Briefcase,
+  Loader2, Megaphone, ChevronDown, ChevronRight, ExternalLink, Copy, Search,
 } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
 import { copyToClipboard } from '../../../../lib/clipboard';
 import { formatDateKo } from '../../../../lib/utils';
-import { BADGE_BASE } from '../../../../utils/statusStyles';
-import { useAuth } from '../../../../contexts/AuthContext';
 import { RECRUIT_TYPE_LABEL } from '../../../../types/application';
-import type {
-  RecruitForm, RecruitApplication, RecruitApplicationStatus,
-} from '../../../../types/application';
-import { Copy } from 'lucide-react';
+import type { RecruitForm } from '../../../../types/application';
+import RecruitsApplicantList from './RecruitsApplicantList';
+import BulkActionBar from '../../../../components/BulkActionBar';
+import { useBulkSelect } from '../../../../hooks/useBulkSelect';
 
 interface Props {
   programId: string;
@@ -29,26 +26,6 @@ type FormRow = Pick<
   application_count: number;
 };
 
-type AppRow = Pick<
-  RecruitApplication,
-  'id' | 'form_id' | 'name' | 'phone' | 'email' | 'career' | 'portfolio_url' |
-  'specialty' | 'message' | 'status' | 'created_at'
->;
-
-const APP_STATUS_LABEL: Record<RecruitApplicationStatus, string> = {
-  applied: '지원',
-  reviewing: '검토중',
-  accepted: '합격',
-  rejected: '불합격',
-};
-
-const APP_STATUS_STYLE: Record<RecruitApplicationStatus, string> = {
-  applied: 'bg-slate-100 text-slate-500 border-slate-300',
-  reviewing: 'bg-orange-50 text-orange-600 border-orange-200',
-  accepted: 'bg-emerald-50 text-emerald-600 border-emerald-200',
-  rejected: 'bg-rose-50 text-rose-600 border-rose-200',
-};
-
 function buildRecruitUrl(token: string): string {
   const base = typeof window !== 'undefined' ? window.location.origin : '';
   return `${base}/recruit/${token}`;
@@ -59,6 +36,29 @@ export default function RecruitsPanel({ programId }: Props) {
   const [forms, setForms] = useState<FormRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [openFormId, setOpenFormId] = useState<string | null>(null);
+  // STEP-PARTICIPANT-BULK-DELETE — 검색 + 다중 선택
+  const [search, setSearch] = useState('');
+  const visible = search.trim()
+    ? forms.filter((f) => f.title.toLowerCase().includes(search.trim().toLowerCase()))
+    : forms;
+  const { selectedIds, allSelected, toggleAll, toggleOne, clearSelection } = useBulkSelect(visible);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`${selectedIds.size}개 모집 공고와 지원자 정보를 모두 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase.from('recruit_forms').delete().in('id', ids);
+    setBulkDeleting(false);
+    if (error) {
+      console.error('[recruits-panel] 일괄 삭제 실패:', error.message);
+      toast.error('삭제 중 오류가 발생했어요.');
+      return;
+    }
+    toast.success(`${ids.length}개 공고를 삭제했어요.`);
+    clearSelection();
+    void refresh();
+  }
 
   const refresh = useCallback(async () => {
     const { data, error } = await supabase
@@ -114,31 +114,47 @@ export default function RecruitsPanel({ programId }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
           <Megaphone size={16} className="text-orange-500" aria-hidden="true" />
           모집 공고 ({forms.length})
         </h3>
-        <p className="text-[11px] text-slate-500">펼치면 지원자 + 합격/불합격</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* STEP-PARTICIPANT-BULK-DELETE — 검색 + 전체 선택 */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="공고명 검색…"
+              className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-violet-400" />
+          </div>
+          {visible.length > 0 && (
+            <label className="inline-flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                className="w-3.5 h-3.5 rounded border-violet-300 text-violet-600 focus:ring-violet-400" />
+              전체 선택
+            </label>
+          )}
+        </div>
       </header>
 
-      {forms.length === 0 ? (
+      {visible.length === 0 ? (
         <p className="text-sm text-slate-400 italic text-center py-6">
-          등록된 모집 공고가 없어요. 모집 메뉴에서 발행하세요.
+          {forms.length === 0 ? '등록된 모집 공고가 없어요. 모집 메뉴에서 발행하세요.' : '검색 결과가 없어요.'}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {forms.map((f) => {
+          {visible.map((f) => {
             const isOpen = openFormId === f.id;
             return (
               <li key={f.id} className="rounded-xl border border-violet-100 bg-white overflow-hidden">
                 <header className="flex items-center gap-2 px-3 py-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setOpenFormId(isOpen ? null : f.id)}
+                  {/* STEP-PARTICIPANT-BULK-DELETE — 공고 선택 체크박스 */}
+                  <input type="checkbox" checked={selectedIds.has(f.id)} onChange={() => toggleOne(f.id)}
+                    aria-label={`${f.title} 선택`}
+                    className="w-3.5 h-3.5 shrink-0 rounded border-violet-300 text-violet-600 focus:ring-violet-400 cursor-pointer" />
+                  <button type="button" onClick={() => setOpenFormId(isOpen ? null : f.id)}
                     className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md text-violet-600 hover:bg-violet-50"
-                    aria-label={isOpen ? '접기' : '펼치기'}
-                  >
+                    aria-label={isOpen ? '접기' : '펼치기'}>
                     {isOpen ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
                   </button>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-100 text-orange-700 shrink-0">
@@ -179,211 +195,18 @@ export default function RecruitsPanel({ programId }: Props) {
                   </a>
                 </header>
 
-                {isOpen && <ApplicantList formId={f.id} />}
+                {isOpen && <RecruitsApplicantList formId={f.id} />}
               </li>
             );
           })}
         </ul>
       )}
+
+      {/* STEP-PARTICIPANT-BULK-DELETE — 하단 fixed 액션 바 */}
+      <BulkActionBar count={selectedIds.size} busy={bulkDeleting} itemLabel="개"
+        onDelete={() => void handleBulkDelete()} onCancel={clearSelection}
+        deleteLabel="공고 삭제" />
     </div>
   );
 }
 
-function ApplicantList({ formId }: { formId: string }) {
-  const toast = useToast();
-  const { user } = useAuth();
-  const [rows, setRows] = useState<AppRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('recruit_applications')
-      .select(
-        'id, form_id, name, phone, email, career, portfolio_url, specialty, message, status, created_at',
-      )
-      .eq('form_id', formId)
-      .order('created_at', { ascending: false });
-    if (error) {
-      console.error('[step-11/recruit] 지원자 조회 실패:', error.message);
-      toast.error('지원자 목록을 불러오지 못했어요.');
-      return;
-    }
-    setRows((data as AppRow[] | null) ?? []);
-  }, [formId, toast]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    void (async () => {
-      await refresh();
-      if (cancelled) return;
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [refresh]);
-
-  async function changeStatus(id: string, next: RecruitApplicationStatus) {
-    setBusy(id);
-    try {
-      const { error } = await supabase
-        .from('recruit_applications')
-        .update({
-          status: next,
-          reviewed_by: user?.id ?? null,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-      if (error) {
-        console.error('[step-11/recruit] 상태 변경 실패:', error.message);
-        toast.error('상태 변경에 실패했어요.');
-        return;
-      }
-      toast.success(`${APP_STATUS_LABEL[next]} 처리했어요.`);
-      void refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <div className="border-t border-violet-100/70 bg-violet-50/20 px-3 py-3">
-      {loading ? (
-        <div className="flex justify-center py-4">
-          <Loader2 className="animate-spin text-violet-400" size={16} aria-hidden="true" />
-        </div>
-      ) : rows.length === 0 ? (
-        <p className="text-[11px] text-slate-400 italic text-center py-2">아직 지원자가 없어요.</p>
-      ) : (
-        <ul className="flex flex-col gap-1.5">
-          {rows.map((a) => {
-            const isOpen = openId === a.id;
-            return (
-              <li
-                key={a.id}
-                className="rounded-md border border-violet-100 bg-white overflow-hidden"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenId(isOpen ? null : a.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-violet-50/30 transition-colors"
-                >
-                  <span className="flex-1 min-w-0 truncate text-xs font-semibold text-[#1E1B4B]">
-                    {a.name}
-                  </span>
-                  <span className="shrink-0 text-[10px] text-slate-400 tabular-nums">
-                    {formatDateKo(a.created_at).replace(/^\d{4}년\s/, '')}
-                  </span>
-                  <span className={`${BADGE_BASE} ${APP_STATUS_STYLE[a.status]} shrink-0`}>
-                    {APP_STATUS_LABEL[a.status]}
-                  </span>
-                </button>
-
-                {isOpen && (
-                  <div className="px-3 pb-3 pt-1 border-t border-violet-100/70 flex flex-col gap-2">
-                    <div className="flex flex-wrap gap-2 text-[11px] text-slate-600 pt-1">
-                      <span className="inline-flex items-center gap-1">
-                        <Phone size={11} aria-hidden="true" />
-                        {a.phone}
-                      </span>
-                      {a.email && (
-                        <span className="inline-flex items-center gap-1">
-                          <Mail size={11} aria-hidden="true" />
-                          {a.email}
-                        </span>
-                      )}
-                    </div>
-
-                    {a.specialty && a.specialty.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {a.specialty.map((s) => (
-                          <span
-                            key={s}
-                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-violet-50 text-violet-700 border border-violet-100"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {a.career && (
-                      <div className="rounded-md bg-violet-50/30 border border-violet-100 px-3 py-2">
-                        <p className="text-[10px] font-bold text-slate-500 mb-0.5 inline-flex items-center gap-1">
-                          <Briefcase size={10} aria-hidden="true" />
-                          경력
-                        </p>
-                        <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
-                          {a.career}
-                        </p>
-                      </div>
-                    )}
-
-                    {a.message && (
-                      <div className="rounded-md bg-violet-50/30 border border-violet-100 px-3 py-2">
-                        <p className="text-[10px] font-bold text-slate-500 mb-0.5">지원 메시지</p>
-                        <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
-                          {a.message}
-                        </p>
-                      </div>
-                    )}
-
-                    {a.portfolio_url && (
-                      <a
-                        href={a.portfolio_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-600 hover:underline"
-                      >
-                        <ExternalLink size={11} aria-hidden="true" />
-                        포트폴리오 새 탭
-                      </a>
-                    )}
-
-                    {/* 액션 */}
-                    <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-violet-100/70">
-                      {a.status === 'applied' && (
-                        <button
-                          type="button"
-                          onClick={() => void changeStatus(a.id, 'reviewing')}
-                          disabled={busy === a.id}
-                          className="inline-flex items-center gap-0.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
-                        >
-                          <RotateCcw size={11} aria-hidden="true" />
-                          검토 시작
-                        </button>
-                      )}
-                      {a.status !== 'rejected' && (
-                        <button
-                          type="button"
-                          onClick={() => void changeStatus(a.id, 'rejected')}
-                          disabled={busy === a.id}
-                          className="inline-flex items-center gap-0.5 px-2.5 py-1 rounded-md text-[11px] font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
-                        >
-                          <X size={11} aria-hidden="true" />
-                          불합격
-                        </button>
-                      )}
-                      {a.status !== 'accepted' && (
-                        <button
-                          type="button"
-                          onClick={() => void changeStatus(a.id, 'accepted')}
-                          disabled={busy === a.id}
-                          className="inline-flex items-center gap-0.5 px-3 py-1 rounded-md text-[11px] font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          <Check size={11} aria-hidden="true" />
-                          합격
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
