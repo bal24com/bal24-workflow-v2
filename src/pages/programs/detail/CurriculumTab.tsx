@@ -11,7 +11,7 @@ import SaveTemplateModal from './curriculum/SaveTemplateModal';
 import LoadTemplateModal from './curriculum/LoadTemplateModal';
 import AiCurriculumModal from './curriculum/AiCurriculumModal';
 import CurriculumAiDropZone from './curriculum/CurriculumAiDropZone';
-import CurriculumStaffSection from './curriculum/CurriculumStaffSection';
+// STEP-OVERVIEW-UI-FULL PART C — CurriculumStaffSection 제거 (차시 행 강사 컬럼으로 통합)
 import InvitationManagePanel from '../InvitationManagePanel';
 import { fetchCurriculumBundle, trimTime, type CurriculumWithStaff } from './curriculum/curriculumTabUtils';
 import { useCurriculumStaff } from './useCurriculumStaff';
@@ -51,8 +51,6 @@ export default function CurriculumTab({ programId, programName, onSwitchToInstru
   const [inviteMessage, setInviteMessage] = useState<string>('');
   // STEP-CURRICULUM-INSTRUCTOR-FIX — 차시별 강사 초대 매핑
   const [invitationMap, setInvitationMap] = useState<Map<string, InvitationSummary>>(new Map());
-  // STEP-CURRICULUM-INSTRUCTOR-VIEW — 강사 배정 현황 새로고침 키
-  const [staffSectionKey, setStaffSectionKey] = useState(0);
   // STEP-V1-SPLIT-FULL — staff_pool + profiles 통합 옵션 (훅으로 분리)
   const { staffOptions } = useCurriculumStaff();
   // STEP-CURRICULUM-BULK-DELETE — 다중 선택 일괄 삭제
@@ -108,7 +106,6 @@ export default function CurriculumTab({ programId, programName, onSwitchToInstru
       if (inv.curriculum_id) map.set(inv.curriculum_id, { id: inv.id, name: inv.name, status: inv.status });
     }
     setInvitationMap(map);
-    setStaffSectionKey((k) => k + 1);
     // STEP-CURRICULUM-FULL — 양 탭 카운트 동기 갱신
     const cnt = await supabase.from('program_curriculum').select('curriculum_type', { count: 'exact', head: false })
       .eq('program_id', programId);
@@ -298,7 +295,6 @@ export default function CurriculumTab({ programId, programName, onSwitchToInstru
                 invitation={invitationMap.get(c.id) ?? null}
                 onSave={(patch) => saveCurriculum(c.id, patch)}
                 onDelete={() => removeCurriculum(c.id)}
-                onStaffChanged={() => setStaffSectionKey((k) => k + 1)}
                 onRequestInstructor={() => openInvite(c.id, `${c.session_no}차시 — ${c.title}`)}
                 canReorder={curriculumType === 'actual'}
                 onMoveUp={() => void swapWith(idx, 'up')}
@@ -320,13 +316,6 @@ export default function CurriculumTab({ programId, programName, onSwitchToInstru
         </>
       )}
 
-      {/* STEP-CURRICULUM-INSTRUCTOR-VIEW — 차시별 강사·멘토 배정 현황 + 강사 요청 */}
-      <div className="border-t border-slate-100 my-2" />
-      <CurriculumStaffSection
-        programId={programId}
-        refreshKey={staffSectionKey}
-        onRequestInstructor={(cid, info) => openInvite(cid, info)}
-      />
 
       <SaveTemplateModal
         open={saveTplOpen}
@@ -381,7 +370,7 @@ export default function CurriculumTab({ programId, programName, onSwitchToInstru
         defaultCurriculumId={inviteCurriculumId}
         defaultSessionInfo={inviteSessionInfo}
         defaultMessage={inviteMessage}
-        onApproved={() => setStaffSectionKey((k) => k + 1)}
+        onApproved={() => void refresh()}
         onClose={() => {
           setInvitePanelOpen(false); setInviteCurriculumId(null); setInviteSessionInfo(''); setInviteMessage('');
           void refresh();
