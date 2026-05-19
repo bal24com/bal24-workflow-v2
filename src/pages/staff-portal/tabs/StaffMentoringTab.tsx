@@ -1,0 +1,271 @@
+// bal24 v2 — STEP-STAFF-PORTAL-P3
+// 강사 포털 · 멘토링 탭 — 프로그램별 그룹핑 + 멘티 + 일지 작성 + 최근 5건.
+// mentoring_logs 테이블 미적용(PGRST205) 안전 처리.
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Loader2, Users2, BookOpen, Plus, Save, X } from 'lucide-react';
+import { supabase } from '../../../lib/supabase';
+import { useToast } from '../../../contexts/ToastContext';
+import { formatDateKo } from '../../../lib/utils';
+import type { MentoringLog } from '../../../types/mentoring';
+import type { StaffPortalIdentity } from '../staffPortalUtils';
+
+interface Props { staff: StaffPortalIdentity }
+
+interface AssignmentRow {
+  id: string;
+  mentee_ids: string[] | null;
+  program: { id: string; name: string } | null;
+}
+interface MenteeLite { id: string; name: string; organization: string | null }
+
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export default function StaffMentoringTab({ staff }: Props) {
+  const toast = useToast();
+  const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
+  const [mentees, setMentees] = useState<MenteeLite[]>([]);
+  const [logs, setLogs] = useState<MentoringLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tableMissing, setTableMissing] = useState(false);
+  const [formOpenId, setFormOpenId] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const col = staff.sourceType === 'staff_pool' ? 'mentor_pool_id' : 'mentor_profile_id';
+    const { data: asn, error: asnErr } = await supabase
+      .from('mentoring_assignments')
+      .select('id, mentee_ids, program:programs!mentoring_assignments_program_id_fkey(id, name)')
+      .eq(col, staff.id);
+    if (asnErr) {
+      console.error('[staff-portal/mentoring] 배정 조회 실패:', asnErr.message);
+      toast.error('멘토링 배정을 불러오지 못했어요.');
+      setAssignments([]); setLoading(false); return;
+    }
+    const rows = ((asn ?? []) as unknown) as AssignmentRow[];
+    setAssignments(rows);
+
+    const allMenteeIds = Array.from(new Set(rows.flatMap((r) => r.mentee_ids ?? [])));
+    if (allMenteeIds.length > 0) {
+      const { data: mn, error: mnErr } = await supabase.from('program_participants')
+        .select('id, name, organization').in('id', allMenteeIds);
+      if (mnErr) console.warn('[staff-portal/mentoring] 멘티 조회 경고:', mnErr.message);
+      else setMentees((mn ?? []) as MenteeLite[]);
+    } else setMentees([]);
+
+    const asnIds = rows.map((r) => r.id);
+    if (asnIds.length > 0) {
+      const { data: lg, error: lgErr } = await supabase.from('mentoring_logs')
+        .select('*').in('assignment_id', asnIds).order('log_date', { ascending: false });
+      if (lgErr) {
+        const m = (lgErr.message ?? '').toLowerCase();
+        if (m.includes('does not exist') || m.includes('pgrst205')) {
+          setTableMissing(true); setLogs([]);
+        } else {
+          console.warn('[staff-portal/mentoring] 일지 조회 경고:', lgErr.message);
+          setLogs([]);
+        }
+      } else setLogs((lg ?? []) as MentoringLog[]);
+    } else setLogs([]);
+
+    setLoading(false);
+  }, [staff.id, staff.sourceType, toast]);
+
+  useEffect(() => { void fetchData(); }, [fetchData]);
+
+  const menteeMap = useMemo(() => new Map(mentees.map((m) => [m.id, m])), [mentees]);
+  const logsByAsn = useMemo(() => {
+    const m = new Map<string, MentoringLog[]>();
+    logs.forEach((l) => {
+      if (!l.assignment_id) return;
+      const arr = m.get(l.assignment_id) ?? [];
+      arr.push(l);
+      m.set(l.assignment_id, arr);
+    });
+    return m;
+  }, [logs]);
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-400" /></div>;
+  }
+  if (assignments.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 px-4 py-12 text-center">
+        <p className="text-slate-600 font-semibold">배정된 멘토링이 없어요</p>
+        <p className="text-xs text-slate-400 mt-1">PM이 멘토 배정을 추가하면 여기에 표시돼요.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {tableMissing && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-3 text-xs text-amber-800">
+          멘토링 일지 기능이 아직 활성화되지 않았어요. PM에게 마이그레이션 실행을 요청해 주세요.
+        </div>
+      )}
+      {assignments.map((a) => {
+        const programName = a.program?.name ?? '(프로그램 미지정)';
+        const menteeList = (a.mentee_ids ?? []).map((id) => menteeMap.get(id)).filter(Boolean) as MenteeLite[];
+        const asnLogs = logsByAsn.get(a.id) ?? [];
+        return (
+          <section key={a.id} className="bg-white rounded-2xl border border-slate-200 p-4">
+            <h2 className="text-sm font-bold text-[#1E1B4B] mb-3">{programName}</h2>
+            <div className="space-y-3">
+              <div>
+                <p className="text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                  <Users2 size={11} aria-hidden="true" /> 담당 멘티 ({menteeList.length}명)
+                </p>
+                {menteeList.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">배정된 멘티가 없어요.</p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {menteeList.map((m) => (
+                      <li key={m.id} className="text-xs text-slate-700">
+                        · {m.name}{m.organization && <span className="text-slate-400"> ({m.organization})</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* 일지 작성 폼 */}
+              {!tableMissing && (
+                formOpenId === a.id ? (
+                  <LogForm assignment={a} mentees={menteeList} existingCount={asnLogs.length}
+                    onSaved={() => { setFormOpenId(null); void fetchData(); }}
+                    onCancel={() => setFormOpenId(null)} />
+                ) : (
+                  <button type="button" onClick={() => setFormOpenId(a.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700">
+                    <Plus size={11} aria-hidden="true" /> 일지 작성
+                  </button>
+                )
+              )}
+
+              {/* 최근 일지 5건 */}
+              {!tableMissing && asnLogs.length > 0 && (
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                    <BookOpen size={11} aria-hidden="true" /> 최근 일지 ({asnLogs.length}건)
+                  </p>
+                  <ul className="space-y-1.5">
+                    {asnLogs.slice(0, 5).map((l) => (
+                      <li key={l.id} className="rounded-lg border border-slate-100 bg-violet-50/30 px-2.5 py-1.5">
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <span className="font-bold text-slate-700 tabular-nums">{formatDateKo(l.log_date)}</span>
+                          <span className="px-1 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold">{l.session_no ?? 1}회차</span>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-700 line-clamp-2 whitespace-pre-wrap">{l.content}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+interface LogFormProps {
+  assignment: AssignmentRow;
+  mentees: MenteeLite[];
+  existingCount: number;
+  onSaved: () => void;
+  onCancel: () => void;
+}
+
+function LogForm({ assignment, mentees, existingCount, onSaved, onCancel }: LogFormProps) {
+  const toast = useToast();
+  const [logDate, setLogDate] = useState(todayIso());
+  const [sessionNo, setSessionNo] = useState(String(existingCount + 1));
+  const [selectedMentees, setSelectedMentees] = useState<string[]>(mentees.map((m) => m.id));
+  const [content, setContent] = useState('');
+  const [nextPlan, setNextPlan] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function toggleMentee(id: string) {
+    setSelectedMentees((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }
+
+  async function handleSave() {
+    if (!content.trim()) { toast.error('주요 내용을 입력해 주세요.'); return; }
+    setSaving(true);
+    const { error } = await supabase.from('mentoring_logs').insert({
+      assignment_id: assignment.id,
+      program_id: assignment.program?.id ?? null,
+      log_date: logDate,
+      session_no: Number(sessionNo) || 1,
+      mentee_ids: selectedMentees,
+      content: content.trim(),
+      next_plan: nextPlan.trim() || null,
+    });
+    setSaving(false);
+    if (error) {
+      console.error('[staff-portal/mentoring] 일지 저장 실패:', error.message);
+      toast.error('일지 저장에 실패했어요.');
+      return;
+    }
+    toast.success('일지를 저장했어요.');
+    onSaved();
+  }
+
+  return (
+    <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-3 space-y-2">
+      <div className="grid grid-cols-[1fr_auto] gap-2">
+        <div>
+          <label className="text-[10px] font-bold text-slate-600">일지 날짜</label>
+          <input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} disabled={saving}
+            className="w-full h-8 px-2 rounded-md border border-violet-200 bg-white text-xs" />
+        </div>
+        <div>
+          <label className="text-[10px] font-bold text-slate-600">회차</label>
+          <input type="number" min={1} value={sessionNo} onChange={(e) => setSessionNo(e.target.value)} disabled={saving}
+            className="w-16 h-8 px-2 rounded-md border border-violet-200 bg-white text-xs tabular-nums" />
+        </div>
+      </div>
+      {mentees.length > 0 && (
+        <div>
+          <label className="text-[10px] font-bold text-slate-600">멘티 ({selectedMentees.length}/{mentees.length})</label>
+          <div className="flex flex-wrap gap-1.5">
+            {mentees.map((m) => (
+              <label key={m.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-violet-200 bg-white cursor-pointer">
+                <input type="checkbox" checked={selectedMentees.includes(m.id)} onChange={() => toggleMentee(m.id)}
+                  disabled={saving} className="rounded text-violet-600 w-3 h-3" />
+                <span className="text-[11px] text-slate-700">{m.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+      <div>
+        <label className="text-[10px] font-bold text-slate-600">주요 내용</label>
+        <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} disabled={saving}
+          placeholder="멘토링 중 논의한 내용·진행 방식 (최소 3줄)"
+          className="w-full px-2 py-1.5 rounded-md border border-violet-200 bg-white text-xs resize-y" />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold text-slate-600">다음 멘토링 계획 (선택)</label>
+        <textarea value={nextPlan} onChange={(e) => setNextPlan(e.target.value)} rows={2} disabled={saving}
+          placeholder="다음 회차 주제·과제"
+          className="w-full px-2 py-1.5 rounded-md border border-violet-200 bg-white text-xs resize-y" />
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <button type="button" onClick={onCancel} disabled={saving}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-slate-600 hover:bg-slate-100">
+          <X size={11} /> 취소
+        </button>
+        <button type="button" onClick={() => void handleSave()} disabled={saving}
+          className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-violet-600 text-white text-[11px] font-bold hover:bg-violet-700 disabled:opacity-50">
+          {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} 저장
+        </button>
+      </div>
+    </div>
+  );
+}

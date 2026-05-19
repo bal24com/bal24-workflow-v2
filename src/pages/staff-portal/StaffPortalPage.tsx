@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import StaffPortalHeader from './StaffPortalHeader';
 import StaffOverviewTab from './tabs/StaffOverviewTab';
+import StaffMentoringTab from './tabs/StaffMentoringTab';
+import StaffLectureTab from './tabs/StaffLectureTab';
 import { resolveStaffByToken, type StaffPortalIdentity } from './staffPortalUtils';
 
 const TABS = [
@@ -82,8 +84,8 @@ export default function StaffPortalPage() {
       {/* 탭 콘텐츠 */}
       <div className="max-w-2xl mx-auto px-4 py-6">
         {activeTab === 'overview'  && <StaffOverviewTab staff={staff} />}
-        {activeTab === 'mentoring' && <PlaceholderTab label="멘토링" phase="P3" />}
-        {activeTab === 'lecture'   && <PlaceholderTab label="강의" phase="P3" />}
+        {activeTab === 'mentoring' && <StaffMentoringTab staff={staff} />}
+        {activeTab === 'lecture'   && <StaffLectureTab staff={staff} />}
         {activeTab === 'log'       && <PlaceholderTab label="일지" phase="P4" />}
         {activeTab === 'schedule'  && <PlaceholderTab label="일정" phase="P4" />}
         {activeTab === 'materials' && <PlaceholderTab label="자료" phase="P4" />}
