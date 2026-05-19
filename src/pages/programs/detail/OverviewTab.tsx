@@ -117,8 +117,11 @@ export default function OverviewTab({ programId, description }: Props) {
         </section>
       </div>
 
-      {/* 우: KPI + 빠른 액션 */}
+      {/* 우: 단계 시작일 → 통계 KPI (1열) → 빠른 액션. STEP-OVERVIEW-UI-FULL 순서 재배치. */}
       <div className="flex flex-col gap-4 min-w-0">
+        {/* STEP-PHASE-DATE-FULL — 통계 KPI 위로 이동 */}
+        <PhaseDateSection programId={programId} />
+
         <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
           <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
             <ClipboardCheck size={16} className="text-violet-500" aria-hidden="true" />
@@ -129,35 +132,12 @@ export default function OverviewTab({ programId, description }: Props) {
               <Loader2 className="animate-spin text-violet-400" size={18} aria-hidden="true" />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <KpiTile
-                label="신청"
-                value={`${kpis.applicationCount}건`}
-                sub={`승인 ${kpis.acceptedApplicationCount}건`}
-                Icon={Users}
-                tone="violet"
-              />
-              <KpiTile
-                label="출석 세션"
-                value={`${kpis.attendanceSessionCount}회`}
-                sub={`체크인 ${kpis.attendanceCheckedInCount}건`}
-                Icon={ClipboardCheck}
-                tone="emerald"
-              />
-              <KpiTile
-                label="활동 일지"
-                value={`${kpis.activityLogCount}건`}
-                sub="최근 기록"
-                Icon={ListChecks}
-                tone="orange"
-              />
-              <KpiTile
-                label="만족도 응답"
-                value={`${kpis.surveyCount}건`}
-                sub={kpis.surveyAvgRating != null ? `평균 ${kpis.surveyAvgRating}점` : '평점 없음'}
-                Icon={Star}
-                tone="cyan"
-              />
+            // STEP-OVERVIEW-UI-FULL — 2열 → 1열 가로형
+            <div className="grid grid-cols-1 gap-2">
+              <KpiTile label="신청"        value={`${kpis.applicationCount}건`}     sub={`승인 ${kpis.acceptedApplicationCount}건`} Icon={Users}          tone="violet" />
+              <KpiTile label="출석 세션"   value={`${kpis.attendanceSessionCount}회`} sub={`체크인 ${kpis.attendanceCheckedInCount}건`} Icon={ClipboardCheck} tone="emerald" />
+              <KpiTile label="활동 일지"   value={`${kpis.activityLogCount}건`}     sub="최근 기록" Icon={ListChecks} tone="orange" />
+              <KpiTile label="만족도 응답" value={`${kpis.surveyCount}건`}          sub={kpis.surveyAvgRating != null ? `평균 ${kpis.surveyAvgRating}점` : '평점 없음'} Icon={Star} tone="cyan" />
             </div>
           )}
         </section>
@@ -178,9 +158,6 @@ export default function OverviewTab({ programId, description }: Props) {
         </section>
       </div>
     </div>
-
-    {/* STEP-PHASE-DATE-FULL — 개요 탭 하단에 단계 시작일 편집 카드 (외부공유 연동) */}
-    <PhaseDateSection programId={programId} />
     </div>
   );
 }
@@ -197,17 +174,18 @@ const TONE_STYLE: Record<Tone, { bg: string; text: string; ring: string }> = {
 function KpiTile({
   label, value, sub, Icon, tone,
 }: { label: string; value: string; sub: string; Icon: LucideIcon; tone: Tone }) {
+  // STEP-OVERVIEW-UI-FULL — 가로형 (1열 레이아웃 대응). 아이콘 좌 + 라벨/sub 중앙 + 수치 우.
   const t = TONE_STYLE[tone];
   return (
-    <div className={`rounded-xl border ${t.ring} bg-white p-3 flex flex-col gap-1`}>
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-slate-500">{label}</span>
-        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${t.bg} ${t.text}`}>
-          <Icon size={14} aria-hidden="true" />
-        </span>
+    <div className={`rounded-xl border ${t.ring} bg-white p-3 flex items-center gap-3`}>
+      <span className={`shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-md ${t.bg} ${t.text}`}>
+        <Icon size={16} aria-hidden="true" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-slate-600">{label}</p>
+        <p className="text-[10px] text-slate-400 truncate">{sub}</p>
       </div>
-      <div className={`text-lg font-bold tabular-nums ${t.text}`}>{value}</div>
-      <div className="text-[10px] text-slate-400">{sub}</div>
+      <span className={`shrink-0 text-lg font-bold tabular-nums ${t.text}`}>{value}</span>
     </div>
   );
 }

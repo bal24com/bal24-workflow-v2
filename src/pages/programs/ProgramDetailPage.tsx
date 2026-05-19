@@ -285,7 +285,7 @@ export default function ProgramDetailPage() {
             <OverviewTab programId={programId} description={program.description ?? null} />
           </div>
         )}
-        {tab === 'curriculum'   && <CurriculumTab programId={programId} programName={program.name} />}
+        {tab === 'curriculum'   && <CurriculumTab programId={programId} programName={program.name} onSwitchToInstructorTab={() => setTab('instructor')} />}
         {tab === 'participants' && <ParticipantManageTab programId={programId} programName={program.name} canEdit={isStaff} />}
         {tab === 'instructor'   && <InstructorManageTab programId={programId} isPartner={isPartner} />}
         {tab === 'mentoring'    && <MentoringTab programId={programId} />}

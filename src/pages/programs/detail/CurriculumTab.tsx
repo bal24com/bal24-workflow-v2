@@ -29,9 +29,11 @@ import type { CurriculumSessionMeta } from './curriculum/curriculumTemplateUtils
 interface Props {
   programId: string;
   programName?: string;
+  /** STEP-OVERVIEW-UI-FULL — 강사명 클릭 시 상위 탭 전환 */
+  onSwitchToInstructorTab?: () => void;
 }
 
-export default function CurriculumTab({ programId, programName }: Props) {
+export default function CurriculumTab({ programId, programName, onSwitchToInstructorTab }: Props) {
   const toast = useToast();
   const [items, setItems] = useState<CurriculumWithStaff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -277,12 +279,13 @@ export default function CurriculumTab({ programId, programName }: Props) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-[28px_28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          {/* STEP-OVERVIEW-UI-FULL — 강사 컬럼 추가 (12 컬럼) */}
+          <div className="grid grid-cols-[28px_28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(90px,120px)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             {/* STEP-CURRICULUM-BULK-DELETE — 전체 선택 체크박스 */}
             <input type="checkbox" checked={allSelected} onChange={toggleAll}
               aria-label="전체 선택"
               className="w-3.5 h-3.5 rounded border-violet-300 text-violet-600 focus:ring-violet-400 mx-auto cursor-pointer" />
-            {['', '#', '일자', '시작', '종료', '주제·차시명', '초대', '', '', ''].map((label, i) => (
+            {['', '#', '일자', '시작', '종료', '주제·차시명', '강사', '초대', '', '', ''].map((label, i) => (
               <span key={i} className={i === 1 ? 'text-center' : undefined} aria-hidden={label ? undefined : true}>{label}</span>
             ))}
           </div>
@@ -310,6 +313,7 @@ export default function CurriculumTab({ programId, programName }: Props) {
                 staffOptions={staffOptions}
                 checked={selectedIds.has(c.id)}
                 onCheckToggle={() => toggleOne(c.id)}
+                onSwitchToInstructorTab={onSwitchToInstructorTab}
               />
             ))}
           </div>

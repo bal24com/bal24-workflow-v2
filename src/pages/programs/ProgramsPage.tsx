@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LayoutGrid, List, Plus, Loader2, UserPlus, FolderUp, Building2, Users, MapPin, Calendar } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, UserPlus, FolderUp, Building2, Users, MapPin, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Button,
   Card,
@@ -33,6 +33,7 @@ import BulkProgramModal from './BulkProgramModal';
 import ProgramsFilterTabs from './ProgramsFilterTabs';
 import InvitationManagePanel from './InvitationManagePanel';
 import { useMemberProgramIds } from './useMemberProgramIds';
+import ParticipantMiniList from './ParticipantMiniList';
 
 type ViewMode = 'list' | 'card';
 type StatusFilter = ProgramStatus | '전체';
@@ -102,11 +103,16 @@ function InviteButton({ onClick, size = 'sm' }: { onClick: (e: React.MouseEvent)
   );
 }
 
-function ProgramListItem({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow) => void }) {
+function ProgramListItem({
+  p, onInvite, expanded, onToggleExpand,
+}: {
+  p: ProgramRow; onInvite: (p: ProgramRow) => void;
+  expanded: boolean; onToggleExpand: () => void;
+}) {
   return (
     <li className="bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition">
-      <Link to={`/programs/${p.id}`} className="flex items-start gap-3 p-4">
-        <div className="flex-1 min-w-0 space-y-2">
+      <div className="flex items-start gap-3 p-4">
+        <Link to={`/programs/${p.id}`} className="flex-1 min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold text-text truncate">{p.name}</h3>
             <span className={`${BADGE_BASE} ${PROGRAM_STATUS_STYLE[p.status]}`}>{p.status}</span>
@@ -114,17 +120,30 @@ function ProgramListItem({ p, onInvite }: { p: ProgramRow; onInvite: (p: Program
           </div>
           <ProgramMeta p={p} />
           <ProgramStats p={p} />
+        </Link>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {/* STEP-OVERVIEW-UI-FULL — 교육생 명단 펼치기 토글 */}
+          <button type="button" onClick={onToggleExpand} aria-expanded={expanded}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
+            명단 {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </button>
+          <InviteButton onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInvite(p); }} />
         </div>
-        <InviteButton onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInvite(p); }} />
-      </Link>
+      </div>
+      {expanded && <ParticipantMiniList programId={p.id} />}
     </li>
   );
 }
 
-function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow) => void }) {
+function ProgramCard({
+  p, onInvite, expanded, onToggleExpand,
+}: {
+  p: ProgramRow; onInvite: (p: ProgramRow) => void;
+  expanded: boolean; onToggleExpand: () => void;
+}) {
   return (
-    <Link to={`/programs/${p.id}`} className="block h-full">
-      <Card className="hover:border-primary/30 hover:shadow-md transition h-full">
+    <Card className="hover:border-primary/30 hover:shadow-md transition h-full">
+      <Link to={`/programs/${p.id}`} className="block">
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="truncate">{p.name}</CardTitle>
@@ -140,12 +159,18 @@ function ProgramCard({ p, onInvite }: { p: ProgramRow; onInvite: (p: ProgramRow)
             <p className="text-xs text-slate-500 line-clamp-2 pt-2 border-t border-slate-100">{p.description}</p>
           )}
           <ProgramStats p={p} />
-          <div className="flex justify-end">
-            <InviteButton onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInvite(p); }} />
-          </div>
         </CardContent>
-      </Card>
-    </Link>
+      </Link>
+      <div className="flex items-center justify-end gap-1 px-6 pb-4">
+        {/* STEP-OVERVIEW-UI-FULL — 교육생 명단 펼치기 토글 */}
+        <button type="button" onClick={onToggleExpand} aria-expanded={expanded}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
+          명단 {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+        </button>
+        <InviteButton onClick={(e) => { e.preventDefault(); e.stopPropagation(); onInvite(p); }} />
+      </div>
+      {expanded && <ParticipantMiniList programId={p.id} />}
+    </Card>
   );
 }
 
@@ -166,6 +191,13 @@ export default function ProgramsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [invitePanel, setInvitePanel] = useState<ProgramRow | null>(null);
+  // STEP-OVERVIEW-UI-FULL — 프로그램 행별 교육생 명단 펼침 상태
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) => setExpandedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -257,30 +289,16 @@ export default function ProgramsPage() {
 
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-              <button
-                type="button"
-                onClick={() => setView('list')}
-                aria-pressed={view === 'list'}
-                aria-label="리스트 보기"
-                className={[
-                  'inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors',
-                  view === 'list' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50',
-                ].join(' ')}
-              >
-                <List size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setView('card')}
-                aria-pressed={view === 'card'}
-                aria-label="카드 보기"
-                className={[
-                  'inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors',
-                  view === 'card' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50',
-                ].join(' ')}
-              >
-                <LayoutGrid size={16} />
-              </button>
+              {([
+                { mode: 'list' as ViewMode, Icon: List,        label: '리스트 보기' },
+                { mode: 'card' as ViewMode, Icon: LayoutGrid,  label: '카드 보기' },
+              ]).map((v) => (
+                <button key={v.mode} type="button" onClick={() => setView(v.mode)}
+                  aria-pressed={view === v.mode} aria-label={v.label}
+                  className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors ${view === v.mode ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                  <v.Icon size={16} />
+                </button>
+              ))}
             </div>
 
             <Button
@@ -340,13 +358,15 @@ export default function ProgramsPage() {
       ) : view === 'list' ? (
         <ul className="space-y-2">
           {visible.map((p) => (
-            <ProgramListItem key={p.id} p={p} onInvite={setInvitePanel} />
+            <ProgramListItem key={p.id} p={p} onInvite={setInvitePanel}
+              expanded={expandedIds.has(p.id)} onToggleExpand={() => toggleExpand(p.id)} />
           ))}
         </ul>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((p) => (
-            <ProgramCard key={p.id} p={p} onInvite={setInvitePanel} />
+            <ProgramCard key={p.id} p={p} onInvite={setInvitePanel}
+              expanded={expandedIds.has(p.id)} onToggleExpand={() => toggleExpand(p.id)} />
           ))}
         </div>
       )}

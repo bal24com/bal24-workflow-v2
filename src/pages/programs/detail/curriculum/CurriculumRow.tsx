@@ -41,6 +41,8 @@ interface Props {
   /** STEP-CURRICULUM-BULK-DELETE — 일괄 삭제용 체크박스 상태/토글 */
   checked?: boolean;
   onCheckToggle?: () => void;
+  /** STEP-OVERVIEW-UI-FULL — 강사명 클릭 시 상위 강사 탭으로 전환 */
+  onSwitchToInstructorTab?: () => void;
 }
 
 const INVITE_BADGE: Record<InvitationStatus, string> = {
@@ -94,7 +96,10 @@ export default function CurriculumRow({
   onDragStart, onDragEnter, onDragEnd, onDragOver, isDragging,
   staffOptions,
   checked, onCheckToggle,
+  onSwitchToInstructorTab,
 }: Props) {
+  // STEP-OVERVIEW-UI-FULL — 차시별 강사명 미리보기 (role='강사' 첫 번째)
+  const instructorName = item.staff.find((s) => s.role === '강사')?.name ?? null;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => toDraft(item));
   const [saving, setSaving] = useState(false);
@@ -155,8 +160,9 @@ export default function CurriculumRow({
             : 'border-violet-100'
       } bg-white overflow-hidden transition-colors`}
     >
-      {/* 행1 — 헤더 (체크박스·핸들·번호·일차·시간·주제·invitation·↑↓·펼침·삭제) */}
-      <div className="grid grid-cols-[28px_28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-2">
+      {/* 행1 — 헤더 (체크박스·핸들·번호·일차·시간·주제·강사·invitation·↑↓·펼침·삭제) */}
+      {/* STEP-OVERVIEW-UI-FULL — 강사 컬럼 추가 (주제 다음) */}
+      <div className="grid grid-cols-[28px_28px_48px_80px_minmax(110px,130px)_minmax(110px,130px)_minmax(0,1fr)_minmax(90px,120px)_minmax(110px,140px)_auto_28px_28px] items-center gap-2 px-2 py-2">
         {/* STEP-CURRICULUM-BULK-DELETE — 행 선택 체크박스 */}
         {onCheckToggle ? (
           <input type="checkbox" checked={checked ?? false} onChange={onCheckToggle}
@@ -185,6 +191,18 @@ export default function CurriculumRow({
           onChange={(e) => patchDraft('title', e.target.value)}
           placeholder="주제·차시명"
           className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400" />
+        {/* STEP-OVERVIEW-UI-FULL — 강사명 컬럼 (클릭 시 강사 탭 전환) */}
+        {onSwitchToInstructorTab ? (
+          <button type="button" onClick={onSwitchToInstructorTab}
+            className={`truncate text-[11px] text-left ${instructorName ? 'text-violet-700 hover:underline font-semibold' : 'text-slate-400 italic'}`}
+            title={instructorName ? `${instructorName} (강사 탭으로 이동)` : '강사 미배정 — 강사 탭에서 배정'}>
+            {instructorName ?? '미배정'}
+          </button>
+        ) : (
+          <span className={`truncate text-[11px] ${instructorName ? 'text-violet-700 font-semibold' : 'text-slate-400 italic'}`}>
+            {instructorName ?? '미배정'}
+          </span>
+        )}
         <span className="truncate text-[11px]">
           {invitation ? (
             <span className="inline-flex items-center gap-1">
