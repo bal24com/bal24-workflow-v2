@@ -3,9 +3,11 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Mail, Phone, Building2, Calendar, Pencil, Loader2 } from 'lucide-react';
+import { X, Mail, Phone, Building2, Calendar, Pencil, Loader2, Link2 } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import { copyToClipboard } from '../../lib/clipboard';
+import { useToast } from '../../contexts/ToastContext';
 import { formatDateKo } from '../../lib/utils';
 import type { Profile, ProjectStatus } from '../../types/database';
 import { getRoleBadgeTone, getRoleLabel } from '../../constants/roles';
@@ -28,9 +30,24 @@ function initial(name: string): string {
 }
 
 export default function MemberDetailPanel({ memberId, isAdmin, onClose, onEdit }: Props) {
+  const toast = useToast();
   const [member, setMember] = useState<Profile | null>(null);
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // STEP-STAFF-PORTAL-TEAMMATE — 팀원 포털 영구 링크 복사
+  const handleCopyPortalLink = async () => {
+    if (!member) return;
+    const token = member.staff_portal_token;
+    if (!token) {
+      toast.error('포털 토큰이 아직 발급되지 않았어요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    const link = `${window.location.origin}/staff-portal/${token}`;
+    const ok = await copyToClipboard(link);
+    if (ok) toast.success(`${member.name}님 포털 링크가 복사됐어요.`);
+    else toast.error('링크 복사에 실패했어요.');
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -181,12 +198,18 @@ export default function MemberDetailPanel({ memberId, isAdmin, onClose, onEdit }
           )}
         </div>
 
-        {!loading && member && isAdmin && (
-          <footer className="p-5 border-t border-slate-100">
-            <Button variant="primary" onClick={() => onEdit(member)} className="!w-full">
-              <Pencil size={16} className="mr-1.5" aria-hidden="true" />
-              수정
+        {!loading && member && (
+          <footer className="p-5 border-t border-slate-100 flex items-center gap-2">
+            <Button variant="outline" onClick={() => void handleCopyPortalLink()} className="!flex-1">
+              <Link2 size={16} className="mr-1.5" aria-hidden="true" />
+              포털 링크 복사
             </Button>
+            {isAdmin && (
+              <Button variant="primary" onClick={() => onEdit(member)} className="!flex-1">
+                <Pencil size={16} className="mr-1.5" aria-hidden="true" />
+                수정
+              </Button>
+            )}
           </footer>
         )}
       </aside>

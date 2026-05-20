@@ -2,9 +2,11 @@
 // 3열 카드 그리드 + 역할 필터 탭 + 이름·부서·직책 검색
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Search, UserPlus } from 'lucide-react';
+import { Loader2, Search, UserPlus, Link2 } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import { copyToClipboard } from '../../lib/clipboard';
+import { useToast } from '../../contexts/ToastContext';
 import EmptyState from '../../components/EmptyState';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Profile, Role } from '../../types/database';
@@ -41,6 +43,7 @@ function initial(name: string): string {
 
 export default function MembersPage() {
   const { user } = useAuth();
+  const toast = useToast();
 
   const [members, setMembers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,6 +131,19 @@ export default function MembersPage() {
     setEditTarget(member);
     setDetailId(null);
     setModalOpen(true);
+  };
+
+  // STEP-STAFF-PORTAL-TEAMMATE — 팀원 포털 영구 링크 복사 (profiles.staff_portal_token)
+  const handleCopyPortalLink = async (m: Profile) => {
+    const token = m.staff_portal_token;
+    if (!token) {
+      toast.error('포털 토큰이 아직 발급되지 않았어요. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    const link = `${window.location.origin}/staff-portal/${token}`;
+    const ok = await copyToClipboard(link);
+    if (ok) toast.success(`${m.name}님 포털 링크가 복사됐어요.`);
+    else toast.error('링크 복사에 실패했어요.');
   };
 
   return (
@@ -267,9 +283,17 @@ export default function MembersPage() {
                   {m.slogan ?? '한 줄 소개가 없어요.'}
                 </p>
 
-                <Button variant="outline" onClick={() => setDetailId(m.id)} className="!w-full">
-                  상세 보기
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={() => setDetailId(m.id)} className="!flex-1">
+                    상세 보기
+                  </Button>
+                  <button type="button"
+                    onClick={(e) => { e.stopPropagation(); void handleCopyPortalLink(m); }}
+                    aria-label="팀원 포털 링크 복사" title="팀원 포털 링크 복사"
+                    className="inline-flex items-center justify-center w-9 h-9 rounded-md text-violet-600 border border-violet-200 bg-white hover:bg-violet-50 transition-colors shrink-0">
+                    <Link2 size={14} aria-hidden="true" />
+                  </button>
+                </div>
               </article>
             );
           })}
