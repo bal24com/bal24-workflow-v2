@@ -12,6 +12,8 @@ export interface StaffPortalIdentity {
   affiliation: string | null;   // staff_pool.organization 또는 profile.department
   sourceType: StaffSource;
   portalToken: string;
+  /** STEP-STAFF-PORTAL-PIN — staff_pool만 PIN 사용. null이면 최초 설정 화면 */
+  portalPin: string | null;
 }
 
 export interface StaffPortalProgram {
@@ -32,12 +34,36 @@ export interface StaffUpcomingSession {
 
 /** 토큰 → 강사 식별 (staff_pool 우선, profiles 차순) */
 export async function resolveStaffByToken(token: string): Promise<StaffPortalIdentity | null> {
+  // staff_pool은 portal_pin 컬럼이 있을 수도 없을 수도 있어 fallback 처리
   const { data: sp, error: spErr } = await supabase
     .from('staff_pool')
-    .select('id, name, organization, staff_portal_token')
+    .select('id, name, organization, staff_portal_token, portal_pin')
     .eq('staff_portal_token', token)
     .maybeSingle();
-  if (spErr) console.warn('[staff-portal] staff_pool 조회 경고:', spErr.message);
+  if (spErr) {
+    const m = (spErr.message ?? '').toLowerCase();
+    if (m.includes('portal_pin') || m.includes('does not exist')) {
+      // portal_pin 컬럼이 아직 마이그레이션 안 된 경우 — PIN 없이 진행
+      console.warn('[staff-portal] portal_pin 컬럼 미적용 — PIN 인증 비활성.');
+      const { data: spFallback } = await supabase
+        .from('staff_pool')
+        .select('id, name, organization, staff_portal_token')
+        .eq('staff_portal_token', token)
+        .maybeSingle();
+      if (spFallback) {
+        return {
+          id: spFallback.id,
+          name: spFallback.name,
+          affiliation: spFallback.organization ?? null,
+          sourceType: 'staff_pool',
+          portalToken: spFallback.staff_portal_token,
+          portalPin: null,
+        };
+      }
+    } else {
+      console.warn('[staff-portal] staff_pool 조회 경고:', spErr.message);
+    }
+  }
   if (sp) {
     return {
       id: sp.id,
@@ -45,6 +71,7 @@ export async function resolveStaffByToken(token: string): Promise<StaffPortalIde
       affiliation: sp.organization ?? null,
       sourceType: 'staff_pool',
       portalToken: sp.staff_portal_token,
+      portalPin: (sp.portal_pin as string | null) ?? null,
     };
   }
   const { data: pr, error: prErr } = await supabase
@@ -60,6 +87,7 @@ export async function resolveStaffByToken(token: string): Promise<StaffPortalIde
       affiliation: (pr.department as string | null) ?? null,
       sourceType: 'profile',
       portalToken: pr.staff_portal_token,
+      portalPin: null,  // 내부 직원은 PIN 미사용 (사이트 로그인으로 인증)
     };
   }
   return null;
