@@ -1,4 +1,4 @@
-// bal24 v2 — STEP-STAFF-PORTAL-P3
+// bal24 v2 — STEP-STAFF-PORTAL-P3 / STEP-STAFF-PORTAL-UI-UNIFY
 // 강사 포털 · 멘토링 탭 — 프로그램별 그룹핑 + 멘티 + 일지 작성 + 최근 5건.
 // mentoring_logs 테이블 미적용(PGRST205) 안전 처리.
 
@@ -7,6 +7,7 @@ import { Loader2, Users2, BookOpen, Plus, Save, X } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { formatDateKo } from '../../../lib/utils';
+import EmptyState from '../../../components/EmptyState';
 import type { MentoringLog } from '../../../types/mentoring';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 
@@ -18,6 +19,25 @@ interface AssignmentRow {
   program: { id: string; name: string } | null;
 }
 interface MenteeLite { id: string; name: string; organization: string | null }
+
+const CARD_CLASS =
+  'bg-white rounded-2xl border border-violet-100 shadow-[0_4px_16px_rgba(124,58,237,0.08)] p-5';
+
+const INPUT_CLASS =
+  'w-full h-[42px] border border-gray-200 rounded-[10px] px-3 text-sm ' +
+  'focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50';
+
+const TEXTAREA_CLASS =
+  'w-full border border-gray-200 rounded-[10px] px-3 py-2.5 text-sm resize-y ' +
+  'focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50';
+
+const BTN_PRIMARY =
+  'inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-violet-600 ' +
+  'rounded-[10px] hover:bg-violet-700 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100';
+
+const BTN_GHOST =
+  'inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-600 ' +
+  'hover:bg-slate-100 rounded-[10px] transition-all duration-200';
 
 function todayIso(): string {
   const d = new Date();
@@ -52,8 +72,11 @@ export default function StaffMentoringTab({ staff }: Props) {
     if (allMenteeIds.length > 0) {
       const { data: mn, error: mnErr } = await supabase.from('program_participants')
         .select('id, name, organization').in('id', allMenteeIds);
-      if (mnErr) console.warn('[staff-portal/mentoring] 멘티 조회 경고:', mnErr.message);
-      else setMentees((mn ?? []) as MenteeLite[]);
+      if (mnErr) {
+        console.warn('[staff-portal/mentoring] 멘티 조회 경고:', mnErr.message);
+      } else {
+        setMentees((mn ?? []) as MenteeLite[]);
+      }
     } else setMentees([]);
 
     const asnIds = rows.map((r) => r.id);
@@ -93,17 +116,17 @@ export default function StaffMentoringTab({ staff }: Props) {
   }
   if (assignments.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200 px-4 py-12 text-center">
-        <p className="text-slate-600 font-semibold">배정된 멘토링이 없어요</p>
-        <p className="text-xs text-slate-400 mt-1">PM이 멘토 배정을 추가하면 여기에 표시돼요.</p>
+      <div className={CARD_CLASS}>
+        <EmptyState emoji="🤝" title="아직 배정된 멘토링이 없어요."
+          description="PM이 멘토 배정을 추가하면 여기에 표시돼요." />
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {tableMissing && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-3 text-xs text-amber-800">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           멘토링 일지 기능이 아직 활성화되지 않았어요. PM에게 마이그레이션 실행을 요청해 주세요.
         </div>
       )}
@@ -112,19 +135,19 @@ export default function StaffMentoringTab({ staff }: Props) {
         const menteeList = (a.mentee_ids ?? []).map((id) => menteeMap.get(id)).filter(Boolean) as MenteeLite[];
         const asnLogs = logsByAsn.get(a.id) ?? [];
         return (
-          <section key={a.id} className="bg-white rounded-2xl border border-slate-200 p-4">
-            <h2 className="text-sm font-bold text-[#1E1B4B] mb-3">{programName}</h2>
-            <div className="space-y-3">
+          <section key={a.id} className={CARD_CLASS}>
+            <h2 className="text-base font-bold text-[#1E1B4B] mb-4">{programName}</h2>
+            <div className="space-y-4">
               <div>
-                <p className="text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-                  <Users2 size={11} aria-hidden="true" /> 담당 멘티 ({menteeList.length}명)
+                <p className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center gap-1.5">
+                  <Users2 size={12} aria-hidden="true" /> 담당 멘티 ({menteeList.length}명)
                 </p>
                 {menteeList.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">배정된 멘티가 없어요.</p>
+                  <p className="text-sm text-slate-400 italic">배정된 멘티가 없어요.</p>
                 ) : (
-                  <ul className="space-y-0.5">
+                  <ul className="space-y-1">
                     {menteeList.map((m) => (
-                      <li key={m.id} className="text-xs text-slate-700">
+                      <li key={m.id} className="text-sm text-slate-700">
                         · {m.name}{m.organization && <span className="text-slate-400"> ({m.organization})</span>}
                       </li>
                     ))}
@@ -139,27 +162,28 @@ export default function StaffMentoringTab({ staff }: Props) {
                     onSaved={() => { setFormOpenId(null); void fetchData(); }}
                     onCancel={() => setFormOpenId(null)} />
                 ) : (
-                  <button type="button" onClick={() => setFormOpenId(a.id)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700">
-                    <Plus size={11} aria-hidden="true" /> 일지 작성
+                  <button type="button" onClick={() => setFormOpenId(a.id)} className={BTN_PRIMARY}>
+                    <Plus size={14} aria-hidden="true" /> 일지 작성
                   </button>
                 )
               )}
 
               {/* 최근 일지 5건 */}
               {!tableMissing && asnLogs.length > 0 && (
-                <div className="pt-2 border-t border-slate-100">
-                  <p className="text-[11px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-                    <BookOpen size={11} aria-hidden="true" /> 최근 일지 ({asnLogs.length}건)
+                <div className="pt-3 border-t border-slate-100">
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center gap-1.5">
+                    <BookOpen size={12} aria-hidden="true" /> 최근 일지 ({asnLogs.length}건)
                   </p>
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-2">
                     {asnLogs.slice(0, 5).map((l) => (
-                      <li key={l.id} className="rounded-lg border border-slate-100 bg-violet-50/30 px-2.5 py-1.5">
-                        <div className="flex items-center gap-1.5 text-[10px]">
+                      <li key={l.id} className="rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2">
+                        <div className="flex items-center gap-2 text-xs">
                           <span className="font-bold text-slate-700 tabular-nums">{formatDateKo(l.log_date)}</span>
-                          <span className="px-1 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold">{l.session_no ?? 1}회차</span>
+                          <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold text-[10px]">
+                            {l.session_no ?? 1}회차
+                          </span>
                         </div>
-                        <p className="mt-1 text-xs text-slate-700 line-clamp-2 whitespace-pre-wrap">{l.content}</p>
+                        <p className="mt-1.5 text-sm text-slate-700 line-clamp-2 whitespace-pre-wrap">{l.content}</p>
                       </li>
                     ))}
                   </ul>
@@ -217,53 +241,53 @@ function LogForm({ assignment, mentees, existingCount, onSaved, onCancel }: LogF
   }
 
   return (
-    <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-3 space-y-2">
+    <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-3">
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <div>
-          <label className="text-[10px] font-bold text-slate-600">일지 날짜</label>
+          <label className="text-xs font-semibold text-slate-700 block mb-1">일지 날짜</label>
           <input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} disabled={saving}
-            className="w-full h-8 px-2 rounded-md border border-violet-200 bg-white text-xs" />
+            className={INPUT_CLASS} />
         </div>
         <div>
-          <label className="text-[10px] font-bold text-slate-600">회차</label>
+          <label className="text-xs font-semibold text-slate-700 block mb-1">회차</label>
           <input type="number" min={1} value={sessionNo} onChange={(e) => setSessionNo(e.target.value)} disabled={saving}
-            className="w-16 h-8 px-2 rounded-md border border-violet-200 bg-white text-xs tabular-nums" />
+            className="w-20 h-[42px] border border-gray-200 rounded-[10px] px-3 text-sm tabular-nums focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50" />
         </div>
       </div>
       {mentees.length > 0 && (
         <div>
-          <label className="text-[10px] font-bold text-slate-600">멘티 ({selectedMentees.length}/{mentees.length})</label>
+          <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+            멘티 ({selectedMentees.length}/{mentees.length})
+          </label>
           <div className="flex flex-wrap gap-1.5">
             {mentees.map((m) => (
-              <label key={m.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-violet-200 bg-white cursor-pointer">
+              <label key={m.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-violet-200 bg-white cursor-pointer hover:bg-violet-50">
                 <input type="checkbox" checked={selectedMentees.includes(m.id)} onChange={() => toggleMentee(m.id)}
-                  disabled={saving} className="rounded text-violet-600 w-3 h-3" />
-                <span className="text-[11px] text-slate-700">{m.name}</span>
+                  disabled={saving} className="rounded text-violet-600 w-3.5 h-3.5" />
+                <span className="text-xs text-slate-700">{m.name}</span>
               </label>
             ))}
           </div>
         </div>
       )}
       <div>
-        <label className="text-[10px] font-bold text-slate-600">주요 내용</label>
+        <label className="text-xs font-semibold text-slate-700 block mb-1">주요 내용</label>
         <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} disabled={saving}
           placeholder="멘토링 중 논의한 내용·진행 방식 (최소 3줄)"
-          className="w-full px-2 py-1.5 rounded-md border border-violet-200 bg-white text-xs resize-y" />
+          className={TEXTAREA_CLASS} />
       </div>
       <div>
-        <label className="text-[10px] font-bold text-slate-600">다음 멘토링 계획 (선택)</label>
+        <label className="text-xs font-semibold text-slate-700 block mb-1">다음 멘토링 계획 (선택)</label>
         <textarea value={nextPlan} onChange={(e) => setNextPlan(e.target.value)} rows={2} disabled={saving}
           placeholder="다음 회차 주제·과제"
-          className="w-full px-2 py-1.5 rounded-md border border-violet-200 bg-white text-xs resize-y" />
+          className={TEXTAREA_CLASS} />
       </div>
       <div className="flex items-center justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} disabled={saving}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] text-slate-600 hover:bg-slate-100">
-          <X size={11} /> 취소
+        <button type="button" onClick={onCancel} disabled={saving} className={BTN_GHOST}>
+          <X size={14} /> 취소
         </button>
-        <button type="button" onClick={() => void handleSave()} disabled={saving}
-          className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-violet-600 text-white text-[11px] font-bold hover:bg-violet-700 disabled:opacity-50">
-          {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />} 저장
+        <button type="button" onClick={() => void handleSave()} disabled={saving} className={BTN_PRIMARY}>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 저장
         </button>
       </div>
     </div>

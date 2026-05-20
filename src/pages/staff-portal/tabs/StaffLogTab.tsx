@@ -1,4 +1,4 @@
-// bal24 v2 — STEP-STAFF-PORTAL-P4
+// bal24 v2 — STEP-STAFF-PORTAL-P4 / STEP-STAFF-PORTAL-UI-UNIFY
 // 강사 포털 · 일지 탭 — mentoring_logs + activity_logs 통합 목록.
 // PGRST205 안전 처리 + 타입별 필터 + 상세 펼치기.
 
@@ -7,6 +7,7 @@ import { Loader2, BookOpen, ListChecks, ChevronDown, ChevronUp, FileText } from 
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { formatDateKo } from '../../../lib/utils';
+import EmptyState from '../../../components/EmptyState';
 import type { ActivityLog, ActivityLogType } from '../../../types/database';
 import type { MentoringLog } from '../../../types/mentoring';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
@@ -18,15 +19,18 @@ type FilterKind = 'all' | UnifiedKind;
 interface UnifiedLog {
   kind: UnifiedKind;
   id: string;
-  date: string;          // YYYY-MM-DD
+  date: string;
   programId: string | null;
   programName: string | null;
   sessionNo: number | null;
-  title: string | null;  // activity title (mentoring은 회차로 대체)
+  title: string | null;
   content: string;
   nextPlan: string | null;
   logType?: ActivityLogType | null;
 }
+
+const CARD_CLASS =
+  'bg-white rounded-2xl border border-violet-100 shadow-[0_4px_16px_rgba(124,58,237,0.08)] p-5';
 
 const ACTIVITY_TYPE_LABEL: Record<ActivityLogType, string> = {
   mentoring: '멘토링', lecture: '강의', business_trip: '출장',
@@ -44,7 +48,6 @@ export default function StaffLogTab({ staff }: Props) {
     setLoading(true);
     const unified: UnifiedLog[] = [];
 
-    // 1) mentoring_logs (assignment_id → mentor assignment)
     const mentorCol = staff.sourceType === 'staff_pool' ? 'mentor_pool_id' : 'mentor_profile_id';
     const { data: asn } = await supabase.from('mentoring_assignments')
       .select('id, program:programs!mentoring_assignments_program_id_fkey(id, name)')
@@ -81,7 +84,6 @@ export default function StaffLogTab({ staff }: Props) {
       }
     }
 
-    // 2) activity_logs (expert_id 단일 컬럼 — staff_pool 사용)
     if (staff.sourceType === 'staff_pool') {
       const { data: al, error: alErr } = await supabase.from('activity_logs')
         .select('*').eq('expert_id', staff.id).is('deleted_at', null)
@@ -136,79 +138,84 @@ export default function StaffLogTab({ staff }: Props) {
 
   return (
     <div className="space-y-4">
-      <header className="flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-          <FileText size={14} className="text-violet-500" aria-hidden="true" />
-          내 일지 ({logs.length}건)
-        </h2>
-      </header>
+      <section className={CARD_CLASS}>
+        <header className="flex items-center justify-between gap-2 flex-wrap mb-3">
+          <h2 className="text-base font-bold text-[#1E1B4B] flex items-center gap-2">
+            <FileText size={16} className="text-violet-500" aria-hidden="true" />
+            내 일지 ({logs.length}건)
+          </h2>
+        </header>
 
-      {/* 필터 */}
-      <nav role="tablist" aria-label="일지 필터" className="flex gap-1.5 flex-wrap">
-        {([
-          { key: 'all', label: '전체' },
-          { key: 'mentoring', label: '멘토링 일지' },
-          { key: 'activity', label: '활동 일지' },
-        ] as const).map((f) => {
-          const active = filter === f.key;
-          return (
-            <button key={f.key} type="button" role="tab" aria-selected={active}
-              onClick={() => setFilter(f.key)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${active ? 'bg-violet-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-              {f.label}
-              <span className={`inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{counts[f.key]}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {visible.length === 0 ? (
-        <p className="text-sm text-slate-400 italic bg-white rounded-xl border border-slate-100 px-4 py-8 text-center">
-          {logs.length === 0 ? '아직 작성된 일지가 없어요.' : '조건에 맞는 일지가 없어요.'}
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {visible.map((l) => {
-            const expanded = expandedId === l.id;
-            const kindBadge = l.kind === 'mentoring' ? '멘토링' : '활동';
-            const kindStyle = l.kind === 'mentoring'
-              ? 'bg-violet-100 text-violet-700' : 'bg-cyan-100 text-cyan-700';
-            const Icon = l.kind === 'mentoring' ? BookOpen : ListChecks;
+        {/* 필터 */}
+        <nav role="tablist" aria-label="일지 필터" className="flex gap-1.5 flex-wrap mb-4">
+          {([
+            { key: 'all', label: '전체' },
+            { key: 'mentoring', label: '멘토링 일지' },
+            { key: 'activity', label: '활동 일지' },
+          ] as const).map((f) => {
+            const active = filter === f.key;
             return (
-              <li key={`${l.kind}-${l.id}`} className="bg-white rounded-xl border border-slate-200 p-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${kindStyle}`}>
-                    <Icon size={10} aria-hidden="true" />{kindBadge}
-                  </span>
-                  <span className="text-xs font-bold text-slate-700 tabular-nums">{formatDateKo(l.date)}</span>
-                  {l.sessionNo != null && (
-                    <span className="text-[10px] px-1 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold">{l.sessionNo}회차</span>
-                  )}
-                  {l.logType && (
-                    <span className="text-[10px] px-1 py-0.5 rounded bg-slate-100 text-slate-600">{ACTIVITY_TYPE_LABEL[l.logType]}</span>
-                  )}
-                  {l.programName && (
-                    <span className="text-[11px] text-slate-500 ml-auto truncate max-w-[40%]">{l.programName}</span>
-                  )}
-                </div>
-                {l.title && <p className="text-sm font-semibold text-[#1E1B4B] mt-2">{l.title}</p>}
-                <p className={`mt-1 text-xs text-slate-700 whitespace-pre-wrap ${expanded ? '' : 'line-clamp-2'}`}>{l.content}</p>
-                {expanded && l.nextPlan && (
-                  <p className="mt-2 text-[11px] text-slate-600">
-                    <span className="font-bold text-slate-700">다음 계획:</span> {l.nextPlan}
-                  </p>
-                )}
-                <div className="flex justify-end mt-2">
-                  <button type="button" onClick={() => setExpandedId(expanded ? null : l.id)}
-                    className="inline-flex items-center gap-0.5 text-[11px] text-violet-600 hover:underline">
-                    {expanded ? <><ChevronUp size={11} /> 접기</> : <><ChevronDown size={11} /> 상세 보기</>}
-                  </button>
-                </div>
-              </li>
+              <button key={f.key} type="button" role="tab" aria-selected={active}
+                onClick={() => setFilter(f.key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  active
+                    ? 'bg-violet-600 text-white'
+                    : 'text-slate-500 hover:text-violet-600 hover:bg-violet-50'
+                }`}>
+                {f.label}
+                <span className={`inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{counts[f.key]}</span>
+              </button>
             );
           })}
-        </ul>
-      )}
+        </nav>
+
+        {visible.length === 0 ? (
+          <EmptyState emoji="📝"
+            title={logs.length === 0 ? '아직 작성된 일지가 없어요.' : '조건에 맞는 일지가 없어요.'} />
+        ) : (
+          <ul className="space-y-2">
+            {visible.map((l) => {
+              const expanded = expandedId === l.id;
+              const kindBadge = l.kind === 'mentoring' ? '멘토링' : '활동';
+              const kindStyle = l.kind === 'mentoring'
+                ? 'bg-violet-100 text-violet-700' : 'bg-cyan-100 text-cyan-700';
+              const Icon = l.kind === 'mentoring' ? BookOpen : ListChecks;
+              return (
+                <li key={`${l.kind}-${l.id}`} className="rounded-xl border border-violet-100 bg-violet-50/30 p-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${kindStyle}`}>
+                      <Icon size={10} aria-hidden="true" />{kindBadge}
+                    </span>
+                    <span className="text-xs font-bold text-slate-700 tabular-nums">{formatDateKo(l.date)}</span>
+                    {l.sessionNo != null && (
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold">{l.sessionNo}회차</span>
+                    )}
+                    {l.logType && (
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-slate-100 text-slate-600">{ACTIVITY_TYPE_LABEL[l.logType]}</span>
+                    )}
+                    {l.programName && (
+                      <span className="text-xs text-slate-500 ml-auto truncate max-w-[40%]">{l.programName}</span>
+                    )}
+                  </div>
+                  {l.title && <p className="text-sm font-semibold text-[#1E1B4B] mt-2">{l.title}</p>}
+                  <p className={`mt-1.5 text-sm text-slate-700 whitespace-pre-wrap ${expanded ? '' : 'line-clamp-2'}`}>{l.content}</p>
+                  {expanded && l.nextPlan && (
+                    <p className="mt-2 text-xs text-slate-600">
+                      <span className="font-bold text-slate-700">다음 계획:</span> {l.nextPlan}
+                    </p>
+                  )}
+                  <div className="flex justify-end mt-2">
+                    <button type="button" onClick={() => setExpandedId(expanded ? null : l.id)}
+                      className="inline-flex items-center gap-0.5 text-xs text-violet-600 hover:underline">
+                      {expanded ? <><ChevronUp size={12} /> 접기</> : <><ChevronDown size={12} /> 상세 보기</>}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
