@@ -212,12 +212,20 @@ function PinChangeSection({ staffId, currentPin }: { staffId: string; currentPin
     if (newPin !== newPinConfirm) { toast.error('새 비밀번호 확인이 일치하지 않아요.'); return; }
     if (newPin === oldPin) { toast.error('새 비밀번호가 현재 비밀번호와 같아요.'); return; }
     setSaving(true);
-    const { error } = await supabase.from('staff_pool')
-      .update({ portal_pin: newPin }).eq('id', staffId);
+    // STEP-PIN-FIX-V2 — read-back으로 RLS silent failure 감지
+    const { data, error } = await supabase.from('staff_pool')
+      .update({ portal_pin: newPin }).eq('id', staffId)
+      .select('id, portal_pin').maybeSingle();
     setSaving(false);
     if (error) {
       console.error('[staff-pin] 비밀번호 변경 실패:', error.message);
       toast.error('비밀번호 변경에 실패했어요.');
+      return;
+    }
+    const saved = ((data as { portal_pin?: string | null } | null)?.portal_pin ?? '').trim();
+    if (!data || saved !== newPin) {
+      console.error('[staff-pin] 비밀번호 변경 미반영 (RLS 차단 의심). data=', data);
+      toast.error('변경 권한이 없어요. 관리자에게 RLS 정책 적용을 요청해 주세요.');
       return;
     }
     setOldPin(''); setNewPin(''); setNewPinConfirm('');

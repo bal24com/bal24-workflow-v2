@@ -1,5 +1,5 @@
-// bal24 v2 — STEP-STAFF-PORTAL-P2 / STEP-STAFF-PORTAL-UI-UNIFY
-// 강사 통합 포털 헤더 — WorkFlow 디자인 시스템 통일 (rounded-2xl 카드 + violet 그림자).
+// bal24 v2 — STEP-STAFF-PORTAL-P2 / STEP-STAFF-PORTAL-UI-UNIFY / STEP-PIN-FIX-V2
+// 강사 통합 포털 헤더 — 누구의 포털인지 한눈에 확인 (이름 + 님 + 소속).
 
 import type { StaffPortalIdentity } from './staffPortalUtils';
 
@@ -14,7 +14,10 @@ export default function StaffPortalHeader({ staff, onEditInfo }: Props) {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs text-violet-600 font-semibold">WorkFlow · 강사 포털</p>
-          <h1 className="text-xl font-bold text-[#1E1B4B] truncate mt-0.5">{staff.name}</h1>
+          <h1 className="text-xl font-bold text-[#1E1B4B] truncate mt-0.5">
+            {staff.name}
+            <span className="text-base font-semibold text-slate-500 ml-0.5">님</span>
+          </h1>
           {staff.affiliation && (
             <p className="text-sm text-slate-500 truncate mt-0.5">{staff.affiliation}</p>
           )}

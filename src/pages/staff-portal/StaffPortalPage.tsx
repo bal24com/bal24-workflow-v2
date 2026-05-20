@@ -119,11 +119,15 @@ export default function StaffPortalPage() {
 
   // STEP-STAFF-PORTAL-PIN — PIN 게이트 (staff_pool만)
   if (staff.sourceType === 'staff_pool' && !isPinVerified) {
+    // STEP-PIN-FIX-V2 — null·undefined·빈문자열 모두 false로 처리
+    const trimmed = (staff.portalPin ?? '').trim();
+    const hasPin = trimmed.length > 0;
     return (
       <StaffPinGate
         staffId={staff.id}
-        hasPinSet={!!staff.portalPin}
-        expectedPin={staff.portalPin}
+        staffName={staff.name}
+        hasPinSet={hasPin}
+        expectedPin={hasPin ? trimmed : null}
         onVerified={handlePinVerified} />
     );
   }
