@@ -3,8 +3,8 @@
 // 인라인 편집 → 모달 방식 (ParticipantEditModal)
 // V-1: 이 파일은 표시·순서변경·삭제만. 편집 모달은 ParticipantEditModal.tsx
 
-import { useState } from 'react';
-import { Trash2, ChevronUp, ChevronDown, Pencil } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Trash2, ChevronUp, ChevronDown, Pencil, UserCog } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import type { ProgramParticipant } from '../../../types/database';
@@ -14,6 +14,9 @@ import {
   BADGE_BASE,
 } from '../../../utils/statusStyles';
 import ParticipantEditModal from './ParticipantEditModal';
+import ParticipantMentorModal from './ParticipantMentorModal';
+import { getMentorName } from '../../../types/mentoring';
+import type { MentoringAssignment } from '../../../types/mentoring';
 
 interface Props {
   list: ProgramParticipant[];
@@ -23,6 +26,9 @@ interface Props {
   onToggleOne?: (id: string) => void;
   allSelected?: boolean;
   onToggleAll?: () => void;
+  // STEP-MENTOR-MENTEE-MATCHING — 부모가 fetch한 mentoring assignments 전달
+  programId?: string;
+  mentoringAssignments?: MentoringAssignment[];
 }
 
 /** 주민번호 마스킹: 앞 6자리-뒷 첫자리****** */
@@ -36,11 +42,28 @@ function maskIdNumber(raw?: string | null): string {
 export default function ParticipantEditableTable({
   list, canEdit, onChanged,
   selectedIds, onToggleOne, allSelected, onToggleAll,
+  programId, mentoringAssignments = [],
 }: Props) {
   const bulkEnabled = !!onToggleOne;
   const toast = useToast();
   const [editTarget, setEditTarget] = useState<ProgramParticipant | null>(null);
+  const [mentorTarget, setMentorTarget] = useState<ProgramParticipant | null>(null);
   const [reorderingId, setReorderingId] = useState<string | null>(null);
+
+  // STEP-MENTOR-MENTEE-MATCHING — participantId → 담당 멘토 이름 목록
+  const mentorsByParticipant = useMemo(() => {
+    const map = new Map<string, string[]>();
+    mentoringAssignments.forEach((a) => {
+      (a.mentee_ids ?? []).forEach((pid) => {
+        const arr = map.get(pid) ?? [];
+        arr.push(getMentorName(a));
+        map.set(pid, arr);
+      });
+    });
+    return map;
+  }, [mentoringAssignments]);
+
+  const showMentorCol = mentoringAssignments.length > 0;
 
   /** ▲▼ 순서 변경: 인접 행과 display_order 스왑 */
   async function handleMove(idx: number, dir: -1 | 1) {
@@ -106,6 +129,9 @@ export default function ParticipantEditableTable({
               <th className="px-2 py-2 text-left font-bold">연락처</th>
               <th className="px-2 py-2 text-left font-bold">이메일</th>
               <th className="px-2 py-2 text-left font-bold">주민번호</th>
+              {showMentorCol && (
+                <th className="px-2 py-2 text-left font-bold">담당 멘토</th>
+              )}
               <th className="px-2 py-2 text-center font-bold w-20">상태</th>
               {canEdit && (
                 <th className="px-2 py-2 text-right font-bold w-14">수정</th>
@@ -179,6 +205,30 @@ export default function ParticipantEditableTable({
                 <td className="px-2 py-1.5 text-slate-500 whitespace-nowrap tabular-nums">
                   {maskIdNumber(p.id_number)}
                 </td>
+                {/* 담당 멘토 (이름 배지 + 편집 버튼) */}
+                {showMentorCol && (
+                  <td className="px-2 py-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {(mentorsByParticipant.get(p.id) ?? []).length === 0 ? (
+                        <span className="text-[11px] text-slate-300 italic">—</span>
+                      ) : (
+                        (mentorsByParticipant.get(p.id) ?? []).map((name, i) => (
+                          <span key={`${p.id}-mentor-${i}`}
+                            className="text-[10px] font-semibold bg-violet-50 text-violet-700 border border-violet-200 rounded px-1.5 py-0.5">
+                            {name}
+                          </span>
+                        ))
+                      )}
+                      {canEdit && (
+                        <button type="button" onClick={() => setMentorTarget(p)}
+                          aria-label={`${p.name} 담당 멘토 변경`}
+                          className="p-0.5 rounded text-slate-400 hover:text-violet-600 hover:bg-violet-50">
+                          <UserCog size={11} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                )}
                 {/* 상태 배지 */}
                 <td className="px-2 py-1.5 text-center">
                   <span className={`${BADGE_BASE} ${PARTICIPANT_STATUS_STYLE[p.status]}`}>
@@ -215,7 +265,14 @@ export default function ParticipantEditableTable({
             {list.length === 0 && (
               <tr>
                 <td
-                  colSpan={canEdit ? (bulkEnabled ? 9 : 8) : (bulkEnabled ? 8 : 7)}
+                  colSpan={
+                    // base: #, 이름, 소속, 연락처, 이메일, 주민번호, 상태 = 7
+                    7
+                    + (bulkEnabled ? 1 : 0)
+                    + (canEdit ? 1 : 0)           // 순서 col
+                    + (showMentorCol ? 1 : 0)     // 담당 멘토 col
+                    + (canEdit ? 1 : 0)           // 수정 col
+                  }
                   className="py-8 text-center text-slate-400 italic text-xs"
                 >
                   참여자가 없어요.
@@ -231,6 +288,16 @@ export default function ParticipantEditableTable({
         participant={editTarget}
         onClose={() => setEditTarget(null)}
         onSaved={() => { setEditTarget(null); onChanged(); }}
+      />
+
+      {/* STEP-MENTOR-MENTEE-MATCHING — 담당 멘토 배정 모달 */}
+      <ParticipantMentorModal
+        open={!!mentorTarget}
+        programId={programId ?? ''}
+        participant={mentorTarget}
+        assignments={mentoringAssignments}
+        onClose={() => setMentorTarget(null)}
+        onSaved={() => { setMentorTarget(null); onChanged(); }}
       />
     </>
   );

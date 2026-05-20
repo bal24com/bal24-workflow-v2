@@ -1,22 +1,32 @@
 // bal24 v2 — STEP-PARTICIPANT-PORTAL PM용 참여자 관리 탭
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Plus, Loader2, FileUp, Search, FileText, Download,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { Modal, Button, Input } from '../../../components/ui';
+import { Button, Input } from '../../../components/ui';
 import ParticipantDocImportModal from './ParticipantDocImportModal';
 import ParticipantEditableTable from './ParticipantEditableTable';
+import ParticipantBulkCsvModal from './ParticipantBulkCsvModal';
 import BulkActionBar from '../../../components/BulkActionBar';
 import { useBulkSelect } from '../../../hooks/useBulkSelect';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import {
-  PARTICIPANT_ROLE_LABEL, PARTICIPANT_ROLE_BADGE, PARTICIPANT_ROLE_VALUES,
+  PARTICIPANT_ROLE_LABEL, PARTICIPANT_ROLE_VALUES,
   copyParticipantLink, parseParticipantCSV, type ParsedParticipantRow,
 } from '../../../lib/participantUtils';
-import type { ParticipantRole, ProgramParticipant } from '../../../types/database';
+import type { ParticipantRole, ParticipantStatus, ProgramParticipant } from '../../../types/database';
+import { fetchMentoringAssignments } from './mentoringUtils';
+import type { MentoringAssignment } from '../../../types/mentoring';
+
+type SortKey = 'name' | 'status';
+
+// STEP-PARTICIPANTS-SORT — 상태 정렬 우선순위 (지시문 명세)
+const STATUS_SORT_ORDER: Record<ParticipantStatus, number> = {
+  active: 0, pending: 1, completed: 2, incomplete: 3, dropped: 4, inactive: 5,
+};
 
 interface Props {
   programId: string;
@@ -48,21 +58,33 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
   const [csvText, setCsvText] = useState('');
   const [bulkPreview, setBulkPreview] = useState<ParsedParticipantRow[]>([]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  // STEP-MENTOR-MENTEE-MATCHING — 멘토링 배정 목록 (담당 멘토 컬럼 표시용)
+  const [mentoringAssignments, setMentoringAssignments] = useState<MentoringAssignment[]>([]);
+  // STEP-PARTICIPANTS-SORT — 정렬 키 다중 선택 (선택 순서로 우선순위)
+  const [sortKeys, setSortKeys] = useState<SortKey[]>([]);
 
   const reload = useCallback(async () => {
     setLoading(true);
     // STEP-PARTICIPANTS-LIST-UPDATE — display_order 우선, 같으면 created_at asc
-    const { data, error } = await supabase
-      .from('program_participants').select('*')
-      .eq('program_id', programId)
-      .order('display_order', { ascending: true, nullsFirst: false })
-      .order('created_at', { ascending: true });
-    if (error) {
-      console.error('[participant-tab] 조회 실패:', error.message);
+    const [partRes, mentoringList] = await Promise.all([
+      supabase
+        .from('program_participants').select('*')
+        .eq('program_id', programId)
+        .order('display_order', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true }),
+      fetchMentoringAssignments(programId).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : '';
+        console.error('[participant-tab] 멘토링 배정 조회 실패:', msg);
+        return [] as MentoringAssignment[];
+      }),
+    ]);
+    if (partRes.error) {
+      console.error('[participant-tab] 조회 실패:', partRes.error.message);
       toast.error('참여자 목록을 불러오지 못했어요.');
     } else {
-      setList((data ?? []) as ProgramParticipant[]);
+      setList((partRes.data ?? []) as ProgramParticipant[]);
     }
+    setMentoringAssignments(mentoringList);
     setLoading(false);
   }, [programId, toast]);
 
@@ -84,9 +106,33 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
     completed: list.filter((p) => p.status === 'completed').length,
   };
 
-  const visible = search.trim()
+  const filtered = search.trim()
     ? list.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
     : list;
+
+  // STEP-PARTICIPANTS-SORT — 다중 정렬 (sortKeys 순서로 우선순위 적용)
+  const visible = useMemo(() => {
+    if (sortKeys.length === 0) return filtered;
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      for (const key of sortKeys) {
+        if (key === 'name') {
+          const c = a.name.localeCompare(b.name, 'ko');
+          if (c !== 0) return c;
+        } else if (key === 'status') {
+          const c = (STATUS_SORT_ORDER[a.status] ?? 99) - (STATUS_SORT_ORDER[b.status] ?? 99);
+          if (c !== 0) return c;
+        }
+      }
+      return 0;
+    });
+    return sorted;
+  }, [filtered, sortKeys]);
+
+  function toggleSort(key: SortKey) {
+    setSortKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
+  }
 
   // STEP-PARTICIPANT-BULK-DELETE — 다중 선택 일괄 삭제
   const { selectedIds, allSelected, toggleAll, toggleOne, clearSelection } = useBulkSelect(visible);
@@ -218,11 +264,43 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
             엑셀 다운로드
           </Button>
         </div>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="이름 검색…"
-            className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-violet-400" />
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* STEP-PARTICIPANTS-SORT — 정렬 토글 (다중 선택, 클릭 순서가 우선순위) */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500">정렬:</span>
+            {([
+              { key: 'name' as const, label: '가나다순' },
+              { key: 'status' as const, label: '상태순' },
+            ]).map(({ key, label }) => {
+              const idx = sortKeys.indexOf(key);
+              const active = idx >= 0;
+              return (
+                <button key={key} type="button" onClick={() => toggleSort(key)}
+                  className={`text-xs px-3 py-1 rounded-lg border transition-colors inline-flex items-center gap-1 ${
+                    active
+                      ? 'bg-violet-600 text-white border-violet-600'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300'
+                  }`}>
+                  {label}
+                  {active && sortKeys.length > 1 && (
+                    <span className="text-[9px] font-bold tabular-nums opacity-80">{idx + 1}</span>
+                  )}
+                </button>
+              );
+            })}
+            {sortKeys.length > 0 && (
+              <button type="button" onClick={() => setSortKeys([])}
+                className="text-xs text-slate-400 hover:text-slate-600 underline">
+                초기화
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="이름 검색…"
+              className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-violet-400" />
+          </div>
         </div>
       </div>
 
@@ -269,7 +347,9 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
           selectedIds={canEdit ? selectedIds : undefined}
           onToggleOne={canEdit ? toggleOne : undefined}
           allSelected={canEdit ? allSelected : undefined}
-          onToggleAll={canEdit ? toggleAll : undefined} />
+          onToggleAll={canEdit ? toggleAll : undefined}
+          programId={programId}
+          mentoringAssignments={mentoringAssignments} />
       )}
 
       {/* STEP-PARTICIPANT-BULK-DELETE — 하단 fixed 액션 바 */}
@@ -278,49 +358,17 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
           onDelete={() => void handleBulkDelete()} onCancel={clearSelection} />
       )}
 
-      {/* CSV 일괄 등록 모달 */}
-      <Modal
+      {/* CSV 일괄 등록 모달 (분리된 파일) */}
+      <ParticipantBulkCsvModal
         open={bulkOpen}
+        csvText={csvText}
+        preview={bulkPreview}
+        submitting={bulkSubmitting}
+        onCsvChange={setCsvText}
+        onPreview={runCsvParse}
+        onSubmit={() => void handleBulkInsert()}
         onClose={() => { setBulkOpen(false); setCsvText(''); setBulkPreview([]); }}
-        title="📋 CSV 일괄 등록"
-        description="이름,이메일,연락처,역할,소속,주민번호 (헤더 필수, 순서 무관). 역할: 교육생·멘토·고객사·TA·참관 → 자동 변환."
-        size="md"
-        closeOnBackdrop={!bulkSubmitting}
-        footer={
-          <div className="flex w-full items-center justify-between gap-2">
-            <Button variant="outline" onClick={() => setBulkOpen(false)} disabled={bulkSubmitting}>취소</Button>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={runCsvParse} disabled={!csvText.trim() || bulkSubmitting}>미리보기</Button>
-              <Button variant="primary" loading={bulkSubmitting} disabled={bulkPreview.length === 0}
-                onClick={() => void handleBulkInsert()}>
-                {bulkPreview.length > 0 ? `${bulkPreview.length}명 일괄 등록하기` : '일괄 등록하기'}
-              </Button>
-            </div>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <textarea rows={8} value={csvText} onChange={(e) => setCsvText(e.target.value)}
-            placeholder={`이름,이메일,연락처,역할,소속,주민번호\n홍길동,hong@test.com,010-1234-5678,교육생,밸런스닷,900101-1234567\n박멘토,park@test.com,010-2345-6789,멘토`}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono outline-none focus:border-violet-400 resize-none" />
-          {bulkPreview.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 max-h-60 overflow-y-auto">
-              <ul className="divide-y divide-slate-100">
-                {bulkPreview.map((r, idx) => (
-                  <li key={idx} className="grid grid-cols-[1fr_1.5fr_1fr_60px] items-center gap-2 px-3 py-1.5 text-xs">
-                    <span className="font-semibold text-slate-700 truncate">{r.name}</span>
-                    <span className="text-slate-500 truncate">{r.email ?? '-'}</span>
-                    <span className="text-slate-500 truncate">{r.phone ?? '-'}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded text-center ${PARTICIPANT_ROLE_BADGE[r.role]}`}>
-                      {PARTICIPANT_ROLE_LABEL[r.role]}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </Modal>
+      />
 
       <ParticipantDocImportModal
         open={docOpen}

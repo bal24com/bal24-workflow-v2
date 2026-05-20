@@ -19,6 +19,7 @@ import type {
 } from '../../../types/mentoring';
 import MentoringAssignModal from './MentoringAssignModal';
 import MentoringSessionModal from './MentoringSessionModal';
+import MenteeAssignModal from './MenteeAssignModal';
 
 interface Props {
   programId: string;
@@ -38,6 +39,8 @@ export default function MentoringTab({ programId }: Props) {
   } | null>(null);
   // STEP-MENTOR-PORTAL-FULL — 카드 펼침 상태 (lazy fetch 트리거)
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // STEP-MENTOR-MENTEE-MATCHING — 멘티 배정 모달 대상
+  const [menteeTarget, setMenteeTarget] = useState<MentoringAssignment | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -248,6 +251,11 @@ export default function MentoringTab({ programId }: Props) {
                           초대 링크 복사
                         </button>
                       )}
+                      {/* STEP-MENTOR-MENTEE-MATCHING — 멘티 배정 버튼 */}
+                      <button type="button" onClick={() => setMenteeTarget(a)}
+                        className="text-violet-600 hover:underline font-semibold">
+                        멘티 배정
+                      </button>
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-500">
                       <span>완료 {completed}/{planned}회 · 원천 {a.tax_type}</span>
@@ -276,9 +284,10 @@ export default function MentoringTab({ programId }: Props) {
                         </button>
                       </div>
                     </div>
-                    {/* STEP-MENTOR-PORTAL-FULL — 펼친 영역 (멘티 + 최근 일지 3건) */}
+                    {/* STEP-MENTOR-PORTAL-FULL — 펼친 영역 (멘티 + 최근 일지 3건 + 연관 일지) */}
                     {expandedId === a.id && (
-                      <MentoringLogCard assignmentId={a.id} menteeIds={a.mentee_ids ?? []} />
+                      <MentoringLogCard assignmentId={a.id} menteeIds={a.mentee_ids ?? []}
+                        allAssignments={assignments} />
                     )}
                   </li>
                 );
@@ -305,6 +314,15 @@ export default function MentoringTab({ programId }: Props) {
           onSaved={() => void refresh()}
         />
       )}
+
+      {/* STEP-MENTOR-MENTEE-MATCHING — 멘티 배정 모달 */}
+      <MenteeAssignModal
+        open={!!menteeTarget}
+        programId={programId}
+        assignment={menteeTarget}
+        onClose={() => setMenteeTarget(null)}
+        onSaved={() => void refresh()}
+      />
     </div>
   );
 }
