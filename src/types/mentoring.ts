@@ -81,6 +81,10 @@ export interface MentoringLog {
   mentee_ids: string[];
   content: string;
   next_plan: string | null;
+  /** STEP-MENTORING-LOG-FORM — 멘토링 일지 양식 추가 필드 */
+  location: string | null;
+  start_time: string | null; // HH:MM
+  end_time: string | null;   // HH:MM
   created_at: string;
   updated_at: string;
 }
