@@ -160,6 +160,8 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
         role: r.role,
         email: r.email ?? null,
         phone: r.phone ?? null,
+        organization: r.organization ?? null,
+        id_number: r.id_number ? r.id_number.replace(/[^0-9]/g, '') : null,
       }));
       const { error } = await supabase.from('program_participants').insert(payload);
       if (error) throw error;
@@ -281,7 +283,7 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
         open={bulkOpen}
         onClose={() => { setBulkOpen(false); setCsvText(''); setBulkPreview([]); }}
         title="📋 CSV 일괄 등록"
-        description="이름,이메일,연락처,역할 형식. 첫 줄 헤더 자동 감지·역할 한글(교육생·멘토·고객사·TA·참관) 영문 자동 변환."
+        description="이름,이메일,연락처,역할,소속,주민번호 (헤더 필수, 순서 무관). 역할: 교육생·멘토·고객사·TA·참관 → 자동 변환."
         size="md"
         closeOnBackdrop={!bulkSubmitting}
         footer={
@@ -299,7 +301,7 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
       >
         <div className="space-y-3">
           <textarea rows={8} value={csvText} onChange={(e) => setCsvText(e.target.value)}
-            placeholder={`이름,이메일,연락처,역할\n홍길동,hong@test.com,010-1234-5678,교육생\n박멘토,park@test.com,010-2345-6789,멘토`}
+            placeholder={`이름,이메일,연락처,역할,소속,주민번호\n홍길동,hong@test.com,010-1234-5678,교육생,밸런스닷,900101-1234567\n박멘토,park@test.com,010-2345-6789,멘토`}
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono outline-none focus:border-violet-400 resize-none" />
           {bulkPreview.length > 0 && (
             <div className="rounded-lg border border-slate-200 bg-slate-50 max-h-60 overflow-y-auto">

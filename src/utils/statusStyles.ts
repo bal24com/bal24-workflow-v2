@@ -104,6 +104,20 @@ export const PARTICIPANT_STATUS_STYLE: Record<ParticipantStatus, string> = {
   inactive:   'bg-slate-100 text-slate-400 border-slate-300',
 };
 
+// ─── 참여자 상태 — 한글 키 (개요 탭 명단 배지용, PART4) ──────────
+// DB는 영문 enum → PARTICIPANT_STATUS_LABEL 로 한글 변환 후 이 맵으로 CSS 조회
+export const PARTICIPANT_STATUS = ['대기', '진행', '수료', '미수료', '탈락', '비활성'] as const;
+export type ParticipantStatusKo = typeof PARTICIPANT_STATUS[number];
+
+export const PARTICIPANT_STATUS_KO_STYLE: Record<string, string> = {
+  '대기':   'bg-slate-100 text-slate-400 border-slate-300',
+  '진행':   'bg-violet-50 text-violet-600 border-violet-200',
+  '수료':   'bg-emerald-50 text-emerald-600 border-emerald-200',
+  '미수료': 'bg-amber-50 text-amber-600 border-amber-200',
+  '탈락':   'bg-rose-50 text-rose-500 border-rose-200',
+  '비활성': 'bg-slate-100 text-slate-400 border-slate-300',
+};
+
 // ─── 사업실적보고서 상태 (CLAUDE.md 디자인 시스템 — 회색/바이올렛/주황/민트) ─
 import type { ReportStatus as PerformanceReportStatus } from '../types/performanceReport';
 export const PERFORMANCE_REPORT_STATUS_CLASS: Record<PerformanceReportStatus, string> = {
