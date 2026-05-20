@@ -13,7 +13,10 @@ import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../../utils/statusStyles
 import type { CurriculumStaffRole, InvitationStatus } from '../../../types/database';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 
-interface Props { staff: StaffPortalIdentity }
+interface Props {
+  staff: StaffPortalIdentity;
+  selectedProgramId: string | null;
+}
 
 interface LectureRow { id: string; role: CurriculumStaffRole; curriculum_id: string }
 interface CurriculumRow {
@@ -40,7 +43,7 @@ const BTN_DANGER =
 
 function trimTime(t: string | null): string { return t ? t.slice(0, 5) : ''; }
 
-export default function StaffLectureTab({ staff }: Props) {
+export default function StaffLectureTab({ staff, selectedProgramId }: Props) {
   const toast = useToast();
   const [lectures, setLectures] = useState<LectureRow[]>([]);
   const [curriculums, setCurriculums] = useState<CurriculumRow[]>([]);
@@ -50,6 +53,10 @@ export default function StaffLectureTab({ staff }: Props) {
   const [actingId, setActingId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    if (!selectedProgramId) {
+      setLectures([]); setCurriculums([]); setInvitations([]); setPrograms([]);
+      setLoading(false); return;
+    }
     setLoading(true);
     const staffCol = staff.sourceType === 'staff_pool' ? 'staff_pool_id' : 'profile_id';
 
@@ -63,14 +70,21 @@ export default function StaffLectureTab({ staff }: Props) {
     if (curIds.length > 0) {
       const { data: cur, error: curErr } = await supabase.from('program_curriculum')
         .select('id, session_no, title, session_date, start_time, end_time, program_id')
-        .in('id', curIds).order('session_no', { ascending: true });
+        .in('id', curIds)
+        .eq('program_id', selectedProgramId)
+        .order('session_no', { ascending: true });
       if (curErr) console.warn('[staff-portal/lecture] program_curriculum 경고:', curErr.message);
       curRows = (cur ?? []) as CurriculumRow[];
     }
+    // 선택 프로그램의 curriculum_id만 csRows에 남김 (배지 역할 매핑 정확화)
+    const filteredCurIds = new Set(curRows.map((c) => c.id));
+    const filteredCsRows = csRows.filter((r) => filteredCurIds.has(r.curriculum_id));
 
     const { data: inv, error: invErr } = await supabase.from('instructor_invitations')
       .select('id, status, program_id, notes, program:programs!instructor_invitations_program_id_fkey(id, name)')
-      .eq(staffCol, staff.id).order('created_at', { ascending: false });
+      .eq(staffCol, staff.id)
+      .eq('program_id', selectedProgramId)
+      .order('created_at', { ascending: false });
     if (invErr) console.warn('[staff-portal/lecture] 초대 조회 경고:', invErr.message);
     const invRows = ((inv ?? []) as unknown) as InvitationRow[];
 
@@ -83,10 +97,10 @@ export default function StaffLectureTab({ staff }: Props) {
       progRows = (prog ?? []) as ProgramLite[];
     }
 
-    setLectures(csRows); setCurriculums(curRows);
+    setLectures(filteredCsRows); setCurriculums(curRows);
     setInvitations(invRows); setPrograms(progRows);
     setLoading(false);
-  }, [staff.id, staff.sourceType]);
+  }, [staff.id, staff.sourceType, selectedProgramId]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
@@ -122,6 +136,14 @@ export default function StaffLectureTab({ staff }: Props) {
     void fetchData();
   }
 
+  if (!selectedProgramId) {
+    return (
+      <div className={CARD_CLASS}>
+        <EmptyState emoji="🎯" title="먼저 개요 탭에서 프로그램을 선택해 주세요."
+          description="선택된 프로그램의 강의·초대만 표시돼요." />
+      </div>
+    );
+  }
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-400" /></div>;
   }

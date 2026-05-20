@@ -11,7 +11,10 @@ import EmptyState from '../../../components/EmptyState';
 import { calcDurationMin, formatDuration, type MentoringLog } from '../../../types/mentoring';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 
-interface Props { staff: StaffPortalIdentity }
+interface Props {
+  staff: StaffPortalIdentity;
+  selectedProgramId: string | null;
+}
 
 interface AssignmentRow {
   id: string;
@@ -44,7 +47,7 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export default function StaffMentoringTab({ staff }: Props) {
+export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
   const toast = useToast();
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [mentees, setMentees] = useState<MenteeLite[]>([]);
@@ -54,12 +57,14 @@ export default function StaffMentoringTab({ staff }: Props) {
   const [formOpenId, setFormOpenId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    if (!selectedProgramId) { setAssignments([]); setMentees([]); setLogs([]); setLoading(false); return; }
     setLoading(true);
     const col = staff.sourceType === 'staff_pool' ? 'mentor_pool_id' : 'mentor_profile_id';
     const { data: asn, error: asnErr } = await supabase
       .from('mentoring_assignments')
       .select('id, mentee_ids, program:programs!mentoring_assignments_program_id_fkey(id, name)')
-      .eq(col, staff.id);
+      .eq(col, staff.id)
+      .eq('program_id', selectedProgramId);
     if (asnErr) {
       console.error('[staff-portal/mentoring] 배정 조회 실패:', asnErr.message);
       toast.error('멘토링 배정을 불러오지 못했어요.');
@@ -95,7 +100,7 @@ export default function StaffMentoringTab({ staff }: Props) {
     } else setLogs([]);
 
     setLoading(false);
-  }, [staff.id, staff.sourceType, toast]);
+  }, [staff.id, staff.sourceType, selectedProgramId, toast]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
@@ -111,13 +116,21 @@ export default function StaffMentoringTab({ staff }: Props) {
     return m;
   }, [logs]);
 
+  if (!selectedProgramId) {
+    return (
+      <div className={CARD_CLASS}>
+        <EmptyState emoji="🎯" title="먼저 개요 탭에서 프로그램을 선택해 주세요."
+          description="선택된 프로그램의 멘토링 배정과 일지가 표시돼요." />
+      </div>
+    );
+  }
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-400" /></div>;
   }
   if (assignments.length === 0) {
     return (
       <div className={CARD_CLASS}>
-        <EmptyState emoji="🤝" title="아직 배정된 멘토링이 없어요."
+        <EmptyState emoji="🤝" title="선택한 프로그램에 배정된 멘토링이 없어요."
           description="PM이 멘토 배정을 추가하면 여기에 표시돼요." />
       </div>
     );

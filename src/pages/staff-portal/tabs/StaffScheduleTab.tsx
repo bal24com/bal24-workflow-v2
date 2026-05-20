@@ -8,7 +8,10 @@ import { useToast } from '../../../contexts/ToastContext';
 import EmptyState from '../../../components/EmptyState';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 
-interface Props { staff: StaffPortalIdentity }
+interface Props {
+  staff: StaffPortalIdentity;
+  selectedProgramId: string | null;
+}
 
 type ScheduleKind = 'lecture' | 'personal';
 interface ScheduleRow {
@@ -48,7 +51,7 @@ function trimTime(t: string | null): string { return t ? t.slice(0, 5) : ''; }
 function monthKey(d: string): string { return d.slice(0, 7); }
 function weekdayOf(d: string): string { return WEEKDAY[new Date(d).getDay()] ?? ''; }
 
-export default function StaffScheduleTab({ staff }: Props) {
+export default function StaffScheduleTab({ staff, selectedProgramId }: Props) {
   const toast = useToast();
   const [rows, setRows] = useState<ScheduleRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +64,7 @@ export default function StaffScheduleTab({ staff }: Props) {
   const [newEndTime, setNewEndTime] = useState('');
 
   const fetchData = useCallback(async () => {
+    if (!selectedProgramId) { setRows([]); setLoading(false); return; }
     setLoading(true);
     const staffCol = staff.sourceType === 'staff_pool' ? 'staff_pool_id' : 'profile_id';
     const { data: cs } = await supabase.from('curriculum_staff')
@@ -70,7 +74,10 @@ export default function StaffScheduleTab({ staff }: Props) {
     if (ids.length > 0) {
       const { data: pc } = await supabase.from('program_curriculum')
         .select('id, title, session_date, start_time, end_time, session_no, program_id')
-        .in('id', ids).not('session_date', 'is', null).order('session_date', { ascending: true });
+        .in('id', ids)
+        .eq('program_id', selectedProgramId)
+        .not('session_date', 'is', null)
+        .order('session_date', { ascending: true });
       const list = ((pc ?? []) as Array<{
         id: string; title: string; session_date: string; start_time: string | null;
         end_time: string | null; session_no: number; program_id: string;
@@ -109,7 +116,7 @@ export default function StaffScheduleTab({ staff }: Props) {
     const merged = [...lectureRows, ...personalRows].sort((a, b) => a.session_date.localeCompare(b.session_date));
     setRows(merged);
     setLoading(false);
-  }, [staff.id, staff.sourceType]);
+  }, [staff.id, staff.sourceType, selectedProgramId]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
@@ -162,6 +169,14 @@ export default function StaffScheduleTab({ staff }: Props) {
     return Array.from(m.entries());
   }, [upcoming]);
 
+  if (!selectedProgramId) {
+    return (
+      <div className={CARD_CLASS}>
+        <EmptyState emoji="🎯" title="먼저 개요 탭에서 프로그램을 선택해 주세요."
+          description="선택된 프로그램의 차시 일정과 개인 일정이 표시돼요." />
+      </div>
+    );
+  }
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-400" /></div>;
   }

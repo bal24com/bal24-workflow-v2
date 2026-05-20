@@ -12,7 +12,10 @@ import type { ActivityLog, ActivityLogType } from '../../../types/database';
 import type { MentoringLog } from '../../../types/mentoring';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 
-interface Props { staff: StaffPortalIdentity }
+interface Props {
+  staff: StaffPortalIdentity;
+  selectedProgramId: string | null;
+}
 
 type UnifiedKind = 'mentoring' | 'activity';
 type FilterKind = 'all' | UnifiedKind;
@@ -37,7 +40,7 @@ const ACTIVITY_TYPE_LABEL: Record<ActivityLogType, string> = {
   ta: 'TA', operation: '운영', dispatch: '파견',
 };
 
-export default function StaffLogTab({ staff }: Props) {
+export default function StaffLogTab({ staff, selectedProgramId }: Props) {
   const toast = useToast();
   const [logs, setLogs] = useState<UnifiedLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,13 +48,15 @@ export default function StaffLogTab({ staff }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    if (!selectedProgramId) { setLogs([]); setLoading(false); return; }
     setLoading(true);
     const unified: UnifiedLog[] = [];
 
     const mentorCol = staff.sourceType === 'staff_pool' ? 'mentor_pool_id' : 'mentor_profile_id';
     const { data: asn } = await supabase.from('mentoring_assignments')
       .select('id, program:programs!mentoring_assignments_program_id_fkey(id, name)')
-      .eq(mentorCol, staff.id);
+      .eq(mentorCol, staff.id)
+      .eq('program_id', selectedProgramId);
     type AsnRow = { id: string; program: { id: string; name: string } | null };
     const asnRows = ((asn ?? []) as unknown) as AsnRow[];
     const asnMap = new Map(asnRows.map((a) => [a.id, a.program]));
@@ -86,7 +91,9 @@ export default function StaffLogTab({ staff }: Props) {
 
     if (staff.sourceType === 'staff_pool') {
       const { data: al, error: alErr } = await supabase.from('activity_logs')
-        .select('*').eq('expert_id', staff.id).is('deleted_at', null)
+        .select('*').eq('expert_id', staff.id)
+        .eq('program_id', selectedProgramId)
+        .is('deleted_at', null)
         .order('activity_date', { ascending: false });
       if (alErr) {
         const m = (alErr.message ?? '').toLowerCase();
@@ -121,7 +128,7 @@ export default function StaffLogTab({ staff }: Props) {
     unified.sort((a, b) => b.date.localeCompare(a.date));
     setLogs(unified);
     setLoading(false);
-  }, [staff.id, staff.sourceType, toast]);
+  }, [staff.id, staff.sourceType, selectedProgramId, toast]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
@@ -132,6 +139,14 @@ export default function StaffLogTab({ staff }: Props) {
     activity: logs.filter((l) => l.kind === 'activity').length,
   }), [logs]);
 
+  if (!selectedProgramId) {
+    return (
+      <div className={CARD_CLASS}>
+        <EmptyState emoji="🎯" title="먼저 개요 탭에서 프로그램을 선택해 주세요."
+          description="선택된 프로그램의 일지만 표시돼요." />
+      </div>
+    );
+  }
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-400" /></div>;
   }

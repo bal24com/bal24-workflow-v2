@@ -8,7 +8,10 @@ import { useToast } from '../../../contexts/ToastContext';
 import EmptyState from '../../../components/EmptyState';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 
-interface Props { staff: StaffPortalIdentity }
+interface Props {
+  staff: StaffPortalIdentity;
+  selectedProgramId: string | null;
+}
 
 interface CurriculumRow {
   id: string; session_no: number; title: string; program_id: string; program_name: string | null;
@@ -23,7 +26,7 @@ const STORAGE_BUCKET = 'staff-files';
 const CARD_CLASS =
   'bg-white rounded-2xl border border-violet-100 shadow-[0_4px_16px_rgba(124,58,237,0.08)] p-5';
 
-export default function StaffMaterialsTab({ staff }: Props) {
+export default function StaffMaterialsTab({ staff, selectedProgramId }: Props) {
   const toast = useToast();
   const [curriculums, setCurriculums] = useState<CurriculumRow[]>([]);
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
@@ -32,6 +35,7 @@ export default function StaffMaterialsTab({ staff }: Props) {
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    if (!selectedProgramId) { setCurriculums([]); setMaterials([]); setLoading(false); return; }
     setLoading(true);
     const staffCol = staff.sourceType === 'staff_pool' ? 'staff_pool_id' : 'profile_id';
     const { data: cs } = await supabase.from('curriculum_staff')
@@ -42,6 +46,7 @@ export default function StaffMaterialsTab({ staff }: Props) {
     }
     const { data: pc } = await supabase.from('program_curriculum')
       .select('id, session_no, title, program_id').in('id', curIds)
+      .eq('program_id', selectedProgramId)
       .order('session_no', { ascending: true });
     const pcRows = ((pc ?? []) as Array<Omit<CurriculumRow, 'program_name'>>);
     const progIds = Array.from(new Set(pcRows.map((r) => r.program_id)));
@@ -52,8 +57,13 @@ export default function StaffMaterialsTab({ staff }: Props) {
     }
     setCurriculums(pcRows.map((r) => ({ ...r, program_name: progMap.get(r.program_id) ?? null })));
 
+    // 선택 프로그램에 속한 curriculum_id만 자료 조회 대상
+    const filteredCurIds = pcRows.map((r) => r.id);
+    if (filteredCurIds.length === 0) {
+      setMaterials([]); setLoading(false); return;
+    }
     const { data: mat, error: matErr } = await supabase.from('curriculum_materials')
-      .select('*').in('curriculum_id', curIds).order('created_at', { ascending: false });
+      .select('*').in('curriculum_id', filteredCurIds).order('created_at', { ascending: false });
     if (matErr) {
       const m = (matErr.message ?? '').toLowerCase();
       if (m.includes('does not exist') || m.includes('pgrst205')) {
@@ -64,7 +74,7 @@ export default function StaffMaterialsTab({ staff }: Props) {
       }
     } else setMaterials((mat ?? []) as MaterialRow[]);
     setLoading(false);
-  }, [staff.id, staff.sourceType]);
+  }, [staff.id, staff.sourceType, selectedProgramId]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
@@ -125,6 +135,14 @@ export default function StaffMaterialsTab({ staff }: Props) {
     void fetchData();
   }
 
+  if (!selectedProgramId) {
+    return (
+      <div className={CARD_CLASS}>
+        <EmptyState emoji="🎯" title="먼저 개요 탭에서 프로그램을 선택해 주세요."
+          description="선택된 프로그램의 차시 자료가 표시돼요." />
+      </div>
+    );
+  }
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin text-violet-400" /></div>;
   }

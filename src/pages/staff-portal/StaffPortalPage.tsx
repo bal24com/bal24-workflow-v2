@@ -1,9 +1,9 @@
-// bal24 v2 — STEP-STAFF-PORTAL-P2
-// /staff-portal/:token (비로그인 공개) — 토큰 검증 + 6탭 디스패처.
-// STEP-STAFF-PORTAL-UI-UNIFY: WorkFlow 디자인 시스템 통일 (bg #F8F7FF + 카드/탭/모달 패턴).
+// bal24 v2 — STEP-STAFF-PORTAL-P2 / STEP-STAFF-PORTAL-PROGRAM-SELECT
+// /staff-portal/:token (비로그인 공개) — 토큰 검증 + 프로그램 선택 컨텍스트 + 6탭 디스패처.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { CheckCircle2 } from 'lucide-react';
 import StaffPortalHeader from './StaffPortalHeader';
 import StaffOverviewTab from './tabs/StaffOverviewTab';
 import StaffMentoringTab from './tabs/StaffMentoringTab';
@@ -12,7 +12,10 @@ import StaffLogTab from './tabs/StaffLogTab';
 import StaffScheduleTab from './tabs/StaffScheduleTab';
 import StaffMaterialsTab from './tabs/StaffMaterialsTab';
 import StaffInfoEditModal from './StaffInfoEditModal';
-import { resolveStaffByToken, type StaffPortalIdentity } from './staffPortalUtils';
+import {
+  resolveStaffByToken, fetchStaffPrograms,
+  type StaffPortalIdentity, type StaffPortalProgram,
+} from './staffPortalUtils';
 
 const TABS = [
   { key: 'overview',   label: '개요' },
@@ -31,6 +34,11 @@ export default function StaffPortalPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [infoOpen, setInfoOpen] = useState(false);
 
+  // STEP-STAFF-PORTAL-PROGRAM-SELECT — 프로그램 선택 컨텍스트
+  const [programs, setPrograms] = useState<StaffPortalProgram[]>([]);
+  const [programsLoading, setProgramsLoading] = useState(false);
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!token) { setLoading(false); return; }
     let cancelled = false;
@@ -43,6 +51,25 @@ export default function StaffPortalPage() {
     })();
     return () => { cancelled = true; };
   }, [token]);
+
+  useEffect(() => {
+    if (!staff) return;
+    let cancelled = false;
+    setProgramsLoading(true);
+    void (async () => {
+      const list = await fetchStaffPrograms(staff.id, staff.sourceType);
+      if (cancelled) return;
+      setPrograms(list);
+      if (list.length === 1) setSelectedProgramId(list[0].id);
+      setProgramsLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [staff]);
+
+  const selectedProgram = useMemo(
+    () => programs.find((p) => p.id === selectedProgramId) ?? null,
+    [programs, selectedProgramId],
+  );
 
   if (loading) {
     return (
@@ -68,7 +95,13 @@ export default function StaffPortalPage() {
       <div className="max-w-2xl mx-auto px-4 py-6">
         <StaffPortalHeader staff={staff} onEditInfo={() => setInfoOpen(true)} />
 
-        {/* 탭 메뉴 */}
+        {selectedProgram && (
+          <div className="mb-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 border border-violet-200 text-violet-700 text-xs font-semibold">
+            <CheckCircle2 size={12} aria-hidden="true" />
+            선택된 프로그램: <span className="font-bold">{selectedProgram.name}</span>
+          </div>
+        )}
+
         <nav role="tablist" aria-label="강사 포털 탭"
           className="flex gap-1 overflow-x-auto bg-white rounded-2xl border border-violet-100 shadow-[0_4px_16px_rgba(124,58,237,0.08)] p-1.5 mb-4">
           {TABS.map((tab) => {
@@ -87,14 +120,17 @@ export default function StaffPortalPage() {
           })}
         </nav>
 
-        {/* 탭 콘텐츠 */}
         <div>
-          {activeTab === 'overview'  && <StaffOverviewTab staff={staff} />}
-          {activeTab === 'mentoring' && <StaffMentoringTab staff={staff} />}
-          {activeTab === 'lecture'   && <StaffLectureTab staff={staff} />}
-          {activeTab === 'log'       && <StaffLogTab staff={staff} />}
-          {activeTab === 'schedule'  && <StaffScheduleTab staff={staff} />}
-          {activeTab === 'materials' && <StaffMaterialsTab staff={staff} />}
+          {activeTab === 'overview'  && (
+            <StaffOverviewTab staff={staff} programs={programs} programsLoading={programsLoading}
+              selectedProgramId={selectedProgramId}
+              onSelectProgram={setSelectedProgramId} />
+          )}
+          {activeTab === 'mentoring' && <StaffMentoringTab staff={staff} selectedProgramId={selectedProgramId} />}
+          {activeTab === 'lecture'   && <StaffLectureTab   staff={staff} selectedProgramId={selectedProgramId} />}
+          {activeTab === 'log'       && <StaffLogTab       staff={staff} selectedProgramId={selectedProgramId} />}
+          {activeTab === 'schedule'  && <StaffScheduleTab  staff={staff} selectedProgramId={selectedProgramId} />}
+          {activeTab === 'materials' && <StaffMaterialsTab staff={staff} selectedProgramId={selectedProgramId} />}
         </div>
       </div>
 
