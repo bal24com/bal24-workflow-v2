@@ -14,3 +14,6 @@ verify_jwt = true
 
 [functions.send-notification]
 verify_jwt = true
+
+[functions.create-member]
+verify_jwt = true

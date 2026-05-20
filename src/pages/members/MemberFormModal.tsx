@@ -1,17 +1,21 @@
-// bal24 v2 — 팀원 등록·수정 모달 (STEP 18)
-// 신규: profiles INSERT만 (Auth 연동은 추후 별도 처리)
+// bal24 v2 — 팀원 등록·수정 모달 (STEP-MEMBER-DIRECT-REGISTER)
+// 신규: create-member Edge Function 호출 (Auth + profiles 동시 생성)
+//       초기 비밀번호 = 연락처 끝 4자리 (4자리 미만이면 차단)
 // 수정: profiles UPDATE + 퇴직 처리(is_active=false) + 아바타 업로드
 
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { Trash2, Upload, X } from 'lucide-react';
-import { Modal, Button, Input } from '../../components/ui';
+import { Trash2 } from 'lucide-react';
+import { Modal, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import type { Profile, Role } from '../../types/database';
-import { ROLE_LABELS } from '../../constants/roles';
+import type { Profile } from '../../types/database';
+import MemberFormFields, { EMPTY_MEMBER_FORM, type MemberFormState } from './MemberFormFields';
 
-// STEP-ROLE-TYPE-AUDIT — DB 실측 소문자 통일
-const ROLE_VALUES: Role[] = ['admin', 'pm', 'staff', 'finance', 'partner'];
+/** 연락처에서 숫자만 추출해 끝 4자리 반환 (초기 비밀번호용) */
+function getInitialPassword(phone: string): string {
+  const digits = (phone ?? '').replace(/\D/g, '');
+  return digits.slice(-4);
+}
 
 interface Props {
   open: boolean;
@@ -20,42 +24,23 @@ interface Props {
   onSaved: () => void;
 }
 
-interface FormState {
-  name: string;
-  email: string;
-  role: Role;
-  department: string;
-  position: string;
-  phone: string;
-  joinedAt: string;
-  slogan: string;
-  isActive: boolean;
-  avatarUrl: string;
-}
-
-const EMPTY: FormState = {
-  name: '',
-  email: '',
-  role: 'staff',
-  department: '',
-  position: '',
-  phone: '',
-  joinedAt: '',
-  slogan: '',
-  isActive: true,
-  avatarUrl: '',
-};
-
 function translateError(raw: string): string {
   const m = raw.toLowerCase();
   if (m.includes('row-level security')) return '권한이 없어요. 관리자에게 문의해 주세요.';
-  if (m.includes('duplicate') || m.includes('unique')) return '이미 등록된 이메일이에요.';
+  if (m.includes('duplicate') || m.includes('unique') || m.includes('already')) return '이미 등록된 이메일이에요.';
   if (m.includes('check constraint')) return '역할 값이 허용 범위가 아니에요.';
   return '저장 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }
 
+interface CreateMemberResponse {
+  success?: boolean;
+  userId?: string;
+  email?: string;
+  error?: string;
+}
+
 export default function MemberFormModal({ open, editTarget, onClose, onSaved }: Props) {
-  const [form, setForm] = useState<FormState>(EMPTY);
+  const [form, setForm] = useState<MemberFormState>(EMPTY_MEMBER_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [retiring, setRetiring] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -77,12 +62,12 @@ export default function MemberFormModal({ open, editTarget, onClose, onSaved }: 
         avatarUrl: editTarget.avatar_url ?? '',
       });
     } else {
-      setForm(EMPTY);
+      setForm(EMPTY_MEMBER_FORM);
     }
     setErrorMsg(null);
   }, [open, editTarget]);
 
-  const update = <K extends keyof FormState>(k: K, v: FormState[K]) => {
+  const update = <K extends keyof MemberFormState>(k: K, v: MemberFormState[K]) => {
     setForm((p) => ({ ...p, [k]: v }));
   };
 
@@ -138,6 +123,7 @@ export default function MemberFormModal({ open, editTarget, onClose, onSaved }: 
     setSubmitting(true);
     try {
       if (editTarget) {
+        // 수정: profiles UPDATE (Auth 정보는 그대로)
         const payload = {
           name: form.name.trim(),
           role: form.role,
@@ -150,7 +136,6 @@ export default function MemberFormModal({ open, editTarget, onClose, onSaved }: 
           avatar_url: form.avatarUrl || null,
           updated_at: new Date().toISOString(),
         };
-        // RLS 정책으로 update 가 silent 실패하는 경우 감지 위해 .select() 추가
         const { data, error } = await supabase
           .from('profiles')
           .update(payload)
@@ -158,26 +143,50 @@ export default function MemberFormModal({ open, editTarget, onClose, onSaved }: 
           .select('id');
         if (error) throw error;
         if (!data || data.length === 0) {
-          // RLS UPDATE 정책 부재로 0 row affected
           console.error('[members] update 0 row affected — RLS 정책 누락 추정. id=', editTarget.id);
           setErrorMsg('수정 권한이 없거나 RLS 정책이 누락되어 저장되지 않았어요. 관리자에게 문의해 주세요.');
           return;
         }
       } else {
-        const payload = {
-          email: form.email.trim(),
-          name: form.name.trim(),
-          role: form.role,
-          department: form.department.trim() || null,
-          position: form.position.trim() || null,
-          phone: form.phone.trim() || null,
-          joined_at: form.joinedAt || null,
-          slogan: form.slogan.trim() || null,
-          is_active: true,
-          avatar_url: form.avatarUrl || null,
-        };
-        const { error } = await supabase.from('profiles').insert(payload);
-        if (error) throw error;
+        // STEP-MEMBER-DIRECT-REGISTER — Edge Function으로 Auth + profiles 동시 생성
+        const initialPassword = getInitialPassword(form.phone);
+        if (initialPassword.length < 4) {
+          setErrorMsg('초기 비밀번호 생성을 위해 연락처를 4자리 이상 입력해 주세요.');
+          return;
+        }
+        const { data, error } = await supabase.functions.invoke<CreateMemberResponse>('create-member', {
+          body: {
+            email: form.email.trim(),
+            password: initialPassword,
+            name: form.name.trim(),
+            role: form.role,
+            department: form.department.trim() || null,
+            position: form.position.trim() || null,
+            phone: form.phone.trim() || null,
+            joined_at: form.joinedAt || null,
+            slogan: form.slogan.trim() || null,
+            avatar_url: form.avatarUrl || null,
+          },
+        });
+        if (error) {
+          // FunctionsHttpError — Edge Function이 4xx/5xx 반환
+          const ctx = (error as { context?: { json?: () => Promise<CreateMemberResponse> } }).context;
+          let serverMsg = '';
+          try {
+            const j = await ctx?.json?.();
+            serverMsg = j?.error ?? '';
+          } catch { /* noop */ }
+          console.error('[members] create-member 실패:', serverMsg || error.message);
+          setErrorMsg(translateError(serverMsg || error.message));
+          return;
+        }
+        if (data?.error) {
+          console.error('[members] create-member 응답 오류:', data.error);
+          setErrorMsg(translateError(data.error));
+          return;
+        }
+        // 등록 성공 → 초기 비밀번호 안내 (이름 + 끝 4자리)
+        window.alert(`${form.name.trim()}님이 등록됐어요.\n초기 비밀번호: ${initialPassword}\n(연락처 끝 4자리, 첫 로그인 후 변경을 권장해요.)`);
       }
 
       onSaved();
@@ -220,8 +229,10 @@ export default function MemberFormModal({ open, editTarget, onClose, onSaved }: 
     <Modal
       open={open}
       onClose={onClose}
-      title={editTarget ? '팀원 정보 수정' : '팀원 초대'}
-      description={editTarget ? '팀원 정보를 수정하거나 퇴직 처리할 수 있어요.' : '신규 팀원을 등록해요. 로그인 계정은 별도 이메일 초대로 처리해요.'}
+      title={editTarget ? '팀원 정보 수정' : '팀원 등록'}
+      description={editTarget
+        ? '팀원 정보를 수정하거나 퇴직 처리할 수 있어요.'
+        : '이메일 초대 없이 즉시 계정이 생성돼요. 초기 비밀번호는 연락처 끝 4자리예요.'}
       size="md"
       closeOnBackdrop={!busy}
       footer={
@@ -252,143 +263,15 @@ export default function MemberFormModal({ open, editTarget, onClose, onSaved }: 
       }
     >
       <form id="member-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
-        <div className="flex items-center gap-3">
-          {form.avatarUrl ? (
-            <div className="relative">
-              <img
-                src={form.avatarUrl}
-                alt="프로필 미리보기"
-                className="w-20 h-20 rounded-full object-cover border border-violet-100"
-              />
-              <button
-                type="button"
-                onClick={() => update('avatarUrl', '')}
-                aria-label="아바타 제거"
-                className="absolute -top-1 -right-1 rounded-full bg-white border border-slate-200 p-0.5 hover:bg-rose-50 hover:border-rose-200"
-              >
-                <X size={14} className="text-slate-500" aria-hidden="true" />
-              </button>
-            </div>
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-2xl font-bold">
-              {form.name.trim().charAt(0).toUpperCase() || '?'}
-            </div>
-          )}
-          <label className="cursor-pointer inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100">
-            <Upload size={16} aria-hidden="true" />
-            {uploading ? '업로드 중…' : '프로필 사진 업로드'}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarUpload}
-              disabled={busy}
-              className="hidden"
-            />
-          </label>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="이름"
-            required
-            value={form.name}
-            onChange={(e) => update('name', e.target.value)}
-            disabled={busy}
-            placeholder="예) 박경수"
-          />
-          <Input
-            type="email"
-            label="이메일"
-            required={!editTarget}
-            value={form.email}
-            onChange={(e) => update('email', e.target.value)}
-            disabled={busy || Boolean(editTarget)}
-            placeholder="example@bal24.kr"
-            helperText={editTarget ? '이메일은 수정할 수 없어요.' : undefined}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-700">역할 <span className="text-rose-500">*</span></label>
-            <select
-              value={form.role}
-              onChange={(e) => update('role', e.target.value as Role)}
-              disabled={busy}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            >
-              {ROLE_VALUES.map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABELS[r] ?? r}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Input
-            label="부서"
-            value={form.department}
-            onChange={(e) => update('department', e.target.value)}
-            disabled={busy}
-            placeholder="예) 운영팀"
-          />
-          <Input
-            label="직책"
-            value={form.position}
-            onChange={(e) => update('position', e.target.value)}
-            disabled={busy}
-            placeholder="예) 매니저"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            type="tel"
-            label="연락처"
-            value={form.phone}
-            onChange={(e) => update('phone', e.target.value)}
-            disabled={busy}
-            placeholder="010-0000-0000"
-          />
-          <Input
-            type="date"
-            label="입사일"
-            value={form.joinedAt}
-            onChange={(e) => update('joinedAt', e.target.value)}
-            disabled={busy}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-slate-700">한 줄 소개</label>
-          <textarea
-            value={form.slogan}
-            onChange={(e) => update('slogan', e.target.value)}
-            disabled={busy}
-            rows={2}
-            placeholder="팀에 자신을 한 줄로 소개해 주세요."
-            className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-          />
-        </div>
-
-        {editTarget && (
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(e) => update('isActive', e.target.checked)}
-              disabled={busy}
-              className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/30"
-            />
-            <span className="font-semibold text-slate-700">재직 중</span>
-            <span className="text-xs text-slate-500">(체크 해제 시 퇴직 상태)</span>
-          </label>
-        )}
-
-        {errorMsg && (
-          <div role="alert" className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-2.5 text-sm text-rose-700">
-            {errorMsg}
-          </div>
-        )}
+        <MemberFormFields
+          form={form}
+          onUpdate={update}
+          onAvatarUpload={handleAvatarUpload}
+          isEditMode={Boolean(editTarget)}
+          busy={busy}
+          uploading={uploading}
+          errorMsg={errorMsg}
+        />
       </form>
     </Modal>
   );
