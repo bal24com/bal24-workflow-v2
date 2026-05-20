@@ -89,6 +89,18 @@ export interface MentoringLog {
   updated_at: string;
 }
 
+/** STEP-MENTORING-LOG-UX — 멘토링 일지 첨부 파일 */
+export interface MentoringLogFile {
+  id: string;
+  log_id: string;
+  file_name: string;
+  file_url: string;
+  file_type: 'image' | 'document';
+  file_size: number | null;
+  created_at: string;
+  created_by: string | null;
+}
+
 /** 지급 계산 — 완료 회수 기반 */
 export function calcMentoringPay(a: MentoringAssignment, completedCount: number) {
   const base =

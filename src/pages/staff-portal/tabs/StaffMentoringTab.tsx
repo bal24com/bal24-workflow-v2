@@ -3,13 +3,15 @@
 // mentoring_logs 테이블 미적용(PGRST205) 안전 처리.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Users2, BookOpen, Plus, Save, X, Clock } from 'lucide-react';
+import { Loader2, Users2, BookOpen, Plus, Clock, Paperclip } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
+import { useAuth } from '../../../contexts/AuthContext';
 import { formatDateKo } from '../../../lib/utils';
 import EmptyState from '../../../components/EmptyState';
-import { calcDurationMin, formatDuration, type MentoringLog } from '../../../types/mentoring';
+import { type MentoringLog, type MentoringLogFile } from '../../../types/mentoring';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
+import MentoringLogForm from './MentoringLogForm';
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -26,32 +28,18 @@ interface MenteeLite { id: string; name: string; organization: string | null }
 const CARD_CLASS =
   'bg-white rounded-2xl border border-violet-100 shadow-[0_4px_16px_rgba(124,58,237,0.08)] p-5';
 
-const INPUT_CLASS =
-  'w-full h-[42px] border border-gray-200 rounded-[10px] px-3 text-sm ' +
-  'focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50';
-
-const TEXTAREA_CLASS =
-  'w-full border border-gray-200 rounded-[10px] px-3 py-2.5 text-sm resize-y ' +
-  'focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50';
-
 const BTN_PRIMARY =
   'inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-violet-600 ' +
   'rounded-[10px] hover:bg-violet-700 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100';
 
-const BTN_GHOST =
-  'inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-600 ' +
-  'hover:bg-slate-100 rounded-[10px] transition-all duration-200';
-
-function todayIso(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
   const toast = useToast();
+  const { user } = useAuth();
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [mentees, setMentees] = useState<MenteeLite[]>([]);
   const [logs, setLogs] = useState<MentoringLog[]>([]);
+  // STEP-MENTORING-LOG-UX — log_id → 파일 목록
+  const [filesByLog, setFilesByLog] = useState<Map<string, MentoringLogFile[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
   const [formOpenId, setFormOpenId] = useState<string | null>(null);
@@ -85,6 +73,7 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
     } else setMentees([]);
 
     const asnIds = rows.map((r) => r.id);
+    let logRows: MentoringLog[] = [];
     if (asnIds.length > 0) {
       const { data: lg, error: lgErr } = await supabase.from('mentoring_logs')
         .select('*').in('assignment_id', asnIds).order('log_date', { ascending: false });
@@ -96,8 +85,33 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
           console.warn('[staff-portal/mentoring] 일지 조회 경고:', lgErr.message);
           setLogs([]);
         }
-      } else setLogs((lg ?? []) as MentoringLog[]);
+      } else {
+        logRows = (lg ?? []) as MentoringLog[];
+        setLogs(logRows);
+      }
     } else setLogs([]);
+
+    // STEP-MENTORING-LOG-UX — 일지별 첨부 파일 fetch (마이그레이션 미적용 안전)
+    const logIds = logRows.map((l) => l.id);
+    const map = new Map<string, MentoringLogFile[]>();
+    if (logIds.length > 0) {
+      const { data: filesData, error: filesErr } = await supabase
+        .from('mentoring_log_files').select('*').in('log_id', logIds)
+        .order('created_at', { ascending: true });
+      if (filesErr) {
+        const m = (filesErr.message ?? '').toLowerCase();
+        if (!m.includes('does not exist') && !m.includes('pgrst205')) {
+          console.warn('[staff-portal/mentoring] 파일 조회 경고:', filesErr.message);
+        }
+      } else {
+        (filesData ?? []).forEach((f) => {
+          const row = f as MentoringLogFile;
+          const arr = map.get(row.log_id) ?? [];
+          arr.push(row); map.set(row.log_id, arr);
+        });
+      }
+    }
+    setFilesByLog(map);
 
     setLoading(false);
   }, [staff.id, staff.sourceType, selectedProgramId, toast]);
@@ -168,11 +182,12 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
                 )}
               </div>
 
-              {/* 일지 작성 폼 */}
+              {/* 일지 작성 폼 (분리된 파일) */}
               {!tableMissing && (
                 formOpenId === a.id ? (
-                  <LogForm assignment={a} mentees={menteeList}
+                  <MentoringLogForm assignment={a} mentees={menteeList}
                     programName={programName} mentorName={staff.name}
+                    userId={user?.id ?? null}
                     onSaved={() => { setFormOpenId(null); void fetchData(); }}
                     onCancel={() => setFormOpenId(null)} />
                 ) : (
@@ -191,6 +206,7 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
                   <ul className="space-y-2">
                     {asnLogs.slice(0, 5).map((l) => {
                       const timeRange = (l.start_time && l.end_time) ? `${l.start_time}~${l.end_time}` : null;
+                      const logFiles = filesByLog.get(l.id) ?? [];
                       return (
                         <li key={l.id} className="rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2">
                           <div className="flex items-center gap-2 text-xs flex-wrap">
@@ -208,8 +224,31 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
                             {l.location && (
                               <span className="text-[10px] text-slate-500 truncate">· {l.location}</span>
                             )}
+                            {logFiles.length > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] text-violet-600 font-semibold">
+                                <Paperclip size={9} aria-hidden="true" />{logFiles.length}
+                              </span>
+                            )}
                           </div>
                           <p className="mt-1.5 text-sm text-slate-700 line-clamp-2 whitespace-pre-wrap">{l.content}</p>
+                          {/* 첨부 파일 미리보기 */}
+                          {logFiles.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {logFiles.map((f) => (
+                                f.file_type === 'image' ? (
+                                  <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer">
+                                    <img src={f.file_url} alt={f.file_name}
+                                      className="w-12 h-12 object-cover rounded-md border border-violet-100 hover:opacity-80" />
+                                  </a>
+                                ) : (
+                                  <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[10px] text-violet-700 bg-violet-100 rounded-md px-2 py-1 hover:bg-violet-200 truncate max-w-[140px]">
+                                    📎 {f.file_name}
+                                  </a>
+                                )
+                              ))}
+                            </div>
+                          )}
                         </li>
                       );
                     })}
@@ -220,169 +259,6 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
           </section>
         );
       })}
-    </div>
-  );
-}
-
-interface LogFormProps {
-  assignment: AssignmentRow;
-  mentees: MenteeLite[];
-  programName: string;
-  mentorName: string;
-  onSaved: () => void;
-  onCancel: () => void;
-}
-
-interface LogFormState {
-  log_date: string;     // 상담 날짜
-  start_time: string;   // HH:MM
-  end_time: string;     // HH:MM
-  location: string;     // 장소
-  content: string;      // 주요 내용
-  next_plan: string;    // 다음 멘토링 계획 (선택)
-}
-
-const READONLY_CLASS =
-  'w-full h-[42px] border border-gray-200 rounded-[10px] px-3 text-sm bg-slate-50 text-slate-600';
-
-function LogForm({ assignment, mentees, programName, mentorName, onSaved, onCancel }: LogFormProps) {
-  const toast = useToast();
-  const [form, setForm] = useState<LogFormState>({
-    log_date: todayIso(),
-    start_time: '09:00',
-    end_time: '11:00',
-    location: '',
-    content: '',
-    next_plan: '',
-  });
-  const [selectedMentees, setSelectedMentees] = useState<string[]>(mentees.map((m) => m.id));
-  const [saving, setSaving] = useState(false);
-
-  const durationLabel = useMemo(
-    () => formatDuration(calcDurationMin(form.start_time, form.end_time)),
-    [form.start_time, form.end_time],
-  );
-
-  function toggleMentee(id: string) {
-    setSelectedMentees((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-  }
-
-  async function handleSave() {
-    if (!form.content.trim()) { toast.error('주요 내용을 입력해 주세요.'); return; }
-    if (calcDurationMin(form.start_time, form.end_time) <= 0) {
-      toast.error('종료 시간이 시작 시간보다 늦어야 해요.'); return;
-    }
-    setSaving(true);
-    const { error } = await supabase.from('mentoring_logs').insert({
-      assignment_id: assignment.id,
-      program_id: assignment.program?.id ?? null,
-      log_date: form.log_date,
-      start_time: form.start_time,
-      end_time: form.end_time,
-      location: form.location.trim() || null,
-      mentee_ids: selectedMentees,
-      content: form.content.trim(),
-      next_plan: form.next_plan.trim() || null,
-    });
-    setSaving(false);
-    if (error) {
-      console.error('[staff-portal/mentoring] 일지 저장 실패:', error.message);
-      toast.error('일지 저장에 실패했어요.');
-      return;
-    }
-    toast.success('일지를 저장했어요.');
-    onSaved();
-  }
-
-  return (
-    <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-4">
-      {/* 사업명 — 자동 표시 */}
-      <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1">사업명</label>
-        <div className={READONLY_CLASS + ' flex items-center truncate'}>{programName}</div>
-      </div>
-
-      {/* 상담일시 — 날짜 + 시작/종료 시간 */}
-      <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1">상담일시</label>
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
-          <input type="date" value={form.log_date} disabled={saving}
-            onChange={(e) => setForm({ ...form, log_date: e.target.value })}
-            className={INPUT_CLASS} />
-          <input type="time" value={form.start_time} disabled={saving}
-            onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-            className="w-28 h-[42px] border border-gray-200 rounded-[10px] px-3 text-sm tabular-nums focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50" />
-          <span className="text-sm text-slate-500">~</span>
-          <input type="time" value={form.end_time} disabled={saving}
-            onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-            className="w-28 h-[42px] border border-gray-200 rounded-[10px] px-3 text-sm tabular-nums focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 disabled:bg-slate-50" />
-        </div>
-        <p className="mt-1.5 text-xs text-slate-500 inline-flex items-center gap-1">
-          <Clock size={11} aria-hidden="true" /> 진행시간: <span className="font-semibold text-violet-600">{durationLabel}</span>
-        </p>
-      </div>
-
-      {/* 장소 */}
-      <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1">장소</label>
-        <input type="text" value={form.location} disabled={saving}
-          onChange={(e) => setForm({ ...form, location: e.target.value })}
-          placeholder="예) 지엔스튜디오, 온라인(Zoom) 등"
-          className={INPUT_CLASS} />
-      </div>
-
-      {/* 멘티 + 멘토 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-            멘티 ({selectedMentees.length}/{mentees.length})
-          </label>
-          {mentees.length === 0 ? (
-            <div className={READONLY_CLASS + ' italic flex items-center text-slate-400'}>배정된 멘티가 없어요.</div>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {mentees.map((m) => (
-                <label key={m.id} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-violet-200 bg-white cursor-pointer hover:bg-violet-50">
-                  <input type="checkbox" checked={selectedMentees.includes(m.id)} onChange={() => toggleMentee(m.id)}
-                    disabled={saving} className="rounded text-violet-600 w-3.5 h-3.5" />
-                  <span className="text-xs text-slate-700">{m.name}</span>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-slate-700 block mb-1">멘토</label>
-          <div className={READONLY_CLASS + ' flex items-center truncate'}>{mentorName}</div>
-        </div>
-      </div>
-
-      {/* 주요 내용 */}
-      <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1">주요 내용</label>
-        <textarea value={form.content} disabled={saving} rows={6}
-          placeholder="멘토링 중 논의한 내용, 진행 방식, 컨설팅 내용을 구체적으로 작성하세요"
-          onChange={(e) => setForm({ ...form, content: e.target.value })}
-          className={TEXTAREA_CLASS} />
-      </div>
-
-      {/* 다음 멘토링 계획 (선택) */}
-      <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1">다음 멘토링 계획 (선택)</label>
-        <textarea value={form.next_plan} disabled={saving} rows={3}
-          placeholder="다음 회차 주제·과제·목표"
-          onChange={(e) => setForm({ ...form, next_plan: e.target.value })}
-          className={TEXTAREA_CLASS} />
-      </div>
-
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} disabled={saving} className={BTN_GHOST}>
-          <X size={14} /> 취소
-        </button>
-        <button type="button" onClick={() => void handleSave()} disabled={saving} className={BTN_PRIMARY}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 저장하기
-        </button>
-      </div>
     </div>
   );
 }
