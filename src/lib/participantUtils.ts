@@ -86,30 +86,72 @@ export interface ParsedParticipantRow {
   name: string;
   email?: string;
   phone?: string;
+  organization?: string;
+  id_number?: string;
   role: ParticipantRole;
 }
 
-/** CSV 파싱 (이름,이메일,연락처,역할). 헤더 자동 감지·한글 역할 영문 자동 변환 */
+// STEP-PARTICIPANTS-CSV-FIX — 헤더명 기반 동적 매핑 (순서 무관)
+// 한글·영문·공백 변형 모두 정규화하여 매칭.
+type FieldKey = 'name' | 'email' | 'phone' | 'role' | 'organization' | 'id_number';
+
+const HEADER_MAP: Record<string, FieldKey> = {
+  // 이름
+  '이름': 'name', '성명': 'name', 'name': 'name',
+  // 이메일
+  '이메일': 'email', '메일': 'email', 'email': 'email', 'e-mail': 'email',
+  // 연락처
+  '연락처': 'phone', '휴대폰': 'phone', '전화': 'phone', '핸드폰': 'phone',
+  '전화번호': 'phone', 'phone': 'phone', 'mobile': 'phone', 'tel': 'phone',
+  // 역할
+  '역할': 'role', '구분': 'role', 'role': 'role',
+  // 소속
+  '소속': 'organization', '회사': 'organization', '기관': 'organization',
+  'organization': 'organization', 'org': 'organization', 'company': 'organization',
+  // 주민번호
+  '주민번호': 'id_number', '주민등록번호': 'id_number',
+  'id_number': 'id_number', 'rrn': 'id_number',
+};
+
+function normalizeHeader(s: string): string {
+  return s.trim().replace(/\s+/g, '').toLowerCase();
+}
+
+/** CSV 파싱 — 헤더명 기반 매핑 (순서 무관). 한글 역할 영문 자동 변환 */
 export function parseParticipantCSV(csvText: string): ParsedParticipantRow[] {
   const rows: ParsedParticipantRow[] = [];
   const lines = csvText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return rows;
 
-  // 헤더 자동 감지 (첫 줄에 "이름" 또는 "name" 포함 시 skip)
-  const first = lines[0].toLowerCase();
-  const startIdx = (first.includes('이름') || first.includes('name')) ? 1 : 0;
+  // 1) 헤더 행 분석 → 컬럼 인덱스 → 필드 키 매핑
+  const headerCols = lines[0].split(',').map((c) => c.trim());
+  const colToField: (FieldKey | null)[] = headerCols.map((h) => HEADER_MAP[normalizeHeader(h)] ?? null);
+  const hasHeader = colToField.some((f) => f === 'name');
+
+  // 헤더가 없으면 (이름·이메일·연락처·역할 순서로 가정) — 기존 호환
+  const fieldOrder: (FieldKey | null)[] = hasHeader
+    ? colToField
+    : ['name', 'email', 'phone', 'role'];
+  const startIdx = hasHeader ? 1 : 0;
 
   for (let i = startIdx; i < lines.length; i += 1) {
     const cols = lines[i].split(',').map((c) => c.trim());
-    const [name, email, phone, roleRaw] = cols;
+    const rec: Partial<Record<FieldKey, string>> = {};
+    cols.forEach((val, j) => {
+      const field = fieldOrder[j];
+      if (field && val) rec[field] = val;
+    });
+    const name = rec.name;
     if (!name) continue;
-    const roleKey = (roleRaw ?? '').trim();
+    const roleKey = (rec.role ?? '').trim();
     const role: ParticipantRole = LABEL_TO_ROLE[roleKey]
       ?? ((PARTICIPANT_ROLE_VALUES as string[]).includes(roleKey) ? (roleKey as ParticipantRole) : 'participant');
     rows.push({
       name,
-      email: email || undefined,
-      phone: phone || undefined,
+      email: rec.email || undefined,
+      phone: rec.phone || undefined,
+      organization: rec.organization || undefined,
+      id_number: rec.id_number || undefined,
       role,
     });
   }

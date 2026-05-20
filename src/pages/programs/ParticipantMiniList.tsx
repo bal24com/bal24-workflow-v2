@@ -1,15 +1,19 @@
-// bal24 v2 — STEP-OVERVIEW-UI-FULL
-// 프로그램 목록에서 펼친 교육생 명단 미니 테이블 (최대 50명, 초과 시 "외 N명").
+// bal24 v2 — STEP-OVERVIEW-UI-FULL / STEP-PARTICIPANTS-LIST-UPDATE
+// 프로그램 목록 펼친 교육생 명단 — 이름·연락처·상태 (최대 50명, 초과 시 "외 N명").
 
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import {
+  BADGE_BASE, PARTICIPANT_STATUS_LABEL, PARTICIPANT_STATUS_STYLE,
+} from '../../utils/statusStyles';
+import type { ParticipantStatus } from '../../types/database';
 
 interface ParticipantLite {
   id: string;
   name: string;
-  organization: string | null;
   phone: string | null;
+  status: ParticipantStatus;
 }
 
 interface Props { programId: string }
@@ -27,9 +31,9 @@ export default function ParticipantMiniList({ programId }: Props) {
     void (async () => {
       const { data, count, error } = await supabase
         .from('program_participants')
-        .select('id, name, organization, phone', { count: 'exact' })
+        .select('id, name, phone, status', { count: 'exact' })
         .eq('program_id', programId)
-        .in('status', ['active', 'completed'])
+        .order('display_order', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true })
         .limit(MAX_VISIBLE);
       if (cancelled) return;
@@ -57,29 +61,29 @@ export default function ParticipantMiniList({ programId }: Props) {
   }
 
   return (
-    <div className="border-t border-slate-100 px-4 py-3 overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead className="text-[10px] text-slate-400 uppercase">
-          <tr>
-            <th className="text-center px-2 py-1 font-bold w-8">#</th>
-            <th className="text-left px-2 py-1 font-bold">이름</th>
-            <th className="text-left px-2 py-1 font-bold">소속</th>
-            <th className="text-left px-2 py-1 font-bold">연락처</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {list.map((p, idx) => (
-            <tr key={p.id}>
-              <td className="text-center px-2 py-1 text-slate-400 tabular-nums">{idx + 1}</td>
-              <td className="px-2 py-1 font-semibold text-slate-700">{p.name}</td>
-              <td className="px-2 py-1 text-slate-500">{p.organization ?? '—'}</td>
-              <td className="px-2 py-1 text-slate-500 tabular-nums">{p.phone ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="border-t border-slate-100 px-4 py-3">
+      <ul className="divide-y divide-slate-100">
+        {list.map((p) => {
+          const status: ParticipantStatus = p.status ?? 'pending';
+          return (
+            <li key={p.id} className="flex items-center gap-2 py-2 last:pb-0 first:pt-0">
+              <span className="text-sm font-medium text-[#1E1B4B] w-20 truncate shrink-0">
+                {p.name}
+              </span>
+              <span className="text-sm text-slate-500 flex-1 px-2 tabular-nums truncate">
+                {p.phone || '—'}
+              </span>
+              <span className={`${BADGE_BASE} ${PARTICIPANT_STATUS_STYLE[status]} shrink-0`}>
+                {PARTICIPANT_STATUS_LABEL[status] ?? status}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
       {total > MAX_VISIBLE && (
-        <p className="mt-2 text-[11px] text-slate-400 italic text-center">외 {total - MAX_VISIBLE}명 (상세에서 전체 보기)</p>
+        <p className="mt-2 text-[11px] text-slate-400 italic text-center">
+          외 {total - MAX_VISIBLE}명 (상세에서 전체 보기)
+        </p>
       )}
     </div>
   );

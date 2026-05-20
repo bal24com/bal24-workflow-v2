@@ -1202,8 +1202,9 @@ export interface FinalReportPhoto {
 
 // ─── STEP-PARTICIPANT-PORTAL 참여자 통합 토큰 ─────────────
 export type ParticipantRole = 'participant' | 'mentor' | 'client' | 'ta' | 'observer';
-/** STEP-PROGRAM-ENHANCE-FULL — 'pending'·'dropped' 추가 */
-export type ParticipantStatus = 'active' | 'inactive' | 'completed' | 'pending' | 'dropped';
+/** STEP-PROGRAM-ENHANCE-FULL — 'pending'·'dropped' 추가
+ *  STEP-PARTICIPANTS-LIST-UPDATE — 'incomplete' (미수료: 교육 완료했으나 조건 미달) 추가 */
+export type ParticipantStatus = 'active' | 'inactive' | 'completed' | 'pending' | 'dropped' | 'incomplete';
 
 export interface ProgramParticipant {
   id: string;
@@ -1225,6 +1226,8 @@ export interface ProgramParticipant {
   created_by?: string | null;
   created_at: string;
   updated_at: string;
+  /** STEP-PARTICIPANTS-LIST-UPDATE — 사용자 정의 순서 (drag ▲▼ 정렬) */
+  display_order?: number | null;
 }
 
 /** STEP-PROGRAM-ENHANCE-FULL — 차시별 출석 (AI 자동 처리 결과 포함) */

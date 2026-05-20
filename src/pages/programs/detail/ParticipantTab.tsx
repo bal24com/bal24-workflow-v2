@@ -51,10 +51,12 @@ export default function ParticipantTab({ programId, canEdit }: Props) {
 
   const reload = useCallback(async () => {
     setLoading(true);
+    // STEP-PARTICIPANTS-LIST-UPDATE — display_order 우선, 같으면 created_at asc
     const { data, error } = await supabase
       .from('program_participants').select('*')
       .eq('program_id', programId)
-      .order('created_at', { ascending: false });
+      .order('display_order', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true });
     if (error) {
       console.error('[participant-tab] 조회 실패:', error.message);
       toast.error('참여자 목록을 불러오지 못했어요.');

@@ -13,6 +13,7 @@ import type {
   ExpenseStatus,
   InvitationStatus,
   ConsortiumStatus,
+  ParticipantStatus,
 } from '../types/database';
 
 export const BADGE_BASE =
@@ -81,6 +82,26 @@ export const CONSORTIUM_STATUS_STYLE: Record<ConsortiumStatus, string> = {
   진행: 'bg-violet-50 text-violet-600 border-violet-200',
   완료: 'bg-emerald-50 text-emerald-600 border-emerald-200',
   해산: 'bg-rose-50 text-rose-500 border-rose-200',
+};
+
+// ─── 참여자 상태 (STEP-PARTICIPANTS-LIST-UPDATE) ────────────
+// DB는 영문 enum (active/pending/completed/incomplete/dropped/inactive). UI 라벨은 한글.
+export const PARTICIPANT_STATUS_LABEL: Record<ParticipantStatus, string> = {
+  pending:    '대기',
+  active:     '진행',
+  completed:  '수료',
+  incomplete: '미수료',
+  dropped:    '탈락',
+  inactive:   '비활성',
+};
+
+export const PARTICIPANT_STATUS_STYLE: Record<ParticipantStatus, string> = {
+  pending:    'bg-slate-100 text-slate-400 border-slate-300',
+  active:     'bg-violet-50 text-violet-600 border-violet-200',
+  completed:  'bg-emerald-50 text-emerald-600 border-emerald-200',
+  incomplete: 'bg-amber-50 text-amber-600 border-amber-200',
+  dropped:    'bg-rose-50 text-rose-500 border-rose-200',
+  inactive:   'bg-slate-100 text-slate-400 border-slate-300',
 };
 
 // ─── 사업실적보고서 상태 (CLAUDE.md 디자인 시스템 — 회색/바이올렛/주황/민트) ─
