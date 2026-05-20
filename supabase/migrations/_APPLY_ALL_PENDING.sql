@@ -28,6 +28,23 @@ alter table public.staff_pool
 --    program_participants: '미수료' 상태 + display_order 컬럼
 -- ─────────────────────────────────────────────
 
+-- 3-0) ⭐ 기존 행 status 값 정규화 — constraint 적용 전 필수
+--      ・ 과거 한글 상태값 → 영문 변환
+--      ・ NULL 또는 알 수 없는 값 → 'pending' (대기)
+--      ・ 23514 violation 방지
+update public.program_participants set status = 'pending'    where status in ('대기');
+update public.program_participants set status = 'active'     where status in ('진행', '진행중');
+update public.program_participants set status = 'completed'  where status in ('수료', '완료');
+update public.program_participants set status = 'incomplete' where status in ('미수료');
+update public.program_participants set status = 'dropped'    where status in ('탈락', '중도탈락');
+update public.program_participants set status = 'inactive'   where status in ('비활성');
+
+-- 그 외 알 수 없는 값(NULL 포함) → 'pending'로 안전 처리
+update public.program_participants
+  set status = 'pending'
+  where status is null
+     or status not in ('pending','active','completed','incomplete','dropped','inactive');
+
 -- 3-1) status check constraint 갱신
 alter table public.program_participants
   drop constraint if exists program_participants_status_check;
@@ -45,7 +62,15 @@ create index if not exists idx_program_participants_display_order
 
 
 -- ============================================================
--- 검증 쿼리 (선택) — 정상 적용 확인용
+-- 진단 쿼리 (적용 전에 어떤 값이 있는지 확인하고 싶을 때만 사용)
+-- ============================================================
+-- select status, count(*) from public.program_participants
+--   group by status order by count(*) desc;
+--   -- 결과를 보고 위 정규화 매핑이 다 커버하는지 확인 가능
+
+
+-- ============================================================
+-- 검증 쿼리 (적용 후 정상 확인용)
 -- ============================================================
 -- 1) mentoring_logs 컬럼 확인
 -- select column_name from information_schema.columns
