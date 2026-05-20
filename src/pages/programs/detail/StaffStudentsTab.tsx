@@ -1,132 +1,47 @@
-// bal24 v2 — 프로그램 상세 · 강사 배정 탭 (STEP-STAFF-PORTAL-P4 강사 활동 현황 추가)
-// 강사 초빙 목록 + 담당 차시 수 + 멘토링 일지 수 + 강사 포털 바로가기.
+// bal24 v2 — STEP-STAFF-ASSIGNMENT-FEE
+// 강사 배정 탭 (강사 활동 현황) — instructor_invitations + curriculum_staff UNION.
+// 강사료 계산 + 차시별 완료 체크 + 지출 등록 연동.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Mic2, ExternalLink, Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  Loader2, Mic2, ExternalLink, Send, ChevronDown, ChevronUp,
+  Receipt, AlertCircle,
+} from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
-import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 import { formatMoney } from '../../../lib/utils';
 import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../../utils/statusStyles';
-import type { InstructorInvitation } from '../../../types/database';
+import StaffCurriculumChecklist from './StaffCurriculumChecklist';
+import {
+  fetchStaffActivity, type StaffActivity,
+} from './staffActivityUtils';
+import { markStaffFeeAsPaid } from './staffFeeUtils';
 
 interface Props { programId: string }
 
-type InvitationFull = Pick<
-  InstructorInvitation,
-  'id' | 'name' | 'role' | 'status' | 'lecture_fee' | 'staff_pool_id' | 'profile_id'
->;
-
-interface Summary {
-  inv: InvitationFull;
-  curriculumCount: number;
-  mentoringLogCount: number;
-  staffPortalToken: string | null;
-  mentorInviteToken: string | null;
-}
-
 export default function StaffStudentsTab({ programId }: Props) {
   const toast = useToast();
-  const [rows, setRows] = useState<Summary[]>([]);
+  const { user } = useAuth();
+  const [list, setList] = useState<StaffActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    // 1) 초대 목록
-    const { data: invs, error: invErr } = await supabase.from('instructor_invitations')
-      .select('id, name, role, status, lecture_fee, staff_pool_id, profile_id')
-      .eq('program_id', programId).order('created_at', { ascending: true });
-    if (invErr) {
-      console.error('[staff-students] 초대 조회 실패:', invErr.message);
-      toast.error('강사 정보를 불러오지 못했어요.');
-      setRows([]); setLoading(false); return;
-    }
-    const invList = (invs ?? []) as InvitationFull[];
-    const poolIds = Array.from(new Set(invList.map((i) => i.staff_pool_id).filter(Boolean) as string[]));
-    const profIds = Array.from(new Set(invList.map((i) => i.profile_id).filter(Boolean) as string[]));
-
-    // 2) staff_portal_token 매핑
-    const poolTokenMap = new Map<string, string>();
-    if (poolIds.length > 0) {
-      const { data: pools } = await supabase.from('staff_pool').select('id, staff_portal_token').in('id', poolIds);
-      (pools ?? []).forEach((r) => r.staff_portal_token && poolTokenMap.set(r.id as string, r.staff_portal_token as string));
-    }
-    const profTokenMap = new Map<string, string>();
-    if (profIds.length > 0) {
-      const { data: profs } = await supabase.from('profiles').select('id, staff_portal_token').in('id', profIds);
-      (profs ?? []).forEach((r) => r.staff_portal_token && profTokenMap.set(r.id as string, r.staff_portal_token as string));
-    }
-
-    // 3) 차시 카운트 (curriculum_staff → program_curriculum 매칭)
-    const { data: csAll } = await supabase.from('curriculum_staff')
-      .select('staff_pool_id, profile_id, curriculum:program_curriculum!inner(program_id)')
-      .or([
-        poolIds.length > 0 ? `staff_pool_id.in.(${poolIds.join(',')})` : '',
-        profIds.length > 0 ? `profile_id.in.(${profIds.join(',')})` : '',
-      ].filter(Boolean).join(','));
-    type CsRow = { staff_pool_id: string | null; profile_id: string | null; curriculum: { program_id: string } | { program_id: string }[] | null };
-    const curByPool = new Map<string, number>();
-    const curByProf = new Map<string, number>();
-    ((csAll ?? []) as unknown as CsRow[]).forEach((r) => {
-      const cur = Array.isArray(r.curriculum) ? r.curriculum[0] : r.curriculum;
-      if (!cur || cur.program_id !== programId) return;
-      if (r.staff_pool_id) curByPool.set(r.staff_pool_id, (curByPool.get(r.staff_pool_id) ?? 0) + 1);
-      if (r.profile_id) curByProf.set(r.profile_id, (curByProf.get(r.profile_id) ?? 0) + 1);
-    });
-
-    // 4) 멘토링 + 일지 카운트 (PGRST205 안전)
-    const { data: asnAll } = await supabase.from('mentoring_assignments')
-      .select('id, mentor_pool_id, mentor_profile_id, mentor_invite_token').eq('program_id', programId);
-    type AsnRow = { id: string; mentor_pool_id: string | null; mentor_profile_id: string | null; mentor_invite_token: string | null };
-    const asnRows = (asnAll ?? []) as AsnRow[];
-    const asnIds = asnRows.map((a) => a.id);
-    const inviteTokenByPool = new Map<string, string>();
-    const inviteTokenByProf = new Map<string, string>();
-    asnRows.forEach((a) => {
-      if (a.mentor_pool_id && a.mentor_invite_token) inviteTokenByPool.set(a.mentor_pool_id, a.mentor_invite_token);
-      if (a.mentor_profile_id && a.mentor_invite_token) inviteTokenByProf.set(a.mentor_profile_id, a.mentor_invite_token);
-    });
-    const logsByAsn = new Map<string, number>();
-    if (asnIds.length > 0) {
-      const { data: logs, error: logErr } = await supabase.from('mentoring_logs')
-        .select('id, assignment_id').in('assignment_id', asnIds);
-      if (logErr) {
-        const m = (logErr.message ?? '').toLowerCase();
-        if (!m.includes('does not exist') && !m.includes('pgrst205')) console.warn('[staff-students] 일지 카운트 경고:', logErr.message);
-      } else {
-        ((logs ?? []) as Array<{ assignment_id: string }>).forEach((l) => {
-          logsByAsn.set(l.assignment_id, (logsByAsn.get(l.assignment_id) ?? 0) + 1);
-        });
-      }
-    }
-    const logsByPool = new Map<string, number>();
-    const logsByProf = new Map<string, number>();
-    asnRows.forEach((a) => {
-      const cnt = logsByAsn.get(a.id) ?? 0;
-      if (a.mentor_pool_id) logsByPool.set(a.mentor_pool_id, (logsByPool.get(a.mentor_pool_id) ?? 0) + cnt);
-      if (a.mentor_profile_id) logsByProf.set(a.mentor_profile_id, (logsByProf.get(a.mentor_profile_id) ?? 0) + cnt);
-    });
-
-    // 5) summary 구성
-    setRows(invList.map((inv) => ({
-      inv,
-      curriculumCount: (inv.staff_pool_id ? curByPool.get(inv.staff_pool_id) ?? 0 : 0)
-        + (inv.profile_id ? curByProf.get(inv.profile_id) ?? 0 : 0),
-      mentoringLogCount: (inv.staff_pool_id ? logsByPool.get(inv.staff_pool_id) ?? 0 : 0)
-        + (inv.profile_id ? logsByProf.get(inv.profile_id) ?? 0 : 0),
-      staffPortalToken: (inv.staff_pool_id ? poolTokenMap.get(inv.staff_pool_id) : null)
-        ?? (inv.profile_id ? profTokenMap.get(inv.profile_id) : null) ?? null,
-      mentorInviteToken: (inv.staff_pool_id ? inviteTokenByPool.get(inv.staff_pool_id) : null)
-        ?? (inv.profile_id ? inviteTokenByProf.get(inv.profile_id) : null) ?? null,
-    })));
+    const rows = await fetchStaffActivity(programId);
+    setList(rows);
     setLoading(false);
-  }, [programId, toast]);
+  }, [programId]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
-  const totalInvites = rows.length;
-  const sortedRows = useMemo(() => rows, [rows]);
+  function keyOf(s: StaffActivity): string {
+    return `${s.staff_pool_id ?? ''}|${s.profile_id ?? ''}|${s.instructor_name_raw ?? ''}`;
+  }
 
-  function openPortal(s: Summary) {
+  function openPortal(s: StaffActivity) {
     if (s.staffPortalToken) {
       window.open(`${window.location.origin}/staff-portal/${s.staffPortalToken}`, '_blank', 'noopener');
       return;
@@ -135,7 +50,48 @@ export default function StaffStudentsTab({ programId }: Props) {
       window.open(`${window.location.origin}/mentor-invite/${s.mentorInviteToken}`, '_blank', 'noopener');
       return;
     }
-    toast.error('포털 토큰이 없어요. 강사가 staff_pool에 등록되어 있는지 확인해 주세요.');
+    toast.error('포털 토큰이 없어요. 강사가 인력풀에 등록되어 있는지 확인해 주세요.');
+  }
+
+  // STEP-STAFF-ASSIGNMENT-FEE — 완료 차시 강사료를 지출로 등록 (program_staff_fees 경유)
+  async function handleRegisterExpense(s: StaffActivity) {
+    if (!s.feeRule) {
+      toast.error(`${s.name}님의 강사료 기준이 없어요. [강사료] 탭에서 먼저 등록해 주세요.`);
+      return;
+    }
+    if (s.completedCount === 0) {
+      toast.error('완료 처리된 차시가 없어요. 차시 체크 후 다시 시도해 주세요.');
+      return;
+    }
+    if (s.feeRule.expense_id) {
+      toast.error('이미 지출로 등록된 강사료예요. [강사료] 탭에서 상세 확인이 가능해요.');
+      return;
+    }
+    setBusyKey(keyOf(s));
+    const result = await markStaffFeeAsPaid(s.feeRule, user?.id ?? null);
+    setBusyKey(null);
+    if (!result.success) {
+      toast.error(result.error ?? '지출 등록에 실패했어요.');
+      return;
+    }
+    toast.success(`${s.name}님 강사료가 지출 항목에 등록됐어요.`);
+    void fetchData();
+  }
+
+  const totalCount = list.length;
+  const totalCompletedSessions = useMemo(
+    () => list.reduce((sum, s) => sum + s.completedCount, 0), [list]);
+  const totalGross = useMemo(
+    () => list.reduce((sum, s) => sum + s.calcGross, 0), [list]);
+
+  if (loading) {
+    return (
+      <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
+        <div className="flex justify-center py-6">
+          <Loader2 className="animate-spin text-violet-400" size={18} aria-hidden="true" />
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -143,58 +99,133 @@ export default function StaffStudentsTab({ programId }: Props) {
       <header className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-bold text-[#1E1B4B] flex items-center gap-1.5">
           <Mic2 size={16} className="text-violet-500" aria-hidden="true" />
-          강사 활동 현황 ({totalInvites})
+          강사 활동 현황 ({totalCount}명)
         </h3>
+        {list.length > 0 && (
+          <div className="flex items-center gap-3 text-[11px] text-slate-500">
+            <span>완료 차시 <strong className="text-emerald-700 tabular-nums">{totalCompletedSessions}</strong></span>
+            <span>강사료 합 <strong className="text-violet-700 tabular-nums">{formatMoney(totalGross)}</strong></span>
+          </div>
+        )}
       </header>
-      {loading ? (
-        <div className="flex justify-center py-6"><Loader2 className="animate-spin text-violet-400" size={18} aria-hidden="true" /></div>
-      ) : sortedRows.length === 0 ? (
-        <p className="text-xs text-slate-400 italic text-center py-4">초빙된 강사가 없어요.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-violet-50/40 text-[10px] uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-2 py-2 text-left font-bold">강사명</th>
-                <th className="px-2 py-2 text-center font-bold">초대 상태</th>
-                <th className="px-2 py-2 text-center font-bold whitespace-nowrap">담당 차시</th>
-                <th className="px-2 py-2 text-center font-bold whitespace-nowrap">멘토링 일지</th>
-                <th className="px-2 py-2 text-right font-bold whitespace-nowrap">강사료</th>
-                <th className="px-2 py-2 text-right font-bold whitespace-nowrap">포털</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {sortedRows.map((s) => {
-                const unreg = !s.inv.staff_pool_id && !s.inv.profile_id;
-                return (
-                  <tr key={s.inv.id} className="hover:bg-violet-50/30">
-                    <td className="px-2 py-2 font-semibold text-slate-700">
-                      {s.inv.name}
-                      {s.inv.role && <span className="ml-1 text-[10px] text-slate-400">· {s.inv.role}</span>}
-                      {unreg && <span className="ml-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded px-1">미등록</span>}
-                    </td>
-                    <td className="px-2 py-2 text-center">
-                      <span className={`${BADGE_BASE} ${INVITATION_STATUS_STYLE[s.inv.status]}`}>{s.inv.status}</span>
-                    </td>
-                    <td className="px-2 py-2 text-center tabular-nums text-slate-600">{s.curriculumCount}차시</td>
-                    <td className="px-2 py-2 text-center tabular-nums text-slate-600">{s.mentoringLogCount}건</td>
-                    <td className="px-2 py-2 text-right tabular-nums text-slate-500">
-                      {s.inv.lecture_fee != null ? formatMoney(s.inv.lecture_fee) : '-'}
-                    </td>
-                    <td className="px-2 py-2 text-right">
-                      <button type="button" onClick={() => openPortal(s)}
-                        title={s.staffPortalToken ? '강사 포털 열기' : s.mentorInviteToken ? '멘토 초대 페이지 열기' : '토큰 없음'}
-                        className="inline-flex items-center gap-0.5 px-2 py-1 rounded-md text-[11px] font-semibold text-violet-700 border border-violet-200 hover:bg-violet-50 disabled:opacity-40"
-                        disabled={!s.staffPortalToken && !s.mentorInviteToken}>
-                        {s.staffPortalToken ? <><ExternalLink size={11} aria-hidden="true" /> 포털 보기</> : <><Send size={11} aria-hidden="true" /> 초대 페이지</>}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+
+      {list.length === 0 ? (
+        <div className="flex items-start gap-2 p-4 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-800">
+          <AlertCircle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">아직 강사가 없어요.</p>
+            <p className="mt-1 text-amber-700">
+              커리큘럼 탭에서 차시별 강사를 등록하거나 강사 초빙을 보내면 여기에 표시돼요.
+            </p>
+          </div>
         </div>
+      ) : (
+        <ul className="space-y-2">
+          {list.map((s) => {
+            const k = keyOf(s);
+            const expanded = expandedKey === k;
+            const unregistered = !s.staff_pool_id && !s.profile_id;
+            const feeMissing = !s.feeRule;
+            const feeRegistered = !!s.feeRule?.expense_id;
+            return (
+              <li key={k} className="rounded-xl border border-violet-100 bg-violet-50/30 overflow-hidden">
+                {/* 강사 요약 행 */}
+                <div className="flex items-center gap-3 p-3 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-sm font-bold text-slate-800">{s.name}</span>
+                      {s.organization && (
+                        <span className="text-[11px] text-slate-500">· {s.organization}</span>
+                      )}
+                      {unregistered && (
+                        <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded px-1">미등록</span>
+                      )}
+                      {s.invitationStatus && (
+                        <span className={`${BADGE_BASE} ${INVITATION_STATUS_STYLE[s.invitationStatus]}`}>
+                          {s.invitationStatus}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-2 flex-wrap tabular-nums">
+                      <span>담당 <strong className="text-slate-700">{s.curriculums.length}</strong>차시</span>
+                      <span>· 완료 <strong className="text-emerald-700">{s.completedCount}</strong>차시</span>
+                      <span>· 멘토링 일지 <strong>{s.mentoringLogCount}</strong>건</span>
+                    </p>
+                  </div>
+
+                  {/* 강사료 요약 */}
+                  <div className="text-right min-w-[140px]">
+                    {feeMissing ? (
+                      <p className="text-[11px] text-slate-400 italic">강사료 미등록</p>
+                    ) : (
+                      <>
+                        <p className="text-xs font-bold tabular-nums text-violet-700">
+                          {formatMoney(s.calcGross)}
+                        </p>
+                        <p className="text-[10px] text-slate-500 tabular-nums">
+                          {s.feeRule?.tax_type === '면세' ? '면세' : `${s.feeRule?.tax_type}% 원천`} {formatMoney(s.calcTax)}
+                          {' · 실수령 '}{formatMoney(s.calcNet)}
+                        </p>
+                        {feeRegistered && (
+                          <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">지출 등록 완료</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* 액션 */}
+                  <div className="flex items-center gap-1">
+                    <button type="button"
+                      disabled={busyKey === k || feeMissing || feeRegistered || s.completedCount === 0}
+                      onClick={() => void handleRegisterExpense(s)}
+                      title={feeMissing ? '강사료 기준이 필요해요'
+                        : feeRegistered ? '이미 등록됨'
+                        : s.completedCount === 0 ? '완료된 차시가 없어요'
+                        : '완료 차시 기준으로 지출 등록'}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                      {busyKey === k
+                        ? <Loader2 size={11} className="animate-spin" />
+                        : <Receipt size={11} aria-hidden="true" />}
+                      지출 등록
+                    </button>
+                    <button type="button" onClick={() => openPortal(s)}
+                      title={s.staffPortalToken ? '강사 포털 열기' : s.mentorInviteToken ? '멘토 초대' : '토큰 없음'}
+                      disabled={!s.staffPortalToken && !s.mentorInviteToken}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-violet-700 border border-violet-200 hover:bg-violet-50 disabled:opacity-40">
+                      {s.staffPortalToken ? <ExternalLink size={11} aria-hidden="true" /> : <Send size={11} aria-hidden="true" />}
+                    </button>
+                    <button type="button"
+                      onClick={() => setExpandedKey(expanded ? null : k)}
+                      aria-label={expanded ? '접기' : '펼치기'}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-700">
+                      {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 차시 체크리스트 (펼침 시) */}
+                {expanded && (
+                  <div className="border-t border-violet-100 bg-white px-3 py-2">
+                    <StaffCurriculumChecklist
+                      staff={s}
+                      allStaff={list}
+                      onChanged={() => void fetchData()}
+                    />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* 강사료 미등록 안내 */}
+      {list.some((s) => !s.feeRule) && (
+        <p className="text-[11px] text-slate-500">
+          💡 강사료 기준이 없는 강사는 [강사료] 탭에서 단가·세율을 먼저 등록해 주세요.
+          <Link to="#" onClick={(e) => { e.preventDefault(); /* SubToggle 외부 트리거 불가 */ }}
+            className="ml-1 text-violet-600 hover:underline">강사료 탭으로 →</Link>
+        </p>
       )}
     </section>
   );

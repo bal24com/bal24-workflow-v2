@@ -339,6 +339,10 @@ export interface ProgramCurriculum {
   day_label?: string | null;
   /** STEP-CURRICULUM-INSTRUCTOR-MATCH — AI 추출 강사명 (인력풀 매칭 실패 원본) */
   instructor_name_raw?: string | null;
+  /** STEP-STAFF-ASSIGNMENT-FEE — 실제 강의 완료 체크 */
+  is_completed?: boolean | null;
+  /** STEP-STAFF-ASSIGNMENT-FEE — 실제 강의자 (배정 강사가 아닌 대체 인력) */
+  actual_instructor_id?: string | null;
   /** STEP-CURRICULUM-ATTEND-SURVEY-FULL — 차시별 외부 출석 링크 (구글폼 등) */
   attendance_link?: string | null;
   /** STEP-CURRICULUM-ATTEND-SURVEY-FULL — 차시별 출석부 스캔 파일 URL */
