@@ -93,7 +93,7 @@ export async function resolveStaffByToken(token: string): Promise<StaffPortalIde
   return null;
 }
 
-/** 해당 강사의 담당 프로그램 목록 (curriculum_staff + mentoring_assignments 합집합) */
+/** 해당 강사의 담당 프로그램 목록 (curriculum_staff + mentoring_assignments + instructor_invitations 합집합) */
 export async function fetchStaffPrograms(
   staffId: string,
   sourceType: StaffSource,
@@ -128,9 +128,21 @@ export async function fetchStaffPrograms(
   if (maErr) console.warn('[staff-portal] mentoring_assignments 조회 경고:', maErr.message);
   ((ma ?? []) as Array<{ program_id: string }>).forEach((r) => r.program_id && programIds.add(r.program_id));
 
+  // 4) STEP-INSTRUCTOR-MATCH-FIX — instructor_invitations 추가
+  //    초빙 받았으나 아직 커리큘럼 배정 안 된 강사도 프로그램 보이도록.
+  const { data: inv, error: invErr } = await supabase
+    .from('instructor_invitations')
+    .select('program_id')
+    .eq(staffCol, staffId)
+    .not('program_id', 'is', null);
+  if (invErr) console.warn('[staff-portal] instructor_invitations 조회 경고:', invErr.message);
+  ((inv ?? []) as Array<{ program_id: string | null }>).forEach((r) => {
+    if (r.program_id) programIds.add(r.program_id);
+  });
+
   if (programIds.size === 0) return [];
 
-  // 4) programs 조회 (name 컬럼)
+  // 5) programs 조회 (name 컬럼)
   const { data: programs, error: pErr } = await supabase
     .from('programs')
     .select('id, name, status, start_date, end_date')

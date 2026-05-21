@@ -29,6 +29,19 @@ function translateError(raw: string): string {
   if (m.includes('row-level security')) return '권한이 없어요. 관리자에게 문의해 주세요.';
   if (m.includes('duplicate') || m.includes('unique') || m.includes('already')) return '이미 등록된 이메일이에요.';
   if (m.includes('check constraint')) return '역할 값이 허용 범위가 아니에요.';
+  // STEP-INSTRUCTOR-MATCH-FIX — Edge Function 미배포 시 명확한 안내
+  if (m.includes('failed to send') || m.includes('failed to fetch') || m.includes('functionsfetcherror')) {
+    return 'create-member Edge Function이 배포되지 않은 것 같아요. 관리자에게 배포를 요청해 주세요. (supabase functions deploy create-member)';
+  }
+  if (m.includes('not found') || m.includes('404')) {
+    return 'create-member 함수를 찾을 수 없어요. 관리자에게 Edge Function 배포를 요청해 주세요.';
+  }
+  if (m.includes('unauthorized') || m.includes('401') || m.includes('403')) {
+    return '권한이 없어요. ADMIN 계정으로 다시 로그인해 주세요.';
+  }
+  if (m.includes('column') && m.includes('does not exist')) {
+    return 'profiles 테이블 컬럼이 누락됐어요. 관리자에게 마이그레이션 확인을 요청해 주세요.';
+  }
   return '저장 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }
 

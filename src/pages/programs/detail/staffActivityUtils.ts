@@ -52,7 +52,10 @@ export interface StaffActivity extends StaffKey {
 }
 
 function staffKeyOf(k: StaffKey): string {
-  return `${k.staff_pool_id ?? ''}|${k.profile_id ?? ''}|${k.instructor_name_raw ?? ''}`;
+  // STEP-INSTRUCTOR-MATCH-FIX — ID 우선 매칭 (이름 차이로 인한 중복 방지)
+  if (k.staff_pool_id) return `pool:${k.staff_pool_id}`;
+  if (k.profile_id) return `prof:${k.profile_id}`;
+  return `raw:${(k.instructor_name_raw ?? '').trim()}`;
 }
 
 /** UNION: instructor_invitations + curriculum_staff → 강사 활동 목록 */
