@@ -14,13 +14,15 @@ import type { Income, LedgerType } from '../../types/database';
 import IncomeFormModal from './IncomeFormModal';
 
 type IncomeRow = Income & {
-  client?: { id: string; name: string } | null;
-  project?: { id: string; name: string } | null;
-  consortium?: { id: string; name: string } | null;
+  client?: { id: string; name: string; deleted_at: string | null } | null;
+  project?: { id: string; name: string; deleted_at: string | null } | null;
+  consortium?: { id: string; name: string; deleted_at: string | null } | null;
 };
 
+// STEP-TRASH-FILTER-AUDIT — 휴지통 컨소시엄/프로젝트/고객사가 수입에 노출되던 버그 차단
+// nested deleted_at 까지 select 해서 클라이언트에서 필터.
 const SELECT_COLUMNS =
-  '*, client:clients(id,name), project:projects(id,name), consortium:consortiums(id,name)';
+  '*, client:clients(id,name,deleted_at), project:projects(id,name,deleted_at), consortium:consortiums(id,name,deleted_at)';
 
 
 function LedgerTabs({ value, onChange, counts }: {
@@ -87,15 +89,25 @@ export default function IncomePage() {
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
-  const counts = useMemo(() => ({
-    own: items.filter((i) => i.ledger_type === 'own').length,
-    consortium: items.filter((i) => i.ledger_type === 'consortium').length,
-  }), [items]);
+  const counts = useMemo(() => {
+    // STEP-TRASH-FILTER-AUDIT — 카운트도 휴지통 join row 제외해서 정확하게
+    const live = items.filter((i) =>
+      !i.consortium?.deleted_at && !i.project?.deleted_at && !i.client?.deleted_at,
+    );
+    return {
+      own: live.filter((i) => i.ledger_type === 'own').length,
+      consortium: live.filter((i) => i.ledger_type === 'consortium').length,
+    };
+  }, [items]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((i) => {
       if (i.ledger_type !== ledger) return false;
+      // STEP-TRASH-FILTER-AUDIT — 휴지통 컨소시엄·프로젝트·고객사에 연결된 수입은 숨김
+      if (i.consortium?.deleted_at) return false;
+      if (i.project?.deleted_at) return false;
+      if (i.client?.deleted_at) return false;
       if (!q) return true;
       const hay = [i.description, i.client?.name, i.project?.name, i.consortium?.name]
         .filter(Boolean).join(' ').toLowerCase();
