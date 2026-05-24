@@ -1350,3 +1350,97 @@ export interface MemberRequest {
   reject_reason?: string | null;
   created_at: string;
 }
+
+// ============================================================
+// STEP-ACCOUNTING-ALL — 회계 관리 시스템 타입
+// ============================================================
+
+export type VatType = '과세' | '면세' | '영세율';
+export type ContractStatus = '진행중' | '완료' | '취소' | '보류';
+
+export interface BillingScheduleItem {
+  seq: number;
+  amount: number;
+  due_date: string;
+  status: 'pending' | 'issued' | 'paid';
+}
+
+export interface IncomeContract {
+  id: string;
+  project_id: string | null;
+  client_id: string | null;
+  contract_name: string;
+  contract_amount: number;
+  vat_type: VatType;
+  contract_date: string | null;
+  billing_schedule: BillingScheduleItem[];
+  status: ContractStatus;
+  tax_invoice_url: string | null;
+  contract_file_url: string | null;
+  deposited_at: string | null;
+  memo: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export type PayrollExpenseType = '강사료' | '촬영' | '운영비' | '운영인건비' | '기타외주';
+export type PayrollTaxRateType = '3.3' | '8.8' | '면세' | '없음';
+export type PayrollPaymentStatus = '대기' | '완료' | '후순위' | '취소';
+
+export interface PayrollExpense {
+  id: string;
+  project_id: string | null;
+  program_id: string | null;
+  expense_type: PayrollExpenseType;
+  description: string | null;
+  payee_name: string;
+  payee_id_no: string | null;
+  bank_name: string | null;
+  bank_account: string | null;
+  unit_price: number;
+  quantity: number;
+  subtotal: number;
+  tax_rate_type: PayrollTaxRateType;
+  tax_amount: number;
+  net_amount: number;
+  payment_status: PayrollPaymentStatus;
+  paid_at: string | null;
+  receipt_urls: string[];
+  staff_pool_id: string | null;
+  memo: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export type AccountingReviewStatus = 'pending' | 'reviewing' | 'completed';
+
+export interface AccountingReview {
+  id: string;
+  period_label: string;
+  project_ids: string[];
+  token: string;
+  firm_name: string | null;
+  firm_email: string | null;
+  status: AccountingReviewStatus;
+  sent_at: string | null;
+  completed_at: string | null;
+  expires_at: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type AccountingReviewItemStatus = 'pending' | 'approved' | 'revision';
+
+export interface AccountingReviewItem {
+  id: string;
+  review_id: string;
+  payroll_expense_id: string;
+  review_status: AccountingReviewItemStatus;
+  revision_note: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
