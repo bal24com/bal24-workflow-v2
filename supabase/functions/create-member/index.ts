@@ -22,7 +22,8 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const ALLOWED_ROLES = new Set(['admin', 'pm', 'staff', 'finance', 'partner']);
+// STEP-MEMBER-REGISTER-DEBUG — 'member' role 추가 (types/database.ts Role 타입과 정합)
+const ALLOWED_ROLES = new Set(['admin', 'pm', 'staff', 'finance', 'partner', 'member']);
 
 interface RequestBody {
   email?: string;
@@ -95,22 +96,27 @@ serve(async (req: Request): Promise<Response> => {
     const userId = authData.user.id;
 
     // 2) profiles 테이블 upsert (auth 트리거가 기본 row 생성하는 경우 대응)
+    // STEP-MEMBER-REGISTER-DEBUG — 선택 필드는 값 있을 때만 추가 (없는 컬럼·null 미스매치 방어)
+    const profilePayload: Record<string, unknown> = {
+      id: userId,
+      email,
+      name,
+      role,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    };
+    const dep = body.department?.toString().trim();      if (dep)  profilePayload.department = dep;
+    const pos = body.position?.toString().trim();        if (pos)  profilePayload.position = pos;
+    const ph  = body.phone?.toString().trim();           if (ph)   profilePayload.phone = ph;
+    const ja  = (body.joined_at ?? '').toString().trim(); if (ja)  profilePayload.joined_at = ja;
+    const sl  = body.slogan?.toString().trim();          if (sl)   profilePayload.slogan = sl;
+    const av  = body.avatar_url ?? null;                 if (av)   profilePayload.avatar_url = av;
+
+    console.log('[create-member] profiles upsert 시작. userId=', userId, 'cols=', Object.keys(profilePayload));
+
     const { error: profileError } = await admin
       .from('profiles')
-      .upsert({
-        id: userId,
-        email,
-        name,
-        role,
-        department: body.department?.toString().trim() || null,
-        position: body.position?.toString().trim() || null,
-        phone: body.phone?.toString().trim() || null,
-        joined_at: body.joined_at || null,
-        slogan: body.slogan?.toString().trim() || null,
-        avatar_url: body.avatar_url || null,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'id' });
+      .upsert(profilePayload, { onConflict: 'id' });
 
     if (profileError) {
       // profiles 저장 실패 시 auth user 롤백 (고아 계정 방지)
@@ -118,7 +124,8 @@ serve(async (req: Request): Promise<Response> => {
       await admin.auth.admin.deleteUser(userId).catch((e) => {
         console.error('[create-member] Auth 롤백 실패:', e?.message);
       });
-      return jsonResponse({ error: '팀원 정보 저장에 실패했어요. 잠시 후 다시 시도해 주세요.' }, 500);
+      // STEP-MEMBER-REGISTER-DEBUG — 원본 메시지를 그대로 클라이언트에 노출 (디버깅 우선)
+      return jsonResponse({ error: `profiles 저장 실패: ${profileError.message}` }, 500);
     }
 
     return jsonResponse({ success: true, userId, email });

@@ -29,7 +29,7 @@ function translateError(raw: string): string {
   if (m.includes('row-level security')) return '권한이 없어요. 관리자에게 문의해 주세요.';
   if (m.includes('duplicate') || m.includes('unique') || m.includes('already')) return '이미 등록된 이메일이에요.';
   if (m.includes('check constraint')) return '역할 값이 허용 범위가 아니에요.';
-  // STEP-INSTRUCTOR-MATCH-FIX — Edge Function 미배포 시 명확한 안내
+  // STEP-MEMBER-REGISTER-DEBUG — Edge Function 미배포 시 명확한 안내
   if (m.includes('failed to send') || m.includes('failed to fetch') || m.includes('functionsfetcherror')) {
     return 'create-member Edge Function이 배포되지 않은 것 같아요. 관리자에게 배포를 요청해 주세요. (supabase functions deploy create-member)';
   }
@@ -37,12 +37,16 @@ function translateError(raw: string): string {
     return 'create-member 함수를 찾을 수 없어요. 관리자에게 Edge Function 배포를 요청해 주세요.';
   }
   if (m.includes('unauthorized') || m.includes('401') || m.includes('403')) {
-    return '권한이 없어요. ADMIN 계정으로 다시 로그인해 주세요.';
+    return 'ADMIN 계정으로 다시 로그인해 주세요.';
   }
-  if (m.includes('column') && m.includes('does not exist')) {
-    return 'profiles 테이블 컬럼이 누락됐어요. 관리자에게 마이그레이션 확인을 요청해 주세요.';
+  if (m.includes('column') || m.includes('schema')) {
+    return 'profiles 테이블 구조 오류예요. 관리자에게 문의해 주세요.';
   }
-  return '저장 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
+  if (m.includes('허용되지 않은 역할')) {
+    return raw;   // Edge Function 에서 이미 한글로 명확
+  }
+  // STEP-MEMBER-REGISTER-DEBUG — 원본 메시지 노출 (이전엔 모호한 fallback)
+  return raw.length > 0 ? `등록 실패: ${raw}` : '저장 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.';
 }
 
 interface CreateMemberResponse {
@@ -167,37 +171,50 @@ export default function MemberFormModal({ open, editTarget, onClose, onSaved }: 
           setErrorMsg('초기 비밀번호 생성을 위해 연락처를 4자리 이상 입력해 주세요.');
           return;
         }
+        // STEP-MEMBER-REGISTER-DEBUG — 요청 페이로드 사전 로깅
+        const reqBody = {
+          email: form.email.trim(),
+          password: initialPassword,
+          name: form.name.trim(),
+          role: form.role,
+          department: form.department.trim() || null,
+          position: form.position.trim() || null,
+          phone: form.phone.trim() || null,
+          joined_at: form.joinedAt || null,
+          slogan: form.slogan.trim() || null,
+          avatar_url: form.avatarUrl || null,
+        };
+        console.log('[MemberForm] create-member 호출 페이로드:', { ...reqBody, password: '****' });
+
         const { data, error } = await supabase.functions.invoke<CreateMemberResponse>('create-member', {
-          body: {
-            email: form.email.trim(),
-            password: initialPassword,
-            name: form.name.trim(),
-            role: form.role,
-            department: form.department.trim() || null,
-            position: form.position.trim() || null,
-            phone: form.phone.trim() || null,
-            joined_at: form.joinedAt || null,
-            slogan: form.slogan.trim() || null,
-            avatar_url: form.avatarUrl || null,
-          },
+          body: reqBody,
         });
+
+        // STEP-MEMBER-REGISTER-DEBUG — 상세 오류 로깅
         if (error) {
-          // FunctionsHttpError — Edge Function이 4xx/5xx 반환
-          const ctx = (error as { context?: { json?: () => Promise<CreateMemberResponse> } }).context;
+          const e = error as { message?: string; status?: number; context?: { json?: () => Promise<CreateMemberResponse> } };
+          console.error('[MemberForm] invoke 오류 상세:', {
+            message: e.message,
+            status: e.status,
+            context: e.context,
+          });
           let serverMsg = '';
           try {
-            const j = await ctx?.json?.();
+            const j = await e.context?.json?.();
             serverMsg = j?.error ?? '';
-          } catch { /* noop */ }
-          console.error('[members] create-member 실패:', serverMsg || error.message);
-          setErrorMsg(translateError(serverMsg || error.message));
+            if (serverMsg) console.error('[MemberForm] 함수 반환 오류 본문:', serverMsg);
+          } catch (parseErr) {
+            console.warn('[MemberForm] context.json() 파싱 실패:', parseErr);
+          }
+          setErrorMsg(translateError(serverMsg || e.message || ''));
           return;
         }
         if (data?.error) {
-          console.error('[members] create-member 응답 오류:', data.error);
+          console.error('[MemberForm] 함수 반환 오류:', data.error);
           setErrorMsg(translateError(data.error));
           return;
         }
+        console.log('[MemberForm] 등록 성공:', data);
         // 등록 성공 → 초기 비밀번호 안내 (이름 + 끝 4자리)
         window.alert(`${form.name.trim()}님이 등록됐어요.\n초기 비밀번호: ${initialPassword}\n(연락처 끝 4자리, 첫 로그인 후 변경을 권장해요.)`);
       }
