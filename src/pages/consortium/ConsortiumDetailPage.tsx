@@ -108,7 +108,8 @@ export default function ConsortiumDetailPage() {
     if (!id) return;
     try {
       const [{ data: c, error: cErr }, { data: m, error: mErr }, { count: pCount }, { count: tCount }] = await Promise.all([
-        supabase.from('consortiums').select(SELECT_COLUMNS).eq('id', id).maybeSingle(),
+        // STEP-TRASH-FILTER-AUDIT — 휴지통 컨소시엄 URL 직접 접근 차단
+        supabase.from('consortiums').select(SELECT_COLUMNS).eq('id', id).is('deleted_at', null).maybeSingle(),
         supabase
           .from('consortium_members')
           .select('*, clients!consortium_members_client_id_fkey(id, name, business_name)')

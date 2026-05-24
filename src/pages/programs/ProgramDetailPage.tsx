@@ -110,10 +110,12 @@ export default function ProgramDetailPage() {
     setLoading(true);
     setErrorMsg(null);
 
+    // STEP-TRASH-FILTER-AUDIT — 휴지통 프로그램 URL 직접 접근 차단
     supabase
       .from('programs')
       .select(SELECT_COLUMNS)
       .eq('id', id)
+      .is('deleted_at', null)
       .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return;
