@@ -18,15 +18,16 @@ import ExpenseFormModal from './ExpenseFormModal';
 import { usePartnerProfile } from '../../hooks/usePartnerProfile';
 
 type ExpenseRow = Expense & {
-  payee?: { id: string; name: string } | null;
-  project?: { id: string; name: string } | null;
-  consortium?: { id: string; name: string } | null;
+  payee?: { id: string; name: string; deleted_at: string | null } | null;
+  project?: { id: string; name: string; deleted_at: string | null } | null;
+  consortium?: { id: string; name: string; deleted_at: string | null } | null;
 };
 
 // expenses → profiles FK 두 개(created_by, paid_by)라 명시 필요한 자리는 없지만,
 // payee:clients는 단일 FK라 단축형 안전.
+// STEP-TRASH-FILTER-AUDIT — nested deleted_at 까지 가져와서 휴지통 join row 클라이언트 필터.
 const SELECT_COLUMNS =
-  '*, payee:clients(id,name), project:projects(id,name), consortium:consortiums(id,name)';
+  '*, payee:clients(id,name,deleted_at), project:projects(id,name,deleted_at), consortium:consortiums(id,name,deleted_at)';
 
 function LedgerTabs({ value, onChange, counts }: {
   value: LedgerType;
@@ -102,15 +103,25 @@ export default function ExpensesPage() {
     void fetchItems();
   }, [fetchItems, isPartner, partnerLoading]);
 
-  const counts = useMemo(() => ({
-    own: items.filter((i) => i.ledger_type === 'own').length,
-    consortium: items.filter((i) => i.ledger_type === 'consortium').length,
-  }), [items]);
+  const counts = useMemo(() => {
+    // STEP-TRASH-FILTER-AUDIT — 카운트도 휴지통 join row 제외
+    const live = items.filter((i) =>
+      !i.consortium?.deleted_at && !i.project?.deleted_at && !i.payee?.deleted_at,
+    );
+    return {
+      own: live.filter((i) => i.ledger_type === 'own').length,
+      consortium: live.filter((i) => i.ledger_type === 'consortium').length,
+    };
+  }, [items]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((i) => {
       if (i.ledger_type !== ledger) return false;
+      // STEP-TRASH-FILTER-AUDIT — 휴지통 컨소시엄·프로젝트·고객사에 연결된 지출 숨김
+      if (i.consortium?.deleted_at) return false;
+      if (i.project?.deleted_at) return false;
+      if (i.payee?.deleted_at) return false;
       if (!q) return true;
       const hay = [i.description, i.payee?.name, i.project?.name, i.consortium?.name]
         .filter(Boolean).join(' ').toLowerCase();

@@ -18,12 +18,18 @@ import type { ProjectSettlementRow } from '../../types/database';
 type Filter = 'all' | 1 | 2 | 3 | 4 | 5 | 'done';
 
 type SettlementRow = ProjectSettlementRow & {
-  project: { id: string; name: string; client?: { name: string } | null } | null;
+  project: {
+    id: string;
+    name: string;
+    deleted_at: string | null;
+    client?: { name: string; deleted_at: string | null } | null;
+  } | null;
 };
 
+// STEP-TRASH-FILTER-AUDIT — projects/clients deleted_at 까지 가져와서 휴지통 정산 차단
 // project_settlements → projects 단일 FK + projects → clients 단일 FK
 const SELECT_COLUMNS =
-  '*, project:projects(id, name, client:clients(name))';
+  '*, project:projects(id, name, deleted_at, client:clients(name, deleted_at))';
 
 const TABS: { key: Filter; label: string }[] = [
   { key: 'all',  label: '전체' },
@@ -63,20 +69,27 @@ export default function SettlementPage() {
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
+  // STEP-TRASH-FILTER-AUDIT — 휴지통 프로젝트·고객사에 연결된 정산 row 는 숨김
+  const isLive = useCallback((s: SettlementRow) =>
+    !s.project?.deleted_at && !s.project?.client?.deleted_at,
+  []);
+
   const counts = useMemo<Record<Filter, number>>(() => {
+    const live = items.filter(isLive);
     const acc: Record<Filter, number> = {
-      all: items.length, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, done: 0,
+      all: live.length, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, done: 0,
     };
-    for (const s of items) {
+    for (const s of live) {
       if (isSettlementDone(s)) acc.done += 1;
       else acc[s.current_step] = (acc[s.current_step] ?? 0) + 1;
     }
     return acc;
-  }, [items]);
+  }, [items, isLive]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((s) => {
+      if (!isLive(s)) return false;
       if (filter === 'done') {
         if (!isSettlementDone(s)) return false;
       } else if (filter !== 'all') {
@@ -87,7 +100,7 @@ export default function SettlementPage() {
       const hay = [s.project?.name, s.project?.client?.name].filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     });
-  }, [items, filter, search]);
+  }, [items, filter, search, isLive]);
 
   return (
     <div className="space-y-5 max-w-[1400px]">

@@ -15,14 +15,15 @@ import type { Receipt, ReceiptType } from '../../types/database';
 import { usePartnerProfile } from '../../hooks/usePartnerProfile';
 
 type ReceiptRow = Receipt & {
-  expense?: { id: string; description: string; expense_date: string } | null;
-  income?: { id: string; description: string; income_date: string } | null;
-  project?: { id: string; name: string } | null;
-  consortium?: { id: string; name: string } | null;
+  expense?: { id: string; description: string; expense_date: string; deleted_at: string | null } | null;
+  income?: { id: string; description: string; income_date: string; deleted_at: string | null } | null;
+  project?: { id: string; name: string; deleted_at: string | null } | null;
+  consortium?: { id: string; name: string; deleted_at: string | null } | null;
 };
 
+// STEP-TRASH-FILTER-AUDIT — nested deleted_at 까지 가져와서 휴지통 join 거래 차단
 const SELECT_COLUMNS =
-  '*, expense:expenses!receipts_expense_id_fkey(id,description,expense_date), income:income(id,description,income_date), project:projects(id,name), consortium:consortiums(id,name)';
+  '*, expense:expenses!receipts_expense_id_fkey(id,description,expense_date,deleted_at), income:income(id,description,income_date,deleted_at), project:projects(id,name,deleted_at), consortium:consortiums(id,name,deleted_at)';
 
 type TypeFilter = ReceiptType | '전체';
 
@@ -100,25 +101,32 @@ export default function ReceiptsPage() {
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
+  // STEP-TRASH-FILTER-AUDIT — 휴지통 join 영수증 제외 (재사용 헬퍼)
+  const isLive = useCallback((r: ReceiptRow) =>
+    !r.expense?.deleted_at && !r.income?.deleted_at && !r.project?.deleted_at && !r.consortium?.deleted_at,
+  []);
+
   const counts = useMemo<Record<TypeFilter, number>>(() => {
+    const live = items.filter(isLive);
     const acc: Record<TypeFilter, number> = {
-      전체: items.length,
+      전체: live.length,
       영수증: 0, 세금계산서: 0, 간이영수증: 0, 계좌이체: 0, 카드전표: 0, 기타: 0,
     };
-    for (const r of items) acc[r.receipt_type] = (acc[r.receipt_type] ?? 0) + 1;
+    for (const r of live) acc[r.receipt_type] = (acc[r.receipt_type] ?? 0) + 1;
     return acc;
-  }, [items]);
+  }, [items, isLive]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((r) => {
+      if (!isLive(r)) return false;
       if (filter !== '전체' && r.receipt_type !== filter) return false;
       if (!q) return true;
       const hay = [r.file_name, r.description, r.expense?.description, r.income?.description, r.project?.name, r.consortium?.name]
         .filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     });
-  }, [items, filter, search]);
+  }, [items, filter, search, isLive]);
 
   const total = useMemo(() => visible.reduce((s, r) => s + Number(r.amount || 0), 0), [visible]);
 
