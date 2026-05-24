@@ -2,7 +2,7 @@
 // 3열 카드 그리드 + 역할 필터 탭 + 이름·부서·직책 검색
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Search, UserPlus, Link2 } from 'lucide-react';
+import { Loader2, Search, UserPlus, Link2, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { copyToClipboard } from '../../lib/clipboard';
@@ -15,6 +15,7 @@ import MemberDetailPanel from './MemberDetailPanel';
 import MemberInviteModal from './MemberInviteModal';
 import InviteListSection from './InviteListSection';
 import MemberRequestsTab from './MemberRequestsTab';
+import { cleanupOrphans } from './memberCleanupUtils';
 import {
   ROLE_LABELS, ROLE_BADGE_TONE,
   getRoleBadgeTone, getRoleLabel, normalizeRole, hasRole,
@@ -57,6 +58,43 @@ export default function MembersPage() {
   // STEP-MEMBER-INVITE — 이메일 초대 모달
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteReloadKey, setInviteReloadKey] = useState(0);
+  // STEP-MEMBER-ORPHAN-CLEANUP — 고아 계정 정리
+  const [cleaning, setCleaning] = useState(false);
+
+  async function handleCleanupOrphans() {
+    // 1) dry-run으로 미리 확인
+    const preview = await cleanupOrphans({ dryRun: true });
+    if (!preview.success) {
+      toast.error(preview.errorMsg ?? '정리 미리보기에 실패했어요.');
+      return;
+    }
+    if (preview.foundCount === 0) {
+      toast.success('정리할 고아 계정이 없어요. 시스템이 깨끗합니다.');
+      return;
+    }
+    const emails = (preview.orphans ?? []).map((o) => o.email).slice(0, 5).join(', ');
+    const more = preview.foundCount > 5 ? ` 외 ${preview.foundCount - 5}건` : '';
+    const ok = window.confirm(
+      `고아 계정 ${preview.foundCount}건을 발견했어요.\n\n${emails}${more}\n\n이 계정들을 영구 삭제할까요? 되돌릴 수 없어요.`,
+    );
+    if (!ok) return;
+
+    // 2) 실제 삭제
+    setCleaning(true);
+    const result = await cleanupOrphans();
+    setCleaning(false);
+    if (!result.success) {
+      toast.error(result.errorMsg ?? '정리 실패');
+      return;
+    }
+    if (result.errors.length > 0) {
+      console.warn('[members] 일부 삭제 실패:', result.errors);
+      toast.warning(`${result.deletedCount}건 삭제 완료, ${result.errors.length}건 실패. 콘솔 확인.`);
+    } else {
+      toast.success(`${result.deletedCount}건의 고아 계정을 정리했어요.`);
+    }
+    void reload();
+  }
 
   // STEP-ROLE-TYPE-AUDIT — hasRole 헬퍼 사용
   const isAdmin = hasRole(myRole, 'admin');
@@ -155,6 +193,14 @@ export default function MembersPage() {
         </h1>
         {isAdmin && activeTab === 'list' && (
           <div className="flex items-center gap-2">
+            {/* STEP-MEMBER-ORPHAN-CLEANUP — ADMIN/PM만 표시 */}
+            {(isAdmin || isPM) && (
+              <Button variant="outline" onClick={() => void handleCleanupOrphans()} loading={cleaning}
+                className="!border-rose-200 !text-rose-600 hover:!bg-rose-50">
+                <Trash2 size={14} className="mr-1.5" aria-hidden="true" />
+                고아 계정 정리
+              </Button>
+            )}
             <Button variant="outline" onClick={openCreate}>직접 등록</Button>
             <Button variant="primary" onClick={() => setInviteOpen(true)}>
               <UserPlus size={16} className="mr-1.5" aria-hidden="true" />
