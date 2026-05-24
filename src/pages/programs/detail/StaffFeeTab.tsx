@@ -12,6 +12,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import {
   fetchStaffFees, updatePaymentStatus, deleteStaffFee,
   markStaffFeeAsPaid, cancelStaffFeePayment,
+  convertStaffFeesToPayroll, // STEP-ACCOUNTING-FOLLOWUP7-Phase2.5
 } from './staffFeeUtils';
 import {
   FEE_TYPE_LABEL, TAX_TYPE_LABEL, PAYMENT_STATUS_BADGE, PAYMENT_STATUS_FLOW,
@@ -146,6 +147,15 @@ export default function StaffFeeTab({ programId }: Props) {
     await refresh();
   }
 
+  // STEP-ACCOUNTING-FOLLOWUP7-Phase2.5 — 외주/급여(payroll_expenses)로 일괄 변환
+  async function handleConvertToPayroll() {
+    if (fees.length === 0) { toast.error('변환할 항목이 없어요.'); return; }
+    if (!window.confirm(`강사료 ${fees.length}건을 외주/급여로 일괄 생성할까요? 외주/급여 페이지에서 실집행 정보(지급일·계좌·증빙) 를 채워나가시면 돼요.`)) return;
+    const res = await convertStaffFeesToPayroll(fees, programId);
+    if (res.error) { toast.error(res.error); return; }
+    toast.success(`${res.inserted}건을 외주/급여로 변환했어요.`);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-slate-500">
@@ -163,9 +173,17 @@ export default function StaffFeeTab({ programId }: Props) {
           <Receipt size={18} className="text-violet-600" aria-hidden="true" />
           강사료 지급 기준
         </h2>
-        <Button variant="primary" size="sm" leftIcon={<Plus size={14} />} onClick={() => setModalTarget('new')}>
-          지급 기준 추가
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* STEP-ACCOUNTING-FOLLOWUP7-Phase2.5 — 강사료 → 외주/급여 일괄 변환 */}
+          {fees.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => void handleConvertToPayroll()}>
+              외주/급여로 변환 ({fees.length})
+            </Button>
+          )}
+          <Button variant="primary" size="sm" leftIcon={<Plus size={14} />} onClick={() => setModalTarget('new')}>
+            지급 기준 추가
+          </Button>
+        </div>
       </header>
 
       {/* 요약 카드 3 */}

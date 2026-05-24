@@ -3,7 +3,7 @@
 
 import { supabase } from '../../../lib/supabase';
 import type {
-  StaffFee, FeeCalculation, TaxType, PaymentStatus,
+  StaffFee, FeeCalculation, FeeType, TaxType, PaymentStatus,
 } from '../../../types/staffFee';
 
 /** Supabase nested select 가 단일/배열 둘 다 반환할 수 있음 — 단일로 정규화 */
@@ -262,4 +262,61 @@ export async function cancelStaffFeePayment(fee: StaffFee): Promise<{ success: b
   }
 
   return { success: true };
+}
+
+// ── STEP-ACCOUNTING-FOLLOWUP7-Phase2.5 ────────────────────
+// program_staff_fees → payroll_expenses 일괄 변환
+// 박경수님 새 회계 시스템 도입에 따른 흐름 연결.
+// 기존 markStaffFeeAsPaid (expenses) 와는 독립 — 두 흐름 공존 OK.
+
+// fee_type → payroll expense_type 매핑 (자유 카테고리 prefix 패턴 활용)
+const FEE_TYPE_TO_PAYROLL: Record<FeeType, string> = {
+  education:    '강사료',
+  mentoring:    '강사료-멘토링',
+  consulting:   '기타외주-컨설팅',
+  facilitation: '강사료-진행',
+  etc:          '기타외주',
+};
+
+// staffFee.tax_type ('3.3'|'8.8'|'면세') → payroll.tax_rate_type ('3.3'|'8.8'|'10'|'면세'|'없음')
+function mapTaxRate(taxType: TaxType): '3.3' | '8.8' | '면세' | '없음' {
+  if (taxType === '3.3') return '3.3';
+  if (taxType === '8.8') return '8.8';
+  return '면세';
+}
+
+export async function convertStaffFeesToPayroll(
+  fees: StaffFee[],
+  programId: string,
+): Promise<{ inserted: number; error: string | null }> {
+  if (fees.length === 0) return { inserted: 0, error: '변환할 항목이 없어요.' };
+  // 부모 프로젝트 id 자동 조회 (staff_fee 페이지에서 별도 fetch 안 시키도록)
+  const { data: prog } = await supabase
+    .from('programs').select('project_id').eq('id', programId).maybeSingle();
+  const projectId = (prog as { project_id: string | null } | null)?.project_id ?? null;
+
+  const payloads = fees.map((f) => ({
+    expense_type: FEE_TYPE_TO_PAYROLL[f.fee_type] ?? '강사료',
+    description: f.description ?? null,
+    payee_name: f.expert_name ?? f.profile_name ?? '미정',
+    unit_price: f.unit_price,
+    quantity: f.quantity,
+    tax_rate_type: mapTaxRate(f.tax_type),
+    tax_amount: f.tax_amount,
+    net_amount: f.net_amount,
+    payment_status: '대기',
+    paid_at: f.paid_at,
+    program_id: programId,
+    project_id: projectId,
+  }));
+
+  const { data, error } = await supabase
+    .from('payroll_expenses')
+    .insert(payloads)
+    .select('id');
+  if (error) {
+    console.error('[staff-fee→payroll] 변환 실패:', error.message);
+    return { inserted: 0, error: '변환 중 오류가 발생했어요.' };
+  }
+  return { inserted: (data?.length ?? 0), error: null };
 }
