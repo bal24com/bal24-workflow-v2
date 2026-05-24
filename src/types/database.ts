@@ -60,6 +60,8 @@ export interface Profile {
   consortium_member_id?: string | null;
   /** STEP-STAFF-PORTAL — 내부 직원 강사 겸임용 영구 포털 토큰 */
   staff_portal_token?: string | null;
+  /** STEP-MENTORING-P3-APPROVE — 내부 직원 강사 겸임용 도장/사인 */
+  signature_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -141,6 +143,8 @@ export interface StaffPool {
   deleted_at?: string | null;
   /** STEP-STAFF-PORTAL — 외부 강사 영구 포털 토큰 (/staff-portal/:token) */
   staff_portal_token?: string | null;
+  /** STEP-MENTORING-P3-APPROVE — 도장/사인 이미지 URL (signatures 버킷) */
+  signature_url?: string | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;

@@ -13,7 +13,8 @@ import { type MentoringLog, type MentoringLogFile } from '../../../types/mentori
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 import MentoringLogForm from './MentoringLogForm';
 import { fetchLogForPdf } from '../../programs/detail/mentoringLogPdfFetch';
-import { downloadMentoringLogPdf } from '../../programs/detail/mentoringLogPdf';
+import { downloadMentoringLogPdf, type MentoringLogForPdf } from '../../programs/detail/mentoringLogPdf';
+import SignaturePad from '../../../components/ui/SignaturePad';
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -47,12 +48,12 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
   const [formOpenId, setFormOpenId] = useState<string | null>(null);
   // STEP-MENTORING-P2-PDF — PDF 다운로드 진행 중인 일지 id
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  // STEP-MENTORING-P3-APPROVE — SignaturePad 모달 (서명 미등록 시)
+  const [pendingPdfData, setPendingPdfData] = useState<MentoringLogForPdf | null>(null);
 
-  async function handleDownloadPdf(logId: string) {
-    setDownloadingId(logId);
+  async function executePdfDownload(data: MentoringLogForPdf) {
+    setDownloadingId(data.id);
     try {
-      const data = await fetchLogForPdf(logId);
-      if (!data) { toast.error('일지 정보를 불러오지 못했어요.'); return; }
       await downloadMentoringLogPdf(data);
       toast.success('PDF 다운로드가 시작됐어요.');
     } catch (err) {
@@ -62,6 +63,26 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
     } finally {
       setDownloadingId(null);
     }
+  }
+
+  async function handleDownloadPdf(logId: string) {
+    setDownloadingId(logId);
+    const data = await fetchLogForPdf(logId);
+    setDownloadingId(null);
+    if (!data) { toast.error('일지 정보를 불러오지 못했어요.'); return; }
+    // STEP-MENTORING-P3 — signature_url 없으면 SignaturePad 모달로 임시 서명
+    if (!data.mentor_signature_url) {
+      setPendingPdfData(data);
+      return;
+    }
+    await executePdfDownload(data);
+  }
+
+  function handleSignatureConfirm(dataUrl: string) {
+    if (!pendingPdfData) return;
+    const merged = { ...pendingPdfData, mentor_signature_url: dataUrl };
+    setPendingPdfData(null);
+    void executePdfDownload(merged);
   }
 
   const fetchData = useCallback(async () => {
@@ -177,6 +198,22 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
           멘토링 일지 기능이 아직 활성화되지 않았어요. PM에게 마이그레이션 실행을 요청해 주세요.
         </div>
       )}
+      {/* STEP-MENTORING-P3-APPROVE — SignaturePad 모달 (서명 미등록 강사용) */}
+      {pendingPdfData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+          onClick={() => setPendingPdfData(null)} role="dialog" aria-modal="true">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-[#1E1B4B] mb-2">서명 입력</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              등록된 서명이 없어요. 아래에 서명하면 <strong>이번 PDF에만</strong> 사용돼요.
+              <br />영구 등록하려면 헤더의 <strong>[내 정보 수정]</strong> → 도장/사인 등록을 이용해 주세요.
+            </p>
+            <SignaturePad onConfirm={handleSignatureConfirm} onCancel={() => setPendingPdfData(null)}
+              confirmLabel="이 서명으로 PDF 생성" />
+          </div>
+        </div>
+      )}
+
       {assignments.map((a) => {
         const programName = a.program?.name ?? '(프로그램 미지정)';
         const menteeList = (a.mentee_ids ?? []).map((id) => menteeMap.get(id)).filter(Boolean) as MenteeLite[];

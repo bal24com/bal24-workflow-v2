@@ -42,9 +42,11 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
   }
 
   // 3) 멘토 정보 (assignment → mentor_pool_id|mentor_profile_id → staff_pool|profiles)
+  // STEP-MENTORING-P3 — signature_url 우선순위: 일지의 mentor_signature_url > 강사 프로필 signature_url
   let mentorName = '(이름 없음)';
   let mentorOrg = '';
   let mentorPosition = '전문가';
+  let mentorProfileSignature: string | null = null;
   if (l.assignment_id) {
     const { data: asn } = await supabase.from('mentoring_assignments')
       .select('mentor_pool_id, mentor_profile_id, mentor_name_raw')
@@ -52,22 +54,25 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
     type AsnRow = { mentor_pool_id: string | null; mentor_profile_id: string | null; mentor_name_raw: string | null };
     const a = asn as AsnRow | null;
     if (a?.mentor_pool_id) {
+      // STEP-MENTORING-P3 — signature_url 도 함께 fetch (멘토 프로필 서명)
       const { data: sp } = await supabase.from('staff_pool')
-        .select('name, organization, position').eq('id', a.mentor_pool_id).maybeSingle();
-      const s = sp as { name: string; organization: string | null; position: string | null } | null;
+        .select('name, organization, position, signature_url').eq('id', a.mentor_pool_id).maybeSingle();
+      const s = sp as { name: string; organization: string | null; position: string | null; signature_url: string | null } | null;
       if (s) {
         mentorName = s.name ?? mentorName;
         mentorOrg = s.organization ?? '';
         mentorPosition = s.position ?? mentorPosition;
+        if (s.signature_url) mentorProfileSignature = s.signature_url;
       }
     } else if (a?.mentor_profile_id) {
       const { data: pr } = await supabase.from('profiles')
-        .select('name, department, position').eq('id', a.mentor_profile_id).maybeSingle();
-      const p = pr as { name: string | null; department: string | null; position: string | null } | null;
+        .select('name, department, position, signature_url').eq('id', a.mentor_profile_id).maybeSingle();
+      const p = pr as { name: string | null; department: string | null; position: string | null; signature_url: string | null } | null;
       if (p) {
         mentorName = p.name ?? mentorName;
         mentorOrg = p.department ?? '';
         mentorPosition = p.position ?? mentorPosition;
+        if (p.signature_url) mentorProfileSignature = p.signature_url;
       }
     } else if (a?.mentor_name_raw) {
       mentorName = a.mentor_name_raw;
@@ -108,7 +113,8 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
     log_date: l.log_date,
     duration_min: l.duration_min,
     recipient: l.recipient,
-    mentor_signature_url: l.mentor_signature_url,
+    // STEP-MENTORING-P3 — 일지 자체 서명(임시) > 강사 프로필 서명(영구) > null
+    mentor_signature_url: l.mentor_signature_url ?? mentorProfileSignature,
     status: l.status,
     mentor_name: mentorName,
     mentor_org: mentorOrg,
