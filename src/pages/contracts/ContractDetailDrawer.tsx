@@ -150,7 +150,7 @@ export default function ContractDetailDrawer({ contract, onClose, onEdit, onChan
               <FileLink label="계약서" url={contract.contract_file_url} />
               <FileLink label="세금계산서" url={contract.tax_invoice_url} />
             </ul>
-            <p className="text-[11px] text-slate-400 mt-1">* 파일 업로드는 다음 업데이트에서 활성화됩니다.</p>
+            <p className="text-[11px] text-slate-400 mt-1">* 파일 추가·교체는 [수정] 모달에서 가능합니다.</p>
           </section>
 
           {/* 비고 */}

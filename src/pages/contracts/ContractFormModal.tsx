@@ -4,13 +4,14 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Modal, Button, Input } from '../../components/ui';
+import FileDropZone from '../../components/ui/FileDropZone';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import type {
   BillingScheduleItem, ContractStatus, VatType,
 } from '../../types/database';
 import type { ContractRow } from './contractUtils';
-import { CONTRACT_STATUS_VALUES } from './contractUtils';
+import { CONTRACT_STATUS_VALUES, uploadContractFile } from './contractUtils';
 
 interface RefOption { id: string; name: string }
 
@@ -33,8 +34,13 @@ function emptyForm() {
     contract_date: '',
     status: '진행중' as ContractStatus,
     memo: '',
+    contract_file_url: '' as string,
+    contract_file_name: '' as string,
+    tax_invoice_url: '' as string,
+    tax_invoice_name: '' as string,
   };
 }
+
 
 export default function ContractFormModal({ open, target, onClose, onSaved }: Props) {
   const toast = useToast();
@@ -43,6 +49,8 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
   const [clients, setClients] = useState<RefOption[]>([]);
   const [projects, setProjects] = useState<RefOption[]>([]);
   const [saving, setSaving] = useState(false);
+  const [uploadingContract, setUploadingContract] = useState(false);
+  const [uploadingTaxInvoice, setUploadingTaxInvoice] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +81,10 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         contract_date: target.contract_date ?? '',
         status: target.status ?? '진행중',
         memo: target.memo ?? '',
+        contract_file_url: target.contract_file_url ?? '',
+        contract_file_name: target.contract_file_url ? '업로드된 계약서' : '',
+        tax_invoice_url: target.tax_invoice_url ?? '',
+        tax_invoice_name: target.tax_invoice_url ? '업로드된 세금계산서' : '',
       });
       setSchedule(Array.isArray(target.billing_schedule) ? target.billing_schedule : []);
     } else {
@@ -96,6 +108,43 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
     setSchedule((prev) => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, seq: i + 1 })));
   }
 
+  async function handleContractFile(file: File) {
+    setUploadingContract(true);
+    try {
+      const { url, name } = await uploadContractFile(file, 'contract');
+      setForm((f) => ({ ...f, contract_file_url: url, contract_file_name: name }));
+      toast.success('계약서를 업로드했어요.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      console.error('[ContractFormModal] 계약서 업로드 실패:', msg);
+      toast.error(msg || '계약서 업로드에 실패했어요.');
+    } finally {
+      setUploadingContract(false);
+    }
+  }
+
+  async function handleTaxInvoiceFile(file: File) {
+    setUploadingTaxInvoice(true);
+    try {
+      const { url, name } = await uploadContractFile(file, 'tax_invoice');
+      setForm((f) => ({ ...f, tax_invoice_url: url, tax_invoice_name: name }));
+      toast.success('세금계산서를 업로드했어요.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      console.error('[ContractFormModal] 세금계산서 업로드 실패:', msg);
+      toast.error(msg || '세금계산서 업로드에 실패했어요.');
+    } finally {
+      setUploadingTaxInvoice(false);
+    }
+  }
+
+  function clearContractFile() {
+    setForm((f) => ({ ...f, contract_file_url: '', contract_file_name: '' }));
+  }
+  function clearTaxInvoice() {
+    setForm((f) => ({ ...f, tax_invoice_url: '', tax_invoice_name: '' }));
+  }
+
   async function handleSave() {
     if (!form.contract_name.trim()) { toast.error('계약명을 입력해 주세요.'); return; }
     if (!form.contract_amount || Number.isNaN(Number(form.contract_amount))) {
@@ -114,6 +163,8 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         status: form.status,
         billing_schedule: schedule,
         memo: form.memo.trim() || null,
+        contract_file_url: form.contract_file_url || null,
+        tax_invoice_url: form.tax_invoice_url || null,
         updated_at: new Date().toISOString(),
       };
       if (target) {
@@ -263,6 +314,32 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
               ))}
             </div>
           )}
+        </div>
+
+        {/* 첨부 파일 — Storage contracts 버킷 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="계약서 (PDF·이미지)">
+            <FileDropZone
+              fileUrl={form.contract_file_url || null}
+              fileName={form.contract_file_name || null}
+              accept="application/pdf,image/*"
+              uploading={uploadingContract}
+              uploadingLabel="계약서 업로드 중..."
+              onFileSelected={(file) => void handleContractFile(file)}
+              onClear={clearContractFile}
+            />
+          </Field>
+          <Field label="세금계산서 (PDF·이미지)">
+            <FileDropZone
+              fileUrl={form.tax_invoice_url || null}
+              fileName={form.tax_invoice_name || null}
+              accept="application/pdf,image/*"
+              uploading={uploadingTaxInvoice}
+              uploadingLabel="세금계산서 업로드 중..."
+              onFileSelected={(file) => void handleTaxInvoiceFile(file)}
+              onClear={clearTaxInvoice}
+            />
+          </Field>
         </div>
 
         <Field label="비고">

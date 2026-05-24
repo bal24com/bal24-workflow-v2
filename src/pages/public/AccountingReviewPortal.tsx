@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo, formatMoney } from '../../lib/utils';
-import { maskIdNo } from '../payroll/payrollUtils';
+// STEP-ACCOUNTING-FOLLOWUP — 외부 포털에서 주민번호 미노출 정책으로 maskIdNo import 제거.
 import {
   fetchReviewByToken, upsertReviewItem, updateReviewStatus,
   REVIEW_STATUS_LABEL,
@@ -57,9 +57,16 @@ export default function AccountingReviewPortal() {
       setItemStates(stateMap);
 
       // 연결된 외주/급여 내역
+      // STEP-ACCOUNTING-FOLLOWUP — 회계사무소 외부 포털에서 주민번호(payee_id_no) fetch 제거.
+      // 박경수님 보안 강화 정책 (1차) — 외부 노출 컬럼만 명시적으로 select.
       if (res.review.project_ids.length > 0) {
         const { data, error } = await supabase
-          .from('payroll_expenses').select('*')
+          .from('payroll_expenses').select(
+            'id, project_id, expense_type, description, payee_name, ' +
+            'bank_name, bank_account, unit_price, quantity, subtotal, ' +
+            'tax_rate_type, tax_amount, net_amount, payment_status, ' +
+            'paid_at, created_at',
+          )
           .in('project_id', res.review.project_ids)
           .is('deleted_at', null)
           .order('paid_at', { ascending: false });
@@ -68,7 +75,7 @@ export default function AccountingReviewPortal() {
           setErrorMsg('외주/급여 내역을 불러오지 못했어요.');
           return;
         }
-        setExpenses((data as PayrollExpense[] | null) ?? []);
+        setExpenses(((data as unknown) as PayrollExpense[] | null) ?? []);
       }
 
       // 처음 진입 시 reviewing 상태로 자동 전환
@@ -226,7 +233,7 @@ export default function AccountingReviewPortal() {
                       <td className="px-3 py-2">
                         <div className="text-sm font-medium text-text">{e.payee_name}</div>
                         <div className="text-[11px] text-muted truncate max-w-[260px]">
-                          {e.description ?? ''}{e.payee_id_no && ` · ${maskIdNo(e.payee_id_no)}`}
+                          {e.description ?? ''}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-center text-xs">{e.expense_type}</td>

@@ -110,3 +110,34 @@ export const CONTRACT_STATUS_STYLE: Record<ContractStatus, string> = {
   취소:   'bg-rose-50 text-rose-700 border-rose-200',
   보류:   'bg-amber-50 text-amber-700 border-amber-200',
 };
+
+// ============================================================
+// 계약 파일 업로드 — Storage `contracts` 버킷
+// kind: 'contract' (계약서) / 'tax_invoice' (세금계산서)
+// ============================================================
+export interface ContractFileMeta {
+  url: string;
+  name: string;
+}
+
+export async function uploadContractFile(
+  file: File,
+  kind: 'contract' | 'tax_invoice',
+): Promise<ContractFileMeta> {
+  const ts = Date.now();
+  const safeName = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_');
+  const path = `${kind}/${ts}_${safeName}`;
+  const { error: upErr } = await supabase.storage
+    .from('contracts')
+    .upload(path, file, { upsert: false, contentType: file.type || undefined });
+  if (upErr) {
+    const m = upErr.message.toLowerCase();
+    if (m.includes('bucket not found')) throw new Error('contracts 저장소가 없어요. P1 마이그레이션 실행을 확인해 주세요.');
+    if (m.includes('mime') || m.includes('not allowed')) throw new Error('지원하지 않는 파일 형식이에요. PDF·이미지만 가능합니다.');
+    if (m.includes('payload too large') || m.includes('exceeded')) throw new Error('파일 크기가 너무 커요. (최대 20MB)');
+    if (m.includes('row-level security')) throw new Error('업로드 권한이 없어요.');
+    throw new Error('파일 업로드에 실패했어요. 다시 시도해 주세요.');
+  }
+  const { data: urlData } = supabase.storage.from('contracts').getPublicUrl(path);
+  return { url: urlData.publicUrl, name: file.name };
+}
