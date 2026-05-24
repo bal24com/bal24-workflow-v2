@@ -107,6 +107,7 @@ export function calcContractKpis(rows: ContractRow[]): ContractKpis {
 }
 
 // STEP-ACCOUNTING-FOLLOWUP4 — 통합 연결 대상 검색
+// STEP-ACCOUNTING-FOLLOWUP5 — amount/clientId/clientName/startDate 메타 추가 (자동 채움용)
 export type LinkType = 'project' | 'program' | 'consortium';
 export interface LinkOption {
   key: string;
@@ -115,12 +116,64 @@ export interface LinkOption {
   name: string;
   display: string;
   projectId?: string | null;
+  // 자동 채움 메타 — 콤보박스 표시 + 선택 시 form 으로 prefill
+  amount?: number | null;
+  clientId?: string | null;
+  clientName?: string | null;
+  startDate?: string | null;
 }
 export const LINK_TYPE_LABEL: Record<LinkType, string> = {
   project: '프로젝트',
   program: '프로그램',
   consortium: '컨소시엄',
 };
+
+// FOLLOWUP5 — 통합 옵션 빌드 (메타 포함). ContractFormModal 슬림화.
+interface ProjectLinkRow { id: string; name: string; contract_amount: number | null; client_id: string | null; start_date: string | null }
+interface ProgramLinkRow { id: string; name: string; project_id: string | null; start_date: string | null }
+interface ConsortiumLinkRow { id: string; name: string; total_budget: number | null; lead_client_id: string | null }
+
+export function buildLinkOptions(
+  projects: ProjectLinkRow[],
+  programs: ProgramLinkRow[],
+  consortiums: ConsortiumLinkRow[],
+  clientNameMap: Map<string, string>,
+): LinkOption[] {
+  const opts: LinkOption[] = [];
+  for (const p of projects) {
+    opts.push({
+      key: `project:${p.id}`, type: 'project', id: p.id, name: p.name,
+      display: `프로젝트: ${p.name}`,
+      amount: p.contract_amount,
+      clientId: p.client_id,
+      clientName: p.client_id ? clientNameMap.get(p.client_id) ?? null : null,
+      startDate: p.start_date,
+    });
+  }
+  for (const g of programs) {
+    const parent = g.project_id ? projects.find((pp) => pp.id === g.project_id) : null;
+    opts.push({
+      key: `program:${g.id}`, type: 'program', id: g.id, name: g.name,
+      display: `프로그램: ${g.name}`,
+      projectId: g.project_id,
+      amount: parent?.contract_amount ?? null,
+      clientId: parent?.client_id ?? null,
+      clientName: parent?.client_id ? clientNameMap.get(parent.client_id) ?? null : null,
+      startDate: g.start_date,
+    });
+  }
+  for (const c of consortiums) {
+    opts.push({
+      key: `consortium:${c.id}`, type: 'consortium', id: c.id, name: c.name,
+      display: `컨소시엄: ${c.name}`,
+      amount: c.total_budget,
+      clientId: c.lead_client_id,
+      clientName: c.lead_client_id ? clientNameMap.get(c.lead_client_id) ?? null : null,
+      startDate: null,
+    });
+  }
+  return opts;
+}
 
 export const CONTRACT_STATUS_VALUES: ContractStatus[] = ['진행중', '완료', '취소', '보류'];
 
