@@ -1452,3 +1452,37 @@ export interface AccountingReviewItem {
   reviewed_at: string | null;
   created_at: string;
 }
+
+// ============================================================
+// STEP-ACCOUNTING-FOLLOWUP7-Phase2 — 견적서 시스템
+// ============================================================
+
+export interface ProjectEstimate {
+  id: string;
+  project_id: string | null;
+  program_id: string | null;
+  contract_id: string | null;
+  title: string;
+  total_amount: number;
+  memo: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface EstimateItem {
+  id: string;
+  estimate_id: string;
+  category: string; // '강사료', '운영비', '교통비', ... — 자유 입력
+  description: string | null;
+  payee_name: string | null;
+  unit_price: number;
+  quantity: number;
+  subtotal: number; // generated
+  tax_rate_type: PayrollTaxRateType;
+  memo: string | null;
+  order_index: number;
+  payroll_expense_id: string | null; // 외주/급여 변환 시 참조
+  created_at: string;
+}

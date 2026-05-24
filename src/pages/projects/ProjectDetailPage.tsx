@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Info, Loader2, Users, Link2, Wallet, BookOpen, FolderArchive, Trash2 } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Info, Loader2, Users, Link2, Wallet, BookOpen, FolderArchive, Trash2, FileText } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Badge, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
@@ -18,6 +18,8 @@ import MembersTab from './detail/MembersTab';
 import PortalTab from './detail/PortalTab';
 import GrantLedgerTab from './detail/GrantLedgerTab';
 import ProjectProgramsTab from './detail/ProjectProgramsTab';
+// STEP-ACCOUNTING-FOLLOWUP7-Phase2 — 견적 탭
+import EstimateTab from '../estimates/EstimateTab';
 import ProjectDocsTab from './detail/ProjectDocsTab';
 import StageProgressBar from './detail/StageProgressBar';
 
@@ -26,12 +28,14 @@ type DetailProject = Project & {
   pm?: { id: string; name: string } | null;
 };
 
-type TabKey = 'overview' | 'programs' | 'tasks' | 'grant' | 'docs' | 'members' | 'portal';
+type TabKey = 'overview' | 'programs' | 'tasks' | 'estimate' | 'grant' | 'docs' | 'members' | 'portal';
 
 const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'overview', label: '개요',     Icon: Info },
   { key: 'programs', label: '프로그램', Icon: BookOpen },
   { key: 'tasks',    label: '태스크',   Icon: ClipboardList },
+  // STEP-ACCOUNTING-FOLLOWUP7-Phase2 — 견적 탭
+  { key: 'estimate', label: '견적',     Icon: FileText },
   { key: 'grant',    label: '지원금',   Icon: Wallet },
   { key: 'docs',     label: '문서',     Icon: FolderArchive },
   { key: 'members',  label: '참여인력', Icon: Users },
@@ -214,6 +218,7 @@ export default function ProjectDetailPage() {
         {tab === 'portal' && <PortalTab projectId={projectId} clientId={project.client_id ?? null} />}
         {tab === 'programs' && <ProjectProgramsTab projectId={projectId} />}
         {tab === 'docs'     && <ProjectDocsTab    projectId={projectId} />}
+        {tab === 'estimate' && <EstimateTab projectId={projectId} projectName={project.name ?? '프로젝트'} />}
       </div>
     </div>
   );
