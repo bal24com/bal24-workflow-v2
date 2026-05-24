@@ -11,15 +11,14 @@ import {
   Briefcase,
   Users,
   UserCog,
-  TrendingUp,
-  TrendingDown,
-  Receipt,
   BarChart3,
   BookOpen,
   Sparkles,
   Home,
   ExternalLink,
   Trash2,
+  FileText,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -68,10 +67,11 @@ const SECTIONS: MenuSection[] = [
   {
     heading: '재무',
     items: [
-      { to: '/income',   label: '수입',   Icon: TrendingUp },
-      { to: '/expense',  label: '지출',   Icon: TrendingDown },
-      { to: '/receipts', label: '증빙',   Icon: Receipt },
-      { to: '/reports',  label: '리포트', Icon: BarChart3 },
+      // STEP-ACCOUNTING-ALL — 수입→수입/계약, 지출→외주/급여, 증빙 제거, 회계 검토 신규
+      { to: '/contracts',          label: '수입/계약', Icon: FileText },
+      { to: '/payroll',            label: '외주/급여', Icon: Users },
+      { to: '/accounting-reviews', label: '회계 검토', Icon: ClipboardCheck },
+      { to: '/reports',            label: '리포트',    Icon: BarChart3 },
     ],
   },
   {
@@ -142,10 +142,11 @@ const FINANCE_SECTIONS: MenuSection[] = [
   {
     heading: '재무',
     items: [
-      { to: '/income',   label: '수입',   Icon: TrendingUp },
-      { to: '/expense',  label: '지출',   Icon: TrendingDown },
-      { to: '/receipts', label: '증빙',   Icon: Receipt },
-      { to: '/reports',  label: '리포트', Icon: BarChart3 },
+      // STEP-ACCOUNTING-ALL — 수입→수입/계약, 지출→외주/급여, 증빙 제거, 회계 검토 신규
+      { to: '/contracts',          label: '수입/계약', Icon: FileText },
+      { to: '/payroll',            label: '외주/급여', Icon: Users },
+      { to: '/accounting-reviews', label: '회계 검토', Icon: ClipboardCheck },
+      { to: '/reports',            label: '리포트',    Icon: BarChart3 },
     ],
   },
   {

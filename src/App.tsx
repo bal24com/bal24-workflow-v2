@@ -20,6 +20,9 @@ import ReceiptsPage from './pages/receipts/ReceiptsPage';
 import ContractsPage from './pages/contracts/ContractsPage';
 // STEP-ACCOUNTING-ALL P3 — 외주/급여 페이지
 import PayrollPage from './pages/payroll/PayrollPage';
+// STEP-ACCOUNTING-ALL P4 — 회계사무소 검토 (PM + 외부 포털)
+import AccountingReviewPage from './pages/accounting-portal/AccountingReviewPage';
+import AccountingReviewPortal from './pages/public/AccountingReviewPortal';
 import AttendancePage from './pages/attendance/AttendancePage';
 import AttendanceDetailPage from './pages/attendance/AttendanceDetailPage';
 import ActivityLogsPage from './pages/activity-logs/ActivityLogsPage';
@@ -117,6 +120,8 @@ export default function App() {
             <Route path="/checkin/:token" element={<CheckInPage />} />
             <Route path="/form/:token" element={<PublicFormPage />} />
             <Route path="/portal/:token" element={<ClientPortalPage />} />
+            {/* STEP-ACCOUNTING-ALL P4 — 회계사무소 외부 검토 포털 */}
+            <Route path="/accounting-review/:token" element={<AccountingReviewPortal />} />
             <Route path="/invitation/:token" element={<InstructorInvitePage />} />
             <Route path="/participant/:token" element={<ParticipantPortalPage />} />
             <Route path="/curriculum-invite/:token" element={<CurriculumInvitePage />} />
@@ -185,6 +190,8 @@ export default function App() {
               <Route path="/contracts" element={<ContractsPage />} />
               {/* STEP-ACCOUNTING-ALL P3 — 외주/급여 신규 페이지 */}
               <Route path="/payroll" element={<PayrollPage />} />
+              {/* STEP-ACCOUNTING-ALL P4 — 회계 검토 (PM 측) */}
+              <Route path="/accounting-reviews" element={<AccountingReviewPage />} />
 
               {/* 출석체크 (STEP 11-B) */}
               <Route path="/attendance" element={<AttendancePage />} />
