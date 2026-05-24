@@ -30,7 +30,11 @@ export async function restoreRecord(table: SoftDeleteTable, id: string): Promise
 
 /** 영구 삭제 (실제 DELETE — 30일 경과 row 또는 관리자 강제) */
 export async function permanentDelete(table: SoftDeleteTable, id: string): Promise<string | null> {
-  const { error } = await supabase.from(table).delete().eq('id', id);
+  // .select() 를 붙여서 returning rows 를 받는다.
+  // 이렇게 안 하면 RLS DELETE 정책 누락 시 0 rows affected 로 silent fail 하지만 error 가 null 이라
+  // 코드가 성공으로 오판 → UI 에 "삭제됨" 표시되지만 실제 row 그대로 남는 버그.
+  // (박경수님 보고: projects 휴지통 영구삭제가 그렇게 동작했음. 2026-05-24)
+  const { data, error } = await supabase.from(table).delete().eq('id', id).select('id');
   if (error) {
     // PostgrestError 안전 추출 — error.code·details 까지 사용해서 진짜 원인 표시
     const code = (error as { code?: string }).code ?? '';
@@ -49,6 +53,14 @@ export async function permanentDelete(table: SoftDeleteTable, id: string): Promi
     }
     return msg ? `영구 삭제 실패: ${msg}` : '영구 삭제 중 오류가 발생했어요.';
   }
+
+  // 핵심 방어: returning rows 가 0 이면 RLS DELETE 정책 누락 또는 row 가 이미 없음.
+  // 휴지통 UI 는 row 가 있는 걸 보고 영구삭제 버튼을 눌렀으니 = RLS 차단으로 판단.
+  if (!data || data.length === 0) {
+    console.error(`[permanentDelete:${table}] 0 rows affected — RLS DELETE 정책 누락 가능성`);
+    return `'${table}' 테이블 DELETE 권한 정책이 설정되어 있지 않아요.\n관리자에게 RLS 정책 점검을 요청해 주세요.`;
+  }
+
   return null;
 }
 
