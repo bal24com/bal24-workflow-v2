@@ -1400,6 +1400,7 @@ export interface PayrollExpense {
   id: string;
   project_id: string | null;
   program_id: string | null;
+  contract_id: string | null; // STEP-ACCOUNTING-FOLLOWUP7 — 수입/계약 연결
   expense_type: PayrollExpenseType;
   description: string | null;
   payee_name: string;

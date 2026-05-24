@@ -9,6 +9,8 @@ import type {
 export type PayrollRow = PayrollExpense & {
   project?: { id: string; name: string; deleted_at: string | null } | null;
   program?: { id: string; name: string; deleted_at: string | null } | null;
+  // STEP-ACCOUNTING-FOLLOWUP7 — 수입/계약 연결 (외주/급여가 어느 계약 소속인지)
+  contract?: { id: string; contract_name: string; deleted_at: string | null } | null;
 };
 
 // STEP-ACCOUNTING-FOLLOWUP2 — 카테고리 자유 입력. prefix 매칭으로 outsource/operation 분류.
@@ -51,7 +53,7 @@ export interface PayrollFilter {
 export async function fetchPayroll(filter: PayrollFilter): Promise<PayrollRow[]> {
   let q = supabase
     .from('payroll_expenses')
-    .select('*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at)')
+    .select('*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at), contract:income_contracts(id, contract_name, deleted_at)')
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
@@ -74,9 +76,24 @@ export async function fetchPayroll(filter: PayrollFilter): Promise<PayrollRow[]>
     throw new Error('외주/급여 목록을 불러오지 못했어요.');
   }
   return ((data ?? []) as unknown as PayrollRow[])
-    .filter((r) => !r.project?.deleted_at && !r.program?.deleted_at)
+    .filter((r) => !r.project?.deleted_at && !r.program?.deleted_at && !r.contract?.deleted_at)
     // 그룹 prefix 매칭 (자유 입력 카테고리도 포함)
     .filter((r) => filter.group === 'outsource' ? isOutsourceType(r.expense_type) : isOperationType(r.expense_type));
+}
+
+/** 특정 계약에 묶인 외주/급여 fetch — ContractDetailDrawer 용 */
+export async function fetchPayrollByContract(contractId: string): Promise<PayrollRow[]> {
+  const { data, error } = await supabase
+    .from('payroll_expenses')
+    .select('*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at), contract:income_contracts(id, contract_name, deleted_at)')
+    .eq('contract_id', contractId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('[payroll] 계약별 조회 실패:', error.message);
+    throw new Error('계약에 묶인 외주/급여를 불러오지 못했어요.');
+  }
+  return ((data ?? []) as unknown as PayrollRow[]);
 }
 
 /** soft-delete */

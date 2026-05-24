@@ -18,11 +18,22 @@ import {
 
 interface RefOption { id: string; name: string }
 interface ProgramOption { id: string; name: string; project_id: string | null }
+// STEP-ACCOUNTING-FOLLOWUP7 — 계약 옵션 (선택 시 project/program/consortium/client 자동 prefill)
+interface ContractOption {
+  id: string;
+  contract_name: string;
+  project_id: string | null;
+  program_id: string | null;
+  consortium_id: string | null;
+  client_id: string | null;
+}
 
 interface Props {
   open: boolean;
   target: PayrollRow | null;
   defaultType: PayrollExpenseType;
+  /** 계약 상세에서 [+ 외주/급여 추가] 로 열 때 — contract_id 자동 prefill */
+  defaultContractId?: string;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -32,32 +43,24 @@ const BANK_OPTIONS = [
   '기업은행', '카카오뱅크', '토스뱅크', '새마을금고', '우체국', '기타',
 ];
 
-function emptyForm(defaultType: PayrollExpenseType) {
+function emptyForm(t: PayrollExpenseType) {
   return {
-    expense_type: defaultType,
-    description: '',
-    payee_name: '',
-    payee_id_no: '',
-    bank_name: '',
-    bank_account: '',
-    unit_price: '',
-    quantity: '1',
+    expense_type: t, description: '', payee_name: '', payee_id_no: '',
+    bank_name: '', bank_account: '', unit_price: '', quantity: '1',
     tax_rate_type: '3.3' as PayrollTaxRateType,
     payment_status: '대기' as PayrollPaymentStatus,
-    paid_at: '',
-    project_id: '',
-    program_id: '',
-    memo: '',
+    paid_at: '', project_id: '', program_id: '', contract_id: '', memo: '',
   };
 }
 
 export default function PayrollExpenseFormModal({
-  open, target, defaultType, onClose, onSaved,
+  open, target, defaultType, defaultContractId, onClose, onSaved,
 }: Props) {
   const toast = useToast();
   const [form, setForm] = useState(() => emptyForm(defaultType));
   const [projects, setProjects] = useState<RefOption[]>([]);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
+  const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [projectSearch, setProjectSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -65,17 +68,22 @@ export default function PayrollExpenseFormModal({
     if (!open) return;
     let cancelled = false;
     void (async () => {
-      const [pRes, gRes] = await Promise.all([
+      // STEP-ACCOUNTING-FOLLOWUP7 — contracts 도 함께 fetch
+      const [pRes, gRes, cRes] = await Promise.all([
         supabase.from('projects').select('id, name')
           .is('deleted_at', null).order('created_at', { ascending: false }),
         supabase.from('programs').select('id, name, project_id')
+          .is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('income_contracts').select('id, contract_name, project_id, program_id, consortium_id, client_id')
           .is('deleted_at', null).order('created_at', { ascending: false }),
       ]);
       if (cancelled) return;
       if (pRes.error) console.error('[PayrollExpenseFormModal] projects 조회 실패:', pRes.error.message);
       if (gRes.error) console.error('[PayrollExpenseFormModal] programs 조회 실패:', gRes.error.message);
+      if (cRes.error) console.error('[PayrollExpenseFormModal] contracts 조회 실패:', cRes.error.message);
       setProjects((pRes.data as RefOption[] | null) ?? []);
       setPrograms((gRes.data as ProgramOption[] | null) ?? []);
+      setContracts((cRes.data as ContractOption[] | null) ?? []);
     })();
     return () => { cancelled = true; };
   }, [open]);
@@ -97,15 +105,26 @@ export default function PayrollExpenseFormModal({
         paid_at: target.paid_at ? target.paid_at.slice(0, 10) : '',
         project_id: target.project_id ?? '',
         program_id: target.program_id ?? '',
+        contract_id: target.contract_id ?? '',
         memo: target.memo ?? '',
       });
       const projName = (target as PayrollRow).project?.name;
       setProjectSearch(projName ?? '');
     } else {
-      setForm(emptyForm(defaultType));
+      const empty = emptyForm(defaultType);
+      // STEP-ACCOUNTING-FOLLOWUP7 — 계약 상세에서 [+ 추가] 로 열린 경우, 그 계약의 정보 자동 prefill
+      if (defaultContractId && contracts.length > 0) {
+        const c = contracts.find((x) => x.id === defaultContractId);
+        if (c) {
+          empty.contract_id = c.id;
+          if (c.project_id) empty.project_id = c.project_id;
+          if (c.program_id) empty.program_id = c.program_id;
+        }
+      }
+      setForm(empty);
       setProjectSearch('');
     }
-  }, [open, target, defaultType]);
+  }, [open, target, defaultType, defaultContractId, contracts]);
 
   // 프로젝트 검색 매칭 (자유 입력 → 후보 목록 필터)
   const projectMatches = useMemo(() => {
@@ -119,6 +138,20 @@ export default function PayrollExpenseFormModal({
     if (!form.project_id) return [];
     return programs.filter((g) => g.project_id === form.project_id);
   }, [programs, form.project_id]);
+
+  // STEP-ACCOUNTING-FOLLOWUP7 — 계약 선택 시 project/program 자동 prefill
+  function selectContract(contractId: string) {
+    const c = contracts.find((x) => x.id === contractId);
+    setForm((f) => ({
+      ...f, contract_id: contractId,
+      project_id: c?.project_id ?? f.project_id,
+      program_id: c?.program_id ?? f.program_id,
+    }));
+    if (c?.project_id) {
+      const proj = projects.find((p) => p.id === c.project_id);
+      if (proj) setProjectSearch(proj.name);
+    }
+  }
 
   const subtotal = useMemo(
     () => (Number(form.unit_price) || 0) * (Number(form.quantity) || 0),
@@ -153,6 +186,7 @@ export default function PayrollExpenseFormModal({
         paid_at: form.paid_at ? new Date(form.paid_at).toISOString() : null,
         project_id: form.project_id || null,
         program_id: form.program_id || null,
+        contract_id: form.contract_id || null,
         memo: form.memo.trim() || null,
         updated_at: new Date().toISOString(),
       };
@@ -189,6 +223,21 @@ export default function PayrollExpenseFormModal({
       }
     >
       <div className="space-y-4">
+        {/* STEP-ACCOUNTING-FOLLOWUP7 — 연결 계약 (선택 시 project/program 자동 prefill) */}
+        <Field label="연결 계약 (선택)">
+          <select
+            value={form.contract_id}
+            onChange={(e) => selectContract(e.target.value)}
+            className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
+          >
+            <option value="">선택 안함</option>
+            {contracts.map((c) => <option key={c.id} value={c.id}>{c.contract_name}</option>)}
+          </select>
+          {form.contract_id && (
+            <p className="text-[10px] text-violet-600 mt-1">선택한 계약의 프로젝트·프로그램이 자동 채워졌어요.</p>
+          )}
+        </Field>
+
         <div className="grid grid-cols-2 gap-3">
           {/* STEP-ACCOUNTING-FOLLOWUP2 — 자유 입력 + 기본 5개 + 박경수님 임의 세부항목 datalist */}
           <Field label="구분 (자유 입력 가능)" required>

@@ -13,6 +13,7 @@ import {
   CONTRACT_STATUS_STYLE,
   type ContractRow,
 } from './contractUtils';
+import ContractPayrollSection from './ContractPayrollSection';
 
 interface Props {
   contract: ContractRow | null;
@@ -142,6 +143,9 @@ export default function ContractDetailDrawer({ contract, onClose, onEdit, onChan
               </ul>
             )}
           </section>
+
+          {/* STEP-ACCOUNTING-FOLLOWUP7 — 이 계약의 외주/급여 (합계·목록·추가 버튼) */}
+          <ContractPayrollSection contractId={contract.id} />
 
           {/* 첨부 */}
           <section>
