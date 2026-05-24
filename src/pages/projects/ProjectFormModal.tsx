@@ -64,10 +64,11 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
     let cancelled = false;
     setLoadingRefs(true);
 
+    // STEP-TRASH-FILTER-AUDIT — 휴지통 옵션 노출 차단
     Promise.all([
-      supabase.from('clients').select('id, name').order('name', { ascending: true }),
+      supabase.from('clients').select('id, name').is('deleted_at', null).order('name', { ascending: true }),
       supabase.from('profiles').select('id, name').eq('is_active', true).order('name', { ascending: true }),
-      supabase.from('consortiums').select('id, name').in('status', ['구성중', '진행']).order('name', { ascending: true }),
+      supabase.from('consortiums').select('id, name').is('deleted_at', null).in('status', ['구성중', '진행']).order('name', { ascending: true }),
     ])
       .then(([clientsRes, profilesRes, conRes]) => {
         if (cancelled) return;

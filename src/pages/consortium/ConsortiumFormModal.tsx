@@ -96,9 +96,10 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
     if (!open) return;
     let cancelled = false;
     setLoadingRefs(true);
+    // STEP-TRASH-FILTER-AUDIT — 휴지통 옵션 노출 차단
     Promise.all([
-      supabase.from('clients').select('id, name').order('name', { ascending: true }),
-      supabase.from('projects').select('id, name').order('created_at', { ascending: false }),
+      supabase.from('clients').select('id, name').is('deleted_at', null).order('name', { ascending: true }),
+      supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
     ]).then(([cRes, pRes]) => {
       if (cancelled) return;
       if (cRes.error) console.error('[consortium] 고객사 조회 실패:', cRes.error.message);

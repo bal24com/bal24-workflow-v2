@@ -47,7 +47,8 @@ export default function AttendancePage() {
     try {
       const [sR, pR] = await Promise.all([
         supabase.from('attendance_sessions').select(SELECT_COLUMNS).order('session_date', { ascending: false }),
-        supabase.from('programs').select('id, name').order('created_at', { ascending: false }),
+        // STEP-TRASH-FILTER-AUDIT — 휴지통 프로그램 옵션 노출 차단
+        supabase.from('programs').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
       ]);
       if (sR.error) throw sR.error;
       if (pR.error) throw pR.error;

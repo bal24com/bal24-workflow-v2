@@ -82,9 +82,10 @@ export default function ActivityLogsPage() {
           .select(SELECT_COLUMNS)
           .is('deleted_at', null)
           .order('activity_date', { ascending: false }),
-        supabase.from('programs').select('id, name').order('created_at', { ascending: false }),
-        supabase.from('projects').select('id, name').order('created_at', { ascending: false }),
-        supabase.from('staff_pool').select('id, name').order('name'),
+        // STEP-TRASH-FILTER-AUDIT — 휴지통 옵션 노출 차단
+        supabase.from('programs').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('staff_pool').select('id, name').is('deleted_at', null).order('name'),
       ]);
       if (logsR.error) throw logsR.error;
       if (pR.error) console.error('[activity-logs] programs 조회 실패:', pR.error.message);

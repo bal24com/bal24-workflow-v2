@@ -72,9 +72,10 @@ export default function IncomeFormModal({ open, ledgerType, onClose, onCreated }
     let cancelled = false;
     setLoadingRefs(true);
     Promise.all([
-      supabase.from('clients').select('id, name').order('name'),
-      supabase.from('projects').select('id, name').order('created_at', { ascending: false }),
-      supabase.from('consortiums').select('id, name').order('created_at', { ascending: false }),
+      // STEP-TRASH-FILTER-AUDIT — 휴지통 옵션 노출 차단
+      supabase.from('clients').select('id, name').is('deleted_at', null).order('name'),
+      supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
+      supabase.from('consortiums').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
     ]).then(([cR, pR, conR]) => {
       if (cancelled) return;
       if (cR.error) console.error('[income] clients 조회 실패:', cR.error.message);

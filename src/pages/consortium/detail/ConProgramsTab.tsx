@@ -30,10 +30,12 @@ export default function ConProgramsTab({ consortiumId, members }: Props) {
   const fetchPrograms = useCallback(async () => {
     setLoading(true);
     try {
+      // STEP-TRASH-FILTER-AUDIT — 휴지통 프로그램 제외 (헤더 카운트와 동일하게)
       const { data, error } = await supabase
         .from('programs')
         .select('*')
         .eq('consortium_id', consortiumId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       setPrograms((data as ProgramRow[] | null) ?? []);

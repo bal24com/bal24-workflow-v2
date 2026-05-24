@@ -77,9 +77,10 @@ export default function SchedulePage() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // STEP-TRASH-FILTER-AUDIT — 휴지통 옵션 노출 차단
       const [pRes, gRes] = await Promise.all([
-        supabase.from('projects').select('id, name').order('created_at', { ascending: false }),
-        supabase.from('programs').select('id, name, project_id').order('created_at', { ascending: false }),
+        supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('programs').select('id, name, project_id').is('deleted_at', null).order('created_at', { ascending: false }),
       ]);
       if (cancelled) return;
       if (pRes.error) console.error('[schedule] projects 옵션 조회 실패:', pRes.error.message);

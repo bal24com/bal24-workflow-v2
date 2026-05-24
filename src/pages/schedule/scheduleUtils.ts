@@ -128,12 +128,12 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       .not('end_date', 'is', null)
       .lte('start_date', endDate)
       .gte('end_date', startDate),
-    // 1) 태스크 마감일 (완료 제외 + 부모 프로젝트 휴지통 제외)
-    // STEP-SCHEDULE-DELETED-FIX — projects!inner 로 휴지통 프로젝트의 자식 태스크 차단
+    // 1) 태스크 마감일 (완료 제외)
+    // STEP-TRASH-FILTER-AUDIT — projects!inner 가 컨소시엄 전용 태스크(project_id NULL)를 제외하던 회귀 수정.
+    // left join 으로 가져온 뒤 클라이언트에서 부모 휴지통 필터.
     supabase
       .from('tasks')
-      .select('id, project_id, title, due_date, status, projects!inner(deleted_at)')
-      .is('projects.deleted_at', null)
+      .select('id, project_id, title, due_date, status, projects(deleted_at)')
       .not('due_date', 'is', null)
       .gte('due_date', startDate)
       .lte('due_date', endDate)
@@ -190,6 +190,11 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
 
   for (const t of tasks.data ?? []) {
     if (!t.due_date) continue;
+    // STEP-TRASH-FILTER-AUDIT — project_id 있고 그 프로젝트가 휴지통이면 캘린더에서 제외.
+    // project_id NULL (컨소시엄 전용 태스크) 은 그대로 캘린더 노출.
+    const rawProj = (t as unknown as { projects?: { deleted_at: string | null } | { deleted_at: string | null }[] | null }).projects;
+    const proj = Array.isArray(rawProj) ? rawProj[0] : rawProj;
+    if (t.project_id && proj?.deleted_at) continue;
     events.push({
       id: `task-${t.id}`,
       title: t.title,

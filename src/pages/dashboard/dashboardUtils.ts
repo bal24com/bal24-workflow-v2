@@ -130,19 +130,18 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
         .select('id', { count: 'exact', head: true })
         .is('deleted_at', null)
         .in('status', ACTIVE_PROGRAM_STATUS),
-      // STEP-DASHBOARD-FIX — 삭제(soft-delete)된 프로젝트의 task 제외 (inner join + project.deleted_at IS NULL)
+      // STEP-TRASH-FILTER-AUDIT — projects!inner 가 컨소시엄 전용 태스크(project_id NULL) 를 제외하던 회귀 수정.
+      // left join 으로 fetch 후 클라이언트에서 isLiveTask 필터로 카운팅 (10~30명 규모 SaaS 라 성능 영향 없음)
       supabase
         .from('tasks')
-        .select('id, project:projects!inner(id, deleted_at)', { count: 'exact', head: true })
+        .select('id, project_id, projects(deleted_at)')
         .in('status', OPEN_TASK_STATUS)
-        .eq('due_date', today)
-        .is('project.deleted_at', null),
+        .eq('due_date', today),
       supabase
         .from('tasks')
-        .select('id, project:projects!inner(id, deleted_at)', { count: 'exact', head: true })
+        .select('id, project_id, projects(deleted_at)')
         .in('status', OPEN_TASK_STATUS)
-        .lt('due_date', today)
-        .is('project.deleted_at', null),
+        .lt('due_date', today),
     ]);
 
   if (projRes.error) console.error('[dashboard] 프로젝트 카운트 실패:', projRes.error.message);
@@ -158,6 +157,19 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
   const sumGross = (rows: Array<{ gross_amount: number | string | null }> | null) =>
     (rows ?? []).reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
 
+  // STEP-TRASH-FILTER-AUDIT — 컨소시엄 전용 태스크(project_id NULL) 보존 + 휴지통 프로젝트의 task 제외
+  type TaskWithProject = {
+    project_id: string | null;
+    projects: { deleted_at: string | null } | { deleted_at: string | null }[] | null;
+  };
+  const isLiveTask = (t: TaskWithProject) => {
+    if (t.project_id === null) return true; // 컨소시엄 전용 태스크 (정상 데이터)
+    const p = Array.isArray(t.projects) ? t.projects[0] : t.projects;
+    return !p?.deleted_at;
+  };
+  const todayLive = ((todayDueRes.data as TaskWithProject[] | null) ?? []).filter(isLiveTask);
+  const overdueLive = ((overdueRes.data as TaskWithProject[] | null) ?? []).filter(isLiveTask);
+
   return {
     activeProjectCount: projRes.count ?? 0,
     thisMonthIncome: sumAmount(thisIncomeRes.data as Array<{ amount: number | string | null }> | null),
@@ -165,8 +177,8 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
     pendingExpenseTotal: sumGross(pendingRes.data as Array<{ gross_amount: number | string | null }> | null),
     pendingExpenseCount: pendingRes.count ?? 0,
     activeProgramCount: programRes.count ?? 0,
-    todayDueCount: todayDueRes.count ?? 0,
-    overdueCount: overdueRes.count ?? 0,
+    todayDueCount: todayLive.length,
+    overdueCount: overdueLive.length,
   };
 }
 
@@ -295,41 +307,43 @@ export async function fetchTaskBuckets(limit = 8): Promise<TaskBuckets> {
   const today = todayIso();
   const OPEN_TASK_STATUS: TaskStatus[] = ['인식', '실행', '검토'];
 
+  // STEP-TRASH-FILTER-AUDIT — left join + 클라이언트 필터로 컨소시엄 전용 태스크(project_id NULL) 보존
+  // limit 보다 더 가져온 뒤 필터 후 slice (휴지통 row 제외로 결과 부족 방지)
+  const fetchLimit = limit * 2;
   const [todayRes, overdueRes] = await Promise.all([
-    // STEP-DASHBOARD-FIX — 삭제된 프로젝트의 task 제외 (inner join + deleted_at IS NULL)
     supabase
       .from('tasks')
-      .select('id, project_id, title, status, due_date, project:projects!inner(id, name, deleted_at)')
+      .select('id, project_id, title, status, due_date, project:projects(id, name, deleted_at)')
       .in('status', OPEN_TASK_STATUS)
       .eq('due_date', today)
-      .is('project.deleted_at', null)
       .order('seq_num', { ascending: true })
-      .limit(limit),
+      .limit(fetchLimit),
     supabase
       .from('tasks')
-      .select('id, project_id, title, status, due_date, project:projects!inner(id, name, deleted_at)')
+      .select('id, project_id, title, status, due_date, project:projects(id, name, deleted_at)')
       .in('status', OPEN_TASK_STATUS)
       .lt('due_date', today)
-      .is('project.deleted_at', null)
       .order('due_date', { ascending: true })
-      .limit(limit),
+      .limit(fetchLimit),
   ]);
 
   if (todayRes.error) console.error('[dashboard] 오늘 마감 태스크 조회 실패:', todayRes.error.message);
   if (overdueRes.error) console.error('[dashboard] 지연 태스크 조회 실패:', overdueRes.error.message);
 
-  const mapRow = (r: {
+  type RawRow = {
     id: string;
-    project_id: string;
+    project_id: string | null;
     title: string;
     status: TaskStatus;
     due_date: string | null;
-    project: { id: string; name: string } | { id: string; name: string }[] | null;
-  }): TaskAlertRow => {
+    project: { id: string; name: string; deleted_at: string | null } | { id: string; name: string; deleted_at: string | null }[] | null;
+  };
+
+  const mapRow = (r: RawRow): TaskAlertRow => {
     const project = Array.isArray(r.project) ? r.project[0] : r.project;
     return {
       id: r.id,
-      project_id: r.project_id,
+      project_id: r.project_id ?? '', // 컨소시엄 전용 태스크는 빈 문자열 (Link to=/projects/ 분기 처리 필요)
       title: r.title,
       status: r.status,
       due_date: r.due_date,
@@ -337,8 +351,14 @@ export async function fetchTaskBuckets(limit = 8): Promise<TaskBuckets> {
     };
   };
 
-  const todayRows = (todayRes.data as Parameters<typeof mapRow>[0][] | null) ?? [];
-  const overdueRows = (overdueRes.data as Parameters<typeof mapRow>[0][] | null) ?? [];
+  const isLiveRaw = (r: RawRow) => {
+    if (r.project_id === null) return true; // 컨소시엄 전용 태스크 보존
+    const p = Array.isArray(r.project) ? r.project[0] : r.project;
+    return !p?.deleted_at;
+  };
+
+  const todayRows = ((todayRes.data as RawRow[] | null) ?? []).filter(isLiveRaw).slice(0, limit);
+  const overdueRows = ((overdueRes.data as RawRow[] | null) ?? []).filter(isLiveRaw).slice(0, limit);
 
   return {
     todayDue: todayRows.map(mapRow),

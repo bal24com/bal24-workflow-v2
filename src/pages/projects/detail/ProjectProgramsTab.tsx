@@ -24,9 +24,11 @@ export default function ProjectProgramsTab({ projectId }: Props) {
 
   const reload = useCallback(async () => {
     setLoading(true);
+    // STEP-TRASH-FILTER-AUDIT — 휴지통 프로그램 제외 (ProgramsPage 와 동일)
     const { data, error } = await supabase
       .from('programs').select('*')
       .eq('project_id', projectId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     if (error) {
       console.error('[project-programs] 조회 실패:', error.message);
