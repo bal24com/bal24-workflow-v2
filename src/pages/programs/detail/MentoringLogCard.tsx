@@ -2,11 +2,14 @@
 // 멘토링 배정 카드 펼친 영역 — 담당 멘티 목록 + 최근 일지 3건 + 연관 멘토 일지
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Users2, BookOpen, Link2 } from 'lucide-react';
+import { Loader2, Users2, BookOpen, Link2, FileDown } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import { useToast } from '../../../contexts/ToastContext';
 import { formatDateKo } from '../../../lib/utils';
 import { getMentorName, MENTORING_LOG_STATUS_LABEL, MENTORING_LOG_STATUS_STYLE } from '../../../types/mentoring';
 import type { MentoringAssignment, MentoringLog } from '../../../types/mentoring';
+import { fetchLogForPdf } from './mentoringLogPdfFetch';
+import { downloadMentoringLogPdf } from './mentoringLogPdf';
 
 interface MenteeLite { id: string; name: string; organization: string | null }
 
@@ -24,10 +27,29 @@ interface Props {
 }
 
 export default function MentoringLogCard({ assignmentId, menteeIds, allAssignments = [] }: Props) {
+  const toast = useToast();
   const [mentees, setMentees] = useState<MenteeLite[]>([]);
   const [logs, setLogs] = useState<MentoringLog[]>([]);
   const [relatedLogs, setRelatedLogs] = useState<RelatedLogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  // STEP-MENTORING-P2-PDF — PDF 생성 중 상태
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  async function handleDownloadPdf(logId: string) {
+    setDownloadingId(logId);
+    try {
+      const data = await fetchLogForPdf(logId);
+      if (!data) { toast.error('일지 정보를 불러오지 못했어요.'); return; }
+      await downloadMentoringLogPdf(data);
+      toast.success('PDF 다운로드가 시작됐어요.');
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : '';
+      console.error('[mentoring-log-card] PDF 생성 실패:', raw);
+      toast.error('PDF 생성 중 오류가 발생했어요.');
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   // 공통 멘티를 가진 다른 멘토 배정 (현재 멘토 제외, 멘티 교집합이 있는 것만)
   const relatedAssignments = useMemo(() => {
@@ -155,7 +177,14 @@ export default function MentoringLogCard({ assignmentId, menteeIds, allAssignmen
                   <span className={`px-1 py-0.5 rounded font-semibold ${MENTORING_LOG_STATUS_STYLE[log.status ?? 'draft']}`}>
                     {MENTORING_LOG_STATUS_LABEL[log.status ?? 'draft']}
                   </span>
-                  {log.subject && <span className="text-slate-500 truncate max-w-[50%]">· {log.subject}</span>}
+                  {log.subject && <span className="text-slate-500 truncate max-w-[40%]">· {log.subject}</span>}
+                  {/* STEP-MENTORING-P2-PDF — PDF 다운로드 버튼 */}
+                  <button type="button" onClick={() => void handleDownloadPdf(log.id)}
+                    disabled={downloadingId === log.id}
+                    className="ml-auto inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-violet-200 text-violet-700 hover:bg-violet-50 disabled:opacity-50">
+                    {downloadingId === log.id ? <Loader2 size={9} className="animate-spin" /> : <FileDown size={9} aria-hidden="true" />}
+                    PDF
+                  </button>
                 </div>
                 <p className="mt-1 text-[11px] text-slate-700 line-clamp-2">{log.content}</p>
               </li>

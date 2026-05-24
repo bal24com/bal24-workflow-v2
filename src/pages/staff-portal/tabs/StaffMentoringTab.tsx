@@ -3,7 +3,7 @@
 // mentoring_logs 테이블 미적용(PGRST205) 안전 처리.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Users2, BookOpen, Plus, Clock, Paperclip } from 'lucide-react';
+import { Loader2, Users2, BookOpen, Plus, Clock, Paperclip, FileDown } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -12,6 +12,8 @@ import EmptyState from '../../../components/EmptyState';
 import { type MentoringLog, type MentoringLogFile } from '../../../types/mentoring';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 import MentoringLogForm from './MentoringLogForm';
+import { fetchLogForPdf } from '../../programs/detail/mentoringLogPdfFetch';
+import { downloadMentoringLogPdf } from '../../programs/detail/mentoringLogPdf';
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -43,6 +45,24 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
   const [formOpenId, setFormOpenId] = useState<string | null>(null);
+  // STEP-MENTORING-P2-PDF — PDF 다운로드 진행 중인 일지 id
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  async function handleDownloadPdf(logId: string) {
+    setDownloadingId(logId);
+    try {
+      const data = await fetchLogForPdf(logId);
+      if (!data) { toast.error('일지 정보를 불러오지 못했어요.'); return; }
+      await downloadMentoringLogPdf(data);
+      toast.success('PDF 다운로드가 시작됐어요.');
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : '';
+      console.error('[staff-portal/mentoring] PDF 생성 실패:', raw);
+      toast.error('PDF 생성 중 오류가 발생했어요.');
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   const fetchData = useCallback(async () => {
     if (!selectedProgramId) { setAssignments([]); setMentees([]); setLogs([]); setLoading(false); return; }
@@ -229,6 +249,13 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
                                 <Paperclip size={9} aria-hidden="true" />{logFiles.length}
                               </span>
                             )}
+                            {/* STEP-MENTORING-P2-PDF — PDF 다운로드 버튼 */}
+                            <button type="button" onClick={() => void handleDownloadPdf(l.id)}
+                              disabled={downloadingId === l.id}
+                              className="ml-auto inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-violet-200 text-violet-700 text-[10px] hover:bg-violet-50 disabled:opacity-50">
+                              {downloadingId === l.id ? <Loader2 size={10} className="animate-spin" /> : <FileDown size={10} aria-hidden="true" />}
+                              PDF
+                            </button>
                           </div>
                           <p className="mt-1.5 text-sm text-slate-700 line-clamp-2 whitespace-pre-wrap">{l.content}</p>
                           {/* 첨부 파일 미리보기 */}
