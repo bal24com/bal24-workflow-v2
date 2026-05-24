@@ -119,9 +119,11 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
 
   const [projects, tasks, programs, sessions, customs] = await Promise.all([
     // 0) 프로젝트 기간 (STEP-UX-FIXES — 배경 바로 표시)
+    // STEP-SCHEDULE-DELETED-FIX — 휴지통 (deleted_at IS NOT NULL) 제외
     supabase
       .from('projects')
       .select('id, name, start_date, end_date')
+      .is('deleted_at', null)
       .not('start_date', 'is', null)
       .not('end_date', 'is', null)
       .lte('start_date', endDate)
@@ -134,10 +136,11 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       .gte('due_date', startDate)
       .lte('due_date', endDate)
       .neq('status', '완료'),
-    // 2) 프로그램 기간
+    // 2) 프로그램 기간 (휴지통 제외)
     supabase
       .from('programs')
       .select('id, name, start_date, end_date')
+      .is('deleted_at', null)
       .not('start_date', 'is', null)
       .not('end_date', 'is', null)
       .lte('start_date', endDate)
