@@ -19,15 +19,34 @@ export default function ProgramDeleteButton({ programId, programName }: Props) {
   // STEP-PROGRAM-DELETE-FIX — FK 제약 시 자세한 에러 메시지 + 모달 유지
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  function translateDeleteError(raw: string): string {
-    const m = raw.toLowerCase();
+  function translateDeleteError(raw: string, code: string, details: string): string {
+    const m = `${raw} ${code} ${details}`.toLowerCase();
     if (m.includes('foreign key') || m.includes('violates') || m.includes('23503')) {
-      return 'FK 제약 — 이 프로그램에 연결된 자식 데이터(커리큘럼·참여자·초대·일지 등)가 있어서 삭제할 수 없어요. Supabase SQL Editor에서 자식 데이터를 먼저 삭제해 주세요. (PM 문의)';
+      // details 에 보통 'is still referenced from table "xxx"' 형태로 자식 테이블명이 들어옴
+      const refMatch = details.match(/table\s+"([^"]+)"/i);
+      const childTable = refMatch ? ` (자식 테이블: ${refMatch[1]})` : '';
+      return `이 프로그램에 연결된 자식 데이터${childTable}가 남아 있어서 삭제할 수 없어요.\n→ 커리큘럼·참여자·강사 초대·일지 등을 먼저 정리한 뒤 다시 시도해 주세요.`;
     }
     if (m.includes('row-level security') || m.includes('permission denied')) {
       return '삭제 권한이 없어요. 관리자에게 문의해 주세요.';
     }
-    return raw ? `삭제 실패: ${raw}` : '삭제에 실패했어요. 잠시 후 다시 시도해 주세요.';
+    if (raw) return `삭제 실패: ${raw}`;
+    if (code) return `삭제 실패 (code: ${code})`;
+    return '삭제에 실패했어요. 잠시 후 다시 시도해 주세요.';
+  }
+
+  // PostgrestError 는 Error 인스턴스가 아니라 { message, code, details, hint } 형태의 객체.
+  // err instanceof Error 만으로는 message 가 비어서 사용자에게 "잠시 후 다시 시도해 주세요" 만 보였음.
+  function extractError(err: unknown): { message: string; code: string; details: string } {
+    if (err && typeof err === 'object') {
+      const obj = err as { message?: unknown; code?: unknown; details?: unknown };
+      return {
+        message: typeof obj.message === 'string' ? obj.message : '',
+        code: typeof obj.code === 'string' ? obj.code : '',
+        details: typeof obj.details === 'string' ? obj.details : '',
+      };
+    }
+    return { message: '', code: '', details: '' };
   }
 
   async function handleDelete() {
@@ -40,9 +59,9 @@ export default function ProgramDeleteButton({ programId, programName }: Props) {
       setOpen(false);
       navigate('/programs');
     } catch (err) {
-      const raw = err instanceof Error ? err.message : '';
-      console.error('[program-detail] 삭제 실패:', raw);
-      const msg = translateDeleteError(raw);
+      const info = extractError(err);
+      console.error('[program-detail] 삭제 실패:', info);
+      const msg = translateDeleteError(info.message, info.code, info.details);
       setErrorMsg(msg);
       toast.error(msg);
       // 모달 유지 (박경수님이 에러를 확인할 수 있게)

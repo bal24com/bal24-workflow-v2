@@ -2,7 +2,7 @@
 // 다크 슬레이트(#0F172A) 배경. 5그룹 구조로 재편 — 홈/사업/주관기관·인력/재무/도구.
 // PARTNER 는 3그룹(홈/사업/도구), MEMBER 는 1그룹(내 사업).
 
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
   CalendarDays,
@@ -227,17 +227,22 @@ export default function Sidebar() {
       aria-label="주 메뉴"
     >
       <div className="px-5 py-6 border-b border-white/10">
-        <div className="flex items-center gap-2">
+        {/* 로고 영역 — 클릭 시 홈(/home)으로 이동. 박경수님 요청으로 큰글씨/작은글씨 위치 교환 */}
+        <Link
+          to="/home"
+          className="flex items-center gap-2 rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
+          aria-label="홈으로 이동"
+        >
           <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/20 text-primary text-lg">
             🚀
           </span>
           <div className="leading-tight">
-            <div className="text-base font-bold">bal24</div>
-            <div className="text-xs text-slate-400">
+            <div className="text-base font-bold">
               {isPartner ? 'WorkFlow · 참여사' : isMember ? 'WorkFlow · 수혜기업' : 'WorkFlow v2'}
             </div>
+            <div className="text-xs text-slate-400">bal24</div>
           </div>
-        </div>
+        </Link>
       </div>
 
       <nav className="flex-1 px-3 py-4 overflow-y-auto" aria-label="섹션 메뉴">
