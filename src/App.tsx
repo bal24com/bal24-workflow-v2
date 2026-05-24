@@ -16,6 +16,8 @@ import ConsortiumDetailPage from './pages/consortium/ConsortiumDetailPage';
 import IncomePage from './pages/income/IncomePage';
 import ExpensesPage from './pages/expenses/ExpensesPage';
 import ReceiptsPage from './pages/receipts/ReceiptsPage';
+// STEP-ACCOUNTING-ALL P2 — 수입/계약 페이지
+import ContractsPage from './pages/contracts/ContractsPage';
 import AttendancePage from './pages/attendance/AttendancePage';
 import AttendanceDetailPage from './pages/attendance/AttendanceDetailPage';
 import ActivityLogsPage from './pages/activity-logs/ActivityLogsPage';
@@ -177,6 +179,8 @@ export default function App() {
               <Route path="/settlements" element={<SettlementPage />} />
               <Route path="/receipts" element={<ReceiptsPage />} />
               <Route path="/vouchers" element={<Navigate to="/receipts" replace />} />
+              {/* STEP-ACCOUNTING-ALL P2 — 수입/계약 신규 페이지 */}
+              <Route path="/contracts" element={<ContractsPage />} />
 
               {/* 출석체크 (STEP 11-B) */}
               <Route path="/attendance" element={<AttendancePage />} />
