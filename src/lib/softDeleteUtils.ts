@@ -32,8 +32,22 @@ export async function restoreRecord(table: SoftDeleteTable, id: string): Promise
 export async function permanentDelete(table: SoftDeleteTable, id: string): Promise<string | null> {
   const { error } = await supabase.from(table).delete().eq('id', id);
   if (error) {
-    console.error(`[permanentDelete:${table}]`, error.message);
-    return '영구 삭제 중 오류가 발생했어요. 연관 데이터가 있으면 관리자에게 문의해 주세요.';
+    // PostgrestError 안전 추출 — error.code·details 까지 사용해서 진짜 원인 표시
+    const code = (error as { code?: string }).code ?? '';
+    const details = (error as { details?: string }).details ?? '';
+    const msg = error.message ?? '';
+    console.error(`[permanentDelete:${table}]`, { code, message: msg, details });
+
+    const m = `${msg} ${code} ${details}`.toLowerCase();
+    if (m.includes('foreign key') || m.includes('violates') || m.includes('23503')) {
+      const refMatch = details.match(/table\s+"([^"]+)"/i);
+      const child = refMatch ? ` (자식 테이블: ${refMatch[1]})` : '';
+      return `연관된 자식 데이터${child}가 남아 있어서 영구 삭제할 수 없어요.\n→ 자식 데이터를 먼저 정리한 뒤 다시 시도해 주세요.`;
+    }
+    if (m.includes('row-level security') || m.includes('permission denied')) {
+      return '삭제 권한이 없어요. 관리자에게 문의해 주세요.';
+    }
+    return msg ? `영구 삭제 실패: ${msg}` : '영구 삭제 중 오류가 발생했어요.';
   }
   return null;
 }

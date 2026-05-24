@@ -202,7 +202,8 @@ export default function ProgramsPage() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { data, error } = await supabase.from('consortiums').select('id, name').in('status', ['구성중', '진행']).order('name', { ascending: true });
+      // STEP-SCHEDULE-DELETED-FIX — 휴지통 컨소시엄 제외 (deleted_at IS NULL)
+      const { data, error } = await supabase.from('consortiums').select('id, name').is('deleted_at', null).in('status', ['구성중', '진행']).order('name', { ascending: true });
       if (cancelled) return;
       if (error) { console.error('[programs] 컨소시엄 조회 실패:', error.message); return; }
       setConsortiums((data as ConsortiumOption[] | null) ?? []);
