@@ -1,0 +1,133 @@
+// 외주/급여 fetch · 통계 유틸 — PayrollPage·FormModal·ImportModal 공용
+// STEP-ACCOUNTING-ALL P3
+
+import { supabase } from '../../lib/supabase';
+import type {
+  PayrollExpense, PayrollExpenseType, PayrollPaymentStatus, PayrollTaxRateType,
+} from '../../types/database';
+
+export type PayrollRow = PayrollExpense & {
+  project?: { id: string; name: string; deleted_at: string | null } | null;
+};
+
+export const OUTSOURCE_TYPES: PayrollExpenseType[] = ['강사료', '촬영', '기타외주'];
+export const OPERATION_TYPES: PayrollExpenseType[] = ['운영비', '운영인건비'];
+
+export const PAYROLL_TYPE_VALUES: PayrollExpenseType[] = [
+  ...OUTSOURCE_TYPES, ...OPERATION_TYPES,
+];
+
+export const PAYROLL_STATUS_VALUES: PayrollPaymentStatus[] = [
+  '대기', '완료', '후순위', '취소',
+];
+
+export const PAYROLL_STATUS_STYLE: Record<PayrollPaymentStatus, string> = {
+  대기:   'bg-amber-50 text-amber-700 border-amber-200',
+  완료:   'bg-emerald-50 text-emerald-700 border-emerald-200',
+  후순위: 'bg-slate-50 text-slate-600 border-slate-200',
+  취소:   'bg-rose-50 text-rose-700 border-rose-200',
+};
+
+export interface PayrollFilter {
+  types: PayrollExpenseType[];
+  projectId?: string;
+  status?: PayrollPaymentStatus | 'all';
+  month?: string; // YYYY-MM
+}
+
+/** 목록 조회 (휴지통 자동 제외) */
+export async function fetchPayroll(filter: PayrollFilter): Promise<PayrollRow[]> {
+  let q = supabase
+    .from('payroll_expenses')
+    .select('*, project:projects(id, name, deleted_at)')
+    .is('deleted_at', null)
+    .in('expense_type', filter.types)
+    .order('created_at', { ascending: false });
+
+  if (filter.projectId) q = q.eq('project_id', filter.projectId);
+  if (filter.status && filter.status !== 'all') q = q.eq('payment_status', filter.status);
+
+  if (filter.month) {
+    const [y, m] = filter.month.split('-').map(Number);
+    if (y && m) {
+      const start = `${y}-${String(m).padStart(2, '0')}-01`;
+      const lastDay = new Date(y, m, 0).getDate();
+      const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      q = q.gte('paid_at', start).lte('paid_at', end);
+    }
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    console.error('[payroll] 목록 조회 실패:', error.message);
+    throw new Error('외주/급여 목록을 불러오지 못했어요.');
+  }
+  return ((data ?? []) as unknown as PayrollRow[]).filter(
+    (r) => !r.project?.deleted_at,
+  );
+}
+
+/** soft-delete */
+export async function softDeletePayroll(id: string): Promise<string | null> {
+  const { error } = await supabase
+    .from('payroll_expenses')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) {
+    console.error('[payroll] 삭제 실패:', error.message);
+    return '삭제 중 오류가 발생했어요.';
+  }
+  return null;
+}
+
+/** 합계 — 세전·원천세·실지급 */
+export interface PayrollSummary {
+  subtotal: number;
+  taxAmount: number;
+  netAmount: number;
+  count: number;
+}
+export function calcPayrollSummary(rows: PayrollRow[]): PayrollSummary {
+  return rows.reduce<PayrollSummary>(
+    (acc, r) => ({
+      subtotal: acc.subtotal + Number(r.subtotal ?? 0),
+      taxAmount: acc.taxAmount + Number(r.tax_amount ?? 0),
+      netAmount: acc.netAmount + Number(r.net_amount ?? 0),
+      count: acc.count + 1,
+    }),
+    { subtotal: 0, taxAmount: 0, netAmount: 0, count: 0 },
+  );
+}
+
+/** 주민번호 마스킹 (앞 6자리 + 뒤 ******) */
+export function maskIdNo(idNo: string | null | undefined): string {
+  if (!idNo) return '';
+  const clean = idNo.replace(/[^0-9]/g, '');
+  if (clean.length < 7) return idNo;
+  return `${clean.slice(0, 6)}-*******`;
+}
+
+/** Excel import 컬럼 매핑 (현행 강사료 엑셀 양식) */
+export interface ImportRow {
+  expense_type?: PayrollExpenseType;
+  description?: string;
+  payee_name?: string;
+  payee_id_no?: string;
+  bank_name?: string;
+  bank_account?: string;
+  unit_price?: number;
+  quantity?: number;
+  tax_rate_type?: PayrollTaxRateType;
+}
+
+export const IMPORT_COLUMN_MAP: Record<string, keyof ImportRow> = {
+  '구분':     'expense_type',
+  '내용':     'description',
+  '성명':     'payee_name',
+  '주민번호': 'payee_id_no',
+  '은행명':   'bank_name',
+  '계좌번호': 'bank_account',
+  '단가':     'unit_price',
+  '회수':     'quantity',
+  '세액구분': 'tax_rate_type',
+};

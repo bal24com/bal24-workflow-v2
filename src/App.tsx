@@ -18,6 +18,8 @@ import ExpensesPage from './pages/expenses/ExpensesPage';
 import ReceiptsPage from './pages/receipts/ReceiptsPage';
 // STEP-ACCOUNTING-ALL P2 — 수입/계약 페이지
 import ContractsPage from './pages/contracts/ContractsPage';
+// STEP-ACCOUNTING-ALL P3 — 외주/급여 페이지
+import PayrollPage from './pages/payroll/PayrollPage';
 import AttendancePage from './pages/attendance/AttendancePage';
 import AttendanceDetailPage from './pages/attendance/AttendanceDetailPage';
 import ActivityLogsPage from './pages/activity-logs/ActivityLogsPage';
@@ -181,6 +183,8 @@ export default function App() {
               <Route path="/vouchers" element={<Navigate to="/receipts" replace />} />
               {/* STEP-ACCOUNTING-ALL P2 — 수입/계약 신규 페이지 */}
               <Route path="/contracts" element={<ContractsPage />} />
+              {/* STEP-ACCOUNTING-ALL P3 — 외주/급여 신규 페이지 */}
+              <Route path="/payroll" element={<PayrollPage />} />
 
               {/* 출석체크 (STEP 11-B) */}
               <Route path="/attendance" element={<AttendancePage />} />
