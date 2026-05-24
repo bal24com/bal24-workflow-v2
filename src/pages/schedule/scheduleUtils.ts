@@ -128,10 +128,12 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       .not('end_date', 'is', null)
       .lte('start_date', endDate)
       .gte('end_date', startDate),
-    // 1) 태스크 마감일 (완료 제외)
+    // 1) 태스크 마감일 (완료 제외 + 부모 프로젝트 휴지통 제외)
+    // STEP-SCHEDULE-DELETED-FIX — projects!inner 로 휴지통 프로젝트의 자식 태스크 차단
     supabase
       .from('tasks')
-      .select('id, project_id, title, due_date, status')
+      .select('id, project_id, title, due_date, status, projects!inner(deleted_at)')
+      .is('projects.deleted_at', null)
       .not('due_date', 'is', null)
       .gte('due_date', startDate)
       .lte('due_date', endDate)
@@ -145,10 +147,11 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       .not('end_date', 'is', null)
       .lte('start_date', endDate)
       .gte('end_date', startDate),
-    // 3) 출석 세션
+    // 3) 출석 세션 (부모 프로그램 휴지통 제외)
     supabase
       .from('attendance_sessions')
-      .select('id, title, session_date, start_time, end_time, program_id')
+      .select('id, title, session_date, start_time, end_time, program_id, programs!inner(deleted_at)')
+      .is('programs.deleted_at', null)
       .gte('session_date', startDate)
       .lte('session_date', endDate),
     // 4) 수동 등록 일정
