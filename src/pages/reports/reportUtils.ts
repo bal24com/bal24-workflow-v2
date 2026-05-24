@@ -41,20 +41,23 @@ export type AggregatedReport = {
 
 export async function aggregateReportData(projectId: string): Promise<AggregatedReport> {
   // projects + client (단일 FK)
+  // STEP-TRASH-FILTER-AUDIT — 휴지통 프로젝트는 리포트 집계 대상에서 제외
   const { data: projectData, error: projErr } = await supabase
     .from('projects')
     .select('*, client:clients(id,name)')
     .eq('id', projectId)
+    .is('deleted_at', null)
     .maybeSingle();
   if (projErr) throw new Error(projErr.message);
   if (!projectData) throw new Error('프로젝트를 찾을 수 없어요.');
   const project = projectData as Project & { client?: Pick<Client, 'id' | 'name'> | null };
 
-  // programs
+  // programs (휴지통 제외)
   const { data: progs, error: progErr } = await supabase
     .from('programs')
     .select('id, name, start_date, end_date')
     .eq('project_id', projectId)
+    .is('deleted_at', null)
     .order('start_date', { ascending: true });
   if (progErr) throw new Error(progErr.message);
   const programs = (progs ?? []) as Pick<Program, 'id' | 'name' | 'start_date' | 'end_date'>[];

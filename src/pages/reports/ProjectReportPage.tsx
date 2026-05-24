@@ -56,7 +56,8 @@ export default function ProjectReportPage() {
     setErrorMsg(null);
     try {
       const [pR, rR, sR] = await Promise.all([
-        supabase.from('projects').select('id, name').eq('id', projectId).maybeSingle(),
+        // STEP-TRASH-FILTER-AUDIT — 휴지통 프로젝트 리포트 페이지 차단
+        supabase.from('projects').select('id, name').eq('id', projectId).is('deleted_at', null).maybeSingle(),
         supabase.from('project_reports').select('*').eq('project_id', projectId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('project_settlements').select('*').eq('project_id', projectId).maybeSingle(),
       ]);

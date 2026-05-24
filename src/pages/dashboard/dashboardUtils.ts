@@ -171,9 +171,11 @@ export async function fetchDashboardKpis(): Promise<DashboardKpis> {
 }
 
 export async function fetchRecentProjects(limit = 5): Promise<RecentProject[]> {
+  // STEP-TRASH-FILTER-AUDIT — 휴지통 프로젝트 제외
   const { data, error } = await supabase
     .from('projects')
     .select('id, name, status, start_date, end_date, client:clients(id, name)')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -239,9 +241,11 @@ export async function fetchRecentExpenses(limit = 5): Promise<RecentExpense[]> {
 export async function fetchActiveProjects(limit = 6): Promise<ActiveProjectRow[]> {
   const ACTIVE_STATUS: ProjectStatus[] = ['진행', '정산'];
 
+  // STEP-TRASH-FILTER-AUDIT — 휴지통 프로젝트 제외
   const { data, error } = await supabase
     .from('projects')
     .select('id, name, status, updated_at, client:clients(id, name)')
+    .is('deleted_at', null)
     .in('status', ACTIVE_STATUS)
     .order('updated_at', { ascending: false })
     .limit(limit);
@@ -271,7 +275,8 @@ export async function fetchActiveProjects(limit = 6): Promise<ActiveProjectRow[]
 
 /** 단계별 프로젝트 카운트 (제안·진행·정산·종료 4단계) */
 export async function fetchProjectStageCounts(): Promise<ProjectStageCounts> {
-  const { data, error } = await supabase.from('projects').select('status');
+  // STEP-TRASH-FILTER-AUDIT — 휴지통 프로젝트는 단계 카운트에서 제외
+  const { data, error } = await supabase.from('projects').select('status').is('deleted_at', null);
 
   if (error) {
     console.error('[dashboard] 단계별 프로젝트 카운트 실패:', error.message);

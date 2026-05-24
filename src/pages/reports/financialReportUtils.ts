@@ -130,6 +130,7 @@ export async function fetchSummary(year: number, ledgerType: LedgerType): Promis
     supabase
       .from('projects')
       .select('id', { count: 'exact', head: true })
+      .is('deleted_at', null)
       .in('status', ['진행', '정산']),
     supabase
       .from('expenses')

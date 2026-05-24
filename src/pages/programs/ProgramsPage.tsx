@@ -214,7 +214,8 @@ export default function ProgramsPage() {
   const fetchPrograms = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('programs').select(SELECT_COLUMNS).order('created_at', { ascending: false });
+      // STEP-TRASH-FILTER-AUDIT — 휴지통(deleted_at IS NOT NULL) 프로그램 제외
+      const { data, error } = await supabase.from('programs').select(SELECT_COLUMNS).is('deleted_at', null).order('created_at', { ascending: false });
       if (error) throw error;
       setPrograms((data ?? []) as ProgramRow[]);
     } catch (err) {
