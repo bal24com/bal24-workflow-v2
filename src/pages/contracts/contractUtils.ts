@@ -6,15 +6,17 @@ import type { IncomeContract, ContractStatus, BillingScheduleItem } from '../../
 
 export type ContractRow = IncomeContract & {
   project?: { id: string; name: string; deleted_at: string | null } | null;
+  program?: { id: string; name: string; deleted_at: string | null } | null;
   client?: { id: string; name: string; deleted_at: string | null } | null;
 };
 
 const SELECT_COLUMNS =
-  '*, project:projects(id, name, deleted_at), client:clients(id, name, deleted_at)';
+  '*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at), client:clients(id, name, deleted_at)';
 
 /** 휴지통 join row 제외 헬퍼 */
 function isLiveContract(c: ContractRow): boolean {
   if (c.project?.deleted_at) return false;
+  if (c.program?.deleted_at) return false;
   if (c.client?.deleted_at) return false;
   return true;
 }

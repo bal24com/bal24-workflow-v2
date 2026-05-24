@@ -1,8 +1,8 @@
 // 수입/계약 등록·수정 모달 — STEP-ACCOUNTING-ALL P2
 // 기본정보 + 청구 단계 jsonb + 첨부 + 비고
 
-import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Search as SearchIcon } from 'lucide-react';
 import { Modal, Button, Input } from '../../components/ui';
 import FileDropZone from '../../components/ui/FileDropZone';
 import { supabase } from '../../lib/supabase';
@@ -12,8 +12,10 @@ import type {
 } from '../../types/database';
 import type { ContractRow } from './contractUtils';
 import { CONTRACT_STATUS_VALUES, uploadContractFile } from './contractUtils';
+import BillingScheduleEditor from './BillingScheduleEditor';
 
 interface RefOption { id: string; name: string }
+interface ProgramOption { id: string; name: string; project_id: string | null }
 
 interface Props {
   open: boolean;
@@ -29,6 +31,7 @@ function emptyForm() {
     contract_name: '',
     client_id: '',
     project_id: '',
+    program_id: '', // STEP-ACCOUNTING-FOLLOWUP3
     contract_amount: '',
     vat_type: '과세' as VatType,
     contract_date: '',
@@ -48,6 +51,8 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
   const [schedule, setSchedule] = useState<BillingScheduleItem[]>([]);
   const [clients, setClients] = useState<RefOption[]>([]);
   const [projects, setProjects] = useState<RefOption[]>([]);
+  const [programs, setPrograms] = useState<ProgramOption[]>([]);
+  const [projectSearch, setProjectSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingContract, setUploadingContract] = useState(false);
   const [uploadingTaxInvoice, setUploadingTaxInvoice] = useState(false);
@@ -56,15 +61,18 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
     if (!open) return;
     let cancelled = false;
     void (async () => {
-      const [cRes, pRes] = await Promise.all([
+      const [cRes, pRes, gRes] = await Promise.all([
         supabase.from('clients').select('id, name').is('deleted_at', null).order('name'),
         supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('programs').select('id, name, project_id').is('deleted_at', null).order('created_at', { ascending: false }),
       ]);
       if (cancelled) return;
       if (cRes.error) console.error('[ContractFormModal] clients 조회 실패:', cRes.error.message);
       if (pRes.error) console.error('[ContractFormModal] projects 조회 실패:', pRes.error.message);
+      if (gRes.error) console.error('[ContractFormModal] programs 조회 실패:', gRes.error.message);
       setClients((cRes.data as RefOption[] | null) ?? []);
       setProjects((pRes.data as RefOption[] | null) ?? []);
+      setPrograms((gRes.data as ProgramOption[] | null) ?? []);
     })();
     return () => { cancelled = true; };
   }, [open]);
@@ -76,6 +84,7 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         contract_name: target.contract_name ?? '',
         client_id: target.client_id ?? '',
         project_id: target.project_id ?? '',
+        program_id: target.program_id ?? '',
         contract_amount: String(target.contract_amount ?? ''),
         vat_type: target.vat_type ?? '과세',
         contract_date: target.contract_date ?? '',
@@ -87,9 +96,11 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         tax_invoice_name: target.tax_invoice_url ? '업로드된 세금계산서' : '',
       });
       setSchedule(Array.isArray(target.billing_schedule) ? target.billing_schedule : []);
+      setProjectSearch(target.project?.name ?? '');
     } else {
       setForm(emptyForm());
       setSchedule([]);
+      setProjectSearch('');
     }
   }, [open, target]);
 
@@ -106,6 +117,39 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
 
   function removeSchedule(idx: number) {
     setSchedule((prev) => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, seq: i + 1 })));
+  }
+
+  // STEP-ACCOUNTING-FOLLOWUP3 — 프로젝트 검색 + 프로그램 자동 매칭
+  const projectMatches = useMemo(() => {
+    const q = projectSearch.trim().toLowerCase();
+    if (!q) return projects.slice(0, 8);
+    return projects.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [projects, projectSearch]);
+
+  const programMatches = useMemo(() => {
+    if (!form.project_id) return [];
+    return programs.filter((g) => g.project_id === form.project_id);
+  }, [programs, form.project_id]);
+
+  function selectProject(name: string) {
+    const match = projects.find((p) => p.name === name);
+    setProjectSearch(name);
+    setForm((f) => {
+      const next = { ...f, project_id: match?.id ?? '', program_id: '' };
+      // 계약명이 비어 있을 때만 자동 채움 (덮어쓰기 X)
+      if (!next.contract_name.trim() && match) next.contract_name = match.name;
+      return next;
+    });
+  }
+
+  function selectProgram(programId: string) {
+    setForm((f) => {
+      const next = { ...f, program_id: programId };
+      const g = programs.find((p) => p.id === programId);
+      // 계약명이 비어 있을 때만 자동으로 프로그램명으로 채움
+      if (programId && g && !next.contract_name.trim()) next.contract_name = g.name;
+      return next;
+    });
   }
 
   async function handleContractFile(file: File) {
@@ -157,6 +201,7 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         contract_name: form.contract_name.trim(),
         client_id: form.client_id || null,
         project_id: form.project_id || null,
+        program_id: form.program_id || null,
         contract_amount: Number(form.contract_amount),
         vat_type: form.vat_type,
         contract_date: form.contract_date || null,
@@ -219,17 +264,37 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </Field>
-          <Field label="연결 프로젝트">
+          <Field label="연결 프로젝트 (검색 가능)">
+            <div className="relative">
+              <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input
+                list="contract-project-options"
+                value={projectSearch}
+                onChange={(e) => selectProject(e.target.value)}
+                placeholder="프로젝트명으로 검색"
+                className="pl-9"
+              />
+              <datalist id="contract-project-options">
+                {projectMatches.map((p) => <option key={p.id} value={p.name} />)}
+              </datalist>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">선택 시 계약명이 비어 있으면 자동으로 채워져요.</p>
+          </Field>
+        </div>
+
+        {/* 프로그램 연동 — 프로젝트 선택 시 그 프로젝트의 프로그램만 노출 */}
+        {form.project_id && programMatches.length > 0 && (
+          <Field label="연결 프로그램 (선택)">
             <select
-              value={form.project_id}
-              onChange={(e) => setForm({ ...form, project_id: e.target.value })}
+              value={form.program_id}
+              onChange={(e) => selectProgram(e.target.value)}
               className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
             >
               <option value="">선택 안함</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {programMatches.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </Field>
-        </div>
+        )}
 
         <div className="grid grid-cols-3 gap-3">
           <Field label="계약금액" required>
@@ -268,53 +333,12 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
           </select>
         </Field>
 
-        {/* 청구 단계 jsonb */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500">청구 단계</span>
-            <Button variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={addSchedule}>단계 추가</Button>
-          </div>
-          {schedule.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">청구 단계를 추가하지 않으면 일괄 계약으로 처리됩니다.</p>
-          ) : (
-            <div className="space-y-2">
-              {schedule.map((s, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-1 text-center text-xs text-slate-500">{s.seq}회차</div>
-                  <Input
-                    className="col-span-3"
-                    type="number"
-                    value={String(s.amount || '')}
-                    onChange={(e) => updateSchedule(idx, { amount: Number(e.target.value) || 0 })}
-                    placeholder="금액"
-                  />
-                  <Input
-                    className="col-span-3"
-                    type="date"
-                    value={s.due_date}
-                    onChange={(e) => updateSchedule(idx, { due_date: e.target.value })}
-                  />
-                  <select
-                    className="col-span-3 h-10 rounded-xl border border-slate-200 px-2 text-xs"
-                    value={s.status}
-                    onChange={(e) => updateSchedule(idx, { status: e.target.value as BillingScheduleItem['status'] })}
-                  >
-                    <option value="pending">대기</option>
-                    <option value="issued">발행</option>
-                    <option value="paid">완료</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => removeSchedule(idx)}
-                    className="col-span-2 inline-flex items-center justify-center h-9 rounded-lg text-xs text-rose-600 hover:bg-rose-50"
-                  >
-                    <Trash2 size={12} className="mr-1" />삭제
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <BillingScheduleEditor
+          schedule={schedule}
+          onAdd={addSchedule}
+          onUpdate={updateSchedule}
+          onRemove={removeSchedule}
+        />
 
         {/* 첨부 파일 — Storage contracts 버킷 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -1368,6 +1368,7 @@ export interface BillingScheduleItem {
 export interface IncomeContract {
   id: string;
   project_id: string | null;
+  program_id: string | null; // STEP-ACCOUNTING-FOLLOWUP3
   client_id: string | null;
   contract_name: string;
   contract_amount: number;
