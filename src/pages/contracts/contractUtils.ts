@@ -7,16 +7,18 @@ import type { IncomeContract, ContractStatus, BillingScheduleItem } from '../../
 export type ContractRow = IncomeContract & {
   project?: { id: string; name: string; deleted_at: string | null } | null;
   program?: { id: string; name: string; deleted_at: string | null } | null;
+  consortium?: { id: string; name: string; deleted_at: string | null } | null;
   client?: { id: string; name: string; deleted_at: string | null } | null;
 };
 
 const SELECT_COLUMNS =
-  '*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at), client:clients(id, name, deleted_at)';
+  '*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at), consortium:consortiums(id, name, deleted_at), client:clients(id, name, deleted_at)';
 
 /** 휴지통 join row 제외 헬퍼 */
 function isLiveContract(c: ContractRow): boolean {
   if (c.project?.deleted_at) return false;
   if (c.program?.deleted_at) return false;
+  if (c.consortium?.deleted_at) return false;
   if (c.client?.deleted_at) return false;
   return true;
 }
@@ -103,6 +105,22 @@ export function calcContractKpis(rows: ContractRow[]): ContractKpis {
     { inProgressTotal: 0, completedCount: 0, notDepositedCount: 0 },
   );
 }
+
+// STEP-ACCOUNTING-FOLLOWUP4 — 통합 연결 대상 검색
+export type LinkType = 'project' | 'program' | 'consortium';
+export interface LinkOption {
+  key: string;
+  type: LinkType;
+  id: string;
+  name: string;
+  display: string;
+  projectId?: string | null;
+}
+export const LINK_TYPE_LABEL: Record<LinkType, string> = {
+  project: '프로젝트',
+  program: '프로그램',
+  consortium: '컨소시엄',
+};
 
 export const CONTRACT_STATUS_VALUES: ContractStatus[] = ['진행중', '완료', '취소', '보류'];
 

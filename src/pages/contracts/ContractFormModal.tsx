@@ -10,8 +10,8 @@ import { useToast } from '../../contexts/ToastContext';
 import type {
   BillingScheduleItem, ContractStatus, VatType,
 } from '../../types/database';
-import type { ContractRow } from './contractUtils';
-import { CONTRACT_STATUS_VALUES, uploadContractFile } from './contractUtils';
+import type { ContractRow, LinkOption } from './contractUtils';
+import { CONTRACT_STATUS_VALUES, LINK_TYPE_LABEL, uploadContractFile } from './contractUtils';
 import BillingScheduleEditor from './BillingScheduleEditor';
 
 interface RefOption { id: string; name: string }
@@ -28,21 +28,13 @@ const VAT_VALUES: VatType[] = ['과세', '면세', '영세율'];
 
 function emptyForm() {
   return {
-    contract_name: '',
-    client_id: '',
-    project_id: '',
-    program_id: '', // STEP-ACCOUNTING-FOLLOWUP3
-    contract_amount: '',
-    vat_type: '과세' as VatType,
-    contract_date: '',
-    status: '진행중' as ContractStatus,
-    memo: '',
-    contract_file_url: '' as string,
-    contract_file_name: '' as string,
-    tax_invoice_url: '' as string,
-    tax_invoice_name: '' as string,
+    contract_name: '', client_id: '', project_id: '', program_id: '', consortium_id: '',
+    contract_amount: '', vat_type: '과세' as VatType, contract_date: '',
+    status: '진행중' as ContractStatus, memo: '',
+    contract_file_url: '', contract_file_name: '', tax_invoice_url: '', tax_invoice_name: '',
   };
 }
+
 
 
 export default function ContractFormModal({ open, target, onClose, onSaved }: Props) {
@@ -52,7 +44,8 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
   const [clients, setClients] = useState<RefOption[]>([]);
   const [projects, setProjects] = useState<RefOption[]>([]);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
-  const [projectSearch, setProjectSearch] = useState('');
+  const [consortiums, setConsortiums] = useState<RefOption[]>([]);
+  const [linkSearch, setLinkSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingContract, setUploadingContract] = useState(false);
   const [uploadingTaxInvoice, setUploadingTaxInvoice] = useState(false);
@@ -61,18 +54,21 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
     if (!open) return;
     let cancelled = false;
     void (async () => {
-      const [cRes, pRes, gRes] = await Promise.all([
+      const [cRes, pRes, gRes, conRes] = await Promise.all([
         supabase.from('clients').select('id, name').is('deleted_at', null).order('name'),
         supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
         supabase.from('programs').select('id, name, project_id').is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('consortiums').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
       ]);
       if (cancelled) return;
       if (cRes.error) console.error('[ContractFormModal] clients 조회 실패:', cRes.error.message);
       if (pRes.error) console.error('[ContractFormModal] projects 조회 실패:', pRes.error.message);
       if (gRes.error) console.error('[ContractFormModal] programs 조회 실패:', gRes.error.message);
+      if (conRes.error) console.error('[ContractFormModal] consortiums 조회 실패:', conRes.error.message);
       setClients((cRes.data as RefOption[] | null) ?? []);
       setProjects((pRes.data as RefOption[] | null) ?? []);
       setPrograms((gRes.data as ProgramOption[] | null) ?? []);
+      setConsortiums((conRes.data as RefOption[] | null) ?? []);
     })();
     return () => { cancelled = true; };
   }, [open]);
@@ -85,6 +81,7 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         client_id: target.client_id ?? '',
         project_id: target.project_id ?? '',
         program_id: target.program_id ?? '',
+        consortium_id: target.consortium_id ?? '',
         contract_amount: String(target.contract_amount ?? ''),
         vat_type: target.vat_type ?? '과세',
         contract_date: target.contract_date ?? '',
@@ -96,11 +93,15 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         tax_invoice_name: target.tax_invoice_url ? '업로드된 세금계산서' : '',
       });
       setSchedule(Array.isArray(target.billing_schedule) ? target.billing_schedule : []);
-      setProjectSearch(target.project?.name ?? '');
+      // 기존 연결 항목명을 검색창에 표시
+      const linkedName =
+        target.program?.name ?? target.project?.name ?? target.consortium?.name ?? '';
+      const linkedLabel = target.program ? 'program' : target.project ? 'project' : target.consortium ? 'consortium' : null;
+      setLinkSearch(linkedLabel && linkedName ? `${LINK_TYPE_LABEL[linkedLabel]}: ${linkedName}` : '');
     } else {
       setForm(emptyForm());
       setSchedule([]);
-      setProjectSearch('');
+      setLinkSearch('');
     }
   }, [open, target]);
 
@@ -119,35 +120,46 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
     setSchedule((prev) => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, seq: i + 1 })));
   }
 
-  // STEP-ACCOUNTING-FOLLOWUP3 — 프로젝트 검색 + 프로그램 자동 매칭
-  const projectMatches = useMemo(() => {
-    const q = projectSearch.trim().toLowerCase();
-    if (!q) return projects.slice(0, 8);
-    return projects.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 8);
-  }, [projects, projectSearch]);
+  // STEP-ACCOUNTING-FOLLOWUP4 — 프로젝트/프로그램/컨소시엄 통합 검색
+  // 계약명 = 선택 항목명 강제 (덮어쓰기). 계약은 셋 중 정확히 하나에만 연결.
+  const linkOptions = useMemo<LinkOption[]>(() => {
+    const opts: LinkOption[] = [];
+    for (const p of projects) {
+      opts.push({ key: `project:${p.id}`, type: 'project', id: p.id, name: p.name, display: `프로젝트: ${p.name}` });
+    }
+    for (const g of programs) {
+      opts.push({ key: `program:${g.id}`, type: 'program', id: g.id, name: g.name, display: `프로그램: ${g.name}`, projectId: g.project_id });
+    }
+    for (const c of consortiums) {
+      opts.push({ key: `consortium:${c.id}`, type: 'consortium', id: c.id, name: c.name, display: `컨소시엄: ${c.name}` });
+    }
+    return opts;
+  }, [projects, programs, consortiums]);
 
-  const programMatches = useMemo(() => {
-    if (!form.project_id) return [];
-    return programs.filter((g) => g.project_id === form.project_id);
-  }, [programs, form.project_id]);
+  const linkMatches = useMemo(() => {
+    const q = linkSearch.trim().toLowerCase();
+    if (!q) return linkOptions.slice(0, 12);
+    return linkOptions.filter((o) => o.display.toLowerCase().includes(q)).slice(0, 12);
+  }, [linkOptions, linkSearch]);
 
-  function selectProject(name: string) {
-    const match = projects.find((p) => p.name === name);
-    setProjectSearch(name);
+  function selectLink(displayValue: string) {
+    setLinkSearch(displayValue);
+    // 정확 일치하는 옵션 찾기. 일치 안 하면 form 의 ID 들은 모두 해제.
+    const match = linkOptions.find((o) => o.display === displayValue);
     setForm((f) => {
-      const next = { ...f, project_id: match?.id ?? '', program_id: '' };
-      // 계약명이 비어 있을 때만 자동 채움 (덮어쓰기 X)
-      if (!next.contract_name.trim() && match) next.contract_name = match.name;
-      return next;
-    });
-  }
-
-  function selectProgram(programId: string) {
-    setForm((f) => {
-      const next = { ...f, program_id: programId };
-      const g = programs.find((p) => p.id === programId);
-      // 계약명이 비어 있을 때만 자동으로 프로그램명으로 채움
-      if (programId && g && !next.contract_name.trim()) next.contract_name = g.name;
+      if (!match) {
+        return { ...f, project_id: '', program_id: '', consortium_id: '' };
+      }
+      const next = { ...f, project_id: '', program_id: '', consortium_id: '' };
+      if (match.type === 'project') next.project_id = match.id;
+      if (match.type === 'program') {
+        next.program_id = match.id;
+        // 프로그램은 부모 프로젝트도 자동 설정
+        if (match.projectId) next.project_id = match.projectId;
+      }
+      if (match.type === 'consortium') next.consortium_id = match.id;
+      // 계약명 = 선택 항목명 강제 동기화 (덮어쓰기)
+      next.contract_name = match.name;
       return next;
     });
   }
@@ -202,6 +214,7 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         client_id: form.client_id || null,
         project_id: form.project_id || null,
         program_id: form.program_id || null,
+        consortium_id: form.consortium_id || null,
         contract_amount: Number(form.contract_amount),
         vat_type: form.vat_type,
         contract_date: form.contract_date || null,
@@ -245,56 +258,43 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
       }
     >
       <div className="space-y-4">
-        <Field label="계약명" required>
+        {/* STEP-ACCOUNTING-FOLLOWUP4 — 연결 대상 통합 검색 (프로젝트/프로그램/컨소시엄 중 하나) */}
+        <Field label="연결 대상 (프로젝트·프로그램·컨소시엄)" required>
+          <div className="relative">
+            <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Input
+              list="contract-link-options"
+              value={linkSearch}
+              onChange={(e) => selectLink(e.target.value)}
+              placeholder="이름으로 검색 — 예: '아리랑' 입력 후 옵션 선택"
+              className="pl-9"
+            />
+            <datalist id="contract-link-options">
+              {linkMatches.map((o) => <option key={o.key} value={o.display} />)}
+            </datalist>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1">선택한 항목명이 계약명으로 자동 설정됩니다. (계약명 = 선택 항목명 강제 일치)</p>
+        </Field>
+
+        <Field label="계약명 (선택한 항목명으로 자동 설정)" required>
           <Input
             value={form.contract_name}
-            onChange={(e) => setForm({ ...form, contract_name: e.target.value })}
-            placeholder="예: 2026 광주관광 활성화 1차 용역"
+            readOnly
+            placeholder="위에서 연결 대상을 선택하면 자동으로 채워져요"
+            className="bg-slate-50 cursor-not-allowed"
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="주관기관">
-            <select
-              value={form.client_id}
-              onChange={(e) => setForm({ ...form, client_id: e.target.value })}
-              className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
-            >
-              <option value="">선택 안함</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
-          <Field label="연결 프로젝트 (검색 가능)">
-            <div className="relative">
-              <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <Input
-                list="contract-project-options"
-                value={projectSearch}
-                onChange={(e) => selectProject(e.target.value)}
-                placeholder="프로젝트명으로 검색"
-                className="pl-9"
-              />
-              <datalist id="contract-project-options">
-                {projectMatches.map((p) => <option key={p.id} value={p.name} />)}
-              </datalist>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1">선택 시 계약명이 비어 있으면 자동으로 채워져요.</p>
-          </Field>
-        </div>
-
-        {/* 프로그램 연동 — 프로젝트 선택 시 그 프로젝트의 프로그램만 노출 */}
-        {form.project_id && programMatches.length > 0 && (
-          <Field label="연결 프로그램 (선택)">
-            <select
-              value={form.program_id}
-              onChange={(e) => selectProgram(e.target.value)}
-              className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
-            >
-              <option value="">선택 안함</option>
-              {programMatches.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          </Field>
-        )}
+        <Field label="주관기관">
+          <select
+            value={form.client_id}
+            onChange={(e) => setForm({ ...form, client_id: e.target.value })}
+            className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
+          >
+            <option value="">선택 안함</option>
+            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Field>
 
         <div className="grid grid-cols-3 gap-3">
           <Field label="계약금액" required>
