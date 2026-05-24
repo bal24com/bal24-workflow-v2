@@ -1,7 +1,8 @@
-// 외주/급여 등록·수정 모달 — STEP-ACCOUNTING-ALL P3
-// 단가·회수·세액 자동계산 + 영수증 첨부 (Storage 통합은 후속)
+// 외주/급여 등록·수정 모달 — STEP-ACCOUNTING-FOLLOWUP2
+// 단가·회수·세액 자동계산 + 프로그램 연동 + 부가세 옵션 + 카테고리 자유 입력 + 프로젝트 검색
 
 import { useEffect, useMemo, useState } from 'react';
+import { Search as SearchIcon } from 'lucide-react';
 import { Modal, Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
@@ -11,11 +12,12 @@ import type {
   PayrollExpenseType, PayrollPaymentStatus, PayrollTaxRateType,
 } from '../../types/database';
 import {
-  PAYROLL_TYPE_VALUES, PAYROLL_STATUS_VALUES,
+  PAYROLL_BASE_TYPES, PAYROLL_STATUS_VALUES,
   type PayrollRow,
 } from './payrollUtils';
 
 interface RefOption { id: string; name: string }
+interface ProgramOption { id: string; name: string; project_id: string | null }
 
 interface Props {
   open: boolean;
@@ -44,6 +46,7 @@ function emptyForm(defaultType: PayrollExpenseType) {
     payment_status: '대기' as PayrollPaymentStatus,
     paid_at: '',
     project_id: '',
+    program_id: '',
     memo: '',
   };
 }
@@ -54,18 +57,25 @@ export default function PayrollExpenseFormModal({
   const toast = useToast();
   const [form, setForm] = useState(() => emptyForm(defaultType));
   const [projects, setProjects] = useState<RefOption[]>([]);
+  const [programs, setPrograms] = useState<ProgramOption[]>([]);
+  const [projectSearch, setProjectSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     void (async () => {
-      const { data, error } = await supabase
-        .from('projects').select('id, name')
-        .is('deleted_at', null).order('created_at', { ascending: false });
+      const [pRes, gRes] = await Promise.all([
+        supabase.from('projects').select('id, name')
+          .is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('programs').select('id, name, project_id')
+          .is('deleted_at', null).order('created_at', { ascending: false }),
+      ]);
       if (cancelled) return;
-      if (error) { console.error('[PayrollExpenseFormModal] projects 조회 실패:', error.message); return; }
-      setProjects((data as RefOption[] | null) ?? []);
+      if (pRes.error) console.error('[PayrollExpenseFormModal] projects 조회 실패:', pRes.error.message);
+      if (gRes.error) console.error('[PayrollExpenseFormModal] programs 조회 실패:', gRes.error.message);
+      setProjects((pRes.data as RefOption[] | null) ?? []);
+      setPrograms((gRes.data as ProgramOption[] | null) ?? []);
     })();
     return () => { cancelled = true; };
   }, [open]);
@@ -86,12 +96,29 @@ export default function PayrollExpenseFormModal({
         payment_status: target.payment_status,
         paid_at: target.paid_at ? target.paid_at.slice(0, 10) : '',
         project_id: target.project_id ?? '',
+        program_id: target.program_id ?? '',
         memo: target.memo ?? '',
       });
+      const projName = (target as PayrollRow).project?.name;
+      setProjectSearch(projName ?? '');
     } else {
       setForm(emptyForm(defaultType));
+      setProjectSearch('');
     }
   }, [open, target, defaultType]);
+
+  // 프로젝트 검색 매칭 (자유 입력 → 후보 목록 필터)
+  const projectMatches = useMemo(() => {
+    const q = projectSearch.trim().toLowerCase();
+    if (!q) return projects.slice(0, 8);
+    return projects.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [projects, projectSearch]);
+
+  // 선택된 project_id 에 묶인 program 목록만 노출
+  const programMatches = useMemo(() => {
+    if (!form.project_id) return [];
+    return programs.filter((g) => g.project_id === form.project_id);
+  }, [programs, form.project_id]);
 
   const subtotal = useMemo(
     () => (Number(form.unit_price) || 0) * (Number(form.quantity) || 0),
@@ -111,7 +138,7 @@ export default function PayrollExpenseFormModal({
     setSaving(true);
     try {
       const payload = {
-        expense_type: form.expense_type,
+        expense_type: form.expense_type.trim() || '강사료',
         description: form.description.trim() || null,
         payee_name: form.payee_name.trim(),
         payee_id_no: form.payee_id_no.trim() || null,
@@ -125,6 +152,7 @@ export default function PayrollExpenseFormModal({
         payment_status: form.payment_status,
         paid_at: form.paid_at ? new Date(form.paid_at).toISOString() : null,
         project_id: form.project_id || null,
+        program_id: form.program_id || null,
         memo: form.memo.trim() || null,
         updated_at: new Date().toISOString(),
       };
@@ -162,26 +190,54 @@ export default function PayrollExpenseFormModal({
     >
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="구분" required>
-            <select
+          {/* STEP-ACCOUNTING-FOLLOWUP2 — 자유 입력 + 기본 5개 + 박경수님 임의 세부항목 datalist */}
+          <Field label="구분 (자유 입력 가능)" required>
+            <Input
+              list="payroll-expense-types"
               value={form.expense_type}
               onChange={(e) => setForm({ ...form, expense_type: e.target.value as PayrollExpenseType })}
-              className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
-            >
-              {PAYROLL_TYPE_VALUES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
+              placeholder="예: 강사료, 강사료-OT, 운영비-사무용품"
+            />
+            <datalist id="payroll-expense-types">
+              {PAYROLL_BASE_TYPES.map((t) => <option key={t} value={t} />)}
+            </datalist>
+            <p className="text-[10px] text-slate-400 mt-1">기본 5개 또는 "강사료-OT" 처럼 세부 항목 자유 입력</p>
           </Field>
-          <Field label="연결 프로젝트">
+          <Field label="연결 프로젝트 (검색 가능)">
+            <div className="relative">
+              <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input
+                list="payroll-project-options"
+                value={projectSearch}
+                onChange={(e) => {
+                  setProjectSearch(e.target.value);
+                  // 입력 텍스트와 정확히 일치하는 프로젝트 자동 선택
+                  const match = projects.find((p) => p.name === e.target.value);
+                  setForm((f) => ({ ...f, project_id: match?.id ?? '', program_id: '' }));
+                }}
+                placeholder="프로젝트명으로 검색"
+                className="pl-9"
+              />
+              <datalist id="payroll-project-options">
+                {projectMatches.map((p) => <option key={p.id} value={p.name} />)}
+              </datalist>
+            </div>
+          </Field>
+        </div>
+
+        {/* 프로그램 선택 — 프로젝트 선택 시에만 노출, 해당 프로젝트의 프로그램만 */}
+        {form.project_id && programMatches.length > 0 && (
+          <Field label="연결 프로그램 (선택)">
             <select
-              value={form.project_id}
-              onChange={(e) => setForm({ ...form, project_id: e.target.value })}
+              value={form.program_id}
+              onChange={(e) => setForm({ ...form, program_id: e.target.value })}
               className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
             >
               <option value="">선택 안함</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {programMatches.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </Field>
-        </div>
+        )}
 
         <Field label="내용">
           <Input

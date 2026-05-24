@@ -11,7 +11,6 @@ import { supabase } from '../../lib/supabase';
 import type { PayrollPaymentStatus } from '../../types/database';
 import {
   fetchPayroll, softDeletePayroll, calcPayrollSummary, maskIdNo,
-  OUTSOURCE_TYPES, OPERATION_TYPES,
   PAYROLL_STATUS_VALUES, PAYROLL_STATUS_STYLE,
   type PayrollRow,
 } from './payrollUtils';
@@ -42,9 +41,8 @@ export default function PayrollPage() {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const types = tab === 'outsource' ? OUTSOURCE_TYPES : OPERATION_TYPES;
       const rows = await fetchPayroll({
-        types,
+        group: tab, // 'outsource' | 'operation' — prefix 매칭으로 자유 카테고리도 포함
         projectId: projectFilter || undefined,
         status: statusFilter,
         month: monthFilter || undefined,

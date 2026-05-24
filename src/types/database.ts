@@ -1385,8 +1385,12 @@ export interface IncomeContract {
   deleted_at: string | null;
 }
 
-export type PayrollExpenseType = '강사료' | '촬영' | '운영비' | '운영인건비' | '기타외주';
-export type PayrollTaxRateType = '3.3' | '8.8' | '면세' | '없음';
+// STEP-ACCOUNTING-FOLLOWUP2 — expense_type 자유 입력 (5개 기본 + 박경수님 임의 세부항목)
+// CHECK 제약 제거된 상태라 타입은 string 으로 유연화. 5개 기본 옵션은 const 로 유지.
+export type PayrollExpenseType = string;
+export const PAYROLL_BASE_TYPES = ['강사료', '촬영', '운영비', '운영인건비', '기타외주'] as const;
+// STEP-ACCOUNTING-FOLLOWUP2 — '10' 부가세 10% (포함) 옵션 추가
+export type PayrollTaxRateType = '3.3' | '8.8' | '10' | '면세' | '없음';
 export type PayrollPaymentStatus = '대기' | '완료' | '후순위' | '취소';
 
 export interface PayrollExpense {

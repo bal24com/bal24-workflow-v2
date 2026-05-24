@@ -8,14 +8,25 @@ import type {
 
 export type PayrollRow = PayrollExpense & {
   project?: { id: string; name: string; deleted_at: string | null } | null;
+  program?: { id: string; name: string; deleted_at: string | null } | null;
 };
 
-export const OUTSOURCE_TYPES: PayrollExpenseType[] = ['강사료', '촬영', '기타외주'];
-export const OPERATION_TYPES: PayrollExpenseType[] = ['운영비', '운영인건비'];
+// STEP-ACCOUNTING-FOLLOWUP2 — 카테고리 자유 입력. prefix 매칭으로 outsource/operation 분류.
+export const OUTSOURCE_PREFIXES = ['강사료', '촬영', '기타외주'];
+export const OPERATION_PREFIXES = ['운영비', '운영인건비'];
 
-export const PAYROLL_TYPE_VALUES: PayrollExpenseType[] = [
-  ...OUTSOURCE_TYPES, ...OPERATION_TYPES,
+export const PAYROLL_BASE_TYPES: PayrollExpenseType[] = [
+  ...OUTSOURCE_PREFIXES, ...OPERATION_PREFIXES,
 ];
+
+/** 카테고리가 외주 그룹인지 판정 (prefix 매칭). */
+export function isOutsourceType(type: string): boolean {
+  return OUTSOURCE_PREFIXES.some((p) => type === p || type.startsWith(`${p}-`));
+}
+/** 카테고리가 운영 그룹인지 판정. */
+export function isOperationType(type: string): boolean {
+  return OPERATION_PREFIXES.some((p) => type === p || type.startsWith(`${p}-`));
+}
 
 export const PAYROLL_STATUS_VALUES: PayrollPaymentStatus[] = [
   '대기', '완료', '후순위', '취소',
@@ -29,19 +40,19 @@ export const PAYROLL_STATUS_STYLE: Record<PayrollPaymentStatus, string> = {
 };
 
 export interface PayrollFilter {
-  types: PayrollExpenseType[];
+  // STEP-ACCOUNTING-FOLLOWUP2 — types[] 대신 outsource/operation 그룹으로 (자유 카테고리 prefix 매칭)
+  group: 'outsource' | 'operation';
   projectId?: string;
   status?: PayrollPaymentStatus | 'all';
   month?: string; // YYYY-MM
 }
 
-/** 목록 조회 (휴지통 자동 제외) */
+/** 목록 조회 (휴지통 자동 제외, 그룹은 클라이언트 prefix 필터) */
 export async function fetchPayroll(filter: PayrollFilter): Promise<PayrollRow[]> {
   let q = supabase
     .from('payroll_expenses')
-    .select('*, project:projects(id, name, deleted_at)')
+    .select('*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at)')
     .is('deleted_at', null)
-    .in('expense_type', filter.types)
     .order('created_at', { ascending: false });
 
   if (filter.projectId) q = q.eq('project_id', filter.projectId);
@@ -62,9 +73,10 @@ export async function fetchPayroll(filter: PayrollFilter): Promise<PayrollRow[]>
     console.error('[payroll] 목록 조회 실패:', error.message);
     throw new Error('외주/급여 목록을 불러오지 못했어요.');
   }
-  return ((data ?? []) as unknown as PayrollRow[]).filter(
-    (r) => !r.project?.deleted_at,
-  );
+  return ((data ?? []) as unknown as PayrollRow[])
+    .filter((r) => !r.project?.deleted_at && !r.program?.deleted_at)
+    // 그룹 prefix 매칭 (자유 입력 카테고리도 포함)
+    .filter((r) => filter.group === 'outsource' ? isOutsourceType(r.expense_type) : isOperationType(r.expense_type));
 }
 
 /** soft-delete */
