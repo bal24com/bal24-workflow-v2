@@ -1,21 +1,17 @@
-// bal24 v2 — STEP-STAFF-PORTAL-PIN / STEP-PIN-FIX-V2
+// bal24 v2 — STEP-STAFF-PORTAL-PIN / STEP-PIN-SECURITY (보안 강화)
 // PIN 최초 설정 / PIN 입력 게이트 — staff_pool 강사만 사용 (4~6자리).
-// 3회 실패 시 60초 lockout (sessionStorage 카운트).
-// V2 수정:
-//   1) UPDATE 후 read-back 으로 실제 저장 검증 (RLS silent failure 감지)
-//   2) 저장된 PIN을 로컬 state(savedPin)로 유지 → onVerified 전에 모드 전환
-//   3) 카드 상단에 "OOO님의 강사 포털" 표시
+// 보안: 평문 PIN 클라이언트 노출 차단. RPC (set_staff_pin / verify_staff_pin) 로 위임.
+// 서버 측 rate limit (5회 실패 → 5분 잠금) — sessionStorage 우회 불가.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Loader2, Lock, ShieldCheck } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
+import { setStaffPin, verifyStaffPin } from './staffPortalUtils';
 
 interface Props {
   staffId: string;
   staffName: string;
   hasPinSet: boolean;
-  expectedPin: string | null;
   onVerified: () => void;
 }
 
@@ -28,70 +24,18 @@ const BTN_PRIMARY =
   'w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-violet-600 ' +
   'rounded-[10px] hover:bg-violet-700 transition-all duration-200 disabled:opacity-50';
 
-const LOCK_KEY = (staffId: string) => `staff_pin_lock_${staffId}`;
-const FAIL_KEY = (staffId: string) => `staff_pin_fail_${staffId}`;
-const MAX_FAIL = 3;
-const LOCK_SECONDS = 60;
-
 function isPinShape(s: string): boolean {
   return /^\d{4,6}$/.test(s);
 }
 
-function readLockUntil(staffId: string): number {
-  try {
-    const v = sessionStorage.getItem(LOCK_KEY(staffId));
-    return v ? Number(v) : 0;
-  } catch { return 0; }
-}
-
-function writeLockUntil(staffId: string, ts: number) {
-  try { sessionStorage.setItem(LOCK_KEY(staffId), String(ts)); } catch { /* noop */ }
-}
-
-function readFailCount(staffId: string): number {
-  try {
-    const v = sessionStorage.getItem(FAIL_KEY(staffId));
-    return v ? Number(v) : 0;
-  } catch { return 0; }
-}
-
-function writeFailCount(staffId: string, n: number) {
-  try { sessionStorage.setItem(FAIL_KEY(staffId), String(n)); } catch { /* noop */ }
-}
-
-function clearFailState(staffId: string) {
-  try {
-    sessionStorage.removeItem(FAIL_KEY(staffId));
-    sessionStorage.removeItem(LOCK_KEY(staffId));
-  } catch { /* noop */ }
-}
-
-function normalizePin(v: string | null | undefined): string {
-  return (v ?? '').trim();
-}
-
-export default function StaffPinGate({ staffId, staffName, hasPinSet, expectedPin, onVerified }: Props) {
+export default function StaffPinGate({ staffId, staffName, hasPinSet, onVerified }: Props) {
   const toast = useToast();
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
   const [saving, setSaving] = useState(false);
-  const [lockUntil, setLockUntil] = useState<number>(() => readLockUntil(staffId));
-  const [now, setNow] = useState(Date.now());
-
-  // STEP-PIN-FIX-V2 — 명시적 PIN 존재 체크 (undefined·null·빈 문자열 모두 false)
-  const initialPin = normalizePin(expectedPin);
-  const [savedPin, setSavedPin] = useState<string>(initialPin);
-  const [isSettingMode, setIsSettingMode] = useState<boolean>(!hasPinSet || initialPin.length === 0);
-
-  // 1초 단위로 lockout 카운트다운 갱신
-  useEffect(() => {
-    if (lockUntil <= Date.now()) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [lockUntil]);
-
-  const remainingLock = Math.max(0, Math.ceil((lockUntil - now) / 1000));
-  const locked = remainingLock > 0;
+  const [isSettingMode, setIsSettingMode] = useState<boolean>(!hasPinSet);
+  // 서버 측 잠금 응답 표시용 (sessionStorage 없음 — 서버 단일 소스)
+  const [lockSeconds, setLockSeconds] = useState<number>(0);
 
   const headline = useMemo(
     () => isSettingMode ? 'PIN을 처음 설정해 주세요' : 'PIN을 입력해 주세요',
@@ -103,54 +47,37 @@ export default function StaffPinGate({ staffId, staffName, hasPinSet, expectedPi
     if (!isPinShape(trimmed)) { toast.error('4~6자리 숫자만 사용 가능해요.'); return; }
     if (trimmed !== pinConfirm.trim()) { toast.error('확인 PIN이 일치하지 않아요.'); return; }
     setSaving(true);
-    // STEP-PIN-FIX-V2 — UPDATE + read-back 으로 RLS silent failure 감지
-    const { data, error } = await supabase.from('staff_pool')
-      .update({ portal_pin: trimmed }).eq('id', staffId)
-      .select('id, portal_pin').maybeSingle();
+    const ok = await setStaffPin(staffId, trimmed);
     setSaving(false);
-    if (error) {
-      console.error('[staff-pin] 최초 설정 실패:', error.message);
-      toast.error('PIN 설정에 실패했어요.');
+    if (!ok) {
+      toast.error('PIN 설정에 실패했어요. 관리자에게 RLS 정책 적용을 요청해 주세요.');
       return;
     }
-    const saved = normalizePin((data as { portal_pin?: string | null } | null)?.portal_pin);
-    if (!data || saved !== trimmed) {
-      // RLS 차단으로 0 rows affected
-      console.error('[staff-pin] PIN 저장 미반영 (RLS 차단 의심). data=', data);
-      toast.error('PIN 저장 권한이 없어요. 관리자에게 RLS 정책 적용을 요청해 주세요.');
-      return;
-    }
-    clearFailState(staffId);
-    // 저장 성공 → 로컬 state 즉시 갱신 (다음 검증에 사용)
-    setSavedPin(trimmed);
     setIsSettingMode(false);
     setPin(''); setPinConfirm('');
     toast.success('PIN이 설정됐어요. 그대로 진입해요.');
     onVerified();
   }
 
-  function handleVerifyPin() {
-    if (locked) { toast.error(`잠시 후 다시 시도해 주세요. (${remainingLock}초)`); return; }
+  async function handleVerifyPin() {
     const entered = pin.trim();
     if (!isPinShape(entered)) { toast.error('4~6자리 숫자를 입력해 주세요.'); return; }
-    if (!savedPin) {
-      toast.error('저장된 PIN을 확인할 수 없어요. PM에게 초기화를 요청해 주세요.');
-      return;
-    }
-    if (entered === savedPin) {
-      clearFailState(staffId);
+    setSaving(true);
+    const r = await verifyStaffPin(staffId, entered);
+    setSaving(false);
+    if (r.ok) {
+      setLockSeconds(0);
       onVerified();
       return;
     }
-    const next = readFailCount(staffId) + 1;
-    writeFailCount(staffId, next);
-    if (next >= MAX_FAIL) {
-      const until = Date.now() + LOCK_SECONDS * 1000;
-      writeLockUntil(staffId, until);
-      setLockUntil(until);
-      toast.error('3회 연속 실패했어요. 잠시 후 다시 시도해 주세요.');
+    if (r.reason === 'locked') {
+      const left = r.secondsLeft ?? 300;
+      setLockSeconds(left);
+      toast.error(`5회 연속 실패로 잠겼어요. ${left}초 후 다시 시도해 주세요.`);
+    } else if (r.reason === 'mismatch') {
+      toast.error(`PIN이 일치하지 않아요. (${r.remaining ?? '?'}회 남음)`);
     } else {
-      toast.error(`PIN이 일치하지 않아요. (${MAX_FAIL - next}회 남음)`);
+      toast.error('PIN 검증 중 오류가 발생했어요.');
     }
     setPin('');
   }
@@ -158,8 +85,10 @@ export default function StaffPinGate({ staffId, staffName, hasPinSet, expectedPi
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isSettingMode) void handleSetupPin();
-    else handleVerifyPin();
+    else void handleVerifyPin();
   }
+
+  const locked = lockSeconds > 0;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F7FF] px-4">
@@ -170,7 +99,6 @@ export default function StaffPinGate({ staffId, staffName, hasPinSet, expectedPi
             {isSettingMode ? <ShieldCheck size={20} aria-hidden="true" /> : <Lock size={20} aria-hidden="true" />}
           </div>
           <p className="text-xs text-violet-600 font-semibold mb-1">WorkFlow · 강사 포털</p>
-          {/* STEP-PIN-FIX-V2 — 누구의 포털인지 명시 */}
           <p className="text-sm text-slate-500 mb-2">
             <span className="font-bold text-[#1E1B4B]">{staffName}</span>
             <span className="ml-0.5">님의 강사 포털</span>
@@ -201,7 +129,7 @@ export default function StaffPinGate({ staffId, staffName, hasPinSet, expectedPi
           )}
           {locked && (
             <p className="text-xs text-rose-600 text-center font-semibold">
-              잠시 후 다시 시도해 주세요. ({remainingLock}초 남음)
+              5회 연속 실패로 잠겼어요. {lockSeconds}초 후 다시 시도해 주세요.
             </p>
           )}
           <button type="submit" disabled={saving || locked} className={BTN_PRIMARY}>

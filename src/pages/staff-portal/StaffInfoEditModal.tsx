@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Save, X, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import type { StaffPortalIdentity } from './staffPortalUtils';
+import { verifyStaffPin, setStaffPin, type StaffPortalIdentity } from './staffPortalUtils';
 
 interface Props {
   open: boolean;
@@ -173,8 +173,8 @@ export default function StaffInfoEditModal({ open, staff, onClose, onSaved }: Pr
               </button>
             </footer>
 
-            {/* STEP-STAFF-PORTAL-PIN — 비밀번호 변경 섹션 */}
-            <PinChangeSection staffId={staff.id} currentPin={staff.portalPin} />
+            {/* STEP-STAFF-PORTAL-PIN / STEP-PIN-SECURITY — 비밀번호 변경 (RPC 기반) */}
+            <PinChangeSection staffId={staff.id} hasPin={staff.hasPin} />
           </>
         )}
       </div>
@@ -194,8 +194,8 @@ function Field({ label, required, hint, children }: { label: string; required?: 
   );
 }
 
-// ─── 비밀번호 변경 섹션 ──────────────────────────────────────
-function PinChangeSection({ staffId, currentPin }: { staffId: string; currentPin: string | null }) {
+// ─── 비밀번호 변경 섹션 (STEP-PIN-SECURITY — RPC 기반) ─────────────────
+function PinChangeSection({ staffId, hasPin }: { staffId: string; hasPin: boolean }) {
   const toast = useToast();
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -203,31 +203,29 @@ function PinChangeSection({ staffId, currentPin }: { staffId: string; currentPin
   const [saving, setSaving] = useState(false);
 
   async function handleChange() {
-    if (!currentPin) {
+    if (!hasPin) {
       toast.error('PIN이 설정돼 있지 않아요. 다음 접속 시 설정 화면이 표시돼요.');
       return;
     }
-    if (oldPin !== currentPin) { toast.error('현재 비밀번호가 일치하지 않아요.'); return; }
     if (!isPinShape(newPin)) { toast.error('새 비밀번호는 4~6자리 숫자여야 해요.'); return; }
     if (newPin !== newPinConfirm) { toast.error('새 비밀번호 확인이 일치하지 않아요.'); return; }
     if (newPin === oldPin) { toast.error('새 비밀번호가 현재 비밀번호와 같아요.'); return; }
     setSaving(true);
-    // STEP-PIN-FIX-V2 — read-back으로 RLS silent failure 감지
-    const { data, error } = await supabase.from('staff_pool')
-      .update({ portal_pin: newPin }).eq('id', staffId)
-      .select('id, portal_pin').maybeSingle();
+    // 1) 현재 PIN 검증 (서버 측 — 평문 노출 없음)
+    const verify = await verifyStaffPin(staffId, oldPin);
+    if (!verify.ok) {
+      setSaving(false);
+      if (verify.reason === 'locked') {
+        toast.error(`5회 실패로 잠겼어요. ${verify.secondsLeft ?? 300}초 후 다시 시도해 주세요.`);
+      } else {
+        toast.error('현재 비밀번호가 일치하지 않아요.');
+      }
+      return;
+    }
+    // 2) 새 PIN 설정 (해시 저장 — set_staff_pin RPC)
+    const ok = await setStaffPin(staffId, newPin);
     setSaving(false);
-    if (error) {
-      console.error('[staff-pin] 비밀번호 변경 실패:', error.message);
-      toast.error('비밀번호 변경에 실패했어요.');
-      return;
-    }
-    const saved = ((data as { portal_pin?: string | null } | null)?.portal_pin ?? '').trim();
-    if (!data || saved !== newPin) {
-      console.error('[staff-pin] 비밀번호 변경 미반영 (RLS 차단 의심). data=', data);
-      toast.error('변경 권한이 없어요. 관리자에게 RLS 정책 적용을 요청해 주세요.');
-      return;
-    }
+    if (!ok) { toast.error('비밀번호 변경에 실패했어요.'); return; }
     setOldPin(''); setNewPin(''); setNewPinConfirm('');
     toast.success('비밀번호가 변경됐어요.');
   }
@@ -237,7 +235,7 @@ function PinChangeSection({ staffId, currentPin }: { staffId: string; currentPin
       <h3 className="text-base font-bold text-[#1E1B4B] mb-3 flex items-center gap-2">
         <Lock size={16} className="text-violet-500" aria-hidden="true" /> 비밀번호 변경
       </h3>
-      {!currentPin ? (
+      {!hasPin ? (
         <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
           아직 PIN이 설정돼 있지 않아요. 로그아웃 후 다시 접속하면 PIN 설정 화면이 표시돼요.
         </p>

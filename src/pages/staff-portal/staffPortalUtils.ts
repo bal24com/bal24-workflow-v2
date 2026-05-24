@@ -12,8 +12,8 @@ export interface StaffPortalIdentity {
   affiliation: string | null;   // staff_pool.organization 또는 profile.department
   sourceType: StaffSource;
   portalToken: string;
-  /** STEP-STAFF-PORTAL-PIN — staff_pool만 PIN 사용. null이면 최초 설정 화면 */
-  portalPin: string | null;
+  /** STEP-PIN-SECURITY — PIN 평문 노출 차단. hasPin boolean만 클라이언트에 전달 (해시는 서버에만) */
+  hasPin: boolean;
 }
 
 export interface StaffPortalProgram {
@@ -32,19 +32,21 @@ export interface StaffUpcomingSession {
   program_id: string;
 }
 
-/** 토큰 → 강사 식별 (staff_pool 우선, profiles 차순) */
+/** 토큰 → 강사 식별 (staff_pool 우선, profiles 차순).
+ *  STEP-PIN-SECURITY — portal_pin 컬럼은 절대 클라이언트로 SELECT 하지 않음.
+ *  PIN 존재 여부만 hasPin (boolean) 으로 전달. */
 export async function resolveStaffByToken(token: string): Promise<StaffPortalIdentity | null> {
-  // staff_pool은 portal_pin 컬럼이 있을 수도 없을 수도 있어 fallback 처리
+  // staff_pool: portal_pin_hash 존재 여부만 가져옴 (해시 자체는 안 가져옴 — IS NOT NULL boolean)
   const { data: sp, error: spErr } = await supabase
     .from('staff_pool')
-    .select('id, name, organization, staff_portal_token, portal_pin')
+    .select('id, name, organization, staff_portal_token, portal_pin_hash')
     .eq('staff_portal_token', token)
     .maybeSingle();
   if (spErr) {
     const m = (spErr.message ?? '').toLowerCase();
-    if (m.includes('portal_pin') || m.includes('does not exist')) {
-      // portal_pin 컬럼이 아직 마이그레이션 안 된 경우 — PIN 없이 진행
-      console.warn('[staff-portal] portal_pin 컬럼 미적용 — PIN 인증 비활성.');
+    if (m.includes('portal_pin_hash') || m.includes('does not exist')) {
+      // 보안 마이그레이션 (20260607_pin_security_hardening.sql) 미적용 — PIN 없이 진행
+      console.warn('[staff-portal] portal_pin_hash 컬럼 미적용 — PIN 인증 비활성.');
       const { data: spFallback } = await supabase
         .from('staff_pool')
         .select('id, name, organization, staff_portal_token')
@@ -57,7 +59,7 @@ export async function resolveStaffByToken(token: string): Promise<StaffPortalIde
           affiliation: spFallback.organization ?? null,
           sourceType: 'staff_pool',
           portalToken: spFallback.staff_portal_token,
-          portalPin: null,
+          hasPin: false,
         };
       }
     } else {
@@ -65,13 +67,14 @@ export async function resolveStaffByToken(token: string): Promise<StaffPortalIde
     }
   }
   if (sp) {
+    const hashStr = (sp.portal_pin_hash as string | null) ?? '';
     return {
       id: sp.id,
       name: sp.name,
       affiliation: sp.organization ?? null,
       sourceType: 'staff_pool',
       portalToken: sp.staff_portal_token,
-      portalPin: (sp.portal_pin as string | null) ?? null,
+      hasPin: hashStr.trim().length > 0,
     };
   }
   const { data: pr, error: prErr } = await supabase
@@ -87,10 +90,39 @@ export async function resolveStaffByToken(token: string): Promise<StaffPortalIde
       affiliation: (pr.department as string | null) ?? null,
       sourceType: 'profile',
       portalToken: pr.staff_portal_token,
-      portalPin: null,  // 내부 직원은 PIN 미사용 (사이트 로그인으로 인증)
+      hasPin: false,  // 내부 직원은 PIN 미사용 (사이트 로그인으로 인증)
     };
   }
   return null;
+}
+
+/** STEP-PIN-SECURITY — PIN 설정·검증을 RPC 로 위임 (해시·rate limit 모두 서버 측). */
+export interface PinVerifyResult {
+  ok: boolean;
+  reason?: 'no_pin' | 'mismatch' | 'locked';
+  secondsLeft?: number;
+  remaining?: number;
+}
+
+export async function setStaffPin(staffId: string, pin: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('set_staff_pin', { p_staff_id: staffId, p_pin: pin });
+  if (error) { console.error('[pin-security] set_staff_pin 실패:', error.message); return false; }
+  return Boolean(data);
+}
+
+export async function verifyStaffPin(staffId: string, pin: string): Promise<PinVerifyResult> {
+  const { data, error } = await supabase.rpc('verify_staff_pin', { p_staff_id: staffId, p_pin: pin });
+  if (error) {
+    console.error('[pin-security] verify_staff_pin 실패:', error.message);
+    return { ok: false, reason: 'mismatch' };
+  }
+  const r = (data ?? {}) as { ok?: boolean; reason?: string; seconds_left?: number; remaining?: number };
+  return {
+    ok: !!r.ok,
+    reason: (r.reason as PinVerifyResult['reason']) ?? undefined,
+    secondsLeft: r.seconds_left,
+    remaining: r.remaining,
+  };
 }
 
 /** 해당 강사의 담당 프로그램 목록 (curriculum_staff + mentoring_assignments + instructor_invitations 합집합) */
