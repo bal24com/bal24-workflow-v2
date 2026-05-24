@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Users2, BookOpen, Link2 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { formatDateKo } from '../../../lib/utils';
-import { getMentorName } from '../../../types/mentoring';
+import { getMentorName, MENTORING_LOG_STATUS_LABEL, MENTORING_LOG_STATUS_STYLE } from '../../../types/mentoring';
 import type { MentoringAssignment, MentoringLog } from '../../../types/mentoring';
 
 interface MenteeLite { id: string; name: string; organization: string | null }
@@ -148,9 +148,14 @@ export default function MentoringLogCard({ assignmentId, menteeIds, allAssignmen
           <ul className="space-y-1.5">
             {logs.map((log) => (
               <li key={log.id} className="rounded-lg border border-slate-100 bg-white px-2.5 py-1.5">
-                <div className="flex items-center gap-1.5 text-[10px]">
+                <div className="flex items-center gap-1.5 text-[10px] flex-wrap">
                   <span className="font-bold text-slate-700 tabular-nums">{formatDateKo(log.log_date)}</span>
                   <span className="px-1 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold">{log.session_no ?? 1}회차</span>
+                  {/* STEP-MENTORING-P1 — status 배지 (draft/submitted/approved/rejected) */}
+                  <span className={`px-1 py-0.5 rounded font-semibold ${MENTORING_LOG_STATUS_STYLE[log.status ?? 'draft']}`}>
+                    {MENTORING_LOG_STATUS_LABEL[log.status ?? 'draft']}
+                  </span>
+                  {log.subject && <span className="text-slate-500 truncate max-w-[50%]">· {log.subject}</span>}
                 </div>
                 <p className="mt-1 text-[11px] text-slate-700 line-clamp-2">{log.content}</p>
               </li>

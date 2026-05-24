@@ -71,12 +71,14 @@ export interface MentoringFeedback {
   submitted_at: string;
 }
 
-/** STEP-MENTOR-PORTAL-FULL — 외부 포털에서 멘토가 작성하는 일지 */
+/** STEP-MENTOR-PORTAL-FULL / STEP-MENTORING-P1 — 외부 포털에서 멘토가 작성하는 일지 */
+export type MentoringLogStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+
 export interface MentoringLog {
   id: string;
   assignment_id: string | null;
   program_id: string | null;
-  log_date: string;          // YYYY-MM-DD
+  log_date: string;          // YYYY-MM-DD (= mentoring_date 의미)
   session_no: number | null;
   mentee_ids: string[];
   content: string;
@@ -85,8 +87,34 @@ export interface MentoringLog {
   location: string | null;
   start_time: string | null; // HH:MM
   end_time: string | null;   // HH:MM
+  /** STEP-MENTORING-P1 — PDF 양식 기반 확장 + 승인 워크플로 */
+  subject: string | null;            // 주제
+  duration_min: number | null;       // 진행시간(분)
+  recipient: string | null;          // 제출처
+  status: MentoringLogStatus;
+  submitted_at: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  approval_note: string | null;
+  mentor_signature_url: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** STEP-MENTORING-P1 — 일지 상태 라벨·색상 (한글 표시) */
+export const MENTORING_LOG_STATUS_LABEL: Record<MentoringLogStatus, string> = {
+  draft: '임시저장', submitted: '검토중', approved: '승인완료', rejected: '반려',
+};
+export const MENTORING_LOG_STATUS_STYLE: Record<MentoringLogStatus, string> = {
+  draft:     'bg-slate-100 text-slate-600',
+  submitted: 'bg-amber-100 text-amber-700',
+  approved:  'bg-emerald-100 text-emerald-700',
+  rejected:  'bg-rose-100 text-rose-700',
+};
+
+/** 일지 수정 가능 여부 — 임시저장·반려 상태만 작성자가 수정 가능 */
+export function canEditMentoringLog(log: Pick<MentoringLog, 'status'>): boolean {
+  return log.status === 'draft' || log.status === 'rejected';
 }
 
 /** STEP-MENTORING-LOG-UX — 멘토링 일지 첨부 파일 */

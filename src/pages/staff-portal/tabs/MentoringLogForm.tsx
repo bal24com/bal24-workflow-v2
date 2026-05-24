@@ -1,9 +1,9 @@
-// bal24 v2 — STEP-MENTORING-LOG-UX
+// bal24 v2 — STEP-MENTORING-LOG-UX / STEP-MENTORING-P1
 // 멘토링 일지 작성 폼 (StaffMentoringTab에서 분리, V-1 400줄 유지용)
-// 신규 작성 only — 멘티 빈 배열, TimeSelect 드롭다운, 첨부 파일 일괄 저장
+// P1 추가: subject·recipient 필드, duration_min 저장, draft/submitted 모드 분리.
 
 import { useMemo, useState } from 'react';
-import { Clock, Loader2, Save, X } from 'lucide-react';
+import { Clock, Loader2, Save, Send, X } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { calcDurationMin, formatDuration } from '../../../types/mentoring';
@@ -28,12 +28,14 @@ interface Props {
 }
 
 interface FormState {
+  subject: string;       // STEP-MENTORING-P1 — 주제
   log_date: string;
   start_time: string;
   end_time: string;
   location: string;
   content: string;
   next_plan: string;
+  recipient: string;     // STEP-MENTORING-P1 — 제출처
 }
 
 const INPUT_CLASS =
@@ -65,12 +67,14 @@ export default function MentoringLogForm({
 }: Props) {
   const toast = useToast();
   const [form, setForm] = useState<FormState>({
+    subject: '',
     log_date: todayIso(),
     start_time: '09:00',
     end_time: '11:00',
     location: '',
     content: '',
     next_plan: '',
+    recipient: '',
   });
   // STEP-MENTORING-LOG-UX — 멘티 기본 체크 해제 (빈 배열)
   const [selectedMentees, setSelectedMentees] = useState<string[]>([]);
@@ -87,22 +91,32 @@ export default function MentoringLogForm({
     setSelectedMentees((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }
 
-  async function handleSave() {
-    if (!form.content.trim()) { toast.error('주요 내용을 입력해 주세요.'); return; }
+  async function handleSave(mode: 'draft' | 'submitted') {
+    // STEP-MENTORING-P1 — 제출 모드는 주제·내용 필수, 임시저장은 관대하게 허용
+    if (mode === 'submitted') {
+      if (!form.subject.trim()) { toast.error('주제를 입력해 주세요.'); return; }
+      if (!form.content.trim()) { toast.error('멘토링 내용을 입력해 주세요.'); return; }
+    }
     if (calcDurationMin(form.start_time, form.end_time) <= 0) {
       toast.error('종료 시간이 시작 시간보다 늦어야 해요.'); return;
     }
     setSaving(true);
+    const durationMin = calcDurationMin(form.start_time, form.end_time);
     const { data: savedLog, error } = await supabase.from('mentoring_logs').insert({
       assignment_id: assignment.id,
       program_id: assignment.program?.id ?? null,
       log_date: form.log_date,
       start_time: form.start_time,
       end_time: form.end_time,
+      duration_min: durationMin,
       location: form.location.trim() || null,
       mentee_ids: selectedMentees,
+      subject: form.subject.trim() || null,
       content: form.content.trim(),
       next_plan: form.next_plan.trim() || null,
+      recipient: form.recipient.trim() || null,
+      status: mode,
+      submitted_at: mode === 'submitted' ? new Date().toISOString() : null,
     }).select('id').single();
     if (error || !savedLog) {
       setSaving(false);
@@ -131,7 +145,7 @@ export default function MentoringLogForm({
       }
     }
     setSaving(false);
-    toast.success('일지를 저장했어요.');
+    toast.success(mode === 'submitted' ? '멘토링 일지를 제출했어요. PM 승인 대기 중.' : '임시저장됐어요.');
     onSaved();
   }
 
@@ -193,8 +207,17 @@ export default function MentoringLogForm({
         </div>
       </div>
 
+      {/* STEP-MENTORING-P1 — 주제 (제출 시 필수) */}
       <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1">주요 내용</label>
+        <label className="text-xs font-semibold text-slate-700 block mb-1">주제 <span className="text-rose-500">*</span></label>
+        <input type="text" value={form.subject} disabled={saving}
+          onChange={(e) => setForm({ ...form, subject: e.target.value })}
+          placeholder="예) 프로젝트 주제 선정 및 현장조사 준비"
+          className={INPUT_CLASS} />
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-slate-700 block mb-1">멘토링 내용 <span className="text-rose-500">*</span></label>
         <textarea value={form.content} disabled={saving} rows={6}
           placeholder="멘토링 중 논의한 내용, 진행 방식, 컨설팅 내용을 구체적으로 작성하세요"
           onChange={(e) => setForm({ ...form, content: e.target.value })}
@@ -215,12 +238,27 @@ export default function MentoringLogForm({
         userId={userId}
         disabled={saving} />
 
+      {/* STEP-MENTORING-P1 — 제출처 (선택, 출력 양식 하단 "OO 귀하"에 사용) */}
+      <div>
+        <label className="text-xs font-semibold text-slate-700 block mb-1">제출처 (선택)</label>
+        <input type="text" value={form.recipient} disabled={saving}
+          onChange={(e) => setForm({ ...form, recipient: e.target.value })}
+          placeholder="예) 국립순천대학교"
+          className={INPUT_CLASS} />
+        <p className="text-[11px] text-slate-400 mt-1">PDF 출력 시 "OO 귀하" 형태로 표시돼요.</p>
+      </div>
+
+      {/* STEP-MENTORING-P1 — 임시저장 / 제출 분리 */}
       <div className="flex items-center justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} disabled={saving} className={BTN_GHOST}>
           <X size={14} /> 취소
         </button>
-        <button type="button" onClick={() => void handleSave()} disabled={saving} className={BTN_PRIMARY}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 저장하기
+        <button type="button" onClick={() => void handleSave('draft')} disabled={saving}
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-300 rounded-[10px] hover:bg-slate-50 transition-all duration-200 disabled:opacity-50">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 임시저장
+        </button>
+        <button type="button" onClick={() => void handleSave('submitted')} disabled={saving} className={BTN_PRIMARY}>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} 제출하기
         </button>
       </div>
     </div>
