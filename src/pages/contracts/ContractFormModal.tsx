@@ -13,11 +13,22 @@ import type { ContractRow, LinkOption } from './contractUtils';
 import { CONTRACT_STATUS_VALUES, buildLinkOptions, uploadContractFile } from './contractUtils';
 import BillingScheduleEditor from './BillingScheduleEditor';
 import LinkSearchCombobox from './LinkSearchCombobox';
+import ClientContactSection from './ClientContactSection';
 
-interface RefOption { id: string; name: string }
+interface ClientOption { id: string; name: string; department: string | null }
 interface ProjectOption { id: string; name: string; contract_amount: number | null; client_id: string | null; start_date: string | null }
 interface ProgramOption { id: string; name: string; project_id: string | null; start_date: string | null }
 interface ConsortiumOption { id: string; name: string; total_budget: number | null; lead_client_id: string | null; project_id: string | null }
+// STEP-ACCOUNTING-FOLLOWUP6 — 세금계산서 담당자 옵션
+interface ContactOption {
+  id: string;
+  client_id: string;
+  name: string;
+  position: string | null;
+  email: string | null;
+  phone_office: string | null;
+  phone_mobile: string | null;
+}
 
 interface Props {
   open: boolean;
@@ -31,6 +42,7 @@ const VAT_VALUES: VatType[] = ['과세', '면세', '영세율'];
 function emptyForm() {
   return {
     contract_name: '', client_id: '', project_id: '', program_id: '', consortium_id: '',
+    billing_contact_id: '', // STEP-ACCOUNTING-FOLLOWUP6
     contract_amount: '', vat_type: '과세' as VatType, contract_date: '',
     status: '진행중' as ContractStatus, memo: '',
     contract_file_url: '', contract_file_name: '', tax_invoice_url: '', tax_invoice_name: '',
@@ -43,10 +55,11 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
   const toast = useToast();
   const [form, setForm] = useState(emptyForm());
   const [schedule, setSchedule] = useState<BillingScheduleItem[]>([]);
-  const [clients, setClients] = useState<RefOption[]>([]);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
   const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
+  const [contacts, setContacts] = useState<ContactOption[]>([]);
   const [linkSearch, setLinkSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingContract, setUploadingContract] = useState(false);
@@ -57,21 +70,25 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
     let cancelled = false;
     void (async () => {
       // STEP-ACCOUNTING-FOLLOWUP5 — 자동 채움 메타까지 가져옴 (contract_amount/client_id/start_date 등)
-      const [cRes, pRes, gRes, conRes] = await Promise.all([
-        supabase.from('clients').select('id, name').is('deleted_at', null).order('name'),
+      // STEP-ACCOUNTING-FOLLOWUP6 — client_contacts 도 함께 fetch (세금계산서 담당자)
+      const [cRes, pRes, gRes, conRes, ctRes] = await Promise.all([
+        supabase.from('clients').select('id, name, department').is('deleted_at', null).order('name'),
         supabase.from('projects').select('id, name, contract_amount, client_id, start_date').is('deleted_at', null).order('created_at', { ascending: false }),
         supabase.from('programs').select('id, name, project_id, start_date').is('deleted_at', null).order('created_at', { ascending: false }),
         supabase.from('consortiums').select('id, name, total_budget, lead_client_id, project_id').is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('client_contacts').select('id, client_id, name, position, email, phone_office, phone_mobile'),
       ]);
       if (cancelled) return;
       if (cRes.error) console.error('[ContractFormModal] clients 조회 실패:', cRes.error.message);
       if (pRes.error) console.error('[ContractFormModal] projects 조회 실패:', pRes.error.message);
       if (gRes.error) console.error('[ContractFormModal] programs 조회 실패:', gRes.error.message);
       if (conRes.error) console.error('[ContractFormModal] consortiums 조회 실패:', conRes.error.message);
-      setClients((cRes.data as RefOption[] | null) ?? []);
+      if (ctRes.error) console.error('[ContractFormModal] client_contacts 조회 실패:', ctRes.error.message);
+      setClients((cRes.data as ClientOption[] | null) ?? []);
       setProjects((pRes.data as ProjectOption[] | null) ?? []);
       setPrograms((gRes.data as ProgramOption[] | null) ?? []);
       setConsortiums((conRes.data as ConsortiumOption[] | null) ?? []);
+      setContacts((ctRes.data as ContactOption[] | null) ?? []);
     })();
     return () => { cancelled = true; };
   }, [open]);
@@ -92,6 +109,7 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         project_id: target.project_id ?? '',
         program_id: target.program_id ?? '',
         consortium_id: target.consortium_id ?? '',
+        billing_contact_id: target.billing_contact_id ?? '',
         contract_amount: String(target.contract_amount ?? ''),
         vat_type: target.vat_type ?? '과세',
         contract_date: target.contract_date ?? '',
@@ -135,6 +153,7 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
     [projects, programs, consortiums, clientNameMap],
   );
 
+
   function selectLink(opt: LinkOption | null) {
     if (!opt) {
       setLinkSearch('');
@@ -150,12 +169,15 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         if (opt.projectId) next.project_id = opt.projectId;
       }
       if (opt.type === 'consortium') next.consortium_id = opt.id;
-      // 계약명 강제 동기화
       next.contract_name = opt.name;
-      // 자동 채움 — 박경수님이 비어 있을 때만 채움 (덮어쓰기 X, 박경수님 직접 입력 보존)
       if (!next.contract_amount && opt.amount != null) next.contract_amount = String(opt.amount);
       if (!next.client_id && opt.clientId) next.client_id = opt.clientId;
       if (!next.contract_date && opt.startDate) next.contract_date = opt.startDate;
+      // STEP-ACCOUNTING-FOLLOWUP6 — 담당자 자동 추천 (해당 거래처의 첫 번째 contact, 비어 있을 때만)
+      if (!next.billing_contact_id && next.client_id) {
+        const firstContact = contacts.find((c) => c.client_id === next.client_id);
+        if (firstContact) next.billing_contact_id = firstContact.id;
+      }
       return next;
     });
   }
@@ -211,6 +233,7 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         project_id: form.project_id || null,
         program_id: form.program_id || null,
         consortium_id: form.consortium_id || null,
+        billing_contact_id: form.billing_contact_id || null,
         contract_amount: Number(form.contract_amount),
         vat_type: form.vat_type,
         contract_date: form.contract_date || null,
@@ -274,16 +297,14 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
           />
         </Field>
 
-        <Field label="주관기관">
-          <select
-            value={form.client_id}
-            onChange={(e) => setForm({ ...form, client_id: e.target.value })}
-            className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
-          >
-            <option value="">선택 안함</option>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </Field>
+        <ClientContactSection
+          clients={clients}
+          contacts={contacts}
+          clientId={form.client_id}
+          contactId={form.billing_contact_id}
+          onClientChange={(id) => setForm((f) => ({ ...f, client_id: id, billing_contact_id: '' }))}
+          onContactChange={(id) => setForm((f) => ({ ...f, billing_contact_id: id }))}
+        />
 
         <div className="grid grid-cols-3 gap-3">
           <Field label="계약금액" required>
@@ -372,9 +393,7 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1">
-        {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
-      </label>
+      <label className="block text-xs font-semibold text-slate-600 mb-1">{label}{required && <span className="text-rose-500 ml-0.5">*</span>}</label>
       {children}
     </div>
   );

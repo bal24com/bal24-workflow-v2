@@ -8,11 +8,13 @@ export type ContractRow = IncomeContract & {
   project?: { id: string; name: string; deleted_at: string | null } | null;
   program?: { id: string; name: string; deleted_at: string | null } | null;
   consortium?: { id: string; name: string; deleted_at: string | null } | null;
-  client?: { id: string; name: string; deleted_at: string | null } | null;
+  client?: { id: string; name: string; department: string | null; deleted_at: string | null } | null;
+  // STEP-ACCOUNTING-FOLLOWUP6 — 세금계산서 담당자 (client_contacts FK)
+  billing_contact?: { id: string; name: string; position: string | null; email: string | null; phone_office: string | null; phone_mobile: string | null } | null;
 };
 
 const SELECT_COLUMNS =
-  '*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at), consortium:consortiums(id, name, deleted_at), client:clients(id, name, deleted_at)';
+  '*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at), consortium:consortiums(id, name, deleted_at), client:clients(id, name, department, deleted_at), billing_contact:client_contacts(id, name, position, email, phone_office, phone_mobile)';
 
 /** 휴지통 join row 제외 헬퍼 */
 function isLiveContract(c: ContractRow): boolean {

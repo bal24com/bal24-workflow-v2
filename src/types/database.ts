@@ -1371,6 +1371,7 @@ export interface IncomeContract {
   program_id: string | null; // STEP-ACCOUNTING-FOLLOWUP3
   consortium_id: string | null; // STEP-ACCOUNTING-FOLLOWUP4
   client_id: string | null;
+  billing_contact_id: string | null; // STEP-ACCOUNTING-FOLLOWUP6 — 세금계산서 담당자
   contract_name: string;
   contract_amount: number;
   vat_type: VatType;
