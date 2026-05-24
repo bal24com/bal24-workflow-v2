@@ -24,6 +24,7 @@ import GreetingHeader from './components/GreetingHeader';
 import ProjectStagePanel from './components/ProjectStagePanel';
 import TaskAlertPanel from './components/TaskAlertPanel';
 import QuickActionsCard from './components/QuickActionsCard';
+import DashboardUrgentWidget from './components/DashboardUrgentWidget';
 import PageHelpBanner from '../../components/PageHelpBanner';
 
 type Tone = 'violet' | 'orange' | 'cyan' | 'emerald' | 'rose';
@@ -144,6 +145,9 @@ export default function DashboardPage() {
       />
 
       <GreetingHeader />
+
+      {/* 긴급 처리 위젯 — 멘토링 일지 승인 대기·반려 미수정 (0건이면 숨김) */}
+      <DashboardUrgentWidget />
 
       {/* KPI 6개 — 기존 4 + 오늘마감/지연 2 */}
       {loading || !kpis ? (
