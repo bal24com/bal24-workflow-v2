@@ -2,6 +2,7 @@
 // 상태 필터 + 검색 + KPI + 행 클릭 → 우측 상세 패널
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Loader2, Search, FileText } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
@@ -27,6 +28,7 @@ type LifeFilter = 'all' | 'proposal' | 'contract' | 'operation' | 'closing';
 
 export default function ContractsPage() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [items, setItems] = useState<ContractRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
@@ -244,7 +246,16 @@ export default function ContractsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted">{c.client?.name ?? '-'}</td>
-                  <td className="px-4 py-2.5 text-xs text-muted">{c.project?.name ?? '-'}</td>
+                  {/* PART A — 프로젝트 셀 클릭 시 /projects/:id 로 이동. project_id null 이면 - 표시. */}
+                  <td className="px-4 py-2.5 text-xs">
+                    {c.project_id && c.project?.name ? (
+                      <button type="button"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/projects/${c.project_id}`); }}
+                        className="text-violet-600 hover:underline font-medium">
+                        {c.project.name} →
+                      </button>
+                    ) : <span className="text-muted">-</span>}
+                  </td>
                   <td className="px-4 py-2.5 text-right font-bold text-text tabular-nums whitespace-nowrap">{formatMoney(c.contract_amount)}</td>
                   <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">{billingProgressLabel(c.billing_schedule ?? [])}</td>
                   <td className="px-4 py-2.5 text-center">

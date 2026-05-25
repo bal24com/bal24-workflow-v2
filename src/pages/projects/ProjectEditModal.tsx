@@ -8,6 +8,8 @@ import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { PROJECT_STATUS_VALUES } from './projectStatus';
 import type { Client, Profile, ProjectStatus, ProjectType } from '../../types/database';
+// 박경수님 + SkyClaw PART B — 연결된 계약(income_contracts) 인라인 편집 섹션
+import ProjectFormContractFields, { saveContractDrafts, type ContractDraft } from './ProjectFormContractFields';
 
 const PROJECT_TYPES: ProjectType[] = ['교육', '컨설팅', '이벤트'];
 
@@ -48,6 +50,8 @@ export default function ProjectEditModal({ open, project, onClose, onSaved }: Pr
   const [profiles, setProfiles] = useState<Pick<Profile, 'id' | 'name'>[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // PART B — 연결된 계약 인라인 편집 draft 상태
+  const [contractDrafts, setContractDrafts] = useState<ContractDraft[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -96,6 +100,11 @@ export default function ProjectEditModal({ open, project, onClose, onSaved }: Pr
         updated_at: new Date().toISOString(),
       }).eq('id', project.id);
       if (error) throw error;
+      // PART B — 연결된 계약 변경 사항 함께 저장 (변경된 필드만 UPDATE)
+      const cRes = await saveContractDrafts(contractDrafts);
+      if (!cRes.ok) {
+        toast.error(`계약 수정 일부 실패: ${cRes.reason}`);
+      }
       toast.success('프로젝트를 수정했어요.');
       onSaved();
       onClose();
@@ -172,6 +181,19 @@ export default function ProjectEditModal({ open, project, onClose, onSaved }: Pr
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} disabled={submitting} rows={3}
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
             placeholder="프로젝트 개요·메모" />
+        </div>
+
+        {/* PART B — 수입/계약 정보 (연결된 income_contracts 인라인 편집) */}
+        <div className="space-y-1.5 pt-2 border-t border-slate-100">
+          <label className="text-sm font-semibold text-slate-700">수입/계약 정보</label>
+          <p className="text-[11px] text-muted">이 프로젝트에 연결된 계약을 함께 수정할 수 있어요. 변경된 항목만 저장돼요.</p>
+          <ProjectFormContractFields
+            projectId={project.id}
+            open={open}
+            drafts={contractDrafts}
+            onChange={setContractDrafts}
+            disabled={submitting}
+          />
         </div>
       </form>
     </Modal>

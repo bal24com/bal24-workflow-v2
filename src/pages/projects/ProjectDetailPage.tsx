@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Info, Loader2, Users, Link2, Wallet, BookOpen, FolderArchive, Trash2, FileText, Pencil } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Info, Loader2, Users, Link2, Wallet, BookOpen, FolderArchive, Trash2, FileText, Pencil, CheckCircle2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Badge, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
@@ -75,6 +75,61 @@ export default function ProjectDetailPage() {
   const [tab, setTab] = useState<TabKey>('overview');
   const [deleting, setDeleting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  // 박경수님 + SkyClaw 요청 — 제안 단계 [견적내용 계약진행] 버튼
+  const [confirmingContract, setConfirmingContract] = useState(false);
+
+  // PART C — 견적 합계를 사업비(예산)로 확정하고 status='진행' + income_contracts 동기화
+  async function handleConfirmToContract() {
+    if (!project) return;
+    setConfirmingContract(true);
+    try {
+      // 1) project_estimates 조회 — total_amount 사용 (DB 가 unit_price × quantity × headcount 3중 곱 후 저장)
+      const { data: estimates, error: estErr } = await supabase
+        .from('project_estimates')
+        .select('id, total_amount')
+        .eq('project_id', project.id)
+        .is('deleted_at', null);
+      if (estErr) throw estErr;
+      const totalEstimate = (estimates ?? []).reduce((s, e) => s + Number(e.total_amount ?? 0), 0);
+
+      if (totalEstimate === 0) {
+        toast.error('견적 항목이 없어요. 견적 탭에서 먼저 작성해 주세요.');
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `견적 합계 ${totalEstimate.toLocaleString()}원을 사업비(예산)로 확정하고\n` +
+        `프로젝트 단계를 "진행"으로 전환할까요?`,
+      );
+      if (!confirmed) return;
+
+      // 2) projects.budget + status='진행'
+      const nowIso = new Date().toISOString();
+      const { error: pErr } = await supabase.from('projects').update({
+        budget: totalEstimate,
+        status: '진행',
+        updated_at: nowIso,
+      }).eq('id', project.id);
+      if (pErr) throw pErr;
+
+      // 3) income_contracts 자동 생성 행 동기화 (계약금액 + lifecycle_stage='contract')
+      const { error: cErr } = await supabase.from('income_contracts').update({
+        contract_amount: totalEstimate,
+        lifecycle_stage: 'contract',
+        updated_at: nowIso,
+      }).eq('project_id', project.id).eq('auto_created', true).is('deleted_at', null);
+      if (cErr) console.error('[ProjectDetailPage] 자동계약 동기화 경고:', cErr.message);
+
+      toast.success('견적이 사업비로 확정됐어요. 계약 진행 단계로 이동합니다.');
+      window.location.reload();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      console.error('[ProjectDetailPage] 계약진행 전환 실패:', msg);
+      toast.error('계약 진행 전환에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setConfirmingContract(false);
+    }
+  }
 
   // STEP-DELETE-RESUME-FULL — soft-delete (휴지통 30일 보관, admin/PM만)
   async function handleDeleteProject() {
@@ -169,6 +224,18 @@ export default function ProjectDetailPage() {
           {/* 박경수님 요청 1번 — 수정 + 삭제 (admin/PM 전용) */}
           {(isAdmin || isPM) && (
             <div className="flex items-center gap-2">
+              {/* PART C — 제안 단계에서만 노출. 견적 합계를 사업비로 확정 + 진행 단계 전환 */}
+              {project.status === '제안' && (
+                <Button
+                  variant="primary"
+                  leftIcon={<CheckCircle2 size={14} />}
+                  onClick={() => void handleConfirmToContract()}
+                  loading={confirmingContract}
+                  className="!bg-emerald-600 hover:!bg-emerald-700"
+                >
+                  견적내용 계약진행
+                </Button>
+              )}
               <Button variant="primary" leftIcon={<Pencil size={14} />} onClick={() => setEditOpen(true)}>수정</Button>
               <Button variant="outline" leftIcon={<Trash2 size={14} />}
                 onClick={() => void handleDeleteProject()} disabled={deleting}
