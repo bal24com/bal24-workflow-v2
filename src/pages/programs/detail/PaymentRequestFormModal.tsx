@@ -130,15 +130,15 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
       <form id="payment-request-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-700">카테고리 <span className="text-rose-500">*</span></label>
+            <label className="text-sm font-semibold text-slate-700">항목 <span className="text-rose-500">*</span></label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} disabled={submitting} className={SELECT_CLASS}>
               {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           {category === '기타' ? (
-            <Input label="직접 입력" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} disabled={submitting} placeholder="예) 통역료" />
+            <Input label="항목 직접 입력" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} disabled={submitting} placeholder="예) 통역료" />
           ) : (
-            <Input label="세부 내용" value={description} onChange={(e) => setDescription(e.target.value)} disabled={submitting} placeholder="예) 강사 1박 숙박" />
+            <Input label="세항목" value={description} onChange={(e) => setDescription(e.target.value)} disabled={submitting} placeholder="예) 강사 1박 숙박" />
           )}
         </div>
 

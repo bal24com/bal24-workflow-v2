@@ -136,8 +136,8 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs">
               <tr>
-                <th className="text-left px-3 py-2.5 font-semibold">카테고리</th>
-                <th className="text-left px-3 py-2.5 font-semibold">세부 내용</th>
+                <th className="text-left px-3 py-2.5 font-semibold">항목</th>
+                <th className="text-left px-3 py-2.5 font-semibold">세항목</th>
                 <th className="text-left px-3 py-2.5 font-semibold">지급처</th>
                 <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">단가×회수</th>
                 <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">세액 (원천/부가)</th>

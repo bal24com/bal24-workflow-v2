@@ -2,7 +2,7 @@
 // STEP-ACCOUNTING-FOLLOWUP7-Phase2 + Phase3 (AI 견적서 분석)
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Save, FileText, Wand2, BookOpen, Download, Search, Pencil } from 'lucide-react';
+import { Loader2, Plus, Save, FileText, BookOpen, Download, Search, Pencil } from 'lucide-react';
 import { Button, Input } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../lib/supabase';
@@ -14,7 +14,7 @@ import {
   type DraftItem, type SortKey, type SortDir,
 } from './estimateTableHelpers';
 import {
-  fetchEstimateByProject, createEstimate, saveEstimateItems, convertEstimateToPayroll,
+  fetchEstimateByProject, createEstimate, saveEstimateItems,
   fetchEstimatePaymentMap, estimateItemStatusLabel,
   ESTIMATE_CATEGORY_SUGGESTIONS, type EstimateRow,
 } from './estimateUtils';
@@ -33,7 +33,6 @@ export default function EstimateTab({ projectId, projectName }: Props) {
   const [items, setItems] = useState<DraftItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [converting, setConverting] = useState(false);
   // STEP-ACCOUNTING-FOLLOWUP7-Phase3 — AI 견적서 분석
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState<ExtractedEstimateItem[] | null>(null);
@@ -92,7 +91,13 @@ export default function EstimateTab({ projectId, projectName }: Props) {
     setItems((prev) => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
   }
 
-  function removeItem(idx: number) {
+  async function removeItem(idx: number) {
+    const item = items[idx];
+    if (item._converted) { toast.error('변환된 항목은 외주/급여 페이지에서 삭제하세요.'); return; }
+    if (item._existingId) {
+      const { error } = await supabase.from('estimate_items').delete().eq('id', item._existingId);
+      if (error) { toast.error(`삭제 실패: ${error.message}`); return; }
+    }
     setItems((prev) => prev.filter((_, i) => i !== idx).map((it, i) => ({ ...it, order_index: i })));
   }
 
@@ -114,16 +119,8 @@ export default function EstimateTab({ projectId, projectName }: Props) {
     void reload();
   }
 
-  async function handleConvert() {
-    if (!estimate) { toast.error('먼저 견적을 저장해 주세요.'); return; }
-    if (!window.confirm('미변환 항목들을 외주/급여로 일괄 생성할까요? (이미 변환된 항목은 제외)')) return;
-    setConverting(true);
-    const res = await convertEstimateToPayroll(estimate.id, { project_id: projectId });
-    setConverting(false);
-    if (res.error) { toast.error(res.error); return; }
-    toast.success(`${res.inserted}건을 외주/급여로 변환했어요.`);
-    void reload();
-  }
+  // 일괄 [외주/급여로 변환] 제거됨 — 박경수님 흐름: 프로그램 [지급요청] → [견적에서 가져오기]
+  // (견적과 실집행이 다를 수 있어 박경수님이 선택·수정·전송하는 흐름이 정확)
 
   // STEP-ACCOUNTING-FOLLOWUP7-Phase3 — AI 견적서 분석
   async function handleAiExtract(file: File) {
@@ -172,7 +169,6 @@ export default function EstimateTab({ projectId, projectName }: Props) {
 
   // 박경수님 요청 — 단가 × 회수 × 수량(인원) 3중 곱
   const total = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1), 0);
-  const unconverted = items.filter((it) => !it._converted).length;
 
   // 박경수님 요청 — 필터/검색/정렬 + 프로그램 연동
   const [catFilter, setCatFilter] = useState(''); const [search, setSearch] = useState('');
@@ -219,15 +215,12 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           <Button variant="outline" size="sm" leftIcon={<Download size={12} />} onClick={() => setLoadTplOpen(true)}>템플릿 불러오기</Button>
           <Button variant="outline" size="sm" leftIcon={<BookOpen size={12} />} onClick={() => setSaveTplOpen(true)} disabled={items.length === 0}>템플릿 저장</Button>
           <Button variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={addItem}>항목 추가</Button>
-          <Button variant="outline" size="sm" leftIcon={<Save size={12} />} onClick={() => void handleSave()} loading={saving}>저장</Button>
-          <Button variant="primary" size="sm" leftIcon={<Wand2 size={12} />} onClick={() => void handleConvert()} loading={converting} disabled={!estimate || unconverted === 0}>
-            외주/급여로 변환 ({unconverted})
-          </Button>
+          <Button variant="primary" size="sm" leftIcon={<Save size={12} />} onClick={() => void handleSave()} loading={saving}>저장</Button>
         </div>
       </div>
 
       <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-2.5 text-xs text-violet-900">
-        💡 견적 항목을 입력하고 [저장] → [외주/급여로 변환] 누르면 변환된 항목은 회색 처리되고 외주/급여 페이지에서 실집행 정보(지급일·계좌·증빙) 채워나가시면 돼요.
+        💡 견적 항목을 [저장] 한 뒤 프로그램 → [지급요청] → [⬇ 견적에서 가져오기] 에서 박경수님이 선택·수정 후 지출로 등록하세요. (견적과 실집행이 다를 수 있어 자동 일괄 변환은 사용 안 함)
       </div>
 
       {/* 박경수님 요청 — 메인 탭: [종합] + 프로그램별 */}

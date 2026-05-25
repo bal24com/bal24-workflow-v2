@@ -142,8 +142,8 @@ export default function EstimateImportModal({ open, programId, projectId, group,
               <thead className="bg-slate-50 text-slate-500">
                 <tr>
                   <th className="px-2 py-1.5 text-center"><input type="checkbox" checked={allChecked} onChange={toggleAll} /></th>
-                  <th className="px-2 py-1.5 text-left">견적 카테고리</th>
-                  <th className="px-2 py-1.5 text-left">세부 내용</th>
+                  <th className="px-2 py-1.5 text-left">견적 항목</th>
+                  <th className="px-2 py-1.5 text-left">세항목</th>
                   <th className="px-2 py-1.5 text-left">분류 (수정)</th>
                   <th className="px-2 py-1.5 text-right">단가 (수정)</th>
                   <th className="px-2 py-1.5 text-right">수량 (수정)</th>
