@@ -2,7 +2,7 @@
 // STEP-ACCOUNTING-ALL P3
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Loader2, Search, Users, Upload, ArrowUp, ArrowDown, ArrowUpDown, Filter } from 'lucide-react';
+import { Plus, Loader2, Search, Users, Upload, ArrowUp, ArrowDown, ArrowUpDown, Filter, Download, FileText } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDateKo, formatMoney } from '../../lib/utils';
@@ -19,6 +19,7 @@ import PayrollSummaryBar from './PayrollSummaryBar';
 import PayrollExpenseFormModal from './PayrollExpenseFormModal';
 import PayrollImportModal from './PayrollImportModal';
 import PayrollStatsPanel from './PayrollStatsPanel';
+import { downloadPayrollExcel, downloadPayrollPdf } from './payrollDownload';
 
 // 박경수님 요청 — 외주/운영 메인 탭 제거, [통계][지출] 2탭으로 재구성
 type MainTab = 'stats' | 'list';
@@ -153,20 +154,15 @@ export default function PayrollPage() {
         })}
       </nav>
 
-      {/* 필터 콤보 + 신규/일괄 등록 — 박경수님 요청: 필터는 한 콤보 안에 묶음 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* 박경수님 + SkyClaw 요청 — 필터·검색·다운로드·등록 한 줄 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* [필터▼] 콤보 — 상태·월만 (프로젝트·항목은 콤보 밖) */}
         <details className="relative">
           <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">
             <Filter size={12} aria-hidden="true" />
             필터{activeFilterCount > 0 && <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-violet-600 text-white text-[10px]">{activeFilterCount}</span>}
           </summary>
-          <div className="absolute z-20 mt-1 left-0 p-3 bg-white border border-slate-200 rounded-xl shadow-lg space-y-2 min-w-[280px]">
-            <FilterRow label="프로젝트">
-              <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="w-full h-8 rounded-md border border-slate-200 px-2 text-xs">
-                <option value="">전체</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </FilterRow>
+          <div className="absolute z-20 mt-1 left-0 p-3 bg-white border border-slate-200 rounded-xl shadow-lg space-y-2 min-w-[260px]">
             <FilterRow label="상태">
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as PayrollPaymentStatus | 'all')} className="w-full h-8 rounded-md border border-slate-200 px-2 text-xs">
                 <option value="all">전체</option>
@@ -176,33 +172,39 @@ export default function PayrollPage() {
             <FilterRow label="지급월">
               <input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="w-full h-8 rounded-md border border-slate-200 px-2 text-xs" />
             </FilterRow>
-            <FilterRow label="구분">
-              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-full h-8 rounded-md border border-slate-200 px-2 text-xs">
-                <option value="">전체</option>
-                {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </FilterRow>
-            {activeFilterCount > 0 && (
-              <button type="button" onClick={resetFilters} className="w-full text-[11px] text-rose-600 hover:underline pt-1">필터 초기화</button>
-            )}
           </div>
         </details>
-        <div className="flex items-center gap-2">
+        {/* 프로젝트 dropdown */}
+        <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}
+          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs">
+          <option value="">전체 프로젝트</option>
+          {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        {/* 항목 dropdown */}
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs">
+          <option value="">전체 항목</option>
+          {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        {/* 검색 */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="성명·내용·프로젝트로 검색"
+            className="w-full h-9 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+        </div>
+        {(activeFilterCount > 0 || search) && (
+          <button type="button" onClick={() => { resetFilters(); setSearch(''); }}
+            className="text-[11px] text-rose-600 hover:underline">초기화</button>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" leftIcon={<Download size={14} />} onClick={() => downloadPayrollExcel(visible)} disabled={visible.length === 0}>엑셀</Button>
+          <Button variant="outline" size="sm" leftIcon={<FileText size={14} />}
+            onClick={async () => { const r = await downloadPayrollPdf('payroll-table'); if (!r.ok) toast.error(`PDF 실패: ${r.reason}`); }}
+            disabled={visible.length === 0}>PDF</Button>
           <Button variant="outline" size="sm" leftIcon={<Upload size={14} />} onClick={() => setImportOpen(true)}>일괄 등록</Button>
           <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => { setEditTarget(null); setFormOpen(true); }}>신규 등록</Button>
         </div>
-      </div>
-
-      {/* 검색 */}
-      <div className="relative w-full sm:max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="성명·내용·프로젝트로 검색"
-          className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-        />
       </div>
 
       {/* 합계 바 — 양 탭 공용 */}
@@ -226,17 +228,17 @@ export default function PayrollPage() {
           description="신규 등록 또는 일괄 등록(Excel) 으로 추가해 보세요."
         />
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+        <div id="payroll-table" className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs">
               <tr>
-                <SortableTh k="paid_at"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">지급일</SortableTh>
-                <SortableTh k="payee_name"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">성명/내용</SortableTh>
                 <SortableTh k="project"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">프로젝트</SortableTh>
-                <SortableTh k="expense_type"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">구분</SortableTh>
+                <SortableTh k="expense_type"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">항목</SortableTh>
+                <SortableTh k="payee_name"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">성명/내용</SortableTh>
                 <SortableTh k="subtotal"       sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">단가×회수</SortableTh>
                 <SortableTh k="tax_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">세액 (원천/부가)</SortableTh>
                 <SortableTh k="net_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">실지급</SortableTh>
+                <SortableTh k="paid_at"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">지급일</SortableTh>
                 <SortableTh k="payment_status" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">상태</SortableTh>
                 <SortableTh k="receipt"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">증빙</SortableTh>
                 <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">관리</th>
@@ -248,19 +250,18 @@ export default function PayrollPage() {
                 const needReceipt = !hasReceipt && r.expense_type !== '운영인건비';
                 return (
                   <tr key={r.id} className="hover:bg-violet-50/40">
-                    <td className="px-3 py-2 text-xs text-muted whitespace-nowrap">{r.paid_at ? formatDateKo(r.paid_at) : '-'}</td>
-                    <td className="px-3 py-2">
-                      <div className="text-sm font-medium text-text">{r.payee_name}</div>
-                      <div className="text-[11px] text-muted truncate max-w-[260px]">{r.description ?? ''}{r.payee_id_no && ` · ${maskIdNo(r.payee_id_no)}`}</div>
-                    </td>
                     <td className="px-3 py-2 text-xs text-muted">{r.project?.name ?? '-'}</td>
-                    <td className="px-3 py-2 text-center text-xs">
+                    <td className="px-3 py-2 text-right text-xs whitespace-nowrap">
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border mr-1 ${
                         isOutsourceType(r.expense_type) ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
                         : isOperationType(r.expense_type) ? 'bg-orange-50 text-orange-700 border-orange-200'
                         : 'bg-slate-50 text-slate-600 border-slate-200'
                       }`}>{isOutsourceType(r.expense_type) ? '인건비' : isOperationType(r.expense_type) ? '운영비' : '기타'}</span>
                       {r.expense_type}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="text-sm font-medium text-text">{r.payee_name}</div>
+                      <div className="text-[11px] text-muted truncate max-w-[260px]">{r.description ?? ''}{r.payee_id_no && ` · ${maskIdNo(r.payee_id_no)}`}</div>
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                       <div className="text-xs text-muted">{r.unit_price.toLocaleString()}×{r.quantity}</div>
@@ -276,7 +277,8 @@ export default function PayrollPage() {
                         </>
                       ) : <span className="text-slate-400">없음</span>}
                     </td>
-                    <td className="px-3 py-2 text-right font-bold text-violet-700 tabular-nums whitespace-nowrap">{formatMoney(r.net_amount)}</td>
+                    <td className="px-3 py-2 text-right font-bold text-violet-700 tabular-nums whitespace-nowrap">{formatMoney(r.net_amount && r.net_amount > 0 ? r.net_amount : r.subtotal)}</td>
+                    <td className="px-3 py-2 text-xs text-muted whitespace-nowrap">{r.paid_at ? formatDateKo(r.paid_at) : '-'}</td>
                     <td className="px-3 py-2 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${PAYROLL_STATUS_STYLE[r.payment_status]}`}>{r.payment_status}</span>
                     </td>
