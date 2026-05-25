@@ -24,9 +24,12 @@ export interface ProjectFinance {
   outsourceTotal: number;         // 인건비 (payroll 의 강사료·촬영·기타외주 prefix)
   operationTotal: number;         // 운영비 (payroll 의 운영비·운영인건비 prefix)
   // 박경수님 + SkyClaw 2026-05-26 — 세액 분리
-  vatAmount: number;              // 부가세 (운영비 tax_amount 합)
+  vatAmount: number;              // 매입세액 = 외주 부가세 (payroll 운영비 tax_amount 합)
   withholdingTax: number;         // 원천세 (인건비 tax_amount 합)
   netExpense: number;             // 순지출 (expenseTotal - vatAmount)
+  // 박경수님 + SkyClaw STEP-FINANCE-LABEL-VAT (2026-05-26) — 매출세액 + 납부세액
+  salesVat: number;               // 매출세액 = 사업 계약 부가세 (vat_type='과세' 인 income_contracts 의 contract_amount/11, 포함가 역산)
+  vatPayable: number;             // 납부 부가세 = max(0, salesVat - vatAmount)
   remaining: number;
   settledPct: number;
 }
@@ -65,7 +68,8 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
     supabase.from('projects').select('budget').eq('id', projectId).maybeSingle(),
     supabase.from('income').select('amount, status').eq('project_id', projectId).is('deleted_at', null),
     supabase.from('expenses').select('gross_amount, status').eq('project_id', projectId).is('deleted_at', null),
-    supabase.from('income_contracts').select('contract_amount, status, deposited_at').eq('project_id', projectId).is('deleted_at', null),
+    // 박경수님 + SkyClaw STEP-FINANCE-LABEL-VAT — vat_type 추가 fetch (매출세액 계산용)
+    supabase.from('income_contracts').select('contract_amount, status, deposited_at, vat_type').eq('project_id', projectId).is('deleted_at', null),
     // ACCOUNTING-P3 — 박경수님 요청: expense_type 도 fetch 해서 인건비/운영비 분류
     // 박경수님 + SkyClaw 2026-05-26 — tax_amount 도 fetch 해서 부가세·원천세 분리
     supabase.from('payroll_expenses').select('subtotal, tax_amount, tax_rate_type, payment_status, expense_type').eq('project_id', projectId).is('deleted_at', null),
@@ -85,7 +89,7 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
   // 수입 — 구 income(입금완료) + 신 income_contracts(deposited_at 채워진 행)
   const legacyIncome = ((incomeRes.data ?? []) as Array<{ amount: number | string | null; status: string }>)
     .filter((r) => r.status === '입금완료').reduce((s, r) => s + Number(r.amount ?? 0), 0);
-  const contractRows = (contractRes.data ?? []) as Array<{ contract_amount: number | string | null; status: string; deposited_at: string | null }>;
+  const contractRows = (contractRes.data ?? []) as Array<{ contract_amount: number | string | null; status: string; deposited_at: string | null; vat_type: string | null }>;
   const contractIncome = contractRows.filter((r) => r.deposited_at).reduce((s, r) => s + Number(r.contract_amount ?? 0), 0);
   const incomeTotal = legacyIncome + contractIncome;
 
@@ -123,10 +127,15 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
   // 박경수님 + SkyClaw 2026-05-26 — 전체 사업비 = 모든 계약금액 합. 순지출 = 지출 - 부가세
   const contractTotal = contractRows.reduce((s, r) => s + Number(r.contract_amount ?? 0), 0);
   const netExpense = expenseTotal - vatAmount;
+  // 박경수님 + SkyClaw STEP-FINANCE-LABEL-VAT — 매출세액 (vat_type='과세' 인 행만, 포함가 역산)
+  const salesVat = contractRows
+    .filter((r) => r.vat_type === '과세')
+    .reduce((s, r) => s + Math.floor(Number(r.contract_amount ?? 0) / 11), 0);
+  const vatPayable = Math.max(0, salesVat - vatAmount);
   const remaining = budget - expenseTotal;
   const settledPct = budget > 0 ? Math.min(100, Math.round((incomeTotal / budget) * 100)) : 0;
 
-  return { budget, contractTotal, incomeTotal, expectedIncomeTotal, expenseTotal, pendingExpenseTotal, payrollTotal, proposalTotal, outsourceTotal, operationTotal, vatAmount, withholdingTax, netExpense, remaining, settledPct };
+  return { budget, contractTotal, incomeTotal, expectedIncomeTotal, expenseTotal, pendingExpenseTotal, payrollTotal, proposalTotal, outsourceTotal, operationTotal, vatAmount, withholdingTax, netExpense, salesVat, vatPayable, remaining, settledPct };
 }
 
 /** 참여자 미리보기 — project_members 카운트 + 최근 등록 N명 이름 */

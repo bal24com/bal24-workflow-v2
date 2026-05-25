@@ -97,22 +97,36 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
             <Row label="└ 운영비 (호텔·버스·재료 등)" value={formatMoney(data.operationTotal)} accent="orange" small />
           )}
           {data.pendingExpenseTotal > 0 && (
-            <Row label="└ 대기 지출" value={formatMoney(data.pendingExpenseTotal)} accent="rose" small />
+            <Row label="└ 미지급" value={formatMoney(data.pendingExpenseTotal)} accent="rose" small />
           )}
 
-          {/* 박경수님 + SkyClaw 2026-05-26 — 세액 분리 (부가세·원천세·순지출) */}
-          {(data.vatAmount > 0 || data.withholdingTax > 0) && (
+          {/* 박경수님 + SkyClaw STEP-FINANCE-LABEL-VAT (2026-05-26) — 매입/매출/납부 부가세 + 원천세 + 순지출 */}
+          {(data.vatAmount > 0 || data.withholdingTax > 0 || data.salesVat > 0) && (
             <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 space-y-1 -mx-1">
-              {data.vatAmount > 0 && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-amber-700">└ 부가세 (운영비 포함분)</span>
-                  <span className="text-amber-700 tabular-nums">▲ {formatMoney(data.vatAmount)}</span>
-                </div>
-              )}
               {data.withholdingTax > 0 && (
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-orange-700">└ 원천세 (인건비)</span>
-                  <span className="text-orange-700 tabular-nums">▲ {formatMoney(data.withholdingTax)}</span>
+                  <span className="text-orange-700">▲ 원천세 (인건비 원천징수)</span>
+                  <span className="text-orange-700 tabular-nums">{formatMoney(data.withholdingTax)}</span>
+                </div>
+              )}
+              {data.vatAmount > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-orange-700">▲ 외주 부가세 (매입세액)</span>
+                  <span className="text-orange-700 tabular-nums">{formatMoney(data.vatAmount)}</span>
+                </div>
+              )}
+              {data.salesVat > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-blue-700">사업 부가세 (매출세액)</span>
+                  <span className="text-blue-700 tabular-nums">{formatMoney(data.salesVat)}</span>
+                </div>
+              )}
+              {(data.salesVat > 0 || data.vatAmount > 0) && (
+                <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-amber-200">
+                  <span className="text-slate-700">납부 부가세 (매출 − 매입)</span>
+                  <span className={`tabular-nums ${data.vatPayable > 0 ? 'text-rose-700' : 'text-slate-400'}`}>
+                    {formatMoney(data.vatPayable)}
+                  </span>
                 </div>
               )}
               <div className="flex items-center justify-between text-xs font-bold text-slate-700 pt-1 border-t border-amber-200">
