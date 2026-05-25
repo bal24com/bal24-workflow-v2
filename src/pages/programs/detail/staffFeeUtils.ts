@@ -19,6 +19,19 @@ interface StaffFeeRow extends Omit<StaffFee, 'expert_name' | 'profile_name'> {
   profile: NameRef | NameRef[] | null;
 }
 
+// ── 에러 메시지 번역 (raw 포함 — 박경수님 진단용) ────────
+export function translateStaffFeeError(raw: string): string {
+  const m = (raw ?? '').toLowerCase();
+  if (m.includes('duplicate')) return '동일 강사·활동유형 조합이 이미 등록되어 있어요.';
+  if (m.includes('column') && m.includes('does not exist')) return `강사료 테이블 컬럼이 적용되지 않았어요. Supabase 마이그레이션 실행 필요.\n(${raw})`;
+  if (m.includes('row-level security') || m.includes('permission denied')) return `저장 권한이 없어요. 관리자에게 문의해 주세요.\n(${raw})`;
+  if (m.includes('foreign key')) return `선택한 강사 또는 프로그램이 유효하지 않아요. 휴지통 상태일 수 있어요.\n(${raw})`;
+  if (m.includes('check') && m.includes('constraint')) return `입력 형식이 허용되지 않아요.\n(${raw})`;
+  if (m.includes('null value') || m.includes('not-null')) return `필수 항목이 비어 있어요.\n(${raw})`;
+  if (m.includes('could not find the table') || m.includes('pgrst205')) return 'program_staff_fees 테이블이 적용되지 않았어요. 마이그레이션 실행이 필요해요.';
+  return `저장에 실패했어요: ${raw || '원인 미상'}`;
+}
+
 // ── 원천징수 계산 ──────────────────────────────────────────
 export function calculateFee(gross: number, taxType: TaxType): FeeCalculation {
   const safeGross = Number.isFinite(gross) && gross > 0 ? gross : 0;

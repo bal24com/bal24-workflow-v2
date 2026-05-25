@@ -44,6 +44,9 @@ export interface StaffFee {
   net_amount: number;
   payment_status: PaymentStatus;
   paid_at: string | null;
+  /** 박경수님 요청 — 강의·운영 기간 (선택). DB 컬럼 미적용 시 null 로 처리. */
+  period_start_date?: string | null;
+  period_end_date?: string | null;
   note: string | null;
   /** STEP-STAFF-FEE-EXPENSES-LINK — 자동 생성된 expenses row FK */
   expense_id?: string | null;

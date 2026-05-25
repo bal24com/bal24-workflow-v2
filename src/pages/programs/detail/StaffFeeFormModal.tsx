@@ -7,7 +7,7 @@ import { Modal, Button, Input } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useToast } from '../../../contexts/ToastContext';
-import { calculateFee } from './staffFeeUtils';
+import { calculateFee, translateStaffFeeError, convertStaffFeesToPayroll } from './staffFeeUtils';
 import type {
   StaffFee, FeeType, TaxType, InputMode,
 } from '../../../types/staffFee';
@@ -47,6 +47,9 @@ export default function StaffFeeFormModal({ open, programId, fee, onClose, onSav
   const [grossInput, setGrossInput] = useState('0');
   const [taxType, setTaxType] = useState<TaxType>('3.3');
   const [note, setNote] = useState('');
+  // 박경수님 요청 — 강의·운영 기간 (선택)
+  const [periodStart, setPeriodStart] = useState('');
+  const [periodEnd, setPeriodEnd] = useState('');
 
   // 강사 후보 fetch
   useEffect(() => {
@@ -86,7 +89,11 @@ export default function StaffFeeFormModal({ open, programId, fee, onClose, onSav
       setExpertId(''); setProfileId('');
       setFeeType('education'); setDescription('');
       setInputMode('unit'); setUnitPrice('0'); setQuantity('1'); setGrossInput('0');
-      setTaxType('3.3'); setNote('');
+      setTaxType('3.3'); setNote(''); setPeriodStart(''); setPeriodEnd('');
+    }
+    if (fee) {
+      setPeriodStart(fee.period_start_date ?? '');
+      setPeriodEnd(fee.period_end_date ?? '');
     }
   }, [open, fee]);
 
@@ -119,22 +126,40 @@ export default function StaffFeeFormModal({ open, programId, fee, onClose, onSav
         tax_type: taxType,
         tax_amount: calc.taxAmount,
         net_amount: calc.netAmount,
+        period_start_date: periodStart || null,
+        period_end_date: periodEnd || null,
         note: note.trim() || null,
         created_by: fee ? undefined : (user?.id ?? null),
         updated_at: new Date().toISOString(),
       };
+      // 신규 INSERT 는 inserted row 를 받아서 payroll_expenses 자동 미러
       const res = fee
-        ? await supabase.from('program_staff_fees').update(payload).eq('id', fee.id)
-        : await supabase.from('program_staff_fees').insert(payload);
+        ? await supabase.from('program_staff_fees').update(payload).eq('id', fee.id).select('*').maybeSingle()
+        : await supabase.from('program_staff_fees').insert(payload).select('*, expert:staff_pool!expert_id(name), profile:profiles!profile_id(name)').single();
       if (res.error) {
-        console.error('[staff-fee] 저장 실패:', res.error.message);
-        const msg = res.error.message.includes('duplicate')
-          ? '동일 강사·활동유형 조합이 이미 등록되어 있어요.'
-          : '저장에 실패했어요. 잠시 후 다시 시도해 주세요.';
-        toast.error(msg);
+        const raw = res.error.message ?? '';
+        console.error('[staff-fee] 저장 실패:', raw);
+        toast.error(translateStaffFeeError(raw));
         return;
       }
-      toast.success('지급 기준을 저장했어요.');
+
+      // 박경수님 요청 — 신규 등록 시 재무 외주/급여 (payroll_expenses) 자동 연동
+      if (!fee && res.data) {
+        const row = res.data as Record<string, unknown>;
+        const expertRel = row.expert as { name: string | null } | { name: string | null }[] | null;
+        const profileRel = row.profile as { name: string | null } | { name: string | null }[] | null;
+        const expert_name = Array.isArray(expertRel) ? expertRel[0]?.name ?? null : expertRel?.name ?? null;
+        const profile_name = Array.isArray(profileRel) ? profileRel[0]?.name ?? null : profileRel?.name ?? null;
+        const feeForPayroll = { ...(row as object), expert_name, profile_name } as StaffFee;
+        const mirror = await convertStaffFeesToPayroll([feeForPayroll], programId);
+        if (mirror.error) {
+          toast.success('지급 기준을 저장했어요. (외주/급여 자동 연동 실패 — 재무 페이지에서 수동 변환하세요.)');
+        } else {
+          toast.success('지급 기준을 저장하고 재무 외주/급여에 반영했어요.');
+        }
+      } else {
+        toast.success('지급 기준을 수정했어요.');
+      }
       onSaved();
       onClose();
     } finally {
@@ -206,6 +231,11 @@ export default function StaffFeeFormModal({ open, programId, fee, onClose, onSav
             </select>
           </div>
           <Input label="세부 내용" value={description} onChange={(e) => setDescription(e.target.value)} disabled={submitting} placeholder="예) 오프라인 9/11" />
+        </div>
+        {/* 박경수님 요청 — 강의·운영 기간 (선택) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input type="date" label="기간 시작일" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} disabled={submitting} />
+          <Input type="date" label="기간 종료일" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} disabled={submitting} />
         </div>
 
         {/* 금액 입력 */}

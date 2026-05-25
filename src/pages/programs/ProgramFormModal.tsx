@@ -257,6 +257,7 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onBlur={() => { if (!projectId && name.trim()) { const m = projects.find((p) => p.name.trim() === name.trim()); if (m) { setProjectId(m.id); toast.success(`같은 이름의 프로젝트 '${m.name}' 와 자동 연결했어요.`); } } }}
           disabled={submitting}
           error={nameError}
           placeholder="예) 2026 상반기 리더십 캠프"
