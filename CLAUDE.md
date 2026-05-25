@@ -1,7 +1,7 @@
 BalanceDot WorkFlow v2 — CLAUDE.md
 Claude Code가 매 세션마다 이 파일을 먼저 읽고 작업한다.
 수정 시 반드시 이 파일도 업데이트할 것.
-마지막 업데이트: 2026-05-25 (ACCOUNTING-P1~P4 + FOLLOWUP1~7 + STEP-CONTRACT-AUTO + STEP-TAGS 까지 반영)
+마지막 업데이트: 2026-05-25 (회계·견적·지출 흐름 재구성 — 견적 [종합·프로그램별] 탭, 부가세 10% 분리, 지급요청 [견적에서 가져오기] 선택·수정·전송, 행별 [↑↓ 수정 삭제]. 인수인계 HANDOVER_2026-05-25.md 참고)
 
 1. 프로젝트 개요
 •	앱명: BalanceDot WorkFlow v2
@@ -602,7 +602,8 @@ URL 구조: /consortium/:id/portal
 | GitHub | `https://github.com/bal24com/bal24-workflow-v2` |
 | 배포 | `https://bal24-workflow-v2.netlify.app` / `https://bal24.kr` |
 | Supabase | `https://clsljkxvgmqwenettkrz.supabase.co` |
-| 최근 커밋 | `469b863` (STEP-TAGS commit d — 관리자 태그 분류 CRUD) |
+| 최근 커밋 | `fbd494e` (PaymentRequestTab 행별 [수정][↑↓] + payroll_order_index) |
+| 인수인계 | `HANDOVER_2026-05-25.md` (SkyClaw 등 다른 AI 이어가기 컨텍스트) |
 | 이전 프로젝트 | `C:\workflow\workflow_v7_full` → **폐기, 사용 안 함** |
 
 ---
