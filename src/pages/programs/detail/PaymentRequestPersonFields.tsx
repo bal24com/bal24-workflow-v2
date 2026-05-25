@@ -1,7 +1,9 @@
 // 지급요청 인건비 폼 필드 그룹 (수취인·주민번호·원천세·계좌)
-// PaymentRequestFormModal V-1 분리
+// PaymentRequestFormModal V-1 분리 + 박경수님 요청 staff_pool 검색 자동채움 (2026-05-26)
 
+import { useEffect, useRef, useState } from 'react';
 import { Input } from '../../../components/ui';
+import { supabase } from '../../../lib/supabase';
 import { formatMoney } from '../../../lib/utils';
 import { calcTax } from '../../../utils/taxUtils';
 
@@ -16,6 +18,17 @@ export interface PersonValues {
 export const EMPTY_PERSON: PersonValues = {
   payee_name: '', payee_id_no: '', bank_name: '', bank_account: '', tax_rate_type: '3.3',
 };
+
+// 박경수님 + SkyClaw — staff_pool 검색 결과 (필요한 컬럼만)
+interface StaffSearchResult {
+  id: string;
+  name: string;
+  id_number: string | null;     // 박경수님 환경 컬럼명 (가이드의 resident_number 매핑)
+  bank_name: string | null;
+  bank_account: string | null;
+  staff_type: string | null;    // 가이드의 role 매핑
+  position: string | null;
+}
 
 function maskRrn(raw: string): string {
   const d = raw.replace(/\D/g, '').slice(0, 13);
@@ -34,11 +47,102 @@ export default function PaymentRequestPersonFields({ values, totalAmount, onChan
   const set = <K extends keyof PersonValues>(k: K, v: PersonValues[K]) => onChange({ ...values, [k]: v });
   const calc = calcTax(totalAmount, values.tax_rate_type);
 
+  // 박경수님 + SkyClaw — staff_pool 검색 + 자동채움
+  const [staffResults, setStaffResults] = useState<StaffSearchResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function runSearch(q: string) {
+    if (q.trim().length < 2) { setStaffResults([]); setShowDropdown(false); return; }
+    setSearching(true);
+    const like = `%${q.trim()}%`;
+    // 가이드의 phone 외에 phone_mobile·phone_office 까지 OR 검색
+    const { data, error } = await supabase
+      .from('staff_pool')
+      .select('id, name, id_number, bank_name, bank_account, staff_type, position')
+      .or(`name.ilike.${like},phone.ilike.${like},phone_mobile.ilike.${like}`)
+      .is('deleted_at', null)
+      .limit(10);
+    setSearching(false);
+    if (error) {
+      console.error('[PaymentRequestPersonFields] staff 검색 실패:', error.message);
+      setStaffResults([]); setShowDropdown(true);
+      return;
+    }
+    setStaffResults((data ?? []) as StaffSearchResult[]);
+    setShowDropdown(true);
+  }
+
+  function handleNameChange(v: string) {
+    // 직접 입력도 즉시 반영 (검색 안 되더라도 폼 값은 유지)
+    onChange({ ...values, payee_name: v });
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => { void runSearch(v); }, 200);
+  }
+
+  function selectStaff(s: StaffSearchResult) {
+    // 박경수님 요청 — 선택 시 주민번호·은행 자동채움
+    onChange({
+      ...values,
+      payee_name: s.name,
+      payee_id_no: s.id_number ?? '',
+      bank_name: s.bank_name ?? '',
+      bank_account: s.bank_account ?? '',
+    });
+    setShowDropdown(false);
+    setStaffResults([]);
+  }
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
+
   return (
     <div className="space-y-3 rounded-xl border border-cyan-100 bg-cyan-50/30 p-3">
       <div className="text-xs font-bold text-cyan-700">💼 인건비 (개인)</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Input label="수취인명" required value={values.payee_name} onChange={(e) => set('payee_name', e.target.value)} disabled={disabled} placeholder="예) 홍길동" />
+        {/* 박경수님 + SkyClaw — 수취인명 staff_pool 검색 자동채움 */}
+        <div className="relative space-y-1.5" ref={wrapperRef}>
+          <label className="text-sm font-semibold text-slate-700">
+            수취인명 <span className="text-rose-500">*</span>
+          </label>
+          <input type="text" value={values.payee_name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onFocus={() => { if (staffResults.length > 0) setShowDropdown(true); }}
+            disabled={disabled}
+            placeholder="이름 검색 (등록된 전문가·직원) — 직접 입력도 가능"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60" />
+          {showDropdown && (
+            <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+              {searching && <div className="px-3 py-2 text-xs text-slate-400">검색 중…</div>}
+              {!searching && staffResults.length === 0 && values.payee_name.trim().length >= 2 && (
+                <div className="px-3 py-2 text-xs text-slate-400">검색 결과 없음 — 직접 입력하세요</div>
+              )}
+              {staffResults.map((s) => (
+                <button key={s.id} type="button" onClick={() => selectStaff(s)}
+                  className="block w-full text-left px-3 py-2 text-sm hover:bg-violet-50 border-b border-slate-50 last:border-b-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-text">{s.name}</span>
+                    <span className="text-[10px] text-slate-400">{s.staff_type ?? s.position ?? ''}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    {s.bank_name ? `${s.bank_name} ${s.bank_account ?? ''}` : '계좌 미등록'}
+                    {s.id_number && ' · 주민번호 등록됨'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="space-y-1.5">
           <label className="text-sm font-semibold text-slate-700">주민번호</label>
           <input type="text" value={values.payee_id_no} onChange={(e) => set('payee_id_no', e.target.value.replace(/\D/g, '').slice(0, 13))}
