@@ -2,7 +2,7 @@
 // STEP-ACCOUNTING-FOLLOWUP7-Phase2 + Phase3 (AI 견적서 분석)
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Save, FileText, Wand2, BookOpen, Download, Search } from 'lucide-react';
+import { Loader2, Plus, Save, FileText, Wand2, BookOpen, Download, Search, Pencil } from 'lucide-react';
 import { Button, Input } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../lib/supabase';
@@ -21,15 +21,11 @@ import {
 // STEP-ACCOUNTING-FOLLOWUP7-Phase3 — AI 견적서 추출
 import { extractEstimateFromDocument, type ExtractedEstimateItem } from './estimateExtract';
 import EstimateAiSection from './EstimateAiSection';
+import EstimateHeaderEditModal from './EstimateHeaderEditModal';
 // 박경수님 요청 — 견적 항목 템플릿 저장/불러오기
 import { SaveEstimateTemplateModal, LoadEstimateTemplateModal, type TemplateItem } from './EstimateTemplateModals';
 
-interface Props {
-  projectId: string;
-  projectName: string;
-}
-
-// DraftItem · 정렬 · 필터 헬퍼는 estimateTableHelpers (V-1 분리)
+interface Props { projectId: string; projectName: string }
 
 export default function EstimateTab({ projectId, projectName }: Props) {
   const toast = useToast();
@@ -42,9 +38,8 @@ export default function EstimateTab({ projectId, projectName }: Props) {
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState<ExtractedEstimateItem[] | null>(null);
   const [extractedFileName, setExtractedFileName] = useState('');
-  // 박경수님 요청 — 템플릿 저장/불러오기
-  const [saveTplOpen, setSaveTplOpen] = useState(false);
-  const [loadTplOpen, setLoadTplOpen] = useState(false);
+  // 박경수님 요청 — 템플릿 저장/불러오기 + 견적서 헤더 수정
+  const [saveTplOpen, setSaveTplOpen] = useState(false); const [loadTplOpen, setLoadTplOpen] = useState(false); const [headerEditOpen, setHeaderEditOpen] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -217,6 +212,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         <div className="flex items-center gap-2 text-sm">
           <FileText size={16} className="text-violet-600" aria-hidden="true" />
           <span className="font-semibold text-[#1E1B4B]">{estimate?.title ?? '견적서 (아직 없음)'}</span>
+          {estimate && <button type="button" onClick={() => setHeaderEditOpen(true)} className="inline-flex items-center gap-0.5 text-[11px] text-violet-600 hover:underline" aria-label="견적서 수정"><Pencil size={10} aria-hidden="true" />수정</button>}
           <span className="text-xs text-slate-500">· 항목 {items.length}건 · 총 <span className="font-bold text-violet-700 tabular-nums">{formatMoney(total)}</span></span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -395,6 +391,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           toast.success(`${next.length}건 ${replace ? '교체' : '추가'} 완료. [저장] 을 잊지 마세요.`);
         }}
       />
+      {estimate && <EstimateHeaderEditModal open={headerEditOpen} estimateId={estimate.id} currentTitle={estimate.title} currentMemo={estimate.memo ?? null} onClose={() => setHeaderEditOpen(false)} onSaved={() => { setHeaderEditOpen(false); void reload(); }} />}
     </div>
   );
 }

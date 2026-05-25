@@ -36,17 +36,18 @@ export default function PaymentSummaryCards({ programId, projectId }: Props) {
       let estimateLines: EstimateLine[] = [];
       let estimateTotal = 0;
       if (projectId) {
+        // 박경수님 fix — estimate_items 의 합계 컬럼은 'amount' 가 아닌 'subtotal' (GENERATED)
         const { data: est } = await supabase.from('project_estimates')
-          .select('id, items:estimate_items(category, amount, program_id)')
+          .select('id, items:estimate_items(category, subtotal, program_id)')
           .eq('project_id', projectId).is('deleted_at', null)
           .order('created_at', { ascending: false }).limit(1).maybeSingle();
-        const items = (est as { items?: Array<{ category: string; amount: number; program_id: string | null }> } | null)?.items ?? [];
+        const items = (est as { items?: Array<{ category: string; subtotal: number | string | null; program_id: string | null }> } | null)?.items ?? [];
         const relevant = items.filter((it) => !it.program_id || it.program_id === programId);
         const byCat: Record<string, number> = {};
-        for (const it of relevant) byCat[it.category] = (byCat[it.category] ?? 0) + Number(it.amount ?? 0);
+        for (const it of relevant) byCat[it.category] = (byCat[it.category] ?? 0) + Number(it.subtotal ?? 0);
         estimateLines = Object.entries(byCat).map(([category, amount]) => ({ category, amount }))
           .sort((a, b) => b.amount - a.amount);
-        estimateTotal = relevant.reduce((s, it) => s + Number(it.amount ?? 0), 0);
+        estimateTotal = relevant.reduce((s, it) => s + Number(it.subtotal ?? 0), 0);
       }
 
       // 실제 집행 — payroll_expenses (program_id) 종합 + 부가세/원천세 분리
