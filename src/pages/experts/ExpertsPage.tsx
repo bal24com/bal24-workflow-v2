@@ -17,6 +17,8 @@ import { useToast } from '../../contexts/ToastContext';
 import { softDelete } from '../../lib/softDeleteUtils';
 import { copyToClipboard } from '../../lib/clipboard';
 import type { StaffPool } from '../../types/database';
+import TagFilterTabs from '../../components/TagFilterTabs';
+import { useTagFilter } from '../../hooks/useTagFilter';
 import ExpertFormModal from './ExpertFormModal';
 import ExpertActivityDrawer from './ExpertActivityDrawer';
 
@@ -197,6 +199,9 @@ export default function ExpertsPage() {
   // STEP-STAFF-PORTAL-P4 — 활동 이력 드로어 대상
   const [activityTarget, setActivityTarget] = useState<StaffPool | null>(null);
 
+  // STEP-TAGS-3B — 분류 탭 (관리자 등록 태그)
+  const tagFilter = useTagFilter('staff', experts);
+
   const fetchExperts = useCallback(async () => {
     setLoading(true);
     try {
@@ -262,16 +267,13 @@ export default function ExpertsPage() {
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return experts.filter((s) => {
+      if (!tagFilter.matches(s)) return false; // STEP-TAGS-3B
       if (!expertMatchesField(s, field)) return false;
       if (!q) return true;
-      const haystack = [
-        s.name,
-        s.organization,
-        ...(s.specialty ?? []),
-      ].filter(Boolean).join(' ').toLowerCase();
+      const haystack = [s.name, s.organization, ...(s.specialty ?? [])].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(q);
     });
-  }, [experts, field, search]);
+  }, [experts, field, search, tagFilter]);
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -279,6 +281,10 @@ export default function ExpertsPage() {
         <span aria-hidden="true">👥</span>
         전문가
       </h1>
+
+      {/* STEP-TAGS-3B — 분류 탭 (관리자 등록 태그, 한 전문가가 여러 분류 가능) */}
+      <TagFilterTabs categories={tagFilter.categories} active={tagFilter.active} counts={tagFilter.counts} onChange={tagFilter.setActive} />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="분야 필터">
           {FIELD_FILTERS.map((f) => {

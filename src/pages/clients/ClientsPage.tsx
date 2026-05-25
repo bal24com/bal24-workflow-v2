@@ -17,6 +17,8 @@ import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
 import type { Client, ClientContact, ClientType } from '../../types/database';
+import TagFilterTabs from '../../components/TagFilterTabs';
+import { useTagFilter } from '../../hooks/useTagFilter';
 import ClientFormModal from './ClientFormModal';
 import ClientDetailModal from './ClientDetailModal';
 
@@ -224,7 +226,7 @@ export default function ClientsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Client | null>(null);
   const [detailTarget, setDetailTarget] = useState<Client | null>(null);
-
+  const tagFilter = useTagFilter('client', clients); // STEP-TAGS-2B
   const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
@@ -256,15 +258,16 @@ export default function ClientsPage() {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return clients;
     return clients.filter((c) => {
+      if (!tagFilter.matches(c)) return false; // STEP-TAGS-2B
+      if (!q) return true;
       if (c.name?.toLowerCase().includes(q)) return true;
       if (c.business_name?.toLowerCase().includes(q)) return true;
       if (c.representative?.toLowerCase().includes(q)) return true;
       if (c.ceo_name?.toLowerCase().includes(q)) return true;
       return c.contacts.some((ct) => ct.name?.toLowerCase().includes(q));
     });
-  }, [clients, search]);
+  }, [clients, search, tagFilter]);
 
   const handleView = (c: ClientRow) => setDetailTarget(c);
   const handleEdit = (c: ClientRow) => {
@@ -287,6 +290,9 @@ export default function ClientsPage() {
         <span aria-hidden="true">🏢</span>
         고객사
       </h1>
+
+      <TagFilterTabs categories={tagFilter.categories} active={tagFilter.active} counts={tagFilter.counts} onChange={tagFilter.setActive} />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
