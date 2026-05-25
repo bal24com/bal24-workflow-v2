@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronRight, GripVertical, Trash2, Save, RotateCcw, Send, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import CurriculumRowStaffSection, { type StaffOption } from './CurriculumRowStaffSection';
-import { computeDuration, padTime, trimTime, type CurriculumWithStaff } from './curriculumTabUtils';
+import { computeDuration, padTime, trimTime, normalizeTimeInput, type CurriculumWithStaff } from './curriculumTabUtils';
 import type { ProgramCurriculum, InvitationStatus } from '../../../../types/database';
 
 interface InvitationSummary { id: string; name: string; status: InvitationStatus; }
@@ -180,12 +180,14 @@ export default function CurriculumRow({
           onChange={(e) => patchDraft('day_label', e.target.value || null)}
           placeholder="1일차"
           className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400" />
-        {/* STEP-CURRICULUM-INVITE-UPLOAD-FIX — 네이티브 time input (커스텀 팝업 오버레이 문제 회피) */}
-        <input type="time" value={draft.start_time ?? ''} aria-label="시작 시간"
+        {/* 박경수님 요청 — 단순 텍스트 입력 + onBlur 자동 보정 ('9'→'09:00', '930'→'09:30', '14:5'→'14:05') */}
+        <input type="text" inputMode="numeric" value={draft.start_time ?? ''} aria-label="시작 시간" placeholder="14:00"
           onChange={(e) => patchDraft('start_time', e.target.value || null)}
+          onBlur={(e) => { const n = normalizeTimeInput(e.target.value); if (n !== draft.start_time) patchDraft('start_time', n); }}
           className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 tabular-nums" />
-        <input type="time" value={draft.end_time ?? ''} aria-label="종료 시간"
+        <input type="text" inputMode="numeric" value={draft.end_time ?? ''} aria-label="종료 시간" placeholder="16:00"
           onChange={(e) => patchDraft('end_time', e.target.value || null)}
+          onBlur={(e) => { const n = normalizeTimeInput(e.target.value); if (n !== draft.end_time) patchDraft('end_time', n); }}
           className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 tabular-nums" />
         <input type="text" value={draft.title}
           onChange={(e) => patchDraft('title', e.target.value)}
@@ -236,12 +238,29 @@ export default function CurriculumRow({
         </button>
       </div>
 
-      {/* 행2 — content textarea (항상 노출) */}
-      <div className="px-2 pb-1.5">
+      {/* 행2 — content textarea + 항상 보이는 [저장] 액션 (박경수님 요청) */}
+      <div className="px-2 pb-1.5 space-y-1">
         <textarea value={draft.content ?? ''} rows={2}
           onChange={(e) => patchDraft('content', e.target.value || null)}
           placeholder="강의 내용·진행 방식 입력"
           className="w-full px-2 py-1.5 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 resize-none leading-relaxed" />
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] text-slate-500">
+            {dirty
+              ? <span className="inline-flex items-center gap-1 text-orange-600 font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block" aria-hidden="true" />저장 안 된 변경</span>
+              : <span className="text-slate-400">변경 없음</span>}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={handleReset} disabled={!dirty || saving}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              <RotateCcw size={10} aria-hidden="true" />되돌리기
+            </button>
+            <button type="button" onClick={() => void handleSave()} disabled={!dirty || saving || !draft.title.trim()}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              <Save size={10} aria-hidden="true" />{saving ? '저장 중…' : '저장'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* STEP-CURRICULUM-INLINE-ROLE — 행3: 인력 배정 (항상 노출, 4역할 콤보+검색) */}
@@ -274,38 +293,7 @@ export default function CurriculumRow({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2 pt-2 border-t border-violet-100/70">
-            <p className="text-[11px] text-slate-500">
-              {dirty ? (
-                <span className="inline-flex items-center gap-1 text-orange-600 font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block" aria-hidden="true" />
-                  저장 안 된 변경
-                </span>
-              ) : (
-                <span className="text-slate-400">변경 없음</span>
-              )}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={!dirty || saving}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <RotateCcw size={11} aria-hidden="true" />
-                되돌리기
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={!dirty || saving || !draft.title.trim()}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <Save size={11} aria-hidden="true" />
-                {saving ? '저장 중…' : '저장'}
-              </button>
-            </div>
-          </div>
+          {/* 박경수님 요청 — 저장/되돌리기 액션은 행2 위로 이전됨 (중복 제거) */}
 
           {/* STEP-CURRICULUM-INLINE-ROLE — 강사 요청 (외부 초대) 버튼만 펼침에 유지 */}
           {onRequestInstructor && (

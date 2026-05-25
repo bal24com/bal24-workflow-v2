@@ -110,3 +110,27 @@ export function padTime(t: string | null): string | null {
   if (t.length === 5) return `${t}:00`;
   return t;
 }
+
+/**
+ * 박경수님 요청 — 시간 입력 단순화.
+ * 사용자가 "9", "14", "930", "14:30", "9:5" 등 자유롭게 입력하면 'HH:MM' 으로 보정.
+ * 비어 있거나 인식 불가면 null.
+ */
+export function normalizeTimeInput(raw: string): string | null {
+  const v = (raw ?? '').trim();
+  if (!v) return null;
+  const colon = v.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (colon) {
+    const h = Number(colon[1]); const mm = Number(colon[2]);
+    if (Number.isNaN(h) || Number.isNaN(mm) || h > 23 || mm > 59) return null;
+    return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  }
+  const digits = v.replace(/\D/g, '');
+  if (!digits) return null;
+  let h = 0; let mm = 0;
+  if (digits.length <= 2) { h = Number(digits); mm = 0; }
+  else if (digits.length === 3) { h = Number(digits.slice(0, 1)); mm = Number(digits.slice(1)); }
+  else { h = Number(digits.slice(0, 2)); mm = Number(digits.slice(2, 4)); }
+  if (Number.isNaN(h) || Number.isNaN(mm) || h > 23 || mm > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
