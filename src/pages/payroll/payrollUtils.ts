@@ -48,6 +48,8 @@ export interface PayrollFilter {
   projectId?: string;
   status?: PayrollPaymentStatus | 'all';
   month?: string; // YYYY-MM
+  // 박경수님 + SkyClaw — submitted_at 필터 ('submitted'=확정만, 'draft'=초안만, 'all'=둘다). default='submitted' (외주/급여 페이지)
+  submittedFilter?: 'submitted' | 'draft' | 'all';
 }
 
 /** 목록 조회 (휴지통 자동 제외, 그룹은 클라이언트 prefix 필터) */
@@ -60,6 +62,10 @@ export async function fetchPayroll(filter: PayrollFilter): Promise<PayrollRow[]>
 
   if (filter.projectId) q = q.eq('project_id', filter.projectId);
   if (filter.status && filter.status !== 'all') q = q.eq('payment_status', filter.status);
+  // 박경수님 + SkyClaw — 외주/급여 페이지는 [지출 요청] 실행된 행만 (submitted_at IS NOT NULL). default 'submitted'
+  const submittedFilter = filter.submittedFilter ?? 'submitted';
+  if (submittedFilter === 'submitted') q = q.not('submitted_at', 'is', null);
+  else if (submittedFilter === 'draft') q = q.is('submitted_at', null);
 
   if (filter.month) {
     const [y, m] = filter.month.split('-').map(Number);
@@ -108,6 +114,28 @@ export async function softDeletePayroll(id: string): Promise<string | null> {
   if (error) {
     console.error('[payroll] 삭제 실패:', error.message);
     return '삭제 중 오류가 발생했어요.';
+  }
+  return null;
+}
+
+// 박경수님 + SkyClaw — [지출 요청] 실행 = submitted_at 기록 → 외주/급여 페이지 노출
+export async function submitPaymentRequests(ids: string[]): Promise<string | null> {
+  if (ids.length === 0) return null;
+  const { error } = await supabase
+    .from('payroll_expenses')
+    .update({ submitted_at: new Date().toISOString() })
+    .in('id', ids)
+    .is('submitted_at', null); // 이미 확정된 행은 건드리지 않음
+  if (error) {
+    console.error('[payroll] 지출요청 실행 실패:', error.message);
+    const raw = error.message.toLowerCase();
+    if (raw.includes('column') && raw.includes('submitted_at')) {
+      return 'submitted_at 컬럼이 누락됐어요. 20260526_payroll_submitted_at.sql 을 실행해 주세요.';
+    }
+    if (raw.includes('row-level security')) {
+      return 'RLS UPDATE 정책이 없어요. 20260526_payroll_expenses_rls.sql 을 실행해 주세요.';
+    }
+    return '지출 요청 실행 중 오류가 발생했어요.';
   }
   return null;
 }

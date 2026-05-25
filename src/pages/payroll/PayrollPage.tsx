@@ -165,6 +165,7 @@ export default function PayrollPage() {
         <Users size={22} aria-hidden="true" />
         외주/급여
       </h1>
+      <div className="text-xs text-slate-600 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">✅ 프로그램 상세 [지급요청] 탭에서 <b>[지출 요청]</b> 실행한 항목만 여기에 표시돼요.</div>
 
       {/* 메인 탭 — 박경수님 요청: [통계][지출] 2탭 */}
       <nav role="tablist" aria-label="외주/급여 탭" className="flex items-center gap-1 border-b border-slate-200">

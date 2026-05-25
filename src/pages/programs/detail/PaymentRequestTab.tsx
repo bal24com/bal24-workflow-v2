@@ -2,7 +2,7 @@
 // 박경수님 요청 — 강사료(payroll 변환분 포함)도 인건비 탭에 통합 노출
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Loader2, Trash2, Download, Pencil, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Loader2, Trash2, Download, Pencil, ArrowUp, ArrowDown, Send, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
@@ -12,7 +12,7 @@ import SubToggle from './SubToggle';
 import PaymentRequestFormModal, { type PaymentTarget } from './PaymentRequestFormModal';
 import PaymentSummaryCards from './PaymentSummaryCards';
 import EstimateImportModal from './EstimateImportModal';
-import { isOutsourceType, isOperationType, bulkSoftDeletePayroll } from '../../payroll/payrollUtils';
+import { isOutsourceType, isOperationType, bulkSoftDeletePayroll, submitPaymentRequests } from '../../payroll/payrollUtils';
 
 type Group = 'outsource' | 'operation';
 
@@ -39,6 +39,8 @@ interface Row {
   contract_id: string | null;
   client_id?: string | null;
   biz_reg_no?: string | null;
+  // 박경수님 + SkyClaw — 지출요청 워크플로우. NULL=초안, NOT NULL=외주/급여 페이지 노출
+  submitted_at?: string | null;
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -69,7 +71,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
     const { data, error } = await supabase
       .from('payroll_expenses')
       // 박경수님 보고 fix — 모든 필드 fetch (수정 시 null 덮어쓰기 방지). client_id/biz_reg_no 는 마이그레이션 후 작동
-      .select('id, expense_type, description, payee_name, payee_id_no, bank_name, bank_account, unit_price, quantity, subtotal, tax_amount, tax_rate_type, net_amount, payment_status, paid_at, memo, order_index, program_id, project_id, contract_id, client_id, biz_reg_no')
+      .select('id, expense_type, description, payee_name, payee_id_no, bank_name, bank_account, unit_price, quantity, subtotal, tax_amount, tax_rate_type, net_amount, payment_status, paid_at, memo, order_index, program_id, project_id, contract_id, client_id, biz_reg_no, submitted_at')
       .eq('program_id', programId)
       .is('deleted_at', null)
       .order('order_index', { ascending: true, nullsFirst: false })
@@ -126,6 +128,27 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
     void reload();
   }
 
+  // 박경수님 + SkyClaw — 지출요청 실행 (초안 → 외주/급여 확정)
+  const [submitting, setSubmitting] = useState(false);
+  async function handleSubmitRequests() {
+    // 선택된 행이 있으면 선택분만, 없으면 visible 의 미제출 행 전체
+    const draftSelected = visible.filter((r) => selectedIds.has(r.id) && !r.submitted_at).map((r) => r.id);
+    const draftAll = visible.filter((r) => !r.submitted_at).map((r) => r.id);
+    const ids = draftSelected.length > 0 ? draftSelected : draftAll;
+    if (ids.length === 0) { toast.error('지출 요청할 초안이 없어요.'); return; }
+    const msg = draftSelected.length > 0
+      ? `선택한 초안 ${ids.length}건을 외주/급여로 등록할까요?`
+      : `미제출 초안 ${ids.length}건 전체를 외주/급여로 등록할까요?`;
+    if (!window.confirm(msg)) return;
+    setSubmitting(true);
+    const err = await submitPaymentRequests(ids);
+    setSubmitting(false);
+    if (err) { toast.error(err); return; }
+    toast.success(`${ids.length}건을 외주/급여로 등록했어요.`);
+    setSelectedIds(new Set());
+    void reload();
+  }
+
   // 박경수님 + SkyClaw — 일괄 선택삭제 (visible 기준)
   function toggleAll() {
     if (visible.length === 0) return;
@@ -166,7 +189,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
           active={group}
           onChange={(k) => setGroup(k as Group)}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* 박경수님 + SkyClaw — 선택된 항목 있을 때만 [선택삭제] 노출 */}
           {selectedIds.size > 0 && (
             <Button variant="outline" size="sm" leftIcon={<Trash2 size={13} />}
@@ -175,6 +198,20 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
               선택삭제 ({selectedIds.size}건)
             </Button>
           )}
+          {/* 박경수님 + SkyClaw — [지출 요청] 메뉴. 선택 행 우선, 없으면 미제출 초안 전체 */}
+          {(() => {
+            const draftSelected = visible.filter((r) => selectedIds.has(r.id) && !r.submitted_at).length;
+            const draftAll = visible.filter((r) => !r.submitted_at).length;
+            const count = draftSelected > 0 ? draftSelected : draftAll;
+            if (count === 0) return null;
+            return (
+              <Button variant="primary" size="sm" leftIcon={<Send size={13} />}
+                onClick={() => void handleSubmitRequests()} loading={submitting}
+                className="!bg-emerald-600 hover:!bg-emerald-700">
+                지출 요청 ({count}건)
+              </Button>
+            );
+          })()}
           <Button variant="outline" size="sm" leftIcon={<Download size={13} />} onClick={() => setImportOpen(true)}>견적에서 가져오기</Button>
           <Button variant="primary" size="sm" leftIcon={<Plus size={13} />} onClick={() => setFormOpen(true)}>
             {group === 'outsource' ? '인건비 추가' : '운영비 추가'}
@@ -187,7 +224,25 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
           ? '강사료·촬영·통역 등 인건비. 강사 탭에서 [외주/급여로 변환] 한 항목도 여기에 표시됩니다. 합계 '
           : '호텔·버스·재료비 등 운영 지출. 합계 '}
         <span className="font-bold text-violet-700 tabular-nums">{formatMoney(groupTotal)}</span>
+        {/* 박경수님 + SkyClaw — 초안/확정 카운트 안내 */}
+        {(() => {
+          const draftCount = visible.filter((r) => !r.submitted_at).length;
+          const submittedCount = visible.length - draftCount;
+          if (visible.length === 0) return null;
+          return (
+            <span className="ml-2 text-slate-400">
+              ({draftCount > 0 && <span className="text-amber-600">📝 초안 {draftCount}건</span>}
+              {draftCount > 0 && submittedCount > 0 && ' · '}
+              {submittedCount > 0 && <span className="text-emerald-600">✅ 확정 {submittedCount}건</span>})
+            </span>
+          );
+        })()}
       </p>
+      {/* 박경수님 + SkyClaw — 새 워크플로우 안내 */}
+      <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+        💡 항목을 추가하면 <span className="text-amber-700 font-semibold">📝 초안</span> 상태로 저장돼요.
+        우측 상단 <span className="text-emerald-700 font-semibold">[지출 요청]</span> 버튼을 눌러야 외주/급여 페이지에 등록됩니다.
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-10 text-sm text-muted">
@@ -235,7 +290,22 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                       onClick={(e) => e.stopPropagation()}
                       className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                   </td>
-                  <td className="px-3 py-2 text-xs font-semibold text-violet-700">{r.expense_type}</td>
+                  <td className="px-3 py-2 text-xs font-semibold text-violet-700">
+                    <div className="flex items-center gap-1.5">
+                      {/* 박경수님 + SkyClaw — 초안/확정 배지 */}
+                      {r.submitted_at ? (
+                        <span title={`외주/급여 등록: ${formatDateKo(r.submitted_at)}`}
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 size={9} aria-hidden="true" />확정
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          📝 초안
+                        </span>
+                      )}
+                      <span>{r.expense_type}</span>
+                    </div>
+                  </td>
                   <td className="px-3 py-2 text-xs text-text truncate max-w-[260px]">{r.description ?? '-'}</td>
                   <td className="px-3 py-2 text-xs text-muted">{r.payee_name || '-'}</td>
                   <td className="px-3 py-2 text-right text-xs text-muted tabular-nums whitespace-nowrap">{Number(r.unit_price).toLocaleString()}×{r.quantity}</td>
