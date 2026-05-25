@@ -31,6 +31,11 @@ interface Row {
   payment_status: string;
   paid_at: string | null;
   order_index?: number | null;
+  // 박경수님 보고 — 수정 시 program_id/project_id/contract_id 가 null 로 덮어써져
+  // 그 행이 사라지는 버그. PayrollExpenseFormModal 의 prefill 위해 fetch 필수.
+  program_id: string | null;
+  project_id: string | null;
+  contract_id: string | null;
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -57,7 +62,8 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
     setLoading(true);
     const { data, error } = await supabase
       .from('payroll_expenses')
-      .select('id, expense_type, description, payee_name, unit_price, quantity, subtotal, tax_amount, tax_rate_type, net_amount, payment_status, paid_at, order_index')
+      // 박경수님 보고 fix — program_id/project_id/contract_id 도 fetch (수정 시 null 덮어쓰기 방지)
+      .select('id, expense_type, description, payee_name, unit_price, quantity, subtotal, tax_amount, tax_rate_type, net_amount, payment_status, paid_at, order_index, program_id, project_id, contract_id')
       .eq('program_id', programId)
       .is('deleted_at', null)
       .order('order_index', { ascending: true, nullsFirst: false })
@@ -102,7 +108,14 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
     const { error } = await supabase.from('payroll_expenses')
       .update({ deleted_at: new Date().toISOString() }).eq('id', row.id);
     setActing(null);
-    if (error) { toast.error('삭제 중 오류가 발생했어요.'); return; }
+    if (error) {
+      const raw = error.message.toLowerCase();
+      console.error('[PaymentRequestTab] 삭제 실패:', error.message);
+      if (raw.includes('column') && raw.includes('does not exist')) toast.error(`payroll_expenses 컬럼이 누락됐어요. 마이그레이션 실행 필요.\n(${error.message})`);
+      else if (raw.includes('row-level security')) toast.error(`삭제 권한이 없어요. RLS UPDATE 정책 필요.\n(${error.message})`);
+      else toast.error(`삭제 실패: ${error.message}`);
+      return;
+    }
     toast.success('삭제했어요. 외주/급여 페이지에서도 사라집니다.');
     void reload();
   }
