@@ -5,6 +5,7 @@ import { Navigate } from 'react-router-dom';
 import { Loader2, Trash2 } from 'lucide-react';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import TrashTab from './TrashTab';
+import TagsAdminSection from './TagsAdminSection';
 
 export default function AdminPage() {
   const { isAdmin, loading } = useUserProfile();
@@ -35,6 +36,9 @@ export default function AdminPage() {
         </header>
         <TrashTab />
       </section>
+
+      {/* STEP-TAGS commit d — 태그 분류 관리 */}
+      <TagsAdminSection />
     </div>
   );
 }
