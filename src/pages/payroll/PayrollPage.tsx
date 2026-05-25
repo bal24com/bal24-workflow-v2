@@ -2,7 +2,7 @@
 // STEP-ACCOUNTING-ALL P3
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Loader2, Search, Users, Upload } from 'lucide-react';
+import { Plus, Loader2, Search, Users, Upload, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDateKo, formatMoney } from '../../lib/utils';
@@ -19,6 +19,8 @@ import PayrollExpenseFormModal from './PayrollExpenseFormModal';
 import PayrollImportModal from './PayrollImportModal';
 
 type MainTab = 'outsource' | 'operation';
+type SortKey = 'paid_at' | 'payee_name' | 'project' | 'expense_type' | 'subtotal' | 'tax_amount' | 'net_amount' | 'payment_status' | 'receipt';
+type SortDir = 'asc' | 'desc';
 
 interface ProjectOption { id: string; name: string }
 
@@ -33,6 +35,14 @@ export default function PayrollPage() {
   const [statusFilter, setStatusFilter] = useState<PayrollPaymentStatus | 'all'>('all');
   const [monthFilter, setMonthFilter] = useState('');
   const [search, setSearch] = useState('');
+  // 박경수님 요청 — 항목별 정렬 + 구분(expense_type) 필터
+  const [typeFilter, setTypeFilter] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('paid_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  function toggleSort(k: SortKey) {
+    if (sortKey === k) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(k); setSortDir('asc'); }
+  }
 
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<PayrollRow | null>(null);
@@ -72,14 +82,36 @@ export default function PayrollPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // 구분(expense_type) 옵션 — 현재 탭에 등장하는 값들
+  const typeOptions = useMemo(
+    () => Array.from(new Set(items.map((i) => i.expense_type))).sort(),
+    [items],
+  );
+
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((i) =>
-      [i.payee_name, i.description, i.project?.name, i.bank_name, i.memo]
-        .filter(Boolean).join(' ').toLowerCase().includes(q),
-    );
-  }, [items, search]);
+    let arr = q
+      ? items.filter((i) => [i.payee_name, i.description, i.project?.name, i.bank_name, i.memo]
+          .filter(Boolean).join(' ').toLowerCase().includes(q))
+      : items;
+    if (typeFilter) arr = arr.filter((i) => i.expense_type === typeFilter);
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const sorted = [...arr].sort((a, b) => {
+      switch (sortKey) {
+        case 'paid_at':        return ((a.paid_at ?? '') < (b.paid_at ?? '') ? -1 : (a.paid_at ?? '') > (b.paid_at ?? '') ? 1 : 0) * dir;
+        case 'payee_name':     return (a.payee_name ?? '').localeCompare(b.payee_name ?? '', 'ko') * dir;
+        case 'project':        return (a.project?.name ?? '').localeCompare(b.project?.name ?? '', 'ko') * dir;
+        case 'expense_type':   return (a.expense_type ?? '').localeCompare(b.expense_type ?? '', 'ko') * dir;
+        case 'subtotal':       return (Number(a.subtotal ?? 0) - Number(b.subtotal ?? 0)) * dir;
+        case 'tax_amount':     return (Number(a.tax_amount ?? 0) - Number(b.tax_amount ?? 0)) * dir;
+        case 'net_amount':     return (Number(a.net_amount ?? 0) - Number(b.net_amount ?? 0)) * dir;
+        case 'payment_status': return (a.payment_status ?? '').localeCompare(b.payment_status ?? '', 'ko') * dir;
+        case 'receipt':        return ((a.receipt_urls?.length ?? 0) - (b.receipt_urls?.length ?? 0)) * dir;
+        default: return 0;
+      }
+    });
+    return sorted;
+  }, [items, search, typeFilter, sortKey, sortDir]);
 
   const summary = useMemo(() => calcPayrollSummary(visible), [visible]);
 
@@ -150,6 +182,15 @@ export default function PayrollPage() {
             className="h-9 rounded-lg border border-slate-200 px-2.5 text-xs"
             aria-label="지급월 필터"
           />
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="h-9 rounded-lg border border-slate-200 px-2.5 text-xs"
+            aria-label="구분 필터"
+          >
+            <option value="">전체 구분</option>
+            {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" leftIcon={<Upload size={14} />} onClick={() => setImportOpen(true)}>일괄 등록</Button>
@@ -189,15 +230,15 @@ export default function PayrollPage() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs">
               <tr>
-                <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap">지급일</th>
-                <th className="text-left px-3 py-2.5 font-semibold">성명/내용</th>
-                <th className="text-left px-3 py-2.5 font-semibold">프로젝트</th>
-                <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">구분</th>
-                <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">단가×회수</th>
-                <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">원천세</th>
-                <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">실지급</th>
-                <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">상태</th>
-                <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">증빙</th>
+                <SortableTh k="paid_at"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">지급일</SortableTh>
+                <SortableTh k="payee_name"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">성명/내용</SortableTh>
+                <SortableTh k="project"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">프로젝트</SortableTh>
+                <SortableTh k="expense_type"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">구분</SortableTh>
+                <SortableTh k="subtotal"       sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">단가×회수</SortableTh>
+                <SortableTh k="tax_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">원천세</SortableTh>
+                <SortableTh k="net_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">실지급</SortableTh>
+                <SortableTh k="payment_status" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">상태</SortableTh>
+                <SortableTh k="receipt"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">증빙</SortableTh>
                 <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">관리</th>
               </tr>
             </thead>
@@ -263,5 +304,25 @@ export default function PayrollPage() {
         onImported={() => { setImportOpen(false); void reload(); }}
       />
     </div>
+  );
+}
+
+function SortableTh({ k, sortKey, sortDir, onClick, align, children }: {
+  k: SortKey; sortKey: SortKey; sortDir: SortDir; onClick: (k: SortKey) => void;
+  align: 'left' | 'center' | 'right'; children: React.ReactNode;
+}) {
+  const active = sortKey === k;
+  const alignClass = align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center';
+  const justifyClass = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
+  return (
+    <th className={`${alignClass} px-3 py-2.5 font-semibold whitespace-nowrap`}>
+      <button type="button" onClick={() => onClick(k)}
+        className={`inline-flex items-center gap-1 w-full ${justifyClass} hover:text-violet-700 ${active ? 'text-violet-700' : ''}`}>
+        {children}
+        {active
+          ? (sortDir === 'asc' ? <ArrowUp size={10} aria-hidden="true" /> : <ArrowDown size={10} aria-hidden="true" />)
+          : <ArrowUpDown size={10} aria-hidden="true" className="opacity-30" />}
+      </button>
+    </th>
   );
 }
