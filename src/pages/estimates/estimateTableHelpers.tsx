@@ -8,7 +8,7 @@ export type SortKey = 'category' | 'description' | 'payee_name' | 'unit_price' |
 export type SortDir = 'asc' | 'desc';
 
 export type DraftItem = Pick<EstimateItem,
-  'category' | 'description' | 'payee_name' | 'unit_price' | 'quantity' | 'headcount' | 'tax_rate_type' | 'memo' | 'order_index'
+  'category' | 'description' | 'payee_name' | 'unit_price' | 'quantity' | 'headcount' | 'tax_rate_type' | 'memo' | 'order_index' | 'program_id'
 > & { _existingId?: string; _converted?: boolean };
 
 export function emptyDraft(idx: number): DraftItem {
@@ -16,7 +16,7 @@ export function emptyDraft(idx: number): DraftItem {
     category: '인건비', description: '', payee_name: '',
     unit_price: 0, quantity: 1, headcount: 1,
     tax_rate_type: '없음' as PayrollTaxRateType,
-    memo: '', order_index: idx,
+    memo: '', order_index: idx, program_id: null,
   };
 }
 
@@ -24,11 +24,12 @@ export interface VisibleRow extends DraftItem { _idx: number }
 
 export function applyFilterSort(
   items: DraftItem[],
-  opts: { search: string; catFilter: string; sortKey: SortKey | null; sortDir: SortDir },
+  opts: { search: string; catFilter: string; programFilter?: string; sortKey: SortKey | null; sortDir: SortDir },
 ): VisibleRow[] {
   const q = opts.search.trim().toLowerCase();
   let arr: VisibleRow[] = items.map((it, i) => ({ ...it, _idx: i }));
   if (opts.catFilter) arr = arr.filter((it) => it.category === opts.catFilter);
+  if (opts.programFilter) arr = arr.filter((it) => (it.program_id ?? '') === opts.programFilter);
   if (q) arr = arr.filter((it) => [it.category, it.description, it.payee_name, it.memo]
     .filter(Boolean).join(' ').toLowerCase().includes(q));
   if (opts.sortKey) {

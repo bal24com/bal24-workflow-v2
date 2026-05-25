@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, Save, FileText, Wand2, Upload, Sparkles, BookOpen, Download, Search } from 'lucide-react';
 import { Button, Input } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
+import { supabase } from '../../lib/supabase';
 import { formatMoney } from '../../lib/utils';
 import { calcTax, TAX_RATE_LABEL, TAX_RATE_VALUES } from '../../utils/taxUtils';
 import type { PayrollTaxRateType } from '../../types/database';
@@ -18,6 +19,7 @@ import {
 } from './estimateUtils';
 // STEP-ACCOUNTING-FOLLOWUP7-Phase3 — AI 견적서 추출
 import { extractEstimateFromDocument, type ExtractedEstimateItem } from './estimateExtract';
+import EstimateAiSection from './EstimateAiSection';
 // 박경수님 요청 — 견적 항목 템플릿 저장/불러오기
 import { SaveEstimateTemplateModal, LoadEstimateTemplateModal, type TemplateItem } from './EstimateTemplateModals';
 
@@ -55,16 +57,15 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           payee_name: it.payee_name ?? '',
           unit_price: it.unit_price,
           quantity: it.quantity,
-          headcount: Number(it.headcount ?? 1),  // 박경수님 요청 — 수량(인원)
+          headcount: Number(it.headcount ?? 1),
           tax_rate_type: it.tax_rate_type as PayrollTaxRateType,
           memo: it.memo ?? '',
           order_index: it.order_index,
+          program_id: it.program_id ?? null,  // 박경수님 요청 — 항목별 프로그램 연결
           _existingId: it.id,
           _converted: !!it.payroll_expense_id,
         })));
-      } else {
-        setItems([]);
-      }
+      } else { setItems([]); }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       console.error('[EstimateTab] 조회 오류:', msg);
@@ -109,7 +110,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
     const toSave = items.filter((it) => !it._converted).map((it) => ({
       category: it.category, description: it.description, payee_name: it.payee_name,
       unit_price: it.unit_price, quantity: it.quantity, headcount: it.headcount ?? 1,
-      tax_rate_type: it.tax_rate_type,
+      tax_rate_type: it.tax_rate_type, program_id: it.program_id ?? null,
       memo: it.memo, order_index: it.order_index,
     }));
     const err = await saveEstimateItems(target.id, toSave);
@@ -166,6 +167,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         tax_rate_type: e.tax_rate_type,
         memo: e.memo ?? '',
         order_index: base + i,
+        program_id: null,
       }));
       return [...prev, ...additions];
     });
@@ -178,12 +180,19 @@ export default function EstimateTab({ projectId, projectName }: Props) {
   const total = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1), 0);
   const unconverted = items.filter((it) => !it._converted).length;
 
-  // 박경수님 요청 — 필터/검색/정렬
+  // 박경수님 요청 — 필터/검색/정렬 + 프로그램 연동
   const [catFilter, setCatFilter] = useState(''); const [search, setSearch] = useState('');
+  const [programFilter, setProgramFilter] = useState('');
+  const [programs, setPrograms] = useState<Array<{ id: string; name: string }>>([]);
   const [sortKey, setSortKey] = useState<SortKey | null>(null); const [sortDir, setSortDir] = useState<SortDir>('asc');
   const toggleSort = (k: SortKey) => sortKey === k ? setSortDir((d) => d === 'asc' ? 'desc' : 'asc') : (setSortKey(k), setSortDir('asc'));
   const catOptions = Array.from(new Set(items.map((i) => i.category).filter(Boolean))).sort();
-  const visibleItems = applyFilterSort(items, { search, catFilter, sortKey, sortDir });
+  const visibleItems = applyFilterSort(items, { search, catFilter, programFilter, sortKey, sortDir });
+  useEffect(() => {
+    void supabase.from('programs').select('id, name').eq('project_id', projectId).is('deleted_at', null).order('created_at')
+      .then(({ data }) => setPrograms((data ?? []) as Array<{ id: string; name: string }>));
+  }, [projectId]);
+  const programName = (id: string | null) => id ? (programs.find((p) => p.id === id)?.name ?? '?') : '미연결';
 
   if (loading) {
     return <div className="flex items-center justify-center py-16 text-sm text-muted"><Loader2 size={18} className="animate-spin mr-2" />불러오는 중...</div>;
@@ -213,8 +222,13 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         💡 견적 항목을 입력하고 [저장] → [외주/급여로 변환] 누르면 변환된 항목은 회색 처리되고 외주/급여 페이지에서 실집행 정보(지급일·계좌·증빙) 채워나가시면 돼요.
       </div>
 
-      {/* 박경수님 요청 — 항목 필터 + 검색 (정렬은 컬럼 헤더 클릭) */}
+      {/* 박경수님 요청 — 프로그램·항목 필터 + 검색 + 컬럼 정렬 */}
       <div className="flex flex-wrap items-center gap-2">
+        <select value={programFilter} onChange={(e) => setProgramFilter(e.target.value)}
+          className="h-9 rounded-lg border border-slate-200 px-2.5 text-xs">
+          <option value="">전체 프로그램</option>
+          {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
         <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
           className="h-9 rounded-lg border border-slate-200 px-2.5 text-xs">
           <option value="">전체 항목</option>
@@ -226,87 +240,26 @@ export default function EstimateTab({ projectId, projectName }: Props) {
             placeholder="세항목·내용·메모 검색"
             className="w-full h-9 pl-8 pr-3 rounded-lg border border-slate-200 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
         </div>
-        {(catFilter || search || sortKey) && (
-          <button type="button" onClick={() => { setCatFilter(''); setSearch(''); setSortKey(null); }}
+        {(catFilter || search || sortKey || programFilter) && (
+          <button type="button" onClick={() => { setCatFilter(''); setSearch(''); setSortKey(null); setProgramFilter(''); }}
             className="text-[11px] text-rose-600 hover:underline">필터 초기화</button>
         )}
         <span className="text-[11px] text-slate-500 ml-auto">{visibleItems.length}/{items.length}건</span>
       </div>
 
-      {/* STEP-ACCOUNTING-FOLLOWUP7-Phase3 — AI 견적서 업로드 + 미리보기 */}
-      <div className="rounded-xl bg-amber-50/60 border border-amber-200 px-4 py-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-900">
-            <Sparkles size={14} className="text-amber-600" aria-hidden="true" />
-            AI 견적서 자동 추출
-          </div>
-          <label className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-xs font-semibold text-amber-700 hover:bg-amber-50 cursor-pointer">
-            <Upload size={12} aria-hidden="true" />
-            {extracting ? 'AI 분석 중...' : '견적서 파일 업로드'}
-            <input
-              type="file"
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv"
-              className="hidden"
-              disabled={extracting}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleAiExtract(f);
-                e.target.value = '';
-              }}
-            />
-          </label>
-        </div>
-        <p className="text-[11px] text-amber-700 mt-1">PDF·이미지·엑셀 견적서를 업로드하면 비용 항목을 자동 추출해서 미리보기 후 적용할 수 있어요.</p>
-
-        {extracted && (
-          <div className="mt-3 rounded-xl border border-amber-300 bg-white p-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs">
-                <span className="font-semibold text-amber-900">"{extractedFileName}"</span>
-                <span className="text-slate-500 ml-1">에서 <strong className="text-amber-900">{extracted.length}건</strong> 추출됨</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Button variant="ghost" size="sm" onClick={() => { setExtracted(null); setExtractedFileName(''); }}>취소</Button>
-                <Button variant="primary" size="sm" leftIcon={<Plus size={12} />} onClick={applyExtracted} disabled={extracted.length === 0}>
-                  견적에 추가
-                </Button>
-              </div>
-            </div>
-            <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-lg">
-              <table className="w-full text-xs">
-                <thead className="bg-slate-50 sticky top-0">
-                  <tr className="text-slate-500">
-                    <th className="px-2 py-1.5 text-left">구분</th>
-                    <th className="px-2 py-1.5 text-left">내용</th>
-                    <th className="px-2 py-1.5 text-left">지급처</th>
-                    <th className="px-2 py-1.5 text-right">단가</th>
-                    <th className="px-2 py-1.5 text-right">회수</th>
-                    <th className="px-2 py-1.5 text-left">세액</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {extracted.map((e, i) => (
-                    <tr key={i} className="hover:bg-amber-50/40">
-                      <td className="px-2 py-1 font-semibold">{e.category}</td>
-                      <td className="px-2 py-1 truncate max-w-[180px]">{e.description ?? '-'}</td>
-                      <td className="px-2 py-1">{e.payee_name ?? '-'}</td>
-                      <td className="px-2 py-1 text-right tabular-nums">{e.unit_price.toLocaleString()}</td>
-                      <td className="px-2 py-1 text-right">{e.quantity}</td>
-                      <td className="px-2 py-1">{e.tax_rate_type}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
+      <EstimateAiSection
+        extracting={extracting} extracted={extracted} extractedFileName={extractedFileName}
+        onPickFile={(f) => void handleAiExtract(f)}
+        onCancel={() => { setExtracted(null); setExtractedFileName(''); }}
+        onApply={applyExtracted}
+      />
 
       {/* 항목 테이블 */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs text-slate-500">
             <tr>
+              <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">프로그램</th>
               <EstSortTh k="category"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">항목</EstSortTh>
               <EstSortTh k="description"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">세항목</EstSortTh>
               <EstSortTh k="payee_name"    sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">내용</EstSortTh>
@@ -321,16 +274,24 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {visibleItems.length === 0 ? (
-              <tr><td colSpan={10} className="px-3 py-6 text-center text-xs text-slate-400 italic">
+              <tr><td colSpan={11} className="px-3 py-6 text-center text-xs text-slate-400 italic">
                 {items.length === 0 ? '견적 항목이 아직 없어요. [항목 추가] 로 시작해 보세요.' : '필터/검색 결과가 없어요.'}
               </td></tr>
             ) : visibleItems.map((it) => {
-              const idx = it._idx;  // 원본 items 의 index (편집 핸들러용)
+              const idx = it._idx;
               const sub = (Number(it.unit_price) || 0) * (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1);
               const { netAmount } = calcTax(sub, it.tax_rate_type);
               const locked = !!it._converted;
               return (
                 <tr key={idx} className={locked ? 'bg-emerald-50/30' : 'hover:bg-violet-50/30'}>
+                  <td className="px-2 py-1 w-40">
+                    {/* 박경수님 요청 — 항목별 프로그램 연결 */}
+                    <select value={it.program_id ?? ''} onChange={(e) => updateItem(idx, { program_id: e.target.value || null })}
+                      disabled={locked} className="w-full h-9 rounded-xl border border-slate-200 px-2 text-xs disabled:bg-slate-50">
+                      <option value="">{programs.length === 0 ? '프로그램 없음' : '미연결'}</option>
+                      {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </td>
                   <td className="px-2 py-1">
                     <Input list="estimate-categories" value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} disabled={locked} />
                   </td>

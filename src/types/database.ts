@@ -1498,13 +1498,14 @@ export interface ProjectEstimate {
 export interface EstimateItem {
   id: string;
   estimate_id: string;
+  program_id: string | null;  // 박경수님 요청 — 항목별 프로그램 연결 (1 프로젝트 : N 프로그램)
   category: string; // '강사료', '운영비', '교통비', ... — 자유 입력
   description: string | null;
   payee_name: string | null;
   unit_price: number;
   quantity: number;
   headcount: number;  // 박경수님 요청 — 수량(인원). subtotal = unit_price × quantity × headcount
-  subtotal: number; // app 계산
+  subtotal: number; // GENERATED — DB 가 자동 계산 (3중 곱)
   tax_rate_type: PayrollTaxRateType;
   memo: string | null;
   order_index: number;
