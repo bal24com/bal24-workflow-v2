@@ -141,8 +141,11 @@ export default function CurriculumTab({ programId, programName, onSwitchToInstru
       );
       return;
     }
+    // 박경수님 보고 — refresh() 가 DB 전체를 재fetch 해서 다른 차시의 미저장 draft 가
+    // CurriculumRow.useEffect 로 reset 되는 문제. 새 row 는 setItems 로 즉시 반영하고
+    // counts 만 클라이언트에서 +1. invitation 은 새 차시에 없으니 갱신 불필요.
     setItems((prev) => [...prev, { ...r.data, staff: [] }]);
-    void refresh();
+    setCounts((prev) => ({ ...prev, [curriculumType]: (prev[curriculumType] ?? 0) + 1 }));
     toast.success('차시를 추가했어요.');
   }
 
