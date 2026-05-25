@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Info, Loader2, Users, Link2, Wallet, BookOpen, FolderArchive, Trash2, FileText } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Info, Loader2, Users, Link2, Wallet, BookOpen, FolderArchive, Trash2, FileText, Pencil } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Badge, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
@@ -20,6 +20,7 @@ import GrantLedgerTab from './detail/GrantLedgerTab';
 import ProjectProgramsTab from './detail/ProjectProgramsTab';
 // STEP-ACCOUNTING-FOLLOWUP7-Phase2 — 견적 탭
 import EstimateTab from '../estimates/EstimateTab';
+import ProjectEditModal from './ProjectEditModal';
 import ProjectDocsTab from './detail/ProjectDocsTab';
 import StageProgressBar from './detail/StageProgressBar';
 
@@ -73,6 +74,7 @@ export default function ProjectDetailPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
   const [deleting, setDeleting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   // STEP-DELETE-RESUME-FULL — soft-delete (휴지통 30일 보관, admin/PM만)
   async function handleDeleteProject() {
@@ -164,16 +166,27 @@ export default function ProjectDetailPage() {
               {project.pm?.name && ` · 담당자 ${project.pm.name}`}
             </div>
           </div>
-          {/* STEP-DELETE-RESUME-FULL — 삭제 버튼 (admin/PM 전용) */}
+          {/* 박경수님 요청 1번 — 수정 + 삭제 (admin/PM 전용) */}
           {(isAdmin || isPM) && (
-            <Button variant="outline" leftIcon={<Trash2 size={14} />}
-              onClick={() => void handleDeleteProject()} disabled={deleting}
-              className="!border-rose-300 !text-rose-600 hover:!bg-rose-50">
-              {deleting ? '삭제 중…' : '삭제'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="primary" leftIcon={<Pencil size={14} />} onClick={() => setEditOpen(true)}>수정</Button>
+              <Button variant="outline" leftIcon={<Trash2 size={14} />}
+                onClick={() => void handleDeleteProject()} disabled={deleting}
+                className="!border-rose-300 !text-rose-600 hover:!bg-rose-50">
+                {deleting ? '삭제 중…' : '삭제'}
+              </Button>
+            </div>
           )}
         </div>
       </div>
+
+      {/* 박경수님 요청 1번 — 수정 모달 */}
+      <ProjectEditModal
+        open={editOpen}
+        project={project}
+        onClose={() => setEditOpen(false)}
+        onSaved={() => { setEditOpen(false); window.location.reload(); }}
+      />
 
       <StageProgressBar status={project.status} />
 
