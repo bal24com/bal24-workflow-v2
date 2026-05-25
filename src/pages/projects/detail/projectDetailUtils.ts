@@ -13,6 +13,7 @@ import type {
 
 export interface ProjectFinance {
   budget: number;
+  contractTotal: number;          // 박경수님 + SkyClaw 2026-05-26 — 전체 사업비 (income_contracts 계약금액 합)
   incomeTotal: number;            // 입금 완료 합계 (구 income + 신 income_contracts)
   expectedIncomeTotal: number;    // 진행중·draft·보류 계약 총액 (신 income_contracts)
   expenseTotal: number;           // 지출 합계 (구 expenses + 신 payroll_expenses)
@@ -22,6 +23,10 @@ export interface ProjectFinance {
   proposalTotal: number;          // 제안 견적 합계 (project_estimates.total_amount)
   outsourceTotal: number;         // 인건비 (payroll 의 강사료·촬영·기타외주 prefix)
   operationTotal: number;         // 운영비 (payroll 의 운영비·운영인건비 prefix)
+  // 박경수님 + SkyClaw 2026-05-26 — 세액 분리
+  vatAmount: number;              // 부가세 (운영비 tax_amount 합)
+  withholdingTax: number;         // 원천세 (인건비 tax_amount 합)
+  netExpense: number;             // 순지출 (expenseTotal - vatAmount)
   remaining: number;
   settledPct: number;
 }
@@ -62,7 +67,8 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
     supabase.from('expenses').select('gross_amount, status').eq('project_id', projectId).is('deleted_at', null),
     supabase.from('income_contracts').select('contract_amount, status, deposited_at').eq('project_id', projectId).is('deleted_at', null),
     // ACCOUNTING-P3 — 박경수님 요청: expense_type 도 fetch 해서 인건비/운영비 분류
-    supabase.from('payroll_expenses').select('subtotal, payment_status, expense_type').eq('project_id', projectId).is('deleted_at', null),
+    // 박경수님 + SkyClaw 2026-05-26 — tax_amount 도 fetch 해서 부가세·원천세 분리
+    supabase.from('payroll_expenses').select('subtotal, tax_amount, tax_rate_type, payment_status, expense_type').eq('project_id', projectId).is('deleted_at', null),
     // 박경수님 요청 — 견적도 재무요약에 합산
     supabase.from('project_estimates').select('total_amount').eq('project_id', projectId).is('deleted_at', null),
   ]);
@@ -92,13 +98,21 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
   const legacyExpenseRows = (expenseRes.data ?? []) as Array<{ gross_amount: number | string | null; status: string }>;
   const legacyExpense = legacyExpenseRows.reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
   const legacyPending = legacyExpenseRows.filter((r) => r.status === '대기').reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
-  const payrollRows = (payrollRes.data ?? []) as Array<{ subtotal: number | string | null; payment_status: string; expense_type: string }>;
+  const payrollRows = (payrollRes.data ?? []) as Array<{ subtotal: number | string | null; tax_amount: number | string | null; tax_rate_type: string | null; payment_status: string; expense_type: string }>;
   const livePayroll = payrollRows.filter((r) => r.payment_status !== '취소');
   const payrollTotal = livePayroll.reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
   const payrollPending = payrollRows.filter((r) => r.payment_status === '대기').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
   // 박경수님 요청 — 인건비/운영비 분리 (prefix 매칭)
   const outsourceTotal = livePayroll.filter((r) => isOutsourceType(r.expense_type)).reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
   const operationTotal = livePayroll.filter((r) => isOperationType(r.expense_type)).reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+  // 박경수님 + SkyClaw 2026-05-26 — 세액 분리. tax_amount 0 이면 운영비는 sub/11 fallback
+  const vatAmount = livePayroll.filter((r) => isOperationType(r.expense_type) || r.tax_rate_type === '10')
+    .reduce((s, r) => {
+      const stored = Number(r.tax_amount ?? 0);
+      return s + (stored > 0 ? stored : Math.floor(Number(r.subtotal ?? 0) / 11));
+    }, 0);
+  const withholdingTax = livePayroll.filter((r) => isOutsourceType(r.expense_type) || r.tax_rate_type === '3.3' || r.tax_rate_type === '8.8')
+    .reduce((s, r) => s + Number(r.tax_amount ?? 0), 0);
 
   // 박경수님 요청 — 견적 합계 (제안)
   const proposalTotal = ((estimateRes.data ?? []) as Array<{ total_amount: number | string | null }>)
@@ -106,10 +120,13 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
 
   const expenseTotal = legacyExpense + payrollTotal;
   const pendingExpenseTotal = legacyPending + payrollPending;
+  // 박경수님 + SkyClaw 2026-05-26 — 전체 사업비 = 모든 계약금액 합. 순지출 = 지출 - 부가세
+  const contractTotal = contractRows.reduce((s, r) => s + Number(r.contract_amount ?? 0), 0);
+  const netExpense = expenseTotal - vatAmount;
   const remaining = budget - expenseTotal;
   const settledPct = budget > 0 ? Math.min(100, Math.round((incomeTotal / budget) * 100)) : 0;
 
-  return { budget, incomeTotal, expectedIncomeTotal, expenseTotal, pendingExpenseTotal, payrollTotal, proposalTotal, outsourceTotal, operationTotal, remaining, settledPct };
+  return { budget, contractTotal, incomeTotal, expectedIncomeTotal, expenseTotal, pendingExpenseTotal, payrollTotal, proposalTotal, outsourceTotal, operationTotal, vatAmount, withholdingTax, netExpense, remaining, settledPct };
 }
 
 /** 참여자 미리보기 — project_members 카운트 + 최근 등록 N명 이름 */

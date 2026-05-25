@@ -26,6 +26,8 @@ import TaskAlertPanel from './components/TaskAlertPanel';
 import QuickActionsCard from './components/QuickActionsCard';
 import DashboardUrgentWidget from './components/DashboardUrgentWidget';
 import PageHelpBanner from '../../components/PageHelpBanner';
+// 박경수님 + SkyClaw 2026-05-26 — 홈 하단 전체 재무 대시보드
+import FinancialDashboard from './FinancialDashboard';
 
 type Tone = 'violet' | 'orange' | 'cyan' | 'emerald' | 'rose';
 
@@ -262,6 +264,9 @@ export default function DashboardPage() {
 
         <QuickActionsCard />
       </div>
+
+      {/* 박경수님 + SkyClaw 2026-05-26 — 전체 재무 대시보드 (기간·프로젝트 필터) */}
+      <FinancialDashboard />
     </div>
   );
 }

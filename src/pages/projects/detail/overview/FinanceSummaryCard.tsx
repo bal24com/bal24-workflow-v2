@@ -48,8 +48,23 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
+          {/* 박경수님 + SkyClaw 2026-05-26 — 전체 사업비 (계약금액 합) 상단 강조 */}
+          {data.contractTotal > 0 && (
+            <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 -mx-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-violet-700">전체 사업비 (계약금액)</span>
+                <span className="text-sm font-bold text-violet-700 tabular-nums">{formatMoney(data.contractTotal)}</span>
+              </div>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[10px] text-violet-500">└ 입금 완료</span>
+                <span className="text-[10px] text-violet-500 tabular-nums">{formatMoney(data.incomeTotal)}</span>
+              </div>
+            </div>
+          )}
           <Row label="예산" value={data.budget > 0 ? formatMoney(data.budget) : '미정'} accent="violet" />
-          <Row label="수입 (입금완료)" value={formatMoney(data.incomeTotal)} accent="emerald" />
+          {data.contractTotal === 0 && (
+            <Row label="수입 (입금완료)" value={formatMoney(data.incomeTotal)} accent="emerald" />
+          )}
           {data.expectedIncomeTotal > 0 && (
             <Row label="└ 예상 수입 (계약중)" value={formatMoney(data.expectedIncomeTotal)} accent="violet" small />
           )}
@@ -83,6 +98,28 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
           )}
           {data.pendingExpenseTotal > 0 && (
             <Row label="└ 대기 지출" value={formatMoney(data.pendingExpenseTotal)} accent="rose" small />
+          )}
+
+          {/* 박경수님 + SkyClaw 2026-05-26 — 세액 분리 (부가세·원천세·순지출) */}
+          {(data.vatAmount > 0 || data.withholdingTax > 0) && (
+            <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 space-y-1 -mx-1">
+              {data.vatAmount > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-amber-700">└ 부가세 (운영비 포함분)</span>
+                  <span className="text-amber-700 tabular-nums">▲ {formatMoney(data.vatAmount)}</span>
+                </div>
+              )}
+              {data.withholdingTax > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-orange-700">└ 원천세 (인건비)</span>
+                  <span className="text-orange-700 tabular-nums">▲ {formatMoney(data.withholdingTax)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700 pt-1 border-t border-amber-200">
+                <span>순지출 (세액 제외)</span>
+                <span className="tabular-nums">{formatMoney(data.netExpense)}</span>
+              </div>
+            </div>
           )}
 
           <div className="pt-2 border-t border-violet-100 flex items-center justify-between">
