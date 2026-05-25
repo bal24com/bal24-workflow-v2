@@ -43,7 +43,8 @@ export const PAYROLL_STATUS_STYLE: Record<PayrollPaymentStatus, string> = {
 
 export interface PayrollFilter {
   // STEP-ACCOUNTING-FOLLOWUP2 — types[] 대신 outsource/operation 그룹으로 (자유 카테고리 prefix 매칭)
-  group: 'outsource' | 'operation';
+  // 'all' = 외주+운영 통합 (박경수님 요청 — 페이지 [통계][지출] 2탭 구조)
+  group: 'outsource' | 'operation' | 'all';
   projectId?: string;
   status?: PayrollPaymentStatus | 'all';
   month?: string; // YYYY-MM
@@ -77,8 +78,10 @@ export async function fetchPayroll(filter: PayrollFilter): Promise<PayrollRow[]>
   }
   return ((data ?? []) as unknown as PayrollRow[])
     .filter((r) => !r.project?.deleted_at && !r.program?.deleted_at && !r.contract?.deleted_at)
-    // 그룹 prefix 매칭 (자유 입력 카테고리도 포함)
-    .filter((r) => filter.group === 'outsource' ? isOutsourceType(r.expense_type) : isOperationType(r.expense_type));
+    // 그룹 prefix 매칭 (자유 입력 카테고리도 포함). 'all' 은 통합
+    .filter((r) => filter.group === 'all'
+      ? true
+      : filter.group === 'outsource' ? isOutsourceType(r.expense_type) : isOperationType(r.expense_type));
 }
 
 /** 특정 계약에 묶인 외주/급여 fetch — ContractDetailDrawer 용 */
