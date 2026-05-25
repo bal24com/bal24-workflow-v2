@@ -53,13 +53,16 @@ const FALLBACK_CATEGORY_BY_GROUP: Record<Group, string[]> = {
   operation: ['호텔', '버스', '재료비', '식비', '장비', '인쇄', '운영비', '기타'],
 };
 
-// 견적 카테고리를 group 기준으로 필터.
-// 박경수님 보고 fix (2026-05-26) — 운영비는 isOperationType prefix 매칭 외에도
-// "숙식 및 임차" 같은 자유 카테고리를 포괄해야 함. 따라서 인건비가 아닌 모든 카테고리를 운영비에 노출.
+// 박경수님 환경 견적 category 는 자유 입력 ("인건비"·"운영비"·"숙식 및 임차" 등).
+// isOutsourceType prefix (강사료/촬영/기타외주) 외에 한글 키워드도 인건비로 인식.
+function isPersonCategory(c: string): boolean {
+  if (isOutsourceType(c)) return true;
+  const lower = c.toLowerCase();
+  return ['인건비', '강사', '멘토', '운영진', 'ta', '튜터', '컨설'].some((k) => lower.includes(k.toLowerCase()));
+}
 function filterByGroup(cats: string[], group: Group): string[] {
-  if (group === 'outsource') return cats.filter(isOutsourceType);
-  // operation = 인건비가 아닌 모든 자유 카테고리
-  return cats.filter((c) => !isOutsourceType(c));
+  if (group === 'outsource') return cats.filter(isPersonCategory);
+  return cats.filter((c) => !isPersonCategory(c));
 }
 
 function buildExpenseType(group: Group, category: string, custom: string): string {
@@ -76,8 +79,8 @@ function cleanPayload<T extends Record<string, unknown>>(obj: T): Partial<T> {
 export default function PaymentRequestFormModal({ open, programId, projectId, group, target, onClose, onSaved }: Props) {
   const toast = useToast();
   const isEdit = !!target;
-  // 박경수님 + SkyClaw — 견적 항목 동적 로드 (fallback merge + 그룹 필터)
-  const { categories: estimateCats, loading: catsLoading } = useEstimateCategories(programId, projectId);
+  // 박경수님 + SkyClaw — 견적 항목·세항목 동적 로드 (fallback merge + 그룹 필터)
+  const { categories: estimateCats, descriptionsByCategory, loading: catsLoading } = useEstimateCategories(programId, projectId);
   const categoryOptions = useMemo(() => {
     const fromEstimate = filterByGroup(estimateCats, group);
     const fallback = FALLBACK_CATEGORY_BY_GROUP[group];
@@ -227,7 +230,21 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
           </div>
           {category === '기타'
             ? <Input label="항목 직접 입력" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} disabled={submitting} placeholder="예) 통역료" />
-            : <Input label="세항목" value={description} onChange={(e) => setDescription(e.target.value)} disabled={submitting} placeholder="예) 강사 1박 숙박" />
+            : (
+              /* 박경수님 보고 fix (2026-05-26) — 세항목도 견적 description 옵션 자동완성 (datalist) + 자유 입력 */
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">세항목</label>
+                <input list={`desc-opts-${category}`} value={description}
+                  onChange={(e) => setDescription(e.target.value)} disabled={submitting}
+                  placeholder={(descriptionsByCategory[category]?.length ?? 0) > 0
+                    ? `예) ${descriptionsByCategory[category][0]} (선택·직접입력)`
+                    : '예) 강사 1박 숙박'}
+                  className={SELECT_CLASS} />
+                <datalist id={`desc-opts-${category}`}>
+                  {(descriptionsByCategory[category] ?? []).map((d) => <option key={d} value={d} />)}
+                </datalist>
+              </div>
+            )
           }
         </div>
 
