@@ -118,6 +118,15 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
   const finalCategory = category === '기타' ? (customCategory.trim() || '기타') : category;
   const finalExpenseType = buildExpenseType(group, category, customCategory);
   const totalAmount = (Number(unitPrice || 0)) * (Number(quantity || 0));
+  // 박경수님 보고 fix — 세액·실지급 명시 계산
+  // 인건비(3.3/8.8): tax = sub * 세율, net = sub - tax
+  // 운영비(10): tax = sub/11 (부가세 분리), net = sub (실지급 = 합계 그대로)
+  function calcAmounts(group2: Group, taxRate: string, sub: number): { tax: number; net: number } {
+    if (group2 === 'operation') return { tax: Math.floor(sub / 11), net: sub };
+    if (taxRate === '3.3') { const t = Math.floor(sub * 0.033); return { tax: t, net: sub - t }; }
+    if (taxRate === '8.8') { const t = Math.floor(sub * 0.088); return { tax: t, net: sub - t }; }
+    return { tax: 0, net: sub };
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -130,7 +139,9 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
     setSubmitting(true);
     try {
       const isPerson = group === 'outsource';
-      // 박경수님 요청 — undefined 필드는 cleanPayload 로 제거. 기존 값 null 덮어쓰기 방지.
+      const taxRate = isPerson ? person.tax_rate_type : '10';
+      const amounts = calcAmounts(group, taxRate, totalAmount);
+      // 박경수님 보고 fix — tax_amount/net_amount 명시. cleanPayload 로 undefined 제거 (기존 값 null 덮어쓰기 방지).
       const payload = cleanPayload({
         project_id: projectId ?? undefined,
         program_id: programId,
@@ -142,7 +153,9 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
         bank_account: isPerson ? (person.bank_account.trim() || null) : (company.bank_account.trim() || null),
         unit_price: Number(unitPrice || 0),
         quantity: Number(quantity || 1),
-        tax_rate_type: isPerson ? person.tax_rate_type : '10',
+        tax_rate_type: taxRate,
+        tax_amount: amounts.tax,           // 박경수님 fix — 명시 (인건비=원천세, 운영비=부가세)
+        net_amount: amounts.net,           // 박경수님 fix — 명시 (운영비=합계 그대로)
         paid_at: paidAt || null,
         memo: memo.trim() || null,
         client_id: !isPerson && company.client_id ? company.client_id : undefined,

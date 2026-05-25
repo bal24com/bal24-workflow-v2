@@ -189,16 +189,28 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                   <td className="px-3 py-2 text-xs text-muted">{r.payee_name || '-'}</td>
                   <td className="px-3 py-2 text-right text-xs text-muted tabular-nums whitespace-nowrap">{Number(r.unit_price).toLocaleString()}×{r.quantity}</td>
                   <td className="px-3 py-2 text-right text-xs tabular-nums whitespace-nowrap">
-                    {Number(r.tax_amount ?? 0) > 0 ? (
-                      <>
-                        <div className={r.tax_rate_type === '10' ? 'text-blue-600' : 'text-rose-600'}>
-                          {r.tax_rate_type === '10' ? '+' : '-'}{formatMoney(Number(r.tax_amount ?? 0))}
-                        </div>
-                        <div className="text-[10px] text-slate-400">{r.tax_rate_type === '10' ? '부가세' : `원천 ${r.tax_rate_type}`}</div>
-                      </>
-                    ) : <span className="text-slate-400">-</span>}
+                    {/* 박경수님 보고 fix — tax_amount 0 일 때 운영비(tax_rate_type=10) 면 부가세 계산 폴백 */}
+                    {(() => {
+                      const sub = Number(r.subtotal ?? 0);
+                      const storedTax = Number(r.tax_amount ?? 0);
+                      const isVat = r.tax_rate_type === '10';
+                      // 저장된 tax_amount > 0 이면 그대로. 없으면 운영비는 sub/11 폴백.
+                      const tax = storedTax > 0 ? storedTax : (isVat ? Math.floor(sub / 11) : 0);
+                      if (tax === 0) return <span className="text-slate-400">-</span>;
+                      return (
+                        <>
+                          <div className={isVat ? 'text-blue-600' : 'text-rose-600'}>
+                            {isVat ? '+' : '-'}{formatMoney(tax)}
+                          </div>
+                          <div className="text-[10px] text-slate-400">{isVat ? '부가세' : `원천 ${r.tax_rate_type}`}</div>
+                        </>
+                      );
+                    })()}
                   </td>
-                  <td className="px-3 py-2 text-right font-bold text-violet-700 tabular-nums whitespace-nowrap">{formatMoney(Number(r.net_amount ?? r.subtotal ?? 0))}</td>
+                  <td className="px-3 py-2 text-right font-bold text-violet-700 tabular-nums whitespace-nowrap">
+                    {/* 박경수님 보고 fix — net_amount 0/null 일 때 subtotal 폴백 (0 도 falsy 처리) */}
+                    {formatMoney(Number(r.net_amount && r.net_amount > 0 ? r.net_amount : (r.subtotal ?? 0)))}
+                  </td>
                   <td className="px-3 py-2 text-center text-xs text-muted whitespace-nowrap">{r.paid_at ? formatDateKo(r.paid_at) : '-'}</td>
                   <td className="px-3 py-2 text-center">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${STATUS_STYLE[r.payment_status] ?? STATUS_STYLE['대기']}`}>{r.payment_status}</span>
