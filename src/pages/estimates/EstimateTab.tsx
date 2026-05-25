@@ -2,7 +2,7 @@
 // STEP-ACCOUNTING-FOLLOWUP7-Phase2 + Phase3 (AI 견적서 분석)
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Save, FileText, Wand2, Upload, Sparkles } from 'lucide-react';
+import { Loader2, Plus, Save, FileText, Wand2, Upload, Sparkles, BookOpen, Download } from 'lucide-react';
 import { Button, Input } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { formatMoney } from '../../lib/utils';
@@ -14,6 +14,8 @@ import {
 } from './estimateUtils';
 // STEP-ACCOUNTING-FOLLOWUP7-Phase3 — AI 견적서 추출
 import { extractEstimateFromDocument, type ExtractedEstimateItem } from './estimateExtract';
+// 박경수님 요청 — 견적 항목 템플릿 저장/불러오기
+import { SaveEstimateTemplateModal, LoadEstimateTemplateModal, type TemplateItem } from './EstimateTemplateModals';
 
 interface Props {
   projectId: string;
@@ -43,6 +45,9 @@ export default function EstimateTab({ projectId, projectName }: Props) {
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState<ExtractedEstimateItem[] | null>(null);
   const [extractedFileName, setExtractedFileName] = useState('');
+  // 박경수님 요청 — 템플릿 저장/불러오기
+  const [saveTplOpen, setSaveTplOpen] = useState(false);
+  const [loadTplOpen, setLoadTplOpen] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -188,7 +193,9 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           <span className="font-semibold text-[#1E1B4B]">{estimate?.title ?? '견적서 (아직 없음)'}</span>
           <span className="text-xs text-slate-500">· 항목 {items.length}건 · 총 <span className="font-bold text-violet-700 tabular-nums">{formatMoney(total)}</span></span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" leftIcon={<Download size={12} />} onClick={() => setLoadTplOpen(true)}>템플릿 불러오기</Button>
+          <Button variant="outline" size="sm" leftIcon={<BookOpen size={12} />} onClick={() => setSaveTplOpen(true)} disabled={items.length === 0}>템플릿 저장</Button>
           <Button variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={addItem}>항목 추가</Button>
           <Button variant="outline" size="sm" leftIcon={<Save size={12} />} onClick={() => void handleSave()} loading={saving}>저장</Button>
           <Button variant="primary" size="sm" leftIcon={<Wand2 size={12} />} onClick={() => void handleConvert()} loading={converting} disabled={!estimate || unconverted === 0}>
@@ -300,8 +307,16 @@ export default function EstimateTab({ projectId, projectName }: Props) {
                   </td>
                   <td className="px-2 py-1"><Input value={it.description ?? ''} onChange={(e) => updateItem(idx, { description: e.target.value })} disabled={locked} placeholder="강의명·작업명" /></td>
                   <td className="px-2 py-1"><Input value={it.payee_name ?? ''} onChange={(e) => updateItem(idx, { payee_name: e.target.value })} disabled={locked} placeholder="홍길동 또는 미정" /></td>
-                  <td className="px-2 py-1 w-32"><Input type="number" value={String(it.unit_price)} onChange={(e) => updateItem(idx, { unit_price: Number(e.target.value) || 0 })} disabled={locked} /></td>
-                  <td className="px-2 py-1 w-20"><Input type="number" value={String(it.quantity)} onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) || 1 })} disabled={locked} /></td>
+                  <td className="px-2 py-1 w-36">
+                    {/* 박경수님 요청 — 단가 세자리 콤마 표시 (text + numeric inputMode) */}
+                    <Input type="text" inputMode="numeric" value={(Number(it.unit_price) || 0).toLocaleString()}
+                      onChange={(e) => updateItem(idx, { unit_price: Number(e.target.value.replace(/[^0-9]/g, '')) || 0 })}
+                      disabled={locked} className="text-right" />
+                  </td>
+                  <td className="px-2 py-1 w-28">
+                    {/* 박경수님 요청 — 회수 칸 확대 (w-20 → w-28) */}
+                    <Input type="number" value={String(it.quantity)} onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) || 1 })} disabled={locked} className="text-right" />
+                  </td>
                   <td className="px-2 py-1">
                     <select value={it.tax_rate_type} onChange={(e) => updateItem(idx, { tax_rate_type: e.target.value as PayrollTaxRateType })} disabled={locked} className="w-full h-10 rounded-xl border border-slate-200 px-2 text-xs disabled:bg-slate-50">
                       {TAX_RATE_VALUES.map((t) => <option key={t} value={t}>{TAX_RATE_LABEL[t]}</option>)}
@@ -323,6 +338,31 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           {ESTIMATE_CATEGORY_SUGGESTIONS.map((c) => <option key={c} value={c} />)}
         </datalist>
       </div>
+
+      {/* 박경수님 요청 — 견적 항목 템플릿 저장/불러오기 */}
+      <SaveEstimateTemplateModal
+        open={saveTplOpen}
+        items={items.map<TemplateItem>((it) => ({
+          category: it.category, description: it.description ?? null, payee_name: it.payee_name ?? null,
+          unit_price: it.unit_price, quantity: it.quantity, tax_rate_type: it.tax_rate_type, memo: it.memo ?? null,
+        }))}
+        onClose={() => setSaveTplOpen(false)}
+        onSaved={() => setSaveTplOpen(false)}
+      />
+      <LoadEstimateTemplateModal
+        open={loadTplOpen}
+        onClose={() => setLoadTplOpen(false)}
+        onApply={(tplItems, replace) => {
+          const next = tplItems.map((t, i) => ({
+            category: t.category, description: t.description ?? '', payee_name: t.payee_name ?? '',
+            unit_price: Number(t.unit_price ?? 0), quantity: Number(t.quantity ?? 1),
+            tax_rate_type: (t.tax_rate_type ?? '3.3') as PayrollTaxRateType, memo: t.memo ?? '',
+            order_index: (replace ? 0 : items.length) + i,
+          } as DraftItem));
+          setItems(replace ? next : [...items, ...next]);
+          toast.success(`${next.length}건 ${replace ? '교체' : '추가'} 완료. [저장] 을 잊지 마세요.`);
+        }}
+      />
     </div>
   );
 }
