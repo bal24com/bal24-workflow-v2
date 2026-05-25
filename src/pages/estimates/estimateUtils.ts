@@ -145,6 +145,37 @@ export async function convertEstimateToPayroll(
   return { inserted: insertedRows.length, error: null };
 }
 
+/** 박경수님 요청 — 견적 항목 → 매핑된 payroll_expense 의 지급상태 일괄 조회 (Map) */
+export async function fetchEstimatePaymentMap(
+  payrollExpenseIds: string[],
+): Promise<Map<string, string>> {
+  const ids = payrollExpenseIds.filter(Boolean);
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from('payroll_expenses')
+    .select('id, payment_status')
+    .in('id', ids).is('deleted_at', null);
+  if (error) {
+    console.error('[estimates] payroll 매핑 조회 실패:', error.message);
+    return new Map();
+  }
+  const m = new Map<string, string>();
+  for (const r of (data ?? []) as Array<{ id: string; payment_status: string }>) {
+    m.set(r.id, r.payment_status);
+  }
+  return m;
+}
+
+/** 박경수님 요청 — 견적 항목 상태 라벨 (4단계) */
+export function estimateItemStatusLabel(
+  converted: boolean, paymentStatus: string | null | undefined,
+): { label: string; tone: 'slate' | 'amber' | 'emerald' | 'rose' } {
+  if (!converted) return { label: '미연결', tone: 'slate' };
+  if (paymentStatus === '완료') return { label: '지급완료', tone: 'emerald' };
+  if (paymentStatus === '취소') return { label: '취소', tone: 'rose' };
+  return { label: '집행 대기', tone: 'amber' };
+}
+
 /** 자주 쓰이는 견적 카테고리 (datalist 후보) */
 export const ESTIMATE_CATEGORY_SUGGESTIONS = [
   '강사료', '강사료-OT', '강사료-메인', '특강료',

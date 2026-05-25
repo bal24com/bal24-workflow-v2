@@ -9,7 +9,7 @@ export type SortDir = 'asc' | 'desc';
 
 export type DraftItem = Pick<EstimateItem,
   'category' | 'description' | 'payee_name' | 'unit_price' | 'quantity' | 'headcount' | 'tax_rate_type' | 'memo' | 'order_index' | 'program_id'
-> & { _existingId?: string; _converted?: boolean };
+> & { _existingId?: string; _converted?: boolean; _payrollId?: string | null; _paymentStatus?: string | null };
 
 export function emptyDraft(idx: number): DraftItem {
   return {

@@ -15,6 +15,7 @@ import {
 } from './estimateTableHelpers';
 import {
   fetchEstimateByProject, createEstimate, saveEstimateItems, convertEstimateToPayroll,
+  fetchEstimatePaymentMap, estimateItemStatusLabel,
   ESTIMATE_CATEGORY_SUGGESTIONS, type EstimateRow,
 } from './estimateUtils';
 // STEP-ACCOUNTING-FOLLOWUP7-Phase3 — AI 견적서 추출
@@ -51,19 +52,17 @@ export default function EstimateTab({ projectId, projectName }: Props) {
       const data = await fetchEstimateByProject(projectId);
       setEstimate(data);
       if (data?.items?.length) {
+        // 박경수님 요청 — 매핑된 payroll 의 지급상태 일괄 조회
+        const payrollIds = data.items.map((it) => it.payroll_expense_id).filter(Boolean) as string[];
+        const payMap = await fetchEstimatePaymentMap(payrollIds);
         setItems(data.items.map((it) => ({
-          category: it.category,
-          description: it.description ?? '',
-          payee_name: it.payee_name ?? '',
-          unit_price: it.unit_price,
-          quantity: it.quantity,
-          headcount: Number(it.headcount ?? 1),
+          category: it.category, description: it.description ?? '', payee_name: it.payee_name ?? '',
+          unit_price: it.unit_price, quantity: it.quantity, headcount: Number(it.headcount ?? 1),
           tax_rate_type: it.tax_rate_type as PayrollTaxRateType,
-          memo: it.memo ?? '',
-          order_index: it.order_index,
-          program_id: it.program_id ?? null,  // 박경수님 요청 — 항목별 프로그램 연결
-          _existingId: it.id,
-          _converted: !!it.payroll_expense_id,
+          memo: it.memo ?? '', order_index: it.order_index, program_id: it.program_id ?? null,
+          _existingId: it.id, _converted: !!it.payroll_expense_id,
+          _payrollId: it.payroll_expense_id ?? null,
+          _paymentStatus: it.payroll_expense_id ? payMap.get(it.payroll_expense_id) ?? null : null,
         })));
       } else { setItems([]); }
     } catch (err) {
@@ -351,7 +350,13 @@ export default function EstimateTab({ projectId, projectName }: Props) {
                   </td>
                   <td className="px-2 py-1 text-right tabular-nums font-semibold text-violet-700 whitespace-nowrap">{formatMoney(netAmount)}</td>
                   <td className="px-2 py-1 text-center text-[10px]">
-                    {locked ? <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">변환됨</span> : <span className="text-slate-400">대기</span>}
+                    {(() => {
+                      const st = estimateItemStatusLabel(!!it._converted, it._paymentStatus);
+                      const cls = st.tone === 'emerald' ? 'bg-emerald-100 text-emerald-700'
+                        : st.tone === 'amber' ? 'bg-amber-100 text-amber-700'
+                        : st.tone === 'rose' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500';
+                      return <span className={`px-1.5 py-0.5 rounded font-bold ${cls}`}>{st.label}</span>;
+                    })()}
                   </td>
                   <td className="px-2 py-1 text-right">
                     <button type="button" onClick={() => removeItem(idx)} disabled={locked} className="text-xs text-rose-600 hover:underline disabled:text-slate-300 disabled:no-underline">삭제</button>
