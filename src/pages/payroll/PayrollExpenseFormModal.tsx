@@ -16,6 +16,8 @@ import {
   isOperationType, isOutsourceType,
   type PayrollRow,
 } from './payrollUtils';
+// 박경수님 보고 fix (2026-05-26) — 외주/급여 등록 모달도 견적 카테고리를 datalist 에 노출
+import { useEstimateCategories } from '../../hooks/useEstimateCategories';
 
 interface RefOption { id: string; name: string }
 interface ProgramOption { id: string; name: string; project_id: string | null }
@@ -64,6 +66,9 @@ export default function PayrollExpenseFormModal({
   const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [projectSearch, setProjectSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  // 박경수님 fix — 견적 카테고리 동적 로드 + PAYROLL_BASE_TYPES merge (중복 제거, 견적 우선)
+  const { categories: estimateCats } = useEstimateCategories(form.program_id || null, form.project_id || null);
+  const typeOptions = useMemo(() => Array.from(new Set([...estimateCats, ...PAYROLL_BASE_TYPES])), [estimateCats]);
 
   useEffect(() => {
     if (!open) return;
@@ -240,18 +245,18 @@ export default function PayrollExpenseFormModal({
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          {/* STEP-ACCOUNTING-FOLLOWUP2 — 자유 입력 + 기본 5개 + 박경수님 임의 세부항목 datalist */}
-          <Field label="구분 (자유 입력 가능)" required>
+          {/* 박경수님 보고 fix (2026-05-26) — 견적 카테고리 동적 + 기본 5개 + 자유 입력 통합 datalist */}
+          <Field label="항목 (견적·기본 + 자유 입력)" required>
             <Input
               list="payroll-expense-types"
               value={form.expense_type}
               onChange={(e) => { const t = e.target.value; setForm((p) => ({ ...p, expense_type: t as PayrollExpenseType, tax_rate_type: isOperationType(t) ? '10' : isOutsourceType(t) ? '3.3' : p.tax_rate_type })); }}
-              placeholder="예: 강사료, 강사료-OT, 운영비-사무용품"
+              placeholder="예: 강사료, 숙식 및 임차, 운영비-사무용품"
             />
             <datalist id="payroll-expense-types">
-              {PAYROLL_BASE_TYPES.map((t) => <option key={t} value={t} />)}
+              {typeOptions.map((t) => <option key={t} value={t} />)}
             </datalist>
-            <p className="text-[10px] text-slate-400 mt-1">기본 5개 또는 "강사료-OT" 처럼 세부 항목 자유 입력</p>
+            <p className="text-[10px] text-slate-400 mt-1">{estimateCats.length > 0 ? `📋 견적 ${estimateCats.length}개 + 기본 5개 + 자유 입력` : '💡 프로젝트·프로그램 선택 시 견적 카테고리도 추천돼요'}</p>
           </Field>
           <Field label="연결 프로젝트 (검색 가능)">
             <div className="relative">
@@ -374,13 +379,8 @@ export default function PayrollExpenseFormModal({
         </div>
 
         <Field label="비고">
-          <textarea
-            value={form.memo}
-            onChange={(e) => setForm({ ...form, memo: e.target.value })}
-            rows={2}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-            placeholder="추가 메모"
-          />
+          <textarea value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} rows={2}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="추가 메모" />
         </Field>
       </div>
     </Modal>
@@ -390,9 +390,7 @@ export default function PayrollExpenseFormModal({
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1">
-        {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
-      </label>
+      <label className="block text-xs font-semibold text-slate-600 mb-1">{label}{required && <span className="text-rose-500 ml-0.5">*</span>}</label>
       {children}
     </div>
   );
