@@ -177,14 +177,134 @@ export function buildLinkOptions(
   return opts;
 }
 
-export const CONTRACT_STATUS_VALUES: ContractStatus[] = ['진행중', '완료', '취소', '보류'];
+// STEP-CONTRACT-AUTO — 'draft' 추가 (자동 생성 row 의 대기 상태)
+export const CONTRACT_STATUS_VALUES: ContractStatus[] = ['draft', '진행중', '완료', '취소', '보류'];
 
 export const CONTRACT_STATUS_STYLE: Record<ContractStatus, string> = {
+  draft:  'bg-slate-100 text-slate-600 border-slate-200',
   진행중: 'bg-violet-50 text-violet-700 border-violet-200',
   완료:   'bg-emerald-50 text-emerald-700 border-emerald-200',
   취소:   'bg-rose-50 text-rose-700 border-rose-200',
   보류:   'bg-amber-50 text-amber-700 border-amber-200',
 };
+
+export const CONTRACT_STATUS_LABEL: Record<ContractStatus, string> = {
+  draft:  '대기',
+  진행중: '진행중',
+  완료:   '완료',
+  취소:   '취소',
+  보류:   '보류',
+};
+
+// STEP-CONTRACT-AUTO — 라이프사이클 단계 라벨·컬러
+export const LIFECYCLE_LABEL: Record<'proposal'|'contract'|'operation'|'closing', string> = {
+  proposal: '견적·제안',
+  contract: '계약',
+  operation: '운영',
+  closing:  '종료',
+};
+export const LIFECYCLE_STYLE: Record<'proposal'|'contract'|'operation'|'closing', string> = {
+  proposal: 'bg-slate-100 text-slate-600 border-slate-200',
+  contract: 'bg-violet-100 text-violet-700 border-violet-200',
+  operation: 'bg-blue-100 text-blue-700 border-blue-200',
+  closing:  'bg-emerald-100 text-emerald-700 border-emerald-200',
+};
+
+// ============================================================
+// STEP-CONTRACT-AUTO — 프로젝트/프로그램 생성 시 income_contracts 자동 생성
+// 자동 생성 실패해도 본 INSERT 차단 X. 호출 측에서 try/catch 로 경고 토스트만.
+// ============================================================
+
+/** 프로젝트 생성 시 견적·제안 단계 계약 자동 생성 */
+export async function autoCreateContractForProject(params: {
+  projectId: string;
+  projectName: string;
+  clientId: string | null;
+  userId: string;
+}): Promise<void> {
+  const { error } = await supabase.from('income_contracts').insert({
+    project_id: params.projectId,
+    program_id: null,
+    contract_name: params.projectName,
+    client_id: params.clientId,
+    contract_amount: 0,
+    status: 'draft',
+    lifecycle_stage: 'proposal',
+    auto_created: true,
+    doc_request_pending: false,
+    memo: '프로젝트 생성 시 자동 등록됨. 견적·계약금액·계약일을 채워주세요.',
+    created_by: params.userId,
+  });
+  if (error) {
+    console.error('[ContractAuto] 프로젝트 계약 자동 생성 실패:', error.message);
+    throw new Error('수입/계약 자동 등록 중 오류가 발생했어요. 직접 등록해 주세요.');
+  }
+}
+
+/** ProjectFormModal 에서 한 줄 호출용 wrapper — 자동 생성 실패해도 toast 안내만 */
+export async function safeAutoContractForProject(
+  project: { id: string; name: string; client_id: string | null } | null,
+  userId: string | undefined,
+  onSuccess: (msg: string) => void,
+): Promise<void> {
+  if (!project || !userId) return;
+  try {
+    await autoCreateContractForProject({ projectId: project.id, projectName: project.name, clientId: project.client_id, userId });
+    onSuccess('프로젝트가 생성됐어요. 수입/계약에 대기 항목이 추가됐어요.');
+  } catch (err) {
+    console.warn('[ContractAuto] safe wrapper:', err instanceof Error ? err.message : '');
+    onSuccess('프로젝트가 생성됐어요. (수입/계약은 직접 등록해 주세요)');
+  }
+}
+
+/** 프로그램 생성 시 계약 단계 계약 자동 생성 — 부모 프로젝트의 client_id 자동 prefill */
+export async function autoCreateContractForProgram(params: {
+  programId: string;
+  programName: string;
+  projectId: string | null;
+  userId: string;
+}): Promise<void> {
+  // 부모 프로젝트의 client_id 자동 조회 (FOLLOWUP5 패턴)
+  let clientId: string | null = null;
+  if (params.projectId) {
+    const { data } = await supabase.from('projects').select('client_id').eq('id', params.projectId).maybeSingle();
+    clientId = (data as { client_id: string | null } | null)?.client_id ?? null;
+  }
+  const { error } = await supabase.from('income_contracts').insert({
+    project_id: params.projectId,
+    program_id: params.programId,
+    contract_name: params.programName,
+    client_id: clientId,
+    contract_amount: 0,
+    status: 'draft',
+    lifecycle_stage: 'contract',
+    auto_created: true,
+    doc_request_pending: true, // 주관기관 서류 요청 필요
+    memo: '프로그램 생성 시 자동 등록됨. 계약서·세금계산서·서류 요청 링크를 처리해 주세요.',
+    created_by: params.userId,
+  });
+  if (error) {
+    console.error('[ContractAuto] 프로그램 계약 자동 생성 실패:', error.message);
+    throw new Error('수입/계약 자동 등록 중 오류가 발생했어요. 직접 등록해 주세요.');
+  }
+}
+
+/** ProgramFormModal 에서 한 줄 호출용 wrapper */
+export async function safeAutoContractForProgram(
+  programId: string | null | undefined,
+  programName: string,
+  projectId: string | null,
+  userId: string | undefined,
+  onSuccess: (msg: string) => void,
+): Promise<void> {
+  if (!programId || !userId) return;
+  try {
+    await autoCreateContractForProgram({ programId, programName, projectId, userId });
+    onSuccess('수입/계약에 계약 단계 항목이 추가됐어요. 계약서·서류 요청 링크를 처리해 주세요.');
+  } catch (err) {
+    console.warn('[ContractAuto] safe wrapper:', err instanceof Error ? err.message : '');
+  }
+}
 
 // ============================================================
 // 계약 파일 업로드 — Storage `contracts` 버킷

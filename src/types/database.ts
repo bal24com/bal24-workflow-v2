@@ -1358,7 +1358,9 @@ export interface MemberRequest {
 // ============================================================
 
 export type VatType = '과세' | '면세' | '영세율';
-export type ContractStatus = '진행중' | '완료' | '취소' | '보류';
+// STEP-CONTRACT-AUTO — 'draft' 추가 (자동 생성 대기 상태)
+export type ContractStatus = 'draft' | '진행중' | '완료' | '취소' | '보류';
+export type ContractLifecycleStage = 'proposal' | 'contract' | 'operation' | 'closing';
 
 export interface BillingScheduleItem {
   seq: number;
@@ -1374,6 +1376,11 @@ export interface IncomeContract {
   consortium_id: string | null; // STEP-ACCOUNTING-FOLLOWUP4
   client_id: string | null;
   billing_contact_id: string | null; // STEP-ACCOUNTING-FOLLOWUP6 — 세금계산서 담당자
+  // STEP-CONTRACT-AUTO — 라이프사이클 + 자동 생성 플래그 + 주관기관 서류 요청 포털
+  lifecycle_stage: ContractLifecycleStage | null;
+  auto_created: boolean;
+  doc_request_pending: boolean;
+  portal_id: string | null;
   contract_name: string;
   contract_amount: number;
   vat_type: VatType;

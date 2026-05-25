@@ -48,7 +48,7 @@ export default function ContractsPage() {
   useEffect(() => { void reload(); }, [reload]);
 
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = { all: items.length, 진행중: 0, 완료: 0, 취소: 0, 보류: 0 };
+    const c: Record<Filter, number> = { all: items.length, draft: 0, 진행중: 0, 완료: 0, 취소: 0, 보류: 0 };
     for (const i of items) c[i.status] = (c[i.status] ?? 0) + 1;
     return c;
   }, [items]);

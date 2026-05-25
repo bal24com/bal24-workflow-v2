@@ -18,6 +18,9 @@ import PendingSessionsPreview from './PendingSessionsPreview';
 import ProgramTypeSelector from './ProgramTypeSelector';
 import { applyExtractedProgram, insertPendingSessions, upsertProgramSharePhaseDates, type ExtractedProgram, type ExtractedProgramType, type ExtractedSession, type PhaseDatesPatch } from '../../lib/programAutoFill';
 import { useToast } from '../../contexts/ToastContext';
+// STEP-CONTRACT-AUTO — 프로그램 생성 시 income_contracts 자동 (계약 단계)
+import { useAuth } from '../../contexts/AuthContext';
+import { safeAutoContractForProgram } from '../contracts/contractUtils';
 import type { Project, ProgramStatus, ProgramType } from '../../types/database';
 
 /** program_type(14종 영문) → 기존 programs.type(4종 한글) 매핑 — type 컬럼 NOT NULL 호환용 */
@@ -34,6 +37,7 @@ type Props = { open: boolean; onClose: () => void; onCreated: () => void; defaul
 
 export default function ProgramFormModal({ open, onClose, onCreated, defaultProjectId }: Props) {
   const toast = useToast();
+  const { user } = useAuth();
   const [name, setName] = useState('');
   const [programType, setProgramType] = useState<ExtendedProgramType>('education');
   const [status, setStatus] = useState<ProgramStatus>('준비');
@@ -204,6 +208,9 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
 
       // STEP-AUTOFILL-PHASE-DATES — AI 추출 4단계 시작일을 program_share에 upsert
       if (createdProgram?.id) await upsertProgramSharePhaseDates(createdProgram.id, phaseDates);
+
+      // STEP-CONTRACT-AUTO — 프로그램 INSERT 후 income_contracts 자동 (실패해도 본 INSERT 차단 X)
+      await safeAutoContractForProgram(createdProgram?.id, name.trim(), projectId || null, user?.id, toast.success);
 
       onCreated();
       onClose();

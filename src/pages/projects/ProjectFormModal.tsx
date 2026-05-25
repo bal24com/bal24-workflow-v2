@@ -5,6 +5,9 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Modal, Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import { safeAutoContractForProject } from '../contracts/contractUtils';
 import { PROJECT_STATUS_VALUES } from './projectStatus';
 import type {
   Client,
@@ -32,6 +35,7 @@ type Props = {
 };
 
 export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
+  const { user } = useAuth(); const toast = useToast();
   const [name, setName] = useState('');
   const [type, setType] = useState<ProjectType>('교육');
   const [status, setStatus] = useState<ProjectStatus>('제안');
@@ -172,7 +176,8 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
         if (memErr) console.error('[projects] consortium_members 실패:', memErr.message);
       }
 
-      const { error } = await supabase.from('projects').insert({
+      // STEP-CONTRACT-AUTO — 프로젝트 INSERT 후 income_contracts 자동 생성 (견적·제안 단계)
+      const { data: newProject, error } = await supabase.from('projects').insert({
         name: name.trim(),
         type: [type],
         status,
@@ -187,10 +192,9 @@ export default function ProjectFormModal({ open, onClose, onCreated }: Props) {
         contract_amount: autoExtra.contract_amount,
         contract_type: autoExtra.contract_type,
         duration_months: autoExtra.duration_months,
-      });
-
+      }).select('id, name, client_id').single();
       if (error) throw error;
-
+      await safeAutoContractForProject(newProject as { id: string; name: string; client_id: string | null } | null, user?.id, toast.success); // STEP-CONTRACT-AUTO
       onCreated();
       onClose();
     } catch (err) {
