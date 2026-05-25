@@ -240,7 +240,7 @@ export default function ContractFormModal({ open, target, onClose, onSaved }: Pr
         status: form.status,
         billing_schedule: schedule,
         memo: form.memo.trim() || null,
-        contract_file_url: form.contract_file_url || null,
+        contract_file_url: form.contract_file_url || null, doc_request_pending: form.contract_file_url ? false : undefined, // CONTRACT-AUTO: 계약서 업로드 시 서류 요청 자동 해제
         tax_invoice_url: form.tax_invoice_url || null,
         updated_at: new Date().toISOString(),
       };
