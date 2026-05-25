@@ -13,7 +13,7 @@ import PaymentRequestPersonFields, { EMPTY_PERSON, type PersonValues } from './P
 import PaymentRequestCompanyFields, { EMPTY_COMPANY, type CompanyClient, type CompanyValues } from './PaymentRequestCompanyFields';
 // 박경수님 + SkyClaw 2026-05-26 — 견적 항목 동적 로드
 import { useEstimateCategories } from '../../../hooks/useEstimateCategories';
-import { isOutsourceType } from '../../payroll/payrollUtils';
+import { isPersonCategory } from '../../payroll/payrollUtils';
 
 type Group = 'outsource' | 'operation';
 
@@ -53,13 +53,7 @@ const FALLBACK_CATEGORY_BY_GROUP: Record<Group, string[]> = {
   operation: ['호텔', '버스', '재료비', '식비', '장비', '인쇄', '운영비', '기타'],
 };
 
-// 박경수님 환경 견적 category 는 자유 입력 ("인건비"·"운영비"·"숙식 및 임차" 등).
-// isOutsourceType prefix (강사료/촬영/기타외주) 외에 한글 키워드도 인건비로 인식.
-function isPersonCategory(c: string): boolean {
-  if (isOutsourceType(c)) return true;
-  const lower = c.toLowerCase();
-  return ['인건비', '강사', '멘토', '운영진', 'ta', '튜터', '컨설'].some((k) => lower.includes(k.toLowerCase()));
-}
+// 박경수님 보고 fix (2026-05-26) — isPersonCategory 는 payrollUtils 로 통일 (PaymentSummaryCards·PaymentRequestTab 공용).
 function filterByGroup(cats: string[], group: Group): string[] {
   if (group === 'outsource') return cats.filter(isPersonCategory);
   return cats.filter((c) => !isPersonCategory(c));

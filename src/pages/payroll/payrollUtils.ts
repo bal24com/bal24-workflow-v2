@@ -30,6 +30,20 @@ export function isOperationType(type: string): boolean {
   return OPERATION_PREFIXES.some((p) => type === p || type.startsWith(`${p}-`));
 }
 
+// 박경수님 환경 견적 expense_type 은 자유 입력 한글 ("인건비"·"강사비"·"운영비"·"숙식 및 임차" 등).
+// isOutsourceType prefix(강사료/촬영/기타외주) 외에 한글 키워드도 인건비로 인식.
+// 박경수님 + SkyClaw 2026-05-26 — 지급요청 상단 집계 '기타' 버킷 + 인건비 탭 누락 버그 fix.
+const PERSON_KEYWORDS = ['인건비', '강사', '멘토', '운영진', 'ta', '튜터', '컨설'];
+export function isPersonCategory(type: string): boolean {
+  if (isOutsourceType(type)) return true;
+  const lower = (type ?? '').toLowerCase();
+  return PERSON_KEYWORDS.some((k) => lower.includes(k.toLowerCase()));
+}
+/** 인건비가 아니면 운영비로 간주 (자유 입력 카테고리 포괄). */
+export function isCompanyCategory(type: string): boolean {
+  return !isPersonCategory(type);
+}
+
 export const PAYROLL_STATUS_VALUES: PayrollPaymentStatus[] = [
   '대기', '완료', '후순위', '취소',
 ];

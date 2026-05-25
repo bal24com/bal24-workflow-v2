@@ -12,7 +12,7 @@ import SubToggle from './SubToggle';
 import PaymentRequestFormModal, { type PaymentTarget } from './PaymentRequestFormModal';
 import PaymentSummaryCards from './PaymentSummaryCards';
 import EstimateImportModal from './EstimateImportModal';
-import { isOutsourceType, isOperationType, bulkSoftDeletePayroll, submitPaymentRequests } from '../../payroll/payrollUtils';
+import { isPersonCategory, bulkSoftDeletePayroll, submitPaymentRequests } from '../../payroll/payrollUtils';
 
 type Group = 'outsource' | 'operation';
 
@@ -84,16 +84,18 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
     }
     const all = (data ?? []) as Row[];
     setRows(all);
+    // 박경수님 보고 fix (2026-05-26) — isPersonCategory 기준으로 통일. 인건비 아닌 모든 자유 카테고리는 운영비.
     setCounts({
-      outsource: all.filter((r) => isOutsourceType(r.expense_type)).length,
-      operation: all.filter((r) => isOperationType(r.expense_type)).length,
+      outsource: all.filter((r) => isPersonCategory(r.expense_type)).length,
+      operation: all.filter((r) => !isPersonCategory(r.expense_type)).length,
     });
   }, [programId, toast]);
 
   useEffect(() => { void reload(); }, [reload]);
 
+  // 박경수님 보고 fix (2026-05-26) — '인건비' expense_type 이 인건비 탭에 안 보이던 버그 해결.
   const visible = rows.filter((r) =>
-    group === 'outsource' ? isOutsourceType(r.expense_type) : isOperationType(r.expense_type));
+    group === 'outsource' ? isPersonCategory(r.expense_type) : !isPersonCategory(r.expense_type));
   const groupTotal = visible.reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
 
   // 박경수님 요청 — 위아래 이동 (그룹 내에서 swap)
@@ -364,7 +366,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
       {/* 박경수님 요청 — 행 [수정] 클릭 시 PaymentRequestFormModal 수정 모드 (group 자동 추론) */}
       {editTarget && (
         <PaymentRequestFormModal open={true} programId={programId} projectId={projectId}
-          group={isOutsourceType(editTarget.expense_type) ? 'outsource' : 'operation'}
+          group={isPersonCategory(editTarget.expense_type) ? 'outsource' : 'operation'}
           target={editTarget}
           onClose={() => setEditTarget(null)}
           onSaved={() => { setEditTarget(null); void reload(); }} />

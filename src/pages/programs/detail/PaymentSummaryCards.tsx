@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, FileBarChart, Wallet, AlertCircle } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { formatMoney } from '../../../lib/utils';
-import { isOutsourceType, isOperationType } from '../../payroll/payrollUtils';
+import { isPersonCategory } from '../../payroll/payrollUtils';
 
 interface Props {
   programId: string;
@@ -13,7 +13,7 @@ interface Props {
 }
 
 interface EstimateLine { category: string; amount: number }
-interface ExecLine { group: '인건비' | '운영비' | '기타'; amount: number }
+interface ExecLine { group: '인건비' | '운영비'; amount: number }
 
 interface Summary {
   estimateTotal: number;
@@ -53,21 +53,21 @@ export default function PaymentSummaryCards({ programId, projectId }: Props) {
       // 실제 집행 — payroll_expenses (program_id) 종합 + 부가세/원천세 분리
       const { data: payr } = await supabase.from('payroll_expenses')
         .select('expense_type, subtotal, tax_amount, tax_rate_type').eq('program_id', programId).is('deleted_at', null);
-      let outsource = 0; let operation = 0; let etc = 0; let vatTotal = 0; let withholdingTotal = 0;
+      // 박경수님 보고 fix (2026-05-26) — isPersonCategory 한글 키워드 매칭으로 통일.
+      // 인건비 아닌 모든 자유 카테고리는 운영비로. '기타' 버킷 제거.
+      let outsource = 0; let operation = 0; let vatTotal = 0; let withholdingTotal = 0;
       for (const r of (payr ?? []) as Array<{ expense_type: string; subtotal: number | string | null; tax_amount: number | string | null; tax_rate_type: string | null }>) {
         const amt = Number(r.subtotal ?? 0);
         const tax = Number(r.tax_amount ?? 0);
-        if (isOutsourceType(r.expense_type)) outsource += amt;
-        else if (isOperationType(r.expense_type)) operation += amt;
-        else etc += amt;
+        if (isPersonCategory(r.expense_type)) outsource += amt;
+        else operation += amt;
         if (r.tax_rate_type === '10') vatTotal += tax;
         else if (r.tax_rate_type === '3.3' || r.tax_rate_type === '8.8') withholdingTotal += tax;
       }
-      const execTotal = outsource + operation + etc;
+      const execTotal = outsource + operation;
       const execLines: ExecLine[] = [
         { group: '인건비', amount: outsource },
         { group: '운영비', amount: operation },
-        ...(etc > 0 ? [{ group: '기타' as const, amount: etc }] : []),
       ];
 
       if (cancelled) return;
