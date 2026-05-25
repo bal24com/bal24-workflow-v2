@@ -2,7 +2,9 @@
 // PaymentRequestFormModal V-1 분리 + 박경수님 요청 staff_pool 검색 자동채움 (2026-05-26)
 
 import { useEffect, useRef, useState } from 'react';
+import { Users } from 'lucide-react';
 import { Input } from '../../../components/ui';
+import StaffSearchModal, { type SelectedPerson } from '../../../components/ui/StaffSearchModal';
 import { supabase } from '../../../lib/supabase';
 import { formatMoney } from '../../../lib/utils';
 import { calcTax } from '../../../utils/taxUtils';
@@ -53,6 +55,34 @@ export default function PaymentRequestPersonFields({ values, totalAmount, onChan
   const [searching, setSearching] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 박경수님 요청 2026-05-26 — [전문가 선택] 모달 (기존 StaffSearchModal 재사용)
+  const [staffModalOpen, setStaffModalOpen] = useState(false);
+
+  // 모달에서 선택된 인력의 상세정보(주민번호·은행) fetch 후 자동채움
+  async function handleStaffModalSelect(p: SelectedPerson) {
+    if (p.sourceType !== 'staff_pool' || !p.id) {
+      // profile/manual 은 이름만 채움
+      onChange({ ...values, payee_name: p.name });
+      return;
+    }
+    const { data, error } = await supabase
+      .from('staff_pool')
+      .select('name, id_number, bank_name, bank_account')
+      .eq('id', p.id)
+      .single();
+    if (error || !data) {
+      console.error('[PaymentRequestPersonFields] 선택 인력 상세 조회 실패:', error?.message);
+      onChange({ ...values, payee_name: p.name });
+      return;
+    }
+    onChange({
+      ...values,
+      payee_name: data.name,
+      payee_id_no: data.id_number ?? '',
+      bank_name: data.bank_name ?? '',
+      bank_account: data.bank_account ?? '',
+    });
+  }
 
   async function runSearch(q: string) {
     if (q.trim().length < 2) { setStaffResults([]); setShowDropdown(false); return; }
@@ -110,11 +140,17 @@ export default function PaymentRequestPersonFields({ values, totalAmount, onChan
     <div className="space-y-3 rounded-xl border border-cyan-100 bg-cyan-50/30 p-3">
       <div className="text-xs font-bold text-cyan-700">💼 인건비 (개인)</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* 박경수님 + SkyClaw — 수취인명 staff_pool 검색 자동채움 */}
+        {/* 박경수님 + SkyClaw — 수취인명 staff_pool 검색 자동채움 + [전문가 선택] 모달 */}
         <div className="relative space-y-1.5" ref={wrapperRef}>
-          <label className="text-sm font-semibold text-slate-700">
-            수취인명 <span className="text-rose-500">*</span>
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-slate-700">
+              수취인명 <span className="text-rose-500">*</span>
+            </label>
+            <button type="button" onClick={() => setStaffModalOpen(true)} disabled={disabled}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 disabled:opacity-50">
+              <Users size={11} aria-hidden="true" /> 전문가 선택
+            </button>
+          </div>
           <input type="text" value={values.payee_name}
             onChange={(e) => handleNameChange(e.target.value)}
             onFocus={() => { if (staffResults.length > 0) setShowDropdown(true); }}
@@ -182,6 +218,15 @@ export default function PaymentRequestPersonFields({ values, totalAmount, onChan
         <Input label="은행명" value={values.bank_name} onChange={(e) => set('bank_name', e.target.value)} disabled={disabled} placeholder="예) 국민은행" />
         <Input label="계좌번호" value={values.bank_account} onChange={(e) => set('bank_account', e.target.value)} disabled={disabled} placeholder="123-456-789" />
       </div>
+
+      {/* 박경수님 요청 — 전문가 선택 모달 (기존 StaffSearchModal 재사용, 임시등록·직접추가 지원) */}
+      <StaffSearchModal
+        open={staffModalOpen}
+        role="강사"
+        allowManual
+        onClose={() => setStaffModalOpen(false)}
+        onSelect={(p) => { void handleStaffModalSelect(p); setStaffModalOpen(false); }}
+      />
     </div>
   );
 }

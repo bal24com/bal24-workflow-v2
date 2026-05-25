@@ -5,7 +5,7 @@
 //   lazy : 나머지 모든 인증 후 페이지 + 공개 라우트
 //          → entry bundle 80~90KB → 30KB 수준으로 감소 기대.
 
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import Layout from './components/layout/Layout';
@@ -13,6 +13,9 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
+// 박경수님 + SkyClaw 2026-05-26 — 흰 화면 방지: chunk 재시도 + ErrorBoundary
+import { lazyWithRetry as lazy } from './lib/lazyWithRetry';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // ── 인증 후 페이지 — 모두 lazy (DashboardPage 외) ──
 const ProjectsPage          = lazy(() => import('./pages/projects/ProjectsPage'));
@@ -116,6 +119,7 @@ export default function App() {
     <ToastProvider>
       <ToastContainer />
       <BrowserRouter>
+        <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* 인증 불필요 — 외부 공개 라우트 (token 기반, lazy) */}
@@ -237,6 +241,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>
         </Suspense>
+        </ErrorBoundary>
       </BrowserRouter>
     </ToastProvider>
   );
