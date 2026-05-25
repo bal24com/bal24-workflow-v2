@@ -2,7 +2,7 @@
 // 박경수님 요청 — 강사료(payroll 변환분 포함)도 인건비 탭에 통합 노출
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Loader2, Trash2, Download } from 'lucide-react';
+import { Plus, Loader2, Trash2, Download, Pencil, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
@@ -12,7 +12,8 @@ import SubToggle from './SubToggle';
 import PaymentRequestFormModal from './PaymentRequestFormModal';
 import PaymentSummaryCards from './PaymentSummaryCards';
 import EstimateImportModal from './EstimateImportModal';
-import { isOutsourceType, isOperationType } from '../../payroll/payrollUtils';
+import PayrollExpenseFormModal from '../../payroll/PayrollExpenseFormModal';
+import { isOutsourceType, isOperationType, type PayrollRow } from '../../payroll/payrollUtils';
 
 type Group = 'outsource' | 'operation';
 
@@ -25,10 +26,11 @@ interface Row {
   quantity: number;
   subtotal: number;
   tax_amount: number | null;
-  tax_rate_type: string | null;     // 박경수님 요청 — 부가세('10') 와 원천세('3.3','8.8') 구분 표시
+  tax_rate_type: string | null;
   net_amount: number | null;
   payment_status: string;
   paid_at: string | null;
+  order_index?: number | null;
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -47,6 +49,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<PayrollRow | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [counts, setCounts] = useState({ outsource: 0, operation: 0 });
 
@@ -54,9 +57,10 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
     setLoading(true);
     const { data, error } = await supabase
       .from('payroll_expenses')
-      .select('id, expense_type, description, payee_name, unit_price, quantity, subtotal, tax_amount, tax_rate_type, net_amount, payment_status, paid_at')
+      .select('id, expense_type, description, payee_name, unit_price, quantity, subtotal, tax_amount, tax_rate_type, net_amount, payment_status, paid_at, order_index')
       .eq('program_id', programId)
       .is('deleted_at', null)
+      .order('order_index', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false });
     setLoading(false);
     if (error) {
@@ -77,6 +81,20 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
   const visible = rows.filter((r) =>
     group === 'outsource' ? isOutsourceType(r.expense_type) : isOperationType(r.expense_type));
   const groupTotal = visible.reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+
+  // 박경수님 요청 — 위아래 이동 (그룹 내에서 swap)
+  async function swap(idx: number, dir: 'up' | 'down') {
+    const j = dir === 'up' ? idx - 1 : idx + 1;
+    if (j < 0 || j >= visible.length) return;
+    const a = visible[idx]; const b = visible[j];
+    const ao = Number(a.order_index ?? idx); const bo = Number(b.order_index ?? j);
+    const [u1, u2] = await Promise.all([
+      supabase.from('payroll_expenses').update({ order_index: bo }).eq('id', a.id),
+      supabase.from('payroll_expenses').update({ order_index: ao }).eq('id', b.id),
+    ]);
+    if (u1.error || u2.error) { toast.error('순서 저장 실패 — 마이그레이션(order_index) 확인 필요.'); return; }
+    void reload();
+  }
 
   async function handleDelete(row: Row) {
     if (!window.confirm(`"${row.expense_type} · ${row.payee_name}" 항목을 휴지통으로 보낼까요?`)) return;
@@ -148,7 +166,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {visible.map((r) => (
+              {visible.map((r, idx) => (
                 <tr key={r.id} className="hover:bg-violet-50/40">
                   <td className="px-3 py-2 text-xs font-semibold text-violet-700">{r.expense_type}</td>
                   <td className="px-3 py-2 text-xs text-text truncate max-w-[260px]">{r.description ?? '-'}</td>
@@ -170,10 +188,12 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${STATUS_STYLE[r.payment_status] ?? STATUS_STYLE['대기']}`}>{r.payment_status}</span>
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <button type="button" onClick={() => void handleDelete(r)} disabled={acting === r.id}
-                      className="inline-flex items-center gap-1 text-xs text-rose-600 hover:underline disabled:opacity-40">
-                      <Trash2 size={11} aria-hidden="true" />삭제
-                    </button>
+                    <span className="inline-flex items-center gap-1">
+                      <button type="button" onClick={() => void swap(idx, 'up')} disabled={idx === 0} aria-label="위로" title="위로" className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30"><ArrowUp size={11} aria-hidden="true" /></button>
+                      <button type="button" onClick={() => void swap(idx, 'down')} disabled={idx === visible.length - 1} aria-label="아래로" title="아래로" className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30"><ArrowDown size={11} aria-hidden="true" /></button>
+                      <button type="button" onClick={() => setEditTarget(r as unknown as PayrollRow)} className="inline-flex items-center gap-0.5 text-xs text-violet-600 hover:underline ml-1"><Pencil size={11} aria-hidden="true" />수정</button>
+                      <button type="button" onClick={() => void handleDelete(r)} disabled={acting === r.id} className="inline-flex items-center gap-0.5 text-xs text-rose-600 hover:underline disabled:opacity-40 ml-1"><Trash2 size={11} aria-hidden="true" />삭제</button>
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -192,6 +212,9 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
       />
       <EstimateImportModal open={importOpen} programId={programId} projectId={projectId} group={group}
         onClose={() => setImportOpen(false)} onSaved={() => { setImportOpen(false); void reload(); }} />
+      {/* 박경수님 요청 — 행 [수정] 클릭 시 풀 폼 모달 (외주/급여 페이지와 동일 모달 재사용) */}
+      <PayrollExpenseFormModal open={!!editTarget} target={editTarget} defaultType={editTarget?.expense_type ?? '강사료'}
+        onClose={() => setEditTarget(null)} onSaved={() => { setEditTarget(null); void reload(); }} />
     </div>
   );
 }
