@@ -37,6 +37,7 @@ export interface ConsortiumInitialData {
   status: ConsortiumStatus;
   start_date: string;
   end_date: string;
+  total_budget: number | null;     // 박경수님 요청 — 사업비 입력 칸
 }
 
 type Props = {
@@ -56,13 +57,14 @@ type ConsortiumForm = {
   description: string;
   startDate: string;
   endDate: string;
+  totalBudget: string;          // 사업비 (콤마 허용 입력값)
 };
 
 const EMPTY: ConsortiumForm = {
   name: '', projectId: '', status: '구성중',
   leadClientId: '', leadRole: '주관',
   description: '',
-  startDate: '', endDate: '',
+  startDate: '', endDate: '', totalBudget: '',
 };
 
 function fromInitial(d: ConsortiumInitialData): ConsortiumForm {
@@ -75,6 +77,7 @@ function fromInitial(d: ConsortiumInitialData): ConsortiumForm {
     description: d.description,
     startDate: d.start_date,
     endDate: d.end_date,
+    totalBudget: d.total_budget != null ? String(d.total_budget) : '',
   };
 }
 
@@ -174,6 +177,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
 
     setSubmitting(true);
     try {
+      const totalBudgetNum = form.totalBudget.trim() ? Number(form.totalBudget.replace(/[^0-9.-]/g, '')) : null;
       if (isEditMode && initialData) {
         // 수정 모드 — consortiums UPDATE → 참여사 일괄 DELETE+INSERT (Q4=A)
         const { error: uErr } = await supabase
@@ -186,6 +190,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
             description: form.description.trim() || null,
             start_date: form.startDate || null,
             end_date: form.endDate || null,
+            total_budget: totalBudgetNum,
             updated_at: new Date().toISOString(),
           })
           .eq('id', initialData.id);
@@ -225,6 +230,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
           description: form.description.trim() || null,
           start_date: form.startDate || null,
           end_date: form.endDate || null,
+          total_budget: totalBudgetNum,
         },
         leadRole: form.leadRole,
         drafts: members,
@@ -294,32 +300,28 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Input type="date" label="시작일" value={form.startDate} onChange={(e) => update('startDate', e.target.value)} disabled={submitting} />
+            <Input type="date" label="종료일" value={form.endDate} onChange={(e) => update('endDate', e.target.value)} disabled={submitting} />
             <Input
-              type="date"
-              label="시작일"
-              value={form.startDate}
-              onChange={(e) => update('startDate', e.target.value)}
+              type="text" inputMode="numeric" label="총사업비 (원)"
+              value={form.totalBudget}
+              onChange={(e) => update('totalBudget', e.target.value)}
               disabled={submitting}
-            />
-            <Input
-              type="date"
-              label="종료일"
-              value={form.endDate}
-              onChange={(e) => update('endDate', e.target.value)}
-              disabled={submitting}
+              placeholder="예) 50000000"
+              helperText="컨소시엄 전체 예산. 참여사별 배분은 아래 지분율로 자동 계산"
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="consortium-desc" className="text-sm font-semibold text-slate-700">설명</label>
+            <label htmlFor="consortium-desc" className="text-sm font-semibold text-slate-700">사업 개요 · 세부내용</label>
             <textarea
               id="consortium-desc"
-              rows={2}
+              rows={5}
               value={form.description}
               onChange={(e) => update('description', e.target.value)}
               disabled={submitting}
-              placeholder="목표·배경·기간 등"
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 resize-none"
+              placeholder="목표·배경·기간·기대효과·주요 사업내용 등을 자유롭게 작성하세요."
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 resize-y"
             />
           </div>
         </section>

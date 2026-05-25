@@ -164,7 +164,7 @@ export default function ConsortiumDetailPage() {
   }
 
   const TabContent: Record<TabKey, ReactNode> = {
-    overview: <ConOverviewTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} />,
+    overview: <ConOverviewTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} description={consortium.description} />,
     programs: <ConProgramsTab consortiumId={id} members={members} />,
     tasks: <ConTasksTab consortiumId={id} members={members} />,
     finance: <ConFinanceTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} />,
@@ -337,6 +337,7 @@ export default function ConsortiumDetailPage() {
           status: consortium.status,
           start_date: consortium.start_date ?? '',
           end_date: consortium.end_date ?? '',
+          total_budget: consortium.total_budget ?? null,
         }}
       />
     </div>

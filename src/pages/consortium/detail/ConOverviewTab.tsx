@@ -1,7 +1,7 @@
 // bal24 v2 — 컨소시엄 탭1: 개요 (재무 격리·예산 집행·태스크 요약·타임라인)
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, AlertTriangle, Wallet, ListChecks, Activity } from 'lucide-react';
+import { Loader2, AlertTriangle, Wallet, ListChecks, Activity, BookOpen } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import {
@@ -16,6 +16,7 @@ interface Props {
   consortiumId: string;
   totalBudget: number;
   members: ConsortiumMember[];
+  description?: string | null;       // 박경수님 요청 — 사업 개요·세부내용 노출
 }
 
 interface TaskSummary {
@@ -32,7 +33,7 @@ interface ActivityItem {
   at: string;
 }
 
-export default function ConOverviewTab({ consortiumId, totalBudget, members }: Props) {
+export default function ConOverviewTab({ consortiumId, totalBudget, members, description }: Props) {
   const toast = useToast();
   const [income, setIncome] = useState<number>(0);
   const [expense, setExpense] = useState<number>(0);
@@ -139,6 +140,17 @@ export default function ConOverviewTab({ consortiumId, totalBudget, members }: P
 
   return (
     <div className="space-y-5">
+      {/* 사업 개요 — 박경수님 요청 (모달 description 노출) */}
+      {description?.trim() && (
+        <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-2">
+          <div className="flex items-center gap-1.5">
+            <BookOpen size={16} className="text-violet-500" aria-hidden="true" />
+            <h2 className="text-sm font-bold text-[#1E1B4B]">사업 개요</h2>
+          </div>
+          <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{description}</p>
+        </section>
+      )}
+
       {/* 재무 요약 4개 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="총사업비" value={formatKRW(totalBudget)} tone="violet" />

@@ -106,6 +106,7 @@ interface CreateArgs {
     description: string | null;
     start_date: string | null;
     end_date: string | null;
+    total_budget: number | null;
   };
   leadRole: ConsortiumRole;
   drafts: MemberDraft[];
