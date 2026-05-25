@@ -14,18 +14,23 @@ import {
   calcContractKpis,
   CONTRACT_STATUS_VALUES,
   CONTRACT_STATUS_STYLE,
+  CONTRACT_STATUS_LABEL,
+  LIFECYCLE_LABEL,
+  LIFECYCLE_STYLE,
   type ContractRow,
 } from './contractUtils';
 import ContractFormModal from './ContractFormModal';
 import ContractDetailDrawer from './ContractDetailDrawer';
 
 type Filter = 'all' | ContractStatus;
+type LifeFilter = 'all' | 'proposal' | 'contract' | 'operation' | 'closing';
 
 export default function ContractsPage() {
   const toast = useToast();
   const [items, setItems] = useState<ContractRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
+  const [lifeFilter, setLifeFilter] = useState<LifeFilter>('all'); // STEP-CONTRACT-AUTO
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ContractRow | null>(null);
@@ -53,16 +58,27 @@ export default function ContractsPage() {
     return c;
   }, [items]);
 
+  // STEP-CONTRACT-AUTO — lifecycle 단계별 카운트
+  const lifeCounts = useMemo(() => {
+    const c: Record<LifeFilter, number> = { all: items.length, proposal: 0, contract: 0, operation: 0, closing: 0 };
+    for (const i of items) {
+      const s = i.lifecycle_stage ?? 'proposal';
+      if (s in c) c[s as LifeFilter] = (c[s as LifeFilter] ?? 0) + 1;
+    }
+    return c;
+  }, [items]);
+
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items.filter((i) => {
       if (filter !== 'all' && i.status !== filter) return false;
+      if (lifeFilter !== 'all' && (i.lifecycle_stage ?? 'proposal') !== lifeFilter) return false;
       if (!q) return true;
       const hay = [i.contract_name, i.client?.name, i.project?.name, i.memo]
         .filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     });
-  }, [items, filter, search]);
+  }, [items, filter, lifeFilter, search]);
 
   const kpis = useMemo(() => calcContractKpis(items), [items]);
 
@@ -104,12 +120,37 @@ export default function ContractsPage() {
         </div>
       </div>
 
+      {/* STEP-CONTRACT-AUTO — lifecycle 5탭 (견적·제안 / 계약 / 운영 / 종료) */}
+      <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="라이프사이클 탭">
+        {(['all', 'proposal', 'contract', 'operation', 'closing'] as LifeFilter[]).map((s) => {
+          const active = lifeFilter === s;
+          const label = s === 'all' ? '전체' : LIFECYCLE_LABEL[s];
+          return (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setLifeFilter(s)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                active ? 'bg-primary text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {label}
+              <span className={`inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded text-[10px] ${
+                active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+              }`}>{lifeCounts[s] ?? 0}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* 상태 필터 + 신규 등록 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5" role="tablist" aria-label="상태 필터">
           {(['all', ...CONTRACT_STATUS_VALUES] as Filter[]).map((f) => {
             const active = filter === f;
-            const label = f === 'all' ? '전체' : f;
+            const label = f === 'all' ? '전체' : CONTRACT_STATUS_LABEL[f as ContractStatus] ?? f;
             return (
               <button
                 key={String(f)}
@@ -169,6 +210,7 @@ export default function ContractsPage() {
             <thead className="bg-slate-50 text-slate-500 text-xs">
               <tr>
                 <th className="text-left px-4 py-2.5 font-semibold">계약명</th>
+                <th className="text-center px-4 py-2.5 font-semibold whitespace-nowrap">단계</th>
                 <th className="text-left px-4 py-2.5 font-semibold">주관기관</th>
                 <th className="text-left px-4 py-2.5 font-semibold">프로젝트</th>
                 <th className="text-right px-4 py-2.5 font-semibold whitespace-nowrap">계약금액</th>
@@ -178,27 +220,44 @@ export default function ContractsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {visible.map((c) => (
+              {visible.map((c) => {
+                const life = c.lifecycle_stage ?? 'proposal';
+                const docPending = c.doc_request_pending && !c.contract_file_url;
+                return (
                 <tr
                   key={c.id}
                   className="hover:bg-violet-50 transition-colors cursor-pointer"
                   onClick={() => handleRowClick(c)}
                 >
-                  <td className="px-4 py-2.5 text-text font-medium">{c.contract_name}</td>
+                  <td className="px-4 py-2.5 text-text font-medium">
+                    {c.auto_created && <span className="text-[10px] text-slate-400 mr-1 align-middle">[자동]</span>}
+                    {c.contract_name}
+                    {docPending && (
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-600 align-middle">
+                        계약서류 미업로드
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${LIFECYCLE_STYLE[life]}`}>
+                      {LIFECYCLE_LABEL[life]}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5 text-xs text-muted">{c.client?.name ?? '-'}</td>
                   <td className="px-4 py-2.5 text-xs text-muted">{c.project?.name ?? '-'}</td>
                   <td className="px-4 py-2.5 text-right font-bold text-text tabular-nums whitespace-nowrap">{formatMoney(c.contract_amount)}</td>
                   <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">{billingProgressLabel(c.billing_schedule ?? [])}</td>
                   <td className="px-4 py-2.5 text-center">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-xs font-semibold whitespace-nowrap ${CONTRACT_STATUS_STYLE[c.status]}`}>
-                      {c.status}
+                      {CONTRACT_STATUS_LABEL[c.status] ?? c.status}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-center text-xs text-muted whitespace-nowrap">
                     {c.deposited_at ? formatDateKo(c.deposited_at) : '대기'}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
