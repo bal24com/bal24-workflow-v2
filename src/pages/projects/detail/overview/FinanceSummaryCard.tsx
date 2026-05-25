@@ -50,6 +50,9 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
         <div className="flex flex-col gap-2.5">
           <Row label="예산" value={data.budget > 0 ? formatMoney(data.budget) : '미정'} accent="violet" />
           <Row label="수입 (입금완료)" value={formatMoney(data.incomeTotal)} accent="emerald" />
+          {data.expectedIncomeTotal > 0 && (
+            <Row label="└ 예상 수입 (계약중)" value={formatMoney(data.expectedIncomeTotal)} accent="violet" small />
+          )}
 
           {data.budget > 0 && (
             <div className="flex flex-col gap-1">
@@ -66,6 +69,9 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
           )}
 
           <Row label="지출 합계" value={formatMoney(data.expenseTotal)} accent="orange" />
+          {data.payrollTotal > 0 && (
+            <Row label="└ 외주·급여" value={formatMoney(data.payrollTotal)} accent="orange" small />
+          )}
           {data.pendingExpenseTotal > 0 && (
             <Row label="└ 대기 지출" value={formatMoney(data.pendingExpenseTotal)} accent="rose" small />
           )}

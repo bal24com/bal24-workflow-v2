@@ -12,9 +12,11 @@ import type {
 
 export interface ProjectFinance {
   budget: number;
-  incomeTotal: number;
-  expenseTotal: number;
-  pendingExpenseTotal: number;
+  incomeTotal: number;            // 입금 완료 합계 (구 income + 신 income_contracts)
+  expectedIncomeTotal: number;    // 진행중·draft·보류 계약 총액 (신 income_contracts)
+  expenseTotal: number;           // 지출 합계 (구 expenses + 신 payroll_expenses)
+  pendingExpenseTotal: number;    // 대기 지출 합계
+  payrollTotal: number;           // 외주/급여 합계 (신 payroll_expenses)
   remaining: number;
   settledPct: number;
 }
@@ -47,47 +49,52 @@ export function activityLogTypeLabel(t: ActivityLogType): string {
   return ACTIVITY_LOG_TYPE_LABEL[t] ?? t;
 }
 
-/** 재무 요약 — projects.budget + income(입금완료) 합 + expenses(지출 전체·대기 분리) */
+/** 재무 요약 — 구 income/expenses + 신 income_contracts/payroll_expenses 모두 합산 */
 export async function fetchProjectFinance(projectId: string): Promise<ProjectFinance> {
-  const [projRes, incomeRes, expenseRes] = await Promise.all([
-    supabase
-      .from('projects')
-      .select('budget')
-      .eq('id', projectId)
-      .maybeSingle(),
-    supabase
-      .from('income')
-      .select('amount, status')
-      .eq('project_id', projectId)
-      .is('deleted_at', null),
-    supabase
-      .from('expenses')
-      .select('gross_amount, status')
-      .eq('project_id', projectId)
-      .is('deleted_at', null),
+  const [projRes, incomeRes, expenseRes, contractRes, payrollRes] = await Promise.all([
+    supabase.from('projects').select('budget').eq('id', projectId).maybeSingle(),
+    supabase.from('income').select('amount, status').eq('project_id', projectId).is('deleted_at', null),
+    supabase.from('expenses').select('gross_amount, status').eq('project_id', projectId).is('deleted_at', null),
+    // STEP-CONTRACT-AUTO/ACCOUNTING-P2 — 새 수입/계약 테이블
+    supabase.from('income_contracts').select('contract_amount, status, deposited_at').eq('project_id', projectId).is('deleted_at', null),
+    // ACCOUNTING-P3 — 외주/급여 테이블
+    supabase.from('payroll_expenses').select('subtotal, payment_status').eq('project_id', projectId).is('deleted_at', null),
   ]);
 
   if (projRes.error) console.error('[project-detail] 예산 조회 실패:', projRes.error.message);
-  if (incomeRes.error) console.error('[project-detail] 수입 조회 실패:', incomeRes.error.message);
-  if (expenseRes.error) console.error('[project-detail] 지출 조회 실패:', expenseRes.error.message);
+  if (incomeRes.error) console.error('[project-detail] 수입(legacy) 조회 실패:', incomeRes.error.message);
+  if (expenseRes.error) console.error('[project-detail] 지출(legacy) 조회 실패:', expenseRes.error.message);
+  if (contractRes.error) console.error('[project-detail] 계약 조회 실패:', contractRes.error.message);
+  if (payrollRes.error) console.error('[project-detail] 외주/급여 조회 실패:', payrollRes.error.message);
 
   const budget = Number(projRes.data?.budget ?? 0);
 
-  const incomeRows = (incomeRes.data ?? []) as Array<{ amount: number | string | null; status: string }>;
-  const incomeTotal = incomeRows
-    .filter((r) => r.status === '입금완료')
-    .reduce((s, r) => s + Number(r.amount ?? 0), 0);
+  // 수입 — 구 income(입금완료) + 신 income_contracts(deposited_at 채워진 행)
+  const legacyIncome = ((incomeRes.data ?? []) as Array<{ amount: number | string | null; status: string }>)
+    .filter((r) => r.status === '입금완료').reduce((s, r) => s + Number(r.amount ?? 0), 0);
+  const contractRows = (contractRes.data ?? []) as Array<{ contract_amount: number | string | null; status: string; deposited_at: string | null }>;
+  const contractIncome = contractRows.filter((r) => r.deposited_at).reduce((s, r) => s + Number(r.contract_amount ?? 0), 0);
+  const incomeTotal = legacyIncome + contractIncome;
 
-  const expenseRows = (expenseRes.data ?? []) as Array<{ gross_amount: number | string | null; status: string }>;
-  const expenseTotal = expenseRows.reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
-  const pendingExpenseTotal = expenseRows
-    .filter((r) => r.status === '대기')
-    .reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
+  // 예상 수입 — 입금 전 계약 (취소 제외)
+  const expectedIncomeTotal = contractRows
+    .filter((r) => !r.deposited_at && r.status !== '취소')
+    .reduce((s, r) => s + Number(r.contract_amount ?? 0), 0);
 
+  // 지출 — 구 expenses(전체) + 신 payroll_expenses(취소 제외)
+  const legacyExpenseRows = (expenseRes.data ?? []) as Array<{ gross_amount: number | string | null; status: string }>;
+  const legacyExpense = legacyExpenseRows.reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
+  const legacyPending = legacyExpenseRows.filter((r) => r.status === '대기').reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
+  const payrollRows = (payrollRes.data ?? []) as Array<{ subtotal: number | string | null; payment_status: string }>;
+  const payrollTotal = payrollRows.filter((r) => r.payment_status !== '취소').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+  const payrollPending = payrollRows.filter((r) => r.payment_status === '대기').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+
+  const expenseTotal = legacyExpense + payrollTotal;
+  const pendingExpenseTotal = legacyPending + payrollPending;
   const remaining = budget - expenseTotal;
   const settledPct = budget > 0 ? Math.min(100, Math.round((incomeTotal / budget) * 100)) : 0;
 
-  return { budget, incomeTotal, expenseTotal, pendingExpenseTotal, remaining, settledPct };
+  return { budget, incomeTotal, expectedIncomeTotal, expenseTotal, pendingExpenseTotal, payrollTotal, remaining, settledPct };
 }
 
 /** 참여자 미리보기 — project_members 카운트 + 최근 등록 N명 이름 */
