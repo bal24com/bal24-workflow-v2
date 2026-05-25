@@ -6,6 +6,7 @@ import type { FormEvent } from 'react';
 import { Modal, Button, Input } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
+import { calcTax } from '../../../utils/taxUtils';
 
 type PayeeType = 'client' | 'expert';
 type Group = 'outsource' | 'operation';
@@ -76,8 +77,10 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
   const payeeList = payeeType === 'client' ? clients : experts;
   const payeeName = payeeList.find((p) => p.id === payeeId)?.name ?? '';
   const totalAmount = (Number(unitPrice || 0)) * (Number(quantity || 0));
-  // 인건비는 3.3% 원천세 기본, 운영비는 면세 기본
-  const defaultTaxRate = group === 'outsource' ? '3.3' : '없음';
+  // 박경수님 요청 — 운영비는 부가세 10% 포함, 인건비는 원천세 3.3% 기본
+  const defaultTaxRate: '3.3' | '10' = group === 'outsource' ? '3.3' : '10';
+  const calc = calcTax(totalAmount, defaultTaxRate);
+  const supplyAmount = totalAmount - calc.taxAmount; // 공급가액 (운영비 = 합계 - 부가세)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -160,16 +163,39 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
           <Input type="number" label="회수" value={quantity} onChange={(e) => setQuantity(e.target.value)} disabled={submitting} min={1} step={1} />
         </div>
 
-        <div className="rounded-xl bg-violet-50/60 p-3 text-sm">
-          <div className="flex justify-between font-bold text-violet-700">
-            <span>지급요청 금액</span>
-            <span className="tabular-nums">{totalAmount.toLocaleString()}원</span>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-1">
-            {group === 'outsource'
-              ? '인건비는 기본 3.3% 원천징수가 적용됩니다. 외주/급여 페이지에서 세율을 조정할 수 있어요.'
-              : '운영비는 원천세 없이 전액 지급 처리됩니다.'}
-          </p>
+        <div className="rounded-xl bg-violet-50/60 p-3 text-xs space-y-1">
+          {group === 'operation' ? (
+            <>
+              <div className="flex justify-between text-slate-600">
+                <span>합계 (부가세 포함)</span>
+                <span className="tabular-nums font-semibold">{totalAmount.toLocaleString()}원</span>
+              </div>
+              <div className="flex justify-between text-slate-500">
+                <span>└ 공급가액</span>
+                <span className="tabular-nums">{supplyAmount.toLocaleString()}원</span>
+              </div>
+              <div className="flex justify-between text-blue-600">
+                <span>└ 부가세 10%</span>
+                <span className="tabular-nums">▲ {calc.taxAmount.toLocaleString()}원</span>
+              </div>
+              <p className="text-[10px] text-slate-500 pt-1">운영비는 부가세 10% 포함으로 자동 처리됩니다. 영수증 가격(부가세 포함)을 그대로 입력하세요.</p>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between text-slate-600">
+                <span>세전 합계</span>
+                <span className="tabular-nums font-semibold">{totalAmount.toLocaleString()}원</span>
+              </div>
+              <div className="flex justify-between text-rose-600">
+                <span>└ 원천세 3.3%</span>
+                <span className="tabular-nums">▲ {calc.taxAmount.toLocaleString()}원</span>
+              </div>
+              <div className="flex justify-between font-bold text-violet-700 pt-1 border-t border-violet-200">
+                <span>실수령</span>
+                <span className="tabular-nums">{calc.netAmount.toLocaleString()}원</span>
+              </div>
+            </>
+          )}
         </div>
 
         <Input type="date" label="지급 예정일 (선택)" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} disabled={submitting} />

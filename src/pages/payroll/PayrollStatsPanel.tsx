@@ -14,11 +14,14 @@ export default function PayrollStatsPanel({ rows }: Props) {
     const byCat = new Map<string, CatLine>();
     const byProj = new Map<string, ProjLine>();
     let outsourceSum = 0; let operationSum = 0;
+    let vatSum = 0; let withholdingSum = 0;
 
     for (const r of rows) {
       const sub = Number(r.subtotal ?? 0);
       const tax = Number(r.tax_amount ?? 0);
       const net = Number(r.net_amount ?? sub - tax);
+      if (r.tax_rate_type === '10') vatSum += tax;
+      else if (r.tax_rate_type === '3.3' || r.tax_rate_type === '8.8') withholdingSum += tax;
       const grp: CatLine['group'] = isOutsourceType(r.expense_type)
         ? '인건비'
         : isOperationType(r.expense_type) ? '운영비' : '기타';
@@ -40,17 +43,19 @@ export default function PayrollStatsPanel({ rows }: Props) {
     return {
       catLines: Array.from(byCat.values()).sort((a, b) => b.subtotal - a.subtotal),
       projLines: Array.from(byProj.values()).sort((a, b) => b.subtotal - a.subtotal).slice(0, 8),
-      outsourceSum, operationSum, totalSub,
+      outsourceSum, operationSum, totalSub, vatSum, withholdingSum,
     };
   }, [rows]);
 
   return (
     <div className="space-y-4">
-      {/* 그룹 비교 — 인건비 vs 운영비 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* 그룹 비교 — 인건비 vs 운영비 + 세액 합계 */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <KpiCard label="총 집행" value={formatMoney(stats.totalSub)} tone="violet" />
         <KpiCard label="인건비 (외주)" value={formatMoney(stats.outsourceSum)} sub={`${ratio(stats.outsourceSum, stats.totalSub)}%`} tone="cyan" />
         <KpiCard label="운영비" value={formatMoney(stats.operationSum)} sub={`${ratio(stats.operationSum, stats.totalSub)}%`} tone="orange" />
+        <KpiCard label="원천세 합계" value={formatMoney(stats.withholdingSum)} sub="인건비 차감" tone="rose" />
+        <KpiCard label="부가세 (포함)" value={formatMoney(stats.vatSum)} sub="운영비 10%" tone="blue" />
       </div>
 
       {/* 카테고리별 합계 */}
@@ -123,11 +128,13 @@ function ratio(part: number, total: number): number {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
-type Tone = 'violet' | 'cyan' | 'orange';
+type Tone = 'violet' | 'cyan' | 'orange' | 'rose' | 'blue';
 const TONE: Record<Tone, string> = {
   violet: 'border-violet-100 bg-violet-50/40 text-violet-700',
   cyan: 'border-cyan-100 bg-cyan-50/40 text-cyan-700',
   orange: 'border-orange-100 bg-orange-50/40 text-orange-700',
+  rose: 'border-rose-100 bg-rose-50/40 text-rose-700',
+  blue: 'border-blue-100 bg-blue-50/40 text-blue-700',
 };
 
 function KpiCard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone: Tone }) {

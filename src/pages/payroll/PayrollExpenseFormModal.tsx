@@ -13,6 +13,7 @@ import type {
 } from '../../types/database';
 import {
   PAYROLL_BASE_TYPES, PAYROLL_STATUS_VALUES,
+  isOperationType, isOutsourceType,
   type PayrollRow,
 } from './payrollUtils';
 
@@ -244,7 +245,7 @@ export default function PayrollExpenseFormModal({
             <Input
               list="payroll-expense-types"
               value={form.expense_type}
-              onChange={(e) => setForm({ ...form, expense_type: e.target.value as PayrollExpenseType })}
+              onChange={(e) => { const t = e.target.value; setForm((p) => ({ ...p, expense_type: t as PayrollExpenseType, tax_rate_type: isOperationType(t) ? '10' : isOutsourceType(t) ? '3.3' : p.tax_rate_type })); }}
               placeholder="예: 강사료, 강사료-OT, 운영비-사무용품"
             />
             <datalist id="payroll-expense-types">

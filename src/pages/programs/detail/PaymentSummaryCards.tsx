@@ -20,6 +20,8 @@ interface Summary {
   estimateLines: EstimateLine[];
   execTotal: number;
   execLines: ExecLine[];
+  vatTotal: number;          // 박경수님 요청 — 운영비 부가세 합계
+  withholdingTotal: number;  // 인건비 원천세 합계
 }
 
 export default function PaymentSummaryCards({ programId, projectId }: Props) {
@@ -47,15 +49,18 @@ export default function PaymentSummaryCards({ programId, projectId }: Props) {
         estimateTotal = relevant.reduce((s, it) => s + Number(it.amount ?? 0), 0);
       }
 
-      // 실제 집행 — payroll_expenses (program_id) 종합
+      // 실제 집행 — payroll_expenses (program_id) 종합 + 부가세/원천세 분리
       const { data: payr } = await supabase.from('payroll_expenses')
-        .select('expense_type, subtotal').eq('program_id', programId).is('deleted_at', null);
-      let outsource = 0; let operation = 0; let etc = 0;
-      for (const r of (payr ?? []) as Array<{ expense_type: string; subtotal: number | string | null }>) {
+        .select('expense_type, subtotal, tax_amount, tax_rate_type').eq('program_id', programId).is('deleted_at', null);
+      let outsource = 0; let operation = 0; let etc = 0; let vatTotal = 0; let withholdingTotal = 0;
+      for (const r of (payr ?? []) as Array<{ expense_type: string; subtotal: number | string | null; tax_amount: number | string | null; tax_rate_type: string | null }>) {
         const amt = Number(r.subtotal ?? 0);
+        const tax = Number(r.tax_amount ?? 0);
         if (isOutsourceType(r.expense_type)) outsource += amt;
         else if (isOperationType(r.expense_type)) operation += amt;
         else etc += amt;
+        if (r.tax_rate_type === '10') vatTotal += tax;
+        else if (r.tax_rate_type === '3.3' || r.tax_rate_type === '8.8') withholdingTotal += tax;
       }
       const execTotal = outsource + operation + etc;
       const execLines: ExecLine[] = [
@@ -65,7 +70,7 @@ export default function PaymentSummaryCards({ programId, projectId }: Props) {
       ];
 
       if (cancelled) return;
-      setData({ estimateTotal, estimateLines, execTotal, execLines });
+      setData({ estimateTotal, estimateLines, execTotal, execLines, vatTotal, withholdingTotal });
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -123,6 +128,22 @@ export default function PaymentSummaryCards({ programId, projectId }: Props) {
               <span className="tabular-nums text-slate-700">{formatMoney(l.amount)}</span>
             </li>
           ))}
+          {(data.vatTotal > 0 || data.withholdingTotal > 0) && (
+            <li className="pt-1 mt-1 border-t border-slate-100 space-y-0.5">
+              {data.vatTotal > 0 && (
+                <div className="flex items-center justify-between text-[11px] text-blue-600">
+                  <span>└ 부가세 (운영비 포함)</span>
+                  <span className="tabular-nums">{formatMoney(data.vatTotal)}</span>
+                </div>
+              )}
+              {data.withholdingTotal > 0 && (
+                <div className="flex items-center justify-between text-[11px] text-rose-600">
+                  <span>└ 원천세 (인건비)</span>
+                  <span className="tabular-nums">▲ {formatMoney(data.withholdingTotal)}</span>
+                </div>
+              )}
+            </li>
+          )}
         </ul>
         {data.estimateTotal > 0 && (
           <div className={`pt-2 mt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold ${overBudget ? 'text-rose-600' : 'text-emerald-700'}`}>

@@ -235,7 +235,7 @@ export default function PayrollPage() {
                 <SortableTh k="project"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">프로젝트</SortableTh>
                 <SortableTh k="expense_type"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">구분</SortableTh>
                 <SortableTh k="subtotal"       sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">단가×회수</SortableTh>
-                <SortableTh k="tax_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">원천세</SortableTh>
+                <SortableTh k="tax_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">세액 (원천/부가)</SortableTh>
                 <SortableTh k="net_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">실지급</SortableTh>
                 <SortableTh k="payment_status" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">상태</SortableTh>
                 <SortableTh k="receipt"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">증빙</SortableTh>
@@ -269,8 +269,10 @@ export default function PayrollPage() {
                     <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap text-xs">
                       {r.tax_amount > 0 ? (
                         <>
-                          <div className="text-rose-600 font-semibold">-{formatMoney(r.tax_amount)}</div>
-                          <div className="text-[10px] text-muted">{r.tax_rate_type}</div>
+                          <div className={`font-semibold ${r.tax_rate_type === '10' ? 'text-blue-600' : 'text-rose-600'}`}>
+                            {r.tax_rate_type === '10' ? '+' : '-'}{formatMoney(r.tax_amount)}
+                          </div>
+                          <div className="text-[10px] text-muted">{r.tax_rate_type === '10' ? '부가세 10%' : `원천 ${r.tax_rate_type}`}</div>
                         </>
                       ) : <span className="text-slate-400">없음</span>}
                     </td>

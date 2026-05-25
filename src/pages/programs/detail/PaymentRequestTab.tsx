@@ -24,6 +24,7 @@ interface Row {
   quantity: number;
   subtotal: number;
   tax_amount: number | null;
+  tax_rate_type: string | null;     // 박경수님 요청 — 부가세('10') 와 원천세('3.3','8.8') 구분 표시
   net_amount: number | null;
   payment_status: string;
   paid_at: string | null;
@@ -51,7 +52,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
     setLoading(true);
     const { data, error } = await supabase
       .from('payroll_expenses')
-      .select('id, expense_type, description, payee_name, unit_price, quantity, subtotal, tax_amount, net_amount, payment_status, paid_at')
+      .select('id, expense_type, description, payee_name, unit_price, quantity, subtotal, tax_amount, tax_rate_type, net_amount, payment_status, paid_at')
       .eq('program_id', programId)
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
@@ -134,7 +135,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                 <th className="text-left px-3 py-2.5 font-semibold">세부 내용</th>
                 <th className="text-left px-3 py-2.5 font-semibold">지급처</th>
                 <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">단가×회수</th>
-                <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">원천세</th>
+                <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">세액 (원천/부가)</th>
                 <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">실지급</th>
                 <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">지급일</th>
                 <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap">상태</th>
@@ -148,7 +149,16 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                   <td className="px-3 py-2 text-xs text-text truncate max-w-[260px]">{r.description ?? '-'}</td>
                   <td className="px-3 py-2 text-xs text-muted">{r.payee_name || '-'}</td>
                   <td className="px-3 py-2 text-right text-xs text-muted tabular-nums whitespace-nowrap">{Number(r.unit_price).toLocaleString()}×{r.quantity}</td>
-                  <td className="px-3 py-2 text-right text-xs text-rose-600 tabular-nums whitespace-nowrap">{Number(r.tax_amount ?? 0) > 0 ? `-${formatMoney(Number(r.tax_amount ?? 0))}` : '-'}</td>
+                  <td className="px-3 py-2 text-right text-xs tabular-nums whitespace-nowrap">
+                    {Number(r.tax_amount ?? 0) > 0 ? (
+                      <>
+                        <div className={r.tax_rate_type === '10' ? 'text-blue-600' : 'text-rose-600'}>
+                          {r.tax_rate_type === '10' ? '+' : '-'}{formatMoney(Number(r.tax_amount ?? 0))}
+                        </div>
+                        <div className="text-[10px] text-slate-400">{r.tax_rate_type === '10' ? '부가세' : `원천 ${r.tax_rate_type}`}</div>
+                      </>
+                    ) : <span className="text-slate-400">-</span>}
+                  </td>
                   <td className="px-3 py-2 text-right font-bold text-violet-700 tabular-nums whitespace-nowrap">{formatMoney(Number(r.net_amount ?? r.subtotal ?? 0))}</td>
                   <td className="px-3 py-2 text-center text-xs text-muted whitespace-nowrap">{r.paid_at ? formatDateKo(r.paid_at) : '-'}</td>
                   <td className="px-3 py-2 text-center">
