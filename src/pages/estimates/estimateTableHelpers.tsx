@@ -49,6 +49,21 @@ export function applyFilterSort(
   return arr;
 }
 
+const KPI_TONE: Record<string, string> = {
+  violet: 'border-violet-100 bg-violet-50/40 text-violet-700',
+  emerald: 'border-emerald-100 bg-emerald-50/40 text-emerald-700',
+  cyan: 'border-cyan-100 bg-cyan-50/40 text-cyan-700',
+  orange: 'border-orange-100 bg-orange-50/40 text-orange-700',
+};
+export function KpiBox({ label, value, tone, small }: { label: string; value: string; tone: 'violet' | 'emerald' | 'cyan' | 'orange'; small?: boolean }) {
+  return (
+    <div className={`rounded-2xl border p-3 ${KPI_TONE[tone]}`}>
+      <div className="text-[11px] font-semibold text-slate-500">{label}</div>
+      <div className={`mt-0.5 font-bold tabular-nums ${small ? 'text-base' : 'text-lg'}`}>{value}</div>
+    </div>
+  );
+}
+
 export function EstSortTh({ k, sortKey, sortDir, onClick, align, children }: {
   k: SortKey; sortKey: SortKey | null; sortDir: SortDir; onClick: (k: SortKey) => void;
   align: 'left' | 'right' | 'center'; children: React.ReactNode;

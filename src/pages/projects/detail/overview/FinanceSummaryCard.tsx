@@ -68,9 +68,18 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
             </div>
           )}
 
+          {/* 박경수님 요청 — 견적(제안) 합계 라인 */}
+          {data.proposalTotal > 0 && (
+            <Row label="제안 견적 (총)" value={formatMoney(data.proposalTotal)} accent="violet" small />
+          )}
+
           <Row label="지출 합계" value={formatMoney(data.expenseTotal)} accent="orange" />
-          {data.payrollTotal > 0 && (
-            <Row label="└ 외주·급여" value={formatMoney(data.payrollTotal)} accent="orange" small />
+          {/* 박경수님 요청 — 인건비/운영비 분리 */}
+          {data.outsourceTotal > 0 && (
+            <Row label="└ 인건비 (외주·급여)" value={formatMoney(data.outsourceTotal)} accent="orange" small />
+          )}
+          {data.operationTotal > 0 && (
+            <Row label="└ 운영비 (호텔·버스·재료 등)" value={formatMoney(data.operationTotal)} accent="orange" small />
           )}
           {data.pendingExpenseTotal > 0 && (
             <Row label="└ 대기 지출" value={formatMoney(data.pendingExpenseTotal)} accent="rose" small />

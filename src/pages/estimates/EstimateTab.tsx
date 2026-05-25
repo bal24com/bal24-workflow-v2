@@ -10,7 +10,7 @@ import { formatMoney } from '../../lib/utils';
 import { calcTax, TAX_RATE_LABEL, TAX_RATE_VALUES } from '../../utils/taxUtils';
 import type { PayrollTaxRateType } from '../../types/database';
 import {
-  applyFilterSort, emptyDraft, EstSortTh,
+  applyFilterSort, emptyDraft, EstSortTh, KpiBox,
   type DraftItem, type SortKey, type SortDir,
 } from './estimateTableHelpers';
 import {
@@ -192,7 +192,20 @@ export default function EstimateTab({ projectId, projectName }: Props) {
     void supabase.from('programs').select('id, name').eq('project_id', projectId).is('deleted_at', null).order('created_at')
       .then(({ data }) => setPrograms((data ?? []) as Array<{ id: string; name: string }>));
   }, [projectId]);
-  const programName = (id: string | null) => id ? (programs.find((p) => p.id === id)?.name ?? '?') : '미연결';
+  // 박경수님 요청 — 종합 탭 상단 KPI: 실집행 합계(인건비/운영비 분리)
+  const [exec, setExec] = useState({ total: 0, outsource: 0, operation: 0 });
+  useEffect(() => {
+    void supabase.from('payroll_expenses').select('subtotal, expense_type, payment_status')
+      .eq('project_id', projectId).is('deleted_at', null)
+      .then(({ data }) => {
+        const live = ((data ?? []) as Array<{ subtotal: number | string | null; expense_type: string; payment_status: string }>)
+          .filter((r) => r.payment_status !== '취소');
+        const sum = (rs: typeof live) => rs.reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+        const o = live.filter((r) => /^(강사료|촬영|기타외주)/.test(r.expense_type));
+        const p = live.filter((r) => /^(운영비|운영인건비)/.test(r.expense_type));
+        setExec({ total: sum(live), outsource: sum(o), operation: sum(p) });
+      });
+  }, [projectId, items]);
 
   if (loading) {
     return <div className="flex items-center justify-center py-16 text-sm text-muted"><Loader2 size={18} className="animate-spin mr-2" />불러오는 중...</div>;
@@ -222,13 +235,31 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         💡 견적 항목을 입력하고 [저장] → [외주/급여로 변환] 누르면 변환된 항목은 회색 처리되고 외주/급여 페이지에서 실집행 정보(지급일·계좌·증빙) 채워나가시면 돼요.
       </div>
 
-      {/* 박경수님 요청 — 프로그램·항목 필터 + 검색 + 컬럼 정렬 */}
+      {/* 박경수님 요청 — 메인 탭: [종합] + 프로그램별 */}
+      <nav role="tablist" className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto">
+        {([{ id: '', label: '📊 종합' }, ...programs.map((p) => ({ id: p.id, label: p.name }))]).map((t) => {
+          const active = programFilter === t.id;
+          return (
+            <button key={t.id} type="button" role="tab" aria-selected={active} onClick={() => setProgramFilter(t.id)}
+              className={`px-3 py-2 text-xs font-semibold border-b-2 whitespace-nowrap ${active ? 'text-primary border-primary' : 'text-slate-500 border-transparent hover:text-text'}`}>
+              {t.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* 종합 탭 — 견적 vs 실집행 KPI (인건비/운영비 분리) */}
+      {programFilter === '' && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <KpiBox label="제안 견적" value={formatMoney(total)} tone="violet" />
+          <KpiBox label="실집행 합계" value={formatMoney(exec.total)} tone="emerald" />
+          <KpiBox label="└ 인건비" value={formatMoney(exec.outsource)} tone="cyan" small />
+          <KpiBox label="└ 운영비" value={formatMoney(exec.operation)} tone="orange" small />
+        </div>
+      )}
+
+      {/* 항목 필터 + 검색 + 정렬 */}
       <div className="flex flex-wrap items-center gap-2">
-        <select value={programFilter} onChange={(e) => setProgramFilter(e.target.value)}
-          className="h-9 rounded-lg border border-slate-200 px-2.5 text-xs">
-          <option value="">전체 프로그램</option>
-          {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
         <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
           className="h-9 rounded-lg border border-slate-200 px-2.5 text-xs">
           <option value="">전체 항목</option>
