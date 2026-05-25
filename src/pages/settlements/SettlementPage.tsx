@@ -9,6 +9,8 @@ import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
 import { formatKoreanDate } from '../reports/reportUtils';
+import { formatMoney } from '../../lib/utils';
+import { isOutsourceType, isOperationType } from '../payroll/payrollUtils';
 import {
   getStepLabel, getStepColor, isSettlementDone, lastUpdatedAt,
 } from './settlementUtils';
@@ -41,6 +43,8 @@ const TABS: { key: Filter; label: string }[] = [
   { key: 'done', label: '완료' },
 ];
 
+interface ProjectFin { proposal: number; exec: number; outsource: number; operation: number }
+
 export default function SettlementPage() {
   const toast = useToast();
   const [items, setItems] = useState<SettlementRow[]>([]);
@@ -48,6 +52,8 @@ export default function SettlementPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<SettlementRow | null>(null);
+  // 박경수님 요청 — 각 정산 카드에 미니 재무 요약 (제안 견적 / 인건비 / 운영비)
+  const [finMap, setFinMap] = useState<Map<string, ProjectFin>>(new Map());
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -68,6 +74,34 @@ export default function SettlementPage() {
   }, [toast]);
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
+
+  // 박경수님 요청 — 정산 목록 fetch 후 각 프로젝트의 견적·실집행 일괄 fetch (N+1 회피)
+  useEffect(() => {
+    const projectIds = Array.from(new Set(items.map((s) => s.project?.id).filter(Boolean) as string[]));
+    if (projectIds.length === 0) { setFinMap(new Map()); return; }
+    let cancelled = false;
+    void Promise.all([
+      supabase.from('project_estimates').select('project_id, total_amount').in('project_id', projectIds).is('deleted_at', null),
+      supabase.from('payroll_expenses').select('project_id, subtotal, expense_type, payment_status').in('project_id', projectIds).is('deleted_at', null),
+    ]).then(([estRes, payRes]) => {
+      if (cancelled) return;
+      const m = new Map<string, ProjectFin>();
+      for (const id of projectIds) m.set(id, { proposal: 0, exec: 0, outsource: 0, operation: 0 });
+      for (const r of ((estRes.data ?? []) as Array<{ project_id: string; total_amount: number | string | null }>)) {
+        const f = m.get(r.project_id); if (f) f.proposal += Number(r.total_amount ?? 0);
+      }
+      for (const r of ((payRes.data ?? []) as Array<{ project_id: string; subtotal: number | string | null; expense_type: string; payment_status: string }>)) {
+        if (r.payment_status === '취소') continue;
+        const f = m.get(r.project_id); if (!f) continue;
+        const amt = Number(r.subtotal ?? 0);
+        f.exec += amt;
+        if (isOutsourceType(r.expense_type)) f.outsource += amt;
+        else if (isOperationType(r.expense_type)) f.operation += amt;
+      }
+      setFinMap(m);
+    });
+    return () => { cancelled = true; };
+  }, [items]);
 
   // STEP-TRASH-FILTER-AUDIT — 휴지통 프로젝트·고객사에 연결된 정산 row 는 숨김
   const isLive = useCallback((s: SettlementRow) =>
@@ -186,6 +220,22 @@ export default function SettlementPage() {
                   {stamp && (
                     <div className="text-[11px] text-muted">최근 업데이트 {formatKoreanDate(stamp)}</div>
                   )}
+                  {/* 박경수님 요청 — 미니 재무 요약 */}
+                  {s.project?.id && finMap.get(s.project.id) && (() => {
+                    const f = finMap.get(s.project.id)!;
+                    const remain = f.proposal - f.exec;
+                    return (
+                      <div className="rounded-lg border border-violet-100 bg-violet-50/40 px-2.5 py-1.5 text-[11px] space-y-0.5">
+                        <div className="flex justify-between text-slate-600"><span>제안 견적</span><span className="tabular-nums font-semibold text-violet-700">{formatMoney(f.proposal)}</span></div>
+                        <div className="flex justify-between text-slate-600"><span>실집행 (인건 {formatMoney(f.outsource)} / 운영 {formatMoney(f.operation)})</span><span className="tabular-nums font-semibold text-emerald-700">{formatMoney(f.exec)}</span></div>
+                        {f.proposal > 0 && (
+                          <div className={`flex justify-between font-bold ${remain >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                            <span>{remain >= 0 ? '잔여' : '⚠ 초과'}</span><span className="tabular-nums">{formatMoney(Math.abs(remain))}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {s.note && (
                     <p className="text-xs text-muted line-clamp-2 bg-slate-50/60 rounded-lg p-2">{s.note}</p>
                   )}

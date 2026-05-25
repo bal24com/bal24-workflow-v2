@@ -248,13 +248,16 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         })}
       </nav>
 
-      {/* 종합 탭 — 견적 vs 실집행 KPI (인건비/운영비 분리) */}
+      {/* 종합 탭 — 견적 vs 실집행 KPI (인건비/운영비 분리 + 잔여) */}
       {programFilter === '' && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <KpiBox label="제안 견적" value={formatMoney(total)} tone="violet" />
           <KpiBox label="실집행 합계" value={formatMoney(exec.total)} tone="emerald" />
           <KpiBox label="└ 인건비" value={formatMoney(exec.outsource)} tone="cyan" small />
           <KpiBox label="└ 운영비" value={formatMoney(exec.operation)} tone="orange" small />
+          <KpiBox label={total - exec.total >= 0 ? '잔여' : '⚠ 초과'}
+            value={formatMoney(Math.abs(total - exec.total))}
+            tone={total - exec.total >= 0 ? 'emerald' : 'violet'} />
         </div>
       )}
 
