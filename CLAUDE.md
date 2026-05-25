@@ -1,7 +1,7 @@
 BalanceDot WorkFlow v2 — CLAUDE.md
 Claude Code가 매 세션마다 이 파일을 먼저 읽고 작업한다.
 수정 시 반드시 이 파일도 업데이트할 것.
-마지막 업데이트: 2026-05-07 (STEP-CON 컨소시엄 독립 홈 7탭까지 반영)
+마지막 업데이트: 2026-05-25 (ACCOUNTING-P1~P4 + FOLLOWUP1~7 + STEP-CONTRACT-AUTO + STEP-TAGS 까지 반영)
 
 1. 프로젝트 개요
 •	앱명: BalanceDot WorkFlow v2
@@ -506,6 +506,11 @@ URL 구조: /consortium/:id/portal
 | 출석/일지 외부 | 출석 QR 다운로드 + 외부 `/attend/:token`·`/log/:token` 라우트 + 통합일지 외부 발송 링크 + SignaturePad | `78e726e` |
 | 캘린더 개선 | 다일 이벤트 시작일 텍스트 + 한국 공휴일(`utils/holidays.ts`) + 색상 매핑 정리 | `776f3bd` |
 | **STEP-CON** | 컨소시엄 독립 홈 7탭 구조 (개요·프로그램·태스크·인력·재무·외부공유·포털 + consortium_staff/consortium_links/consortium_portal_permissions + tasks·income·expenses에 consortium_id 추가) | `2f367f4` |
+| **STEP-ACCOUNTING-ALL** | P1 DB·사이드바·타입 / P2 수입·계약 페이지 (income_contracts + 청구단계 jsonb) / P3 외주·급여 페이지 (payroll_expenses + GENERATED subtotal·net) / P4 회계사무소 외부 포털 (accounting_reviews + /accounting-review/:token) | `다수` |
+| **STEP-ACCOUNTING-FOLLOWUP1~7 + Phase2.5/3** | 계약 파일 업로드·주민번호 외부 차단·프로그램 연동·부가세 10%·카테고리 자유·검색·계약명 강제 동기화·컨소시엄 단위·기본정보 자동 채움·콤보박스 고도화·거래처 담당자(세금계산서)·외주↔계약 FK + prefill·program_staff_fees→payroll 변환·AI 견적서 분석 | `다수` |
+| **STEP-CONTRACT-AUTO** | 프로젝트/프로그램 생성 시 income_contracts 자동 생성 (lifecycle 5단계·auto_created·doc_request_pending·portal_id FK). ContractsPage 라이프사이클 5탭 + 자동/서류 미업로드 배지. ContractDetailDrawer 주관기관 서류 요청 → PortalCreateModal 직결 + 자동 portal_id 연결 + 업로드 시 자동 해제 | `15e1843` ~ `5e81534` |
+| **STEP-TAGS** | clients/staff_pool.tags (text[]) + tag_categories + GIN 인덱스 + RLS. useTagFilter / TagFilterTabs / TagsSelector 공용 컴포넌트. ClientsPage·ExpertsPage 필터 탭 + 등록 모달 다중 선택. /admin 에 태그 분류 CRUD (scope=client/staff) | `e503a31` · `469b863` |
+| **박경수님 보고 4건** | 1.프로젝트 수정 메뉴 (ProjectEditModal) / 2.OverviewTab 재무요약 신 회계 합산 (income_contracts + payroll_expenses + expectedIncomeTotal + payrollTotal) / 3.PortalCreateModal 프로젝트명 prefill / 4.MembersTab projects.pm_id 자동 합류 (synthesizePm) | `d96dc60` 등 |
 
 ---
 
@@ -597,7 +602,7 @@ URL 구조: /consortium/:id/portal
 | GitHub | `https://github.com/bal24com/bal24-workflow-v2` |
 | 배포 | `https://bal24-workflow-v2.netlify.app` / `https://bal24.kr` |
 | Supabase | `https://clsljkxvgmqwenettkrz.supabase.co` |
-| 최근 커밋 | `2f367f4` (STEP-CON 컨소시엄 독립 홈 7탭) |
+| 최근 커밋 | `469b863` (STEP-TAGS commit d — 관리자 태그 분류 CRUD) |
 | 이전 프로젝트 | `C:\workflow\workflow_v7_full` → **폐기, 사용 안 함** |
 
 ---
