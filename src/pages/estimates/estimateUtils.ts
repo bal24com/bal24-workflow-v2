@@ -77,8 +77,8 @@ export async function saveEstimateItems(
     console.error('[estimates] 항목 저장 실패:', error.message);
     return '항목 저장 중 오류가 발생했어요.';
   }
-  // 헤더의 total_amount 도 합계로 갱신
-  const total = items.reduce((s, it) => s + (it.unit_price * it.quantity), 0);
+  // 헤더의 total_amount 도 합계로 갱신 — 박경수님 요청 3중 곱 (단가 × 회수 × 수량)
+  const total = items.reduce((s, it) => s + (it.unit_price * it.quantity * (it.headcount ?? 1)), 0);
   await supabase.from('project_estimates').update({ total_amount: total, updated_at: new Date().toISOString() }).eq('id', estimateId);
   return null;
 }
@@ -103,16 +103,18 @@ export async function convertEstimateToPayroll(
   const rows = (items as EstimateItem[] | null) ?? [];
   if (rows.length === 0) return { inserted: 0, error: '변환할 항목이 없어요. (이미 모두 변환됨)' };
 
-  // 2. payroll_expenses 일괄 insert
+  // 2. payroll_expenses 일괄 insert — 박경수님 요청 (단가 × 회수 × 수량) 반영.
+  // payroll_expenses 에는 headcount 컬럼이 없으므로 quantity 에 합쳐서 저장: q_payroll = quantity × headcount
   const payloads = rows.map((it) => {
-    const subtotal = it.unit_price * it.quantity;
+    const effectiveQty = Number(it.quantity ?? 1) * Number(it.headcount ?? 1);
+    const subtotal = it.unit_price * effectiveQty;
     const { taxAmount, netAmount } = calcTax(subtotal, it.tax_rate_type as PayrollTaxRateType);
     return {
       expense_type: it.category,
       description: it.description,
       payee_name: it.payee_name ?? '미정',
       unit_price: it.unit_price,
-      quantity: it.quantity,
+      quantity: effectiveQty,
       tax_rate_type: it.tax_rate_type,
       tax_amount: taxAmount,
       net_amount: netAmount,

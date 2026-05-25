@@ -1503,7 +1503,8 @@ export interface EstimateItem {
   payee_name: string | null;
   unit_price: number;
   quantity: number;
-  subtotal: number; // generated
+  headcount: number;  // 박경수님 요청 — 수량(인원). subtotal = unit_price × quantity × headcount
+  subtotal: number; // app 계산
   tax_rate_type: PayrollTaxRateType;
   memo: string | null;
   order_index: number;

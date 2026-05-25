@@ -2,12 +2,16 @@
 // STEP-ACCOUNTING-FOLLOWUP7-Phase2 + Phase3 (AI 견적서 분석)
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Save, FileText, Wand2, Upload, Sparkles, BookOpen, Download } from 'lucide-react';
+import { Loader2, Plus, Save, FileText, Wand2, Upload, Sparkles, BookOpen, Download, Search } from 'lucide-react';
 import { Button, Input } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { formatMoney } from '../../lib/utils';
 import { calcTax, TAX_RATE_LABEL, TAX_RATE_VALUES } from '../../utils/taxUtils';
-import type { EstimateItem, PayrollTaxRateType } from '../../types/database';
+import type { PayrollTaxRateType } from '../../types/database';
+import {
+  applyFilterSort, emptyDraft, EstSortTh,
+  type DraftItem, type SortKey, type SortDir,
+} from './estimateTableHelpers';
 import {
   fetchEstimateByProject, createEstimate, saveEstimateItems, convertEstimateToPayroll,
   ESTIMATE_CATEGORY_SUGGESTIONS, type EstimateRow,
@@ -22,17 +26,7 @@ interface Props {
   projectName: string;
 }
 
-type DraftItem = Pick<EstimateItem,
-  'category' | 'description' | 'payee_name' | 'unit_price' | 'quantity' | 'tax_rate_type' | 'memo' | 'order_index'
-> & { _existingId?: string; _converted?: boolean };
-
-function emptyDraft(idx: number): DraftItem {
-  return {
-    category: '강사료', description: '', payee_name: '',
-    unit_price: 0, quantity: 1, tax_rate_type: '3.3',
-    memo: '', order_index: idx,
-  };
-}
+// DraftItem · 정렬 · 필터 헬퍼는 estimateTableHelpers (V-1 분리)
 
 export default function EstimateTab({ projectId, projectName }: Props) {
   const toast = useToast();
@@ -61,6 +55,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           payee_name: it.payee_name ?? '',
           unit_price: it.unit_price,
           quantity: it.quantity,
+          headcount: Number(it.headcount ?? 1),  // 박경수님 요청 — 수량(인원)
           tax_rate_type: it.tax_rate_type as PayrollTaxRateType,
           memo: it.memo ?? '',
           order_index: it.order_index,
@@ -113,7 +108,8 @@ export default function EstimateTab({ projectId, projectName }: Props) {
     // 이미 변환된 항목 제외하고 일괄 저장 (변환된 건 server 측 보존)
     const toSave = items.filter((it) => !it._converted).map((it) => ({
       category: it.category, description: it.description, payee_name: it.payee_name,
-      unit_price: it.unit_price, quantity: it.quantity, tax_rate_type: it.tax_rate_type,
+      unit_price: it.unit_price, quantity: it.quantity, headcount: it.headcount ?? 1,
+      tax_rate_type: it.tax_rate_type,
       memo: it.memo, order_index: it.order_index,
     }));
     const err = await saveEstimateItems(target.id, toSave);
@@ -166,6 +162,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         payee_name: e.payee_name ?? '',
         unit_price: e.unit_price,
         quantity: e.quantity,
+        headcount: 1,
         tax_rate_type: e.tax_rate_type,
         memo: e.memo ?? '',
         order_index: base + i,
@@ -177,8 +174,16 @@ export default function EstimateTab({ projectId, projectName }: Props) {
     toast.success('견적 항목에 추가했어요. [저장] 눌러서 확정해 주세요.');
   }
 
-  const total = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0), 0);
+  // 박경수님 요청 — 단가 × 회수 × 수량(인원) 3중 곱
+  const total = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1), 0);
   const unconverted = items.filter((it) => !it._converted).length;
+
+  // 박경수님 요청 — 필터/검색/정렬
+  const [catFilter, setCatFilter] = useState(''); const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey | null>(null); const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const toggleSort = (k: SortKey) => sortKey === k ? setSortDir((d) => d === 'asc' ? 'desc' : 'asc') : (setSortKey(k), setSortDir('asc'));
+  const catOptions = Array.from(new Set(items.map((i) => i.category).filter(Boolean))).sort();
+  const visibleItems = applyFilterSort(items, { search, catFilter, sortKey, sortDir });
 
   if (loading) {
     return <div className="flex items-center justify-center py-16 text-sm text-muted"><Loader2 size={18} className="animate-spin mr-2" />불러오는 중...</div>;
@@ -206,6 +211,26 @@ export default function EstimateTab({ projectId, projectName }: Props) {
 
       <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-2.5 text-xs text-violet-900">
         💡 견적 항목을 입력하고 [저장] → [외주/급여로 변환] 누르면 변환된 항목은 회색 처리되고 외주/급여 페이지에서 실집행 정보(지급일·계좌·증빙) 채워나가시면 돼요.
+      </div>
+
+      {/* 박경수님 요청 — 항목 필터 + 검색 (정렬은 컬럼 헤더 클릭) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
+          className="h-9 rounded-lg border border-slate-200 px-2.5 text-xs">
+          <option value="">전체 항목</option>
+          {catOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <div className="relative flex-1 max-w-sm">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="세항목·내용·메모 검색"
+            className="w-full h-9 pl-8 pr-3 rounded-lg border border-slate-200 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+        </div>
+        {(catFilter || search || sortKey) && (
+          <button type="button" onClick={() => { setCatFilter(''); setSearch(''); setSortKey(null); }}
+            className="text-[11px] text-rose-600 hover:underline">필터 초기화</button>
+        )}
+        <span className="text-[11px] text-slate-500 ml-auto">{visibleItems.length}/{items.length}건</span>
       </div>
 
       {/* STEP-ACCOUNTING-FOLLOWUP7-Phase3 — AI 견적서 업로드 + 미리보기 */}
@@ -282,22 +307,26 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs text-slate-500">
             <tr>
-              <th className="text-left px-3 py-2 font-semibold">구분</th>
-              <th className="text-left px-3 py-2 font-semibold">내용</th>
-              <th className="text-left px-3 py-2 font-semibold">예상 지급처</th>
-              <th className="text-right px-3 py-2 font-semibold">단가</th>
-              <th className="text-right px-3 py-2 font-semibold">회수</th>
-              <th className="text-left px-3 py-2 font-semibold">세액</th>
-              <th className="text-right px-3 py-2 font-semibold">실지급(예상)</th>
+              <EstSortTh k="category"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">항목</EstSortTh>
+              <EstSortTh k="description"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">세항목</EstSortTh>
+              <EstSortTh k="payee_name"    sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">내용</EstSortTh>
+              <EstSortTh k="unit_price"    sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">단가</EstSortTh>
+              <EstSortTh k="quantity"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">회수</EstSortTh>
+              <EstSortTh k="headcount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">수량(인원)</EstSortTh>
+              <EstSortTh k="tax_rate_type" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">세액</EstSortTh>
+              <EstSortTh k="subtotal"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">실지급(예상)</EstSortTh>
               <th className="text-center px-3 py-2 font-semibold">상태</th>
               <th className="text-right px-3 py-2 font-semibold">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {items.length === 0 ? (
-              <tr><td colSpan={9} className="px-3 py-6 text-center text-xs text-slate-400 italic">견적 항목이 아직 없어요. [항목 추가] 로 시작해 보세요.</td></tr>
-            ) : items.map((it, idx) => {
-              const sub = (Number(it.unit_price) || 0) * (Number(it.quantity) || 0);
+            {visibleItems.length === 0 ? (
+              <tr><td colSpan={10} className="px-3 py-6 text-center text-xs text-slate-400 italic">
+                {items.length === 0 ? '견적 항목이 아직 없어요. [항목 추가] 로 시작해 보세요.' : '필터/검색 결과가 없어요.'}
+              </td></tr>
+            ) : visibleItems.map((it) => {
+              const idx = it._idx;  // 원본 items 의 index (편집 핸들러용)
+              const sub = (Number(it.unit_price) || 0) * (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1);
               const { netAmount } = calcTax(sub, it.tax_rate_type);
               const locked = !!it._converted;
               return (
@@ -306,16 +335,19 @@ export default function EstimateTab({ projectId, projectName }: Props) {
                     <Input list="estimate-categories" value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} disabled={locked} />
                   </td>
                   <td className="px-2 py-1"><Input value={it.description ?? ''} onChange={(e) => updateItem(idx, { description: e.target.value })} disabled={locked} placeholder="강의명·작업명" /></td>
-                  <td className="px-2 py-1"><Input value={it.payee_name ?? ''} onChange={(e) => updateItem(idx, { payee_name: e.target.value })} disabled={locked} placeholder="홍길동 또는 미정" /></td>
+                  <td className="px-2 py-1"><Input value={it.payee_name ?? ''} onChange={(e) => updateItem(idx, { payee_name: e.target.value })} disabled={locked} placeholder="구체 내용 또는 지급처" /></td>
                   <td className="px-2 py-1 w-36">
                     {/* 박경수님 요청 — 단가 세자리 콤마 표시 (text + numeric inputMode) */}
                     <Input type="text" inputMode="numeric" value={(Number(it.unit_price) || 0).toLocaleString()}
                       onChange={(e) => updateItem(idx, { unit_price: Number(e.target.value.replace(/[^0-9]/g, '')) || 0 })}
                       disabled={locked} className="text-right" />
                   </td>
-                  <td className="px-2 py-1 w-28">
-                    {/* 박경수님 요청 — 회수 칸 확대 (w-20 → w-28) */}
+                  <td className="px-2 py-1 w-24">
                     <Input type="number" value={String(it.quantity)} onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) || 1 })} disabled={locked} className="text-right" />
+                  </td>
+                  <td className="px-2 py-1 w-24">
+                    {/* 박경수님 요청 — 수량(인원) 컬럼 신규 */}
+                    <Input type="number" value={String(it.headcount ?? 1)} onChange={(e) => updateItem(idx, { headcount: Number(e.target.value) || 1 })} disabled={locked} className="text-right" />
                   </td>
                   <td className="px-2 py-1">
                     <select value={it.tax_rate_type} onChange={(e) => updateItem(idx, { tax_rate_type: e.target.value as PayrollTaxRateType })} disabled={locked} className="w-full h-10 rounded-xl border border-slate-200 px-2 text-xs disabled:bg-slate-50">
