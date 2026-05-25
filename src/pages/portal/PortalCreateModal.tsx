@@ -22,7 +22,8 @@ type Props = {
   clientId?: string | null;
   portal?: ProjectPortal | null;
   onClose: () => void;
-  onSaved: () => void;
+  /** 저장 후 호출 — 신규/수정된 포털 id 를 전달 (계약 자동 연결 등에 활용) */
+  onSaved: (portalId?: string) => void;
 };
 
 type FormState = {
@@ -200,7 +201,7 @@ export default function PortalCreateModal({
         if (iErr) console.error('[portal-create] 항목 저장 실패:', iErr.message);
       }
 
-      onSaved();
+      onSaved(portalId);
       onClose();
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';

@@ -1,19 +1,22 @@
 // 수입/계약 상세 우측 슬라이드 패널 — STEP-ACCOUNTING-ALL P2
-// 기본정보·청구단계·입금확인·삭제
+// 기본정보·청구단계·입금확인·삭제 + STEP-CONTRACT-AUTO 주관기관 서류 요청 (포털)
 
-import { useState } from 'react';
-import { X, Pencil, Trash2, CheckCircle2, FileText, ExternalLink } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Pencil, Trash2, CheckCircle2, FileText, ExternalLink, Link2, Copy } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDateKo, formatMoney } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 import type { BillingScheduleItem } from '../../types/database';
 import {
   markContractDeposited,
   softDeleteContract,
   CONTRACT_STATUS_STYLE,
+  CONTRACT_STATUS_LABEL,
   type ContractRow,
 } from './contractUtils';
 import ContractPayrollSection from './ContractPayrollSection';
+import PortalCreateModal from '../portal/PortalCreateModal';
 
 interface Props {
   contract: ContractRow | null;
@@ -37,8 +40,38 @@ const BILLING_STYLE: Record<BillingScheduleItem['status'], string> = {
 export default function ContractDetailDrawer({ contract, onClose, onEdit, onChanged }: Props) {
   const toast = useToast();
   const [acting, setActing] = useState(false);
+  const [portalOpen, setPortalOpen] = useState(false);
+  const [portalToken, setPortalToken] = useState<string | null>(null);
+
+  // 연결된 포털이 있으면 token 조회 (외부 URL 노출용)
+  useEffect(() => {
+    if (!contract?.portal_id) { setPortalToken(null); return; }
+    let cancelled = false;
+    void supabase.from('project_portals').select('portal_token').eq('id', contract.portal_id).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setPortalToken((data as { portal_token: string } | null)?.portal_token ?? null); });
+    return () => { cancelled = true; };
+  }, [contract?.portal_id]);
 
   if (!contract) return null;
+
+  // 포털 저장 후 income_contracts.portal_id 연결 + doc_request_pending 해제
+  async function handlePortalSaved(portalId?: string) {
+    if (!contract || !portalId) return;
+    const { error } = await supabase.from('income_contracts')
+      .update({ portal_id: portalId, doc_request_pending: false }).eq('id', contract.id);
+    if (error) { toast.error('포털 연결 중 오류가 발생했어요.'); return; }
+    toast.success('주관기관 서류 요청 포털을 연결했어요.');
+    onChanged();
+  }
+
+  function handleCopyPortalUrl() {
+    if (!portalToken) return;
+    const url = `${window.location.origin}/portal/${portalToken}`;
+    void navigator.clipboard.writeText(url).then(
+      () => toast.success('포털 외부 링크를 복사했어요.'),
+      () => toast.error('복사에 실패했어요. 직접 선택해 주세요.'),
+    );
+  }
 
   async function handleConfirmDeposit() {
     if (!contract) return;
@@ -84,7 +117,7 @@ export default function ContractDetailDrawer({ contract, onClose, onEdit, onChan
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1">
               <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-xs font-semibold ${CONTRACT_STATUS_STYLE[contract.status]}`}>
-                {contract.status}
+                {CONTRACT_STATUS_LABEL[contract.status] ?? contract.status}
               </span>
               {contract.deposited_at && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
@@ -122,6 +155,44 @@ export default function ContractDetailDrawer({ contract, onClose, onEdit, onChan
               <Info label="입금일" value={contract.deposited_at ? formatDateKo(contract.deposited_at) : '미입금'} />
             </dl>
           </section>
+
+          {/* STEP-CONTRACT-AUTO — 주관기관 서류 요청 (포털 연동) */}
+          {(contract.doc_request_pending || contract.portal_id) && (
+            <section className="rounded-2xl border border-violet-200 bg-violet-50/40 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Link2 size={14} className="text-violet-600" aria-hidden="true" />
+                <h3 className="text-sm font-bold text-violet-900">주관기관 서류 요청</h3>
+              </div>
+              {contract.portal_id && portalToken ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-600">
+                    포털이 연결돼 있어요. 외부 링크를 주관기관에 전달하세요.
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <code className="flex-1 truncate text-xs px-2 py-1.5 rounded bg-white border border-slate-200 text-slate-700">
+                      {`${window.location.origin}/portal/${portalToken}`}
+                    </code>
+                    <Button variant="outline" size="sm" leftIcon={<Copy size={12} />} onClick={handleCopyPortalUrl}>복사</Button>
+                    <a href={`/portal/${portalToken}`} target="_blank" rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                      <ExternalLink size={12} aria-hidden="true" />열기
+                    </a>
+                  </div>
+                </div>
+              ) : contract.project?.id ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-600">
+                    사업자등록증·통장사본·견적서·납세증명 등 자료 요청 포털을 만들어 주관기관에 링크를 보낼 수 있어요.
+                  </p>
+                  <Button variant="primary" size="sm" leftIcon={<Link2 size={12} />} onClick={() => setPortalOpen(true)}>
+                    포털 만들기
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-xs text-amber-700">프로젝트가 연결돼 있어야 포털을 만들 수 있어요. [수정]에서 프로젝트를 지정해 주세요.</p>
+              )}
+            </section>
+          )}
 
           {/* 청구 단계 */}
           <section>
@@ -182,6 +253,17 @@ export default function ContractDetailDrawer({ contract, onClose, onEdit, onChan
           </footer>
         )}
       </aside>
+
+      {/* STEP-CONTRACT-AUTO — 주관기관 서류 요청 포털 생성 */}
+      {contract.project?.id && (
+        <PortalCreateModal
+          open={portalOpen}
+          projectId={contract.project.id}
+          clientId={contract.client?.id ?? null}
+          onClose={() => setPortalOpen(false)}
+          onSaved={(id) => { setPortalOpen(false); void handlePortalSaved(id); }}
+        />
+      )}
     </>
   );
 }
