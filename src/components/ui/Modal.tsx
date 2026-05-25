@@ -62,6 +62,9 @@ export default function Modal({
   className,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  // 박경수님 요청 — 모달 내부에서 텍스트 드래그 시작 후 백드롭에서 떼면 닫히는 버그 방지.
+  // mousedown 이 백드롭에서 시작된 경우만 백드롭 클릭으로 인정.
+  const mouseDownOnBackdropRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -88,8 +91,17 @@ export default function Modal({
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      onClick={() => {
-        if (closeOnBackdrop) onClose();
+      onMouseDown={(e) => {
+        // 드래그 시작 위치가 백드롭(currentTarget) 자체일 때만 기록
+        mouseDownOnBackdropRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        // mousedown·mouseup 모두 백드롭에서 일어났을 때만 닫기 (드래그로 닫힘 방지)
+        const startedOnBackdrop = mouseDownOnBackdropRef.current;
+        mouseDownOnBackdropRef.current = false;
+        if (closeOnBackdrop && startedOnBackdrop && e.target === e.currentTarget) {
+          onClose();
+        }
       }}
       aria-hidden="false"
     >
@@ -100,6 +112,7 @@ export default function Modal({
         aria-labelledby={title ? 'modal-title' : undefined}
         aria-describedby={description ? 'modal-desc' : undefined}
         tabIndex={-1}
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         className={cn(
           'relative w-full bg-white outline-none flex flex-col max-h-[90vh]',
