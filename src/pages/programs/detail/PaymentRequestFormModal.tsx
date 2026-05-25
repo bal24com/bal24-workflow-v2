@@ -8,23 +8,37 @@ import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 
 type PayeeType = 'client' | 'expert';
+type Group = 'outsource' | 'operation';
 
 interface Props {
   open: boolean;
   programId: string;
   /** 부모 프로젝트 id — programs.project_id 에서 자동 prefill */
   projectId: string | null;
+  /** 'outsource' = 인건비 / 'operation' = 운영비 */
+  group: Group;
   onClose: () => void;
   onSaved: () => void;
 }
 
-const CATEGORY_OPTIONS = ['호텔', '버스', '재료비', '식비', '장비', '인쇄', '기타'];
+// 박경수님 요청 — 인건비/운영비 그룹별 카테고리 분기
+const CATEGORY_BY_GROUP: Record<Group, string[]> = {
+  outsource: ['강사료', '촬영', '통역', '번역', '외주개발', '컨설팅', '기타외주'],
+  operation: ['호텔', '버스', '재료비', '식비', '장비', '인쇄', '운영비', '기타'],
+};
+// expense_type 저장 형식 — outsource 는 카테고리 그대로, operation 은 '운영비-{카테고리}' prefix
+function buildExpenseType(group: Group, category: string, custom: string): string {
+  const c = category === '기타' ? (custom.trim() || '기타') : category;
+  if (group === 'operation') return c === '운영비' ? '운영비' : `운영비-${c}`;
+  return c; // outsource: 강사료/촬영/.../기타외주 그대로 (payrollUtils.isOutsourceType prefix 매칭)
+}
 
 interface NameOption { id: string; name: string }
 
-export default function PaymentRequestFormModal({ open, programId, projectId, onClose, onSaved }: Props) {
+export default function PaymentRequestFormModal({ open, programId, projectId, group, onClose, onSaved }: Props) {
   const toast = useToast();
-  const [category, setCategory] = useState('호텔');
+  const categoryOptions = CATEGORY_BY_GROUP[group];
+  const [category, setCategory] = useState(categoryOptions[0]);
   const [customCategory, setCustomCategory] = useState('');
   const [description, setDescription] = useState('');
   const [payeeType, setPayeeType] = useState<PayeeType>('client');
@@ -40,8 +54,8 @@ export default function PaymentRequestFormModal({ open, programId, projectId, on
 
   useEffect(() => {
     if (!open) return;
-    setCategory('호텔'); setCustomCategory(''); setDescription('');
-    setPayeeType('client'); setPayeeId('');
+    setCategory(categoryOptions[0]); setCustomCategory(''); setDescription('');
+    setPayeeType(group === 'outsource' ? 'expert' : 'client'); setPayeeId('');
     setUnitPrice(''); setQuantity('1'); setPaidAt(''); setMemo('');
     setErrorMsg(null);
     let cancelled = false;
@@ -58,9 +72,12 @@ export default function PaymentRequestFormModal({ open, programId, projectId, on
   }, [open]);
 
   const finalCategory = category === '기타' ? (customCategory.trim() || '기타') : category;
+  const finalExpenseType = buildExpenseType(group, category, customCategory);
   const payeeList = payeeType === 'client' ? clients : experts;
   const payeeName = payeeList.find((p) => p.id === payeeId)?.name ?? '';
   const totalAmount = (Number(unitPrice || 0)) * (Number(quantity || 0));
+  // 인건비는 3.3% 원천세 기본, 운영비는 면세 기본
+  const defaultTaxRate = group === 'outsource' ? '3.3' : '없음';
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -72,12 +89,12 @@ export default function PaymentRequestFormModal({ open, programId, projectId, on
       const payload = {
         project_id: projectId,
         program_id: programId,
-        expense_type: `운영비-${finalCategory}`,
+        expense_type: finalExpenseType,
         description: description.trim() || finalCategory,
         payee_name: payeeName,
         unit_price: Number(unitPrice || 0),
         quantity: Number(quantity || 1),
-        tax_rate_type: '없음',
+        tax_rate_type: defaultTaxRate,
         payment_status: '대기',
         paid_at: paidAt || null,
         memo: memo.trim() || null,
@@ -102,7 +119,7 @@ export default function PaymentRequestFormModal({ open, programId, projectId, on
   const SELECT_CLASS = 'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60';
 
   return (
-    <Modal open={open} onClose={onClose} title="지급요청 추가" size="md"
+    <Modal open={open} onClose={onClose} title={group === 'outsource' ? '인건비 지급요청 추가' : '운영비 지급요청 추가'} size="md"
       footer={<>
         <Button variant="ghost" onClick={onClose} disabled={submitting}>취소</Button>
         <Button type="submit" form="payment-request-form" variant="primary" loading={submitting}>저장</Button>
@@ -112,7 +129,7 @@ export default function PaymentRequestFormModal({ open, programId, projectId, on
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-slate-700">카테고리 <span className="text-rose-500">*</span></label>
             <select value={category} onChange={(e) => setCategory(e.target.value)} disabled={submitting} className={SELECT_CLASS}>
-              {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+              {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           {category === '기타' ? (
@@ -148,7 +165,11 @@ export default function PaymentRequestFormModal({ open, programId, projectId, on
             <span>지급요청 금액</span>
             <span className="tabular-nums">{totalAmount.toLocaleString()}원</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">운영비는 원천세 없이 전액 지급 처리됩니다.</p>
+          <p className="text-[11px] text-slate-500 mt-1">
+            {group === 'outsource'
+              ? '인건비는 기본 3.3% 원천징수가 적용됩니다. 외주/급여 페이지에서 세율을 조정할 수 있어요.'
+              : '운영비는 원천세 없이 전액 지급 처리됩니다.'}
+          </p>
         </div>
 
         <Input type="date" label="지급 예정일 (선택)" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} disabled={submitting} />
