@@ -1,21 +1,21 @@
 // bal24 v2 — 고객사 폼 공통 타입·상수·헬퍼
 // ClientFormModal 400줄 제한 준수를 위해 분리.
 
-import type { Client, ClientContact, ClientType } from '../../types/database';
+import type { Client, ClientContact } from '../../types/database';
 import { type ContactDraft } from './ContactRow';
 
 export const STORAGE_BUCKET = 'client-files';
 
+// 박경수님 + SkyClaw 요청 — clientType 제거 (tags 가 역할 대체)
 export type ClientForm = {
   name: string;
   businessName: string;
   ceoName: string;
-  clientType: ClientType;
   representative: string;
   businessNumber: string;
   businessType: string;
   businessItem: string;
-  department: string;          // STEP-EXPERT-CRUD-FULL
+  department: string;
   bankName: string;
   bankAccount: string;
   bankHolder: string;
@@ -23,11 +23,11 @@ export type ClientForm = {
   phone: string;
   email: string;
   note: string;
-  tags: string[];              // STEP-TAGS-2C — 분류 태그 (관리자 카테고리)
+  tags: string[];
 };
 
 export const EMPTY_CLIENT: ClientForm = {
-  name: '', businessName: '', ceoName: '', clientType: 'client',
+  name: '', businessName: '', ceoName: '',
   representative: '', businessNumber: '', businessType: '', businessItem: '',
   department: '',
   bankName: '', bankAccount: '', bankHolder: '',
@@ -36,21 +36,12 @@ export const EMPTY_CLIENT: ClientForm = {
 
 export function clientToForm(c: Client): ClientForm {
   return {
-    name: c.name ?? '',
-    businessName: c.business_name ?? '',
-    ceoName: c.ceo_name ?? '',
-    clientType: (c.client_type ?? 'client') as ClientType,
-    representative: c.representative ?? '',
-    businessNumber: c.business_number ?? '',
-    businessType: c.business_type ?? '',
-    businessItem: c.business_item ?? '',
+    name: c.name ?? '', businessName: c.business_name ?? '', ceoName: c.ceo_name ?? '',
+    representative: c.representative ?? '', businessNumber: c.business_number ?? '',
+    businessType: c.business_type ?? '', businessItem: c.business_item ?? '',
     department: c.department ?? '',
-    bankName: c.bank_name ?? '',
-    bankAccount: c.bank_account ?? '',
-    bankHolder: c.bank_holder ?? '',
-    address: c.address ?? '',
-    phone: c.phone ?? '',
-    email: c.email ?? '',
+    bankName: c.bank_name ?? '', bankAccount: c.bank_account ?? '', bankHolder: c.bank_holder ?? '',
+    address: c.address ?? '', phone: c.phone ?? '', email: c.email ?? '',
     note: c.note ?? '',
     tags: Array.isArray(c.tags) ? c.tags : [],
   };

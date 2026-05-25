@@ -16,7 +16,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
-import type { Client, ClientContact, ClientType } from '../../types/database';
+import type { Client, ClientContact } from '../../types/database';
 import TagFilterTabs from '../../components/TagFilterTabs';
 import { useTagFilter } from '../../hooks/useTagFilter';
 import ClientFormModal from './ClientFormModal';
@@ -31,22 +31,12 @@ type ClientRow = Client & {
 const SELECT_COLUMNS =
   '*, contacts:client_contacts(id,name,position,phone_mobile,email)';
 
-const TYPE_BADGE: Record<ClientType, { bg: string; text: string; label: string }> = {
-  client: { bg: 'bg-violet-100', text: 'text-violet-700', label: '고객사' },
-  vendor: { bg: 'bg-orange-100', text: 'text-orange-700', label: '주관기관' },
-  both: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: '고객·주관기관' },
-};
-
+// 박경수님 + SkyClaw 요청 — client_type 제거. tags 배지로 대체.
 function formatBusinessNumber(raw?: string | null): string {
   if (!raw) return '';
   const d = raw.replace(/\D/g, '');
   if (d.length !== 10) return raw;
   return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
-}
-
-function typeBadge(c: Client) {
-  const key = (c.client_type ?? 'client') as ClientType;
-  return TYPE_BADGE[key] ?? TYPE_BADGE.client;
 }
 
 interface CardActions {
@@ -57,10 +47,10 @@ interface CardActions {
 }
 
 function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & CardActions) {
-  const tone = typeBadge(c);
   const ceo = c.ceo_name ?? c.representative;
   const industry = [c.business_type, c.business_item].filter(Boolean).join(' · ');
   const bankLine = [c.bank_name, c.bank_account, c.bank_holder].filter(Boolean).join(' ');
+  const cardTags = (c.tags ?? []).slice(0, 3);
 
   return (
     <Card className="group hover:border-violet-200 hover:shadow-md transition min-h-[260px] flex flex-col relative">
@@ -70,11 +60,13 @@ function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & Card
             <Building2 size={18} aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone.bg} ${tone.text}`}>
-                {tone.label}
-              </span>
-            </div>
+            {cardTags.length > 0 && (
+              <div className="flex items-center gap-1 mb-0.5 flex-wrap">
+                {cardTags.map((t) => (
+                  <span key={t} className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-violet-50 text-violet-700 border border-violet-200">{t}</span>
+                ))}
+              </div>
+            )}
             {/* STEP-CLIENT-EXPERT-CARD — 상호명 + 부서명 병기 */}
             <div className="text-base font-bold text-[#1E1B4B] truncate">
               {c.name}
@@ -161,8 +153,8 @@ function Line({ icon, children }: { icon: React.ReactNode; children: React.React
 }
 
 function ClientListRow({ c, onView, onEdit, onDelete }: { c: ClientRow } & CardActions) {
-  const tone = typeBadge(c);
   const ceo = c.ceo_name ?? c.representative;
+  const firstTag = c.tags?.[0];
   return (
     <li className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-violet-200 hover:shadow-sm transition">
       <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-violet-100 text-violet-600 shrink-0">
@@ -171,9 +163,9 @@ function ClientListRow({ c, onView, onEdit, onDelete }: { c: ClientRow } & CardA
       <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tone.bg} ${tone.text}`}>
-              {tone.label}
-            </span>
+            {firstTag && (
+              <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-violet-50 text-violet-700 border border-violet-200">{firstTag}</span>
+            )}
             <span className="text-sm font-bold text-text truncate">{c.name}</span>
           </div>
           <div className="text-xs text-muted truncate">

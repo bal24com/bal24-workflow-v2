@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Modal, Button, Input, FileDropZone } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import type { Client, ClientContact, ClientType, Profile } from '../../types/database';
+import type { Client, ClientContact, Profile } from '../../types/database';
 import { makeContact, type ContactDraft } from './ContactRow';
 import {
   STORAGE_BUCKET,
@@ -39,6 +39,9 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
   const [contacts, setContacts] = useState<ContactDraft[]>([makeContact()]);
   const [licenseUrl, setLicenseUrl] = useState<string | null>(null);
   const [licenseName, setLicenseName] = useState<string | null>(null);
+  // 박경수님 요청 — 통장사본
+  const [bankCopyUrl, setBankCopyUrl] = useState<string | null>(null);
+  const [bankCopyName, setBankCopyName] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
 
   const [uploading, setUploading] = useState(false);
@@ -70,6 +73,8 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
       setForm(clientToForm(client));
       setLicenseUrl(client.business_license_url ?? null);
       setLicenseName(client.business_license_url ? '등록된 사업자등록증' : null);
+      setBankCopyUrl(client.bank_copy_url ?? null);
+      setBankCopyName(client.bank_copy_url ? '등록된 통장사본' : null);
       let cancelled = false;
       void (async () => {
         const { data, error } = await supabase
@@ -90,19 +95,17 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
     }
     setForm(EMPTY_CLIENT);
     setContacts([makeContact()]);
-    setLicenseUrl(null);
-    setLicenseName(null);
+    setLicenseUrl(null); setLicenseName(null);
+    setBankCopyUrl(null); setBankCopyName(null);
   }, [open, client]);
 
   useEffect(() => {
     if (open) return;
     setForm(EMPTY_CLIENT);
     setContacts([makeContact()]);
-    setLicenseUrl(null);
-    setLicenseName(null);
-    setErrors({});
-    setErrorMsg(null);
-    setInfoMsg(null);
+    setLicenseUrl(null); setLicenseName(null);
+    setBankCopyUrl(null); setBankCopyName(null);
+    setErrors({}); setErrorMsg(null); setInfoMsg(null);
   }, [open]);
 
   const update = <K extends keyof ClientForm>(key: K, value: ClientForm[K]) => {
@@ -140,25 +143,24 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
     }
   };
 
-  const handleLicenseSelected = async (file: File) => {
-    setUploading(true);
-    setErrorMsg(null);
+  // 박경수님 요청 — 사업자등록증·통장사본 공통 업로드 (kind 분기로 V-1 절약)
+  const handleDocUpload = async (file: File, kind: 'license' | 'bank_copy') => {
+    setUploading(true); setErrorMsg(null);
     try {
       const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
       const safeBase = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 60);
-      const path = `business_licenses/${Date.now()}_${safeBase}${ext ? '.' + ext : ''}`;
+      const prefix = kind === 'license' ? 'business_licenses' : 'bank_copies';
+      const path = `${prefix}/${Date.now()}_${safeBase}${ext ? '.' + ext : ''}`;
       const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { upsert: false, contentType: file.type || undefined });
       if (error) throw error;
       const { data: pub } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-      setLicenseUrl(pub.publicUrl);
-      setLicenseName(file.name);
+      if (kind === 'license') { setLicenseUrl(pub.publicUrl); setLicenseName(file.name); }
+      else { setBankCopyUrl(pub.publicUrl); setBankCopyName(file.name); }
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
-      console.error('[clients] 사업자등록증 업로드 실패:', raw);
+      console.error('[clients] 업로드 실패:', raw);
       setErrorMsg(translateClientError(raw, 'upload'));
-    } finally {
-      setUploading(false);
-    }
+    } finally { setUploading(false); }
   };
 
   const validate = (): boolean => {
@@ -181,11 +183,11 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
     setSubmitting(true);
     try {
       const businessNumberDigits = form.businessNumber.replace(/\D/g, '');
+      // 박경수님 + SkyClaw 요청 — client_type 제거 (tags 대체) + bank_copy_url 추가 (null 명시)
       const payload = {
         name: form.name.trim(),
         business_name: form.businessName.trim() || null,
         ceo_name: form.ceoName.trim() || null,
-        client_type: form.clientType,
         representative: form.representative.trim() || null,
         business_number: businessNumberDigits || null,
         business_type: form.businessType.trim() || null,
@@ -199,6 +201,7 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
         bank_account: form.bankAccount.trim() || null,
         bank_holder: form.bankHolder.trim() || null,
         business_license_url: licenseUrl,
+        bank_copy_url: bankCopyUrl,
         tags: form.tags ?? [],
       };
 
@@ -284,62 +287,47 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
         {!isEdit && <ClientCardScanSection onApply={handleCardApply} disabled={submitting || uploading} />}
         <section className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">기본 정보</h3>
-          {/* STEP-CLIENT-EXPERT-CARD — 상호명+부서명 그룹핑 (한 줄에 인접) */}
+          {/* 1. 상호명 / 부서명 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="상호명 (통칭)" required value={form.name} onChange={(e) => update('name', e.target.value)} disabled={submitting} error={errors.name} placeholder="예) 밸런스닷" />
             <Input label="부서명" value={form.department} onChange={(e) => update('department', e.target.value)} disabled={submitting} placeholder="부서명 (선택)" helperText="해당 고객사 내 부서·팀명" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">고객 유형</label>
-              <select
-                value={form.clientType}
-                onChange={(e) => update('clientType', e.target.value as ClientType)}
-                disabled={submitting}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              >
-                <option value="client">고객사</option>
-                <option value="vendor">주관기관</option>
-                <option value="both">고객사 + 주관기관</option>
-              </select>
-            </div>
-            <Input label="법인명 (사업자등록증 상)" value={form.businessName} onChange={(e) => update('businessName', e.target.value)} disabled={submitting} placeholder="예) 주식회사 밸런스닷" />
-          </div>
+          {/* 2. 법인명 */}
+          <Input label="법인명 (사업자등록증 상)" value={form.businessName} onChange={(e) => update('businessName', e.target.value)} disabled={submitting} placeholder="예) 주식회사 밸런스닷" />
+          {/* 3. 분류 태그 (고객 유형 select 제거 — 박경수님 요청. tags 가 역할 대체) */}
           <TagsSelector scope="client" value={form.tags} onChange={(next) => update('tags', next)} disabled={submitting} />
-          <Input label="대표자명" value={form.ceoName} onChange={(e) => update('ceoName', e.target.value)} disabled={submitting} placeholder="예) 박경수" />
-          <Input
-            label="사업자등록번호"
-            value={form.businessNumber}
-            onChange={(e) => update('businessNumber', formatBusinessNumber(e.target.value))}
-            disabled={submitting}
-            error={errors.businessNumber}
-            placeholder="000-00-00000"
-            inputMode="numeric"
-            helperText="세금계산서 발행에 필요해요."
-          />
+          {/* 4. 대표자명 / 사업자등록번호 — 박경수님 요청 한 줄 2열 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="대표자명" value={form.ceoName} onChange={(e) => update('ceoName', e.target.value)} disabled={submitting} placeholder="예) 박경수" />
+            <Input label="사업자등록번호" value={form.businessNumber}
+              onChange={(e) => update('businessNumber', formatBusinessNumber(e.target.value))}
+              disabled={submitting} error={errors.businessNumber} placeholder="000-00-00000" inputMode="numeric"
+              helperText="세금계산서 발행에 필요해요." />
+          </div>
+          {/* 업태/종목 — 박경수님 지시에 없음. 보존 위치: 사업자번호 옆 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="업태" value={form.businessType} onChange={(e) => update('businessType', e.target.value)} disabled={submitting} placeholder="예) 서비스업" />
             <Input label="종목" value={form.businessItem} onChange={(e) => update('businessItem', e.target.value)} disabled={submitting} placeholder="예) 교육서비스" />
           </div>
-          <Input label="주소" value={form.address} onChange={(e) => update('address', e.target.value)} disabled={submitting} />
+          {/* 5. 대표전화 / 대표이메일 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="대표 전화" type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} disabled={submitting} placeholder="02-0000-0000" />
             <Input label="대표 이메일" type="email" value={form.email} onChange={(e) => update('email', e.target.value)} disabled={submitting} placeholder="contact@company.kr" />
           </div>
-          <div className="space-y-1.5">
-            <label htmlFor="client-note" className="text-sm font-semibold text-slate-700">메모</label>
-            <textarea
-              id="client-note"
-              rows={2}
-              value={form.note}
-              onChange={(e) => update('note', e.target.value)}
-              disabled={submitting}
-              placeholder="특이사항·할인율·결제조건 등"
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 resize-none"
-            />
-          </div>
+          {/* 6. 주소 */}
+          <Input label="주소" value={form.address} onChange={(e) => update('address', e.target.value)} disabled={submitting} />
         </section>
 
+        {/* 7. 담당자 섹션 — 박경수님 요청 주소 바로 뒤로 이동 */}
+        <ClientContactsSection contacts={contacts} profiles={profiles} disabled={submitting}
+          onCompanyNameSuggested={(name) => { if (!form.name.trim()) update('name', name); }}
+          onScanFeedback={(fb) => {
+            if (fb.type === 'info') { setInfoMsg(fb.message); setErrorMsg(null); }
+            else { setErrorMsg(fb.message); setInfoMsg(null); }
+          }}
+          onChange={setContacts} />
+
+        {/* 8. 계좌 섹션 */}
         <section className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">계좌</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -349,37 +337,34 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
           </div>
         </section>
 
-        <section className="space-y-2">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">사업자등록증</h3>
-          <FileDropZone
-            fileUrl={licenseUrl}
-            fileName={licenseName}
-            uploading={uploading}
-            onFileSelected={(f) => void handleLicenseSelected(f)}
-            onClear={() => { setLicenseUrl(null); setLicenseName(null); }}
-            disabled={submitting}
-            accept="image/*,application/pdf"
-          />
+        {/* 9. 증빙서류 — 박경수님 요청: 사업자등록증 + 통장사본 한 섹션에 통합 */}
+        <section className="space-y-3">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">📎 증빙서류</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600">사업자등록증</label>
+              <FileDropZone fileUrl={licenseUrl} fileName={licenseName} uploading={uploading}
+                onFileSelected={(f) => void handleDocUpload(f, 'license')}
+                onClear={() => { setLicenseUrl(null); setLicenseName(null); }}
+                disabled={submitting} accept="image/*,application/pdf" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600">통장사본</label>
+              <FileDropZone fileUrl={bankCopyUrl} fileName={bankCopyName} uploading={uploading}
+                onFileSelected={(f) => void handleDocUpload(f, 'bank_copy')}
+                onClear={() => { setBankCopyUrl(null); setBankCopyName(null); }}
+                disabled={submitting} accept="image/*,application/pdf" />
+            </div>
+          </div>
         </section>
 
-        <ClientContactsSection
-          contacts={contacts}
-          profiles={profiles}
-          disabled={submitting}
-          onCompanyNameSuggested={(name) => {
-            if (!form.name.trim()) update('name', name);
-          }}
-          onScanFeedback={(fb) => {
-            if (fb.type === 'info') {
-              setInfoMsg(fb.message);
-              setErrorMsg(null);
-            } else {
-              setErrorMsg(fb.message);
-              setInfoMsg(null);
-            }
-          }}
-          onChange={setContacts}
-        />
+        {/* 메모 — 박경수님 지시에 없음. 보존 (마지막) */}
+        <div className="space-y-1.5">
+          <label htmlFor="client-note" className="text-sm font-semibold text-slate-700">메모</label>
+          <textarea id="client-note" rows={2} value={form.note} onChange={(e) => update('note', e.target.value)}
+            disabled={submitting} placeholder="특이사항·할인율·결제조건 등"
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60 resize-none" />
+        </div>
 
         {infoMsg && (
           <div role="status" className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2.5 text-sm text-emerald-700">{infoMsg}</div>

@@ -86,6 +86,8 @@ export interface Client {
   bank_account?: string | null;
   bank_holder?: string | null;
   business_license_url?: string | null;
+  /** 박경수님 요청 — 통장사본 (세금계산서 발행·정산 시 필요) */
+  bank_copy_url?: string | null;
   note?: string | null;
   /** STEP-TAGS-2B — 분류 태그 (주관기관·거래처·협력사 등, 중복 가능) */
   tags?: string[] | null;
