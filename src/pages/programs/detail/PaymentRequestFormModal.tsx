@@ -126,6 +126,8 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
         client_id: target.client_id ?? '', payee_name: target.payee_name ?? '',
         biz_reg_no: target.biz_reg_no ?? '',
         bank_name: target.bank_name ?? '', bank_account: target.bank_account ?? '',
+        // 박경수님 요청 — vat_mode 복원. DB 의 tax_rate_type 으로 추정 ('면세'/'없음'=none, 그 외=included 기본)
+        vat_mode: (target.tax_rate_type === '면세' || target.tax_rate_type === '없음') ? 'none' : 'included',
       });
     } else {
       setCategory(categoryOptions[0]); setCustomCategory(''); setDescription('');
@@ -143,11 +145,13 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
   const finalCategory = category === '기타' ? (customCategory.trim() || '기타') : category;
   const finalExpenseType = buildExpenseType(group, category, customCategory);
   const totalAmount = (Number(unitPrice || 0)) * (Number(quantity || 0));
-  // 박경수님 보고 fix — 세액·실지급 명시 계산
-  // 인건비(3.3/8.8): tax = sub * 세율, net = sub - tax
-  // 운영비(10): tax = sub/11 (부가세 분리), net = sub (실지급 = 합계 그대로)
-  function calcAmounts(group2: Group, taxRate: string, sub: number): { tax: number; net: number } {
-    if (group2 === 'operation') return { tax: Math.floor(sub / 11), net: sub };
+  // 박경수님 fix (2026-05-26) — 세액·실지급 명시 계산. 운영비는 vat_mode 분기.
+  function calcAmounts(group2: Group, taxRate: string, sub: number, vatMode?: CompanyValues['vat_mode']): { tax: number; net: number } {
+    if (group2 === 'operation') {
+      if (vatMode === 'none') return { tax: 0, net: sub };
+      if (vatMode === 'exclusive') { const v = Math.floor(sub * 0.1); return { tax: v, net: sub + v }; }
+      return { tax: Math.floor(sub / 11), net: sub }; // included 기본
+    }
     if (taxRate === '3.3') { const t = Math.floor(sub * 0.033); return { tax: t, net: sub - t }; }
     if (taxRate === '8.8') { const t = Math.floor(sub * 0.088); return { tax: t, net: sub - t }; }
     return { tax: 0, net: sub };
@@ -164,8 +168,12 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
     setSubmitting(true);
     try {
       const isPerson = group === 'outsource';
-      const taxRate = isPerson ? person.tax_rate_type : '10';
-      const amounts = calcAmounts(group, taxRate, totalAmount);
+      // 박경수님 fix (2026-05-26) — 운영비는 vat_mode 에 따라 tax_rate_type 매핑
+      // included/exclusive → '10', none → '면세'
+      const taxRate = isPerson
+        ? person.tax_rate_type
+        : (company.vat_mode === 'none' ? '면세' : '10');
+      const amounts = calcAmounts(group, taxRate, totalAmount, isPerson ? undefined : company.vat_mode);
       // 박경수님 보고 fix — tax_amount/net_amount 명시. cleanPayload 로 undefined 제거 (기존 값 null 덮어쓰기 방지).
       const payload = cleanPayload({
         project_id: projectId ?? undefined,

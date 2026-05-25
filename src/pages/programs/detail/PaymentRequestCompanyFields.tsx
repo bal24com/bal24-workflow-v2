@@ -21,10 +21,14 @@ export interface CompanyValues {
   biz_reg_no: string;
   bank_name: string;
   bank_account: string;
+  // 박경수님 요청 (2026-05-26) — 부가세 처리 모드. 폼 state 만 (DB 저장은 tax_rate_type 매핑)
+  // included = 입력가가 부가세 포함, exclusive = 공급가(별도), none = 면세/없음
+  vat_mode: 'included' | 'exclusive' | 'none';
 }
 
 export const EMPTY_COMPANY: CompanyValues = {
   client_id: '', payee_name: '', biz_reg_no: '', bank_name: '', bank_account: '',
+  vat_mode: 'included',
 };
 
 interface Props {
@@ -37,8 +41,24 @@ interface Props {
 
 export default function PaymentRequestCompanyFields({ values, totalAmount, clients, onChange, disabled }: Props) {
   const set = <K extends keyof CompanyValues>(k: K, v: CompanyValues[K]) => onChange({ ...values, [k]: v });
-  const calc = calcTax(totalAmount, '10');
-  const supply = totalAmount - calc.taxAmount;
+  // 박경수님 요청 — vat_mode 별 합계 분기
+  // included: 입력가가 부가세 포함 (영수증가) → 공급가 = 입력/1.1, 부가세 = 차액, 실지급 = 입력
+  // exclusive: 입력가가 공급가 (부가세 별도) → 부가세 = 입력*0.1 추가, 실지급 = 입력 + 부가세
+  // none: 면세 → 부가세 0, 실지급 = 입력
+  let supply: number; let vat: number; let payable: number;
+  if (values.vat_mode === 'exclusive') {
+    supply = totalAmount;
+    vat = Math.floor(totalAmount * 0.1);
+    payable = supply + vat;
+  } else if (values.vat_mode === 'none') {
+    supply = totalAmount; vat = 0; payable = totalAmount;
+  } else {
+    // included (기본) — calcTax('10') 와 동일 결과
+    const c = calcTax(totalAmount, '10');
+    vat = c.taxAmount;
+    supply = totalAmount - vat;
+    payable = totalAmount;
+  }
 
   // 거래처 검색 + 미리보기
   const [results, setResults] = useState<CompanyClient[]>([]);
@@ -85,6 +105,7 @@ export default function PaymentRequestCompanyFields({ values, totalAmount, clien
       client_id: c.id, payee_name: c.name,
       biz_reg_no: c.business_number ?? '',
       bank_name: c.bank_name ?? '', bank_account: c.bank_account ?? '',
+      vat_mode: values.vat_mode, // 박경수님 요청 — 부가세 모드 유지
     });
     setShowDropdown(false);
   }
@@ -105,6 +126,7 @@ export default function PaymentRequestCompanyFields({ values, totalAmount, clien
       client_id: data.id, payee_name: data.name,
       biz_reg_no: data.business_number ?? '',
       bank_name: data.bank_name ?? '', bank_account: data.bank_account ?? '',
+      vat_mode: values.vat_mode,
     });
     setShowDropdown(false);
   }
@@ -173,20 +195,51 @@ export default function PaymentRequestCompanyFields({ values, totalAmount, clien
       </div>
       <Input label="계좌번호" value={values.bank_account} onChange={(e) => set('bank_account', e.target.value)} disabled={disabled} />
 
-      <div className="rounded-lg bg-white border border-orange-200 p-2.5 text-xs space-y-1">
-        <div className="flex justify-between text-slate-600">
-          <span>합계 (부가세 포함)</span>
-          <span className="tabular-nums font-semibold">{formatMoney(totalAmount)}</span>
+      {/* 박경수님 요청 — 부가세 처리 모드 선택 (3가지) */}
+      <div className="rounded-lg bg-white border border-orange-200 p-2.5 text-xs space-y-2">
+        <div className="font-bold text-slate-700">부가세 처리</div>
+        <div className="flex flex-wrap gap-3">
+          {([
+            { v: 'included', label: '부가세 포함가 (10% 자동 분리)' },
+            { v: 'exclusive', label: '공급가 (10% 별도 추가)' },
+            { v: 'none', label: '면세 / 부가세 없음' },
+          ] as const).map((o) => (
+            <label key={o.v} className="inline-flex items-center gap-1 cursor-pointer">
+              <input type="radio" name="vat_mode" disabled={disabled}
+                checked={values.vat_mode === o.v}
+                onChange={() => set('vat_mode', o.v)}
+                className="text-violet-600 focus:ring-violet-500" />
+              <span className="text-slate-700">{o.label}</span>
+            </label>
+          ))}
         </div>
-        <div className="flex justify-between text-slate-500">
-          <span>└ 공급가액</span>
-          <span className="tabular-nums">{formatMoney(supply)}</span>
+        <div className="border-t border-orange-100 pt-1.5 space-y-1">
+          <div className="flex justify-between text-slate-600">
+            <span>{values.vat_mode === 'exclusive' ? '입력가 (공급가)' : '입력가'}</span>
+            <span className="tabular-nums font-semibold">{formatMoney(totalAmount)}</span>
+          </div>
+          {values.vat_mode !== 'none' && (
+            <>
+              <div className="flex justify-between text-slate-500">
+                <span>└ 공급가액</span>
+                <span className="tabular-nums">{formatMoney(supply)}</span>
+              </div>
+              <div className="flex justify-between text-blue-600">
+                <span>└ 부가세 10%</span>
+                <span className="tabular-nums">{values.vat_mode === 'exclusive' ? '+' : ''}{formatMoney(vat)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex justify-between font-bold text-violet-700 pt-1 border-t border-orange-100">
+            <span>실지급 (총 청구액)</span>
+            <span className="tabular-nums">{formatMoney(payable)}</span>
+          </div>
         </div>
-        <div className="flex justify-between text-blue-600">
-          <span>└ 부가세 10%</span>
-          <span className="tabular-nums">{formatMoney(calc.taxAmount)}</span>
-        </div>
-        <p className="text-[10px] text-slate-500 pt-1">영수증 가격(부가세 포함)을 그대로 입력하면 공급가액·부가세 자동 분리됩니다.</p>
+        <p className="text-[10px] text-slate-500">
+          {values.vat_mode === 'included' && '영수증·계산서 가격(부가세 포함)을 그대로 입력하세요.'}
+          {values.vat_mode === 'exclusive' && '공급가를 입력하면 부가세 10% 자동 추가 → 총 청구액 계산.'}
+          {values.vat_mode === 'none' && '면세 거래·간이과세자 등 부가세가 없는 항목.'}
+        </p>
       </div>
     </div>
   );
