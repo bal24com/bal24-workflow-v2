@@ -180,15 +180,18 @@ export default function CurriculumRow({
           onChange={(e) => patchDraft('day_label', e.target.value || null)}
           placeholder="1일차"
           className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400" />
-        {/* 박경수님 요청 — 단순 텍스트 입력 + onBlur 자동 보정 ('9'→'09:00', '930'→'09:30', '14:5'→'14:05') */}
-        <input type="text" inputMode="numeric" value={draft.start_time ?? ''} aria-label="시작 시간" placeholder="14:00"
+        {/* 박경수님 요청 — 텍스트 입력 + onBlur 자동 보정 + datalist 1시간 단위 빠른 선택 */}
+        <input type="text" inputMode="numeric" list="curriculum-time-options" value={draft.start_time ?? ''} aria-label="시작 시간" placeholder="09:00"
           onChange={(e) => patchDraft('start_time', e.target.value || null)}
           onBlur={(e) => { const n = normalizeTimeInput(e.target.value); if (n !== draft.start_time) patchDraft('start_time', n); }}
           className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 tabular-nums" />
-        <input type="text" inputMode="numeric" value={draft.end_time ?? ''} aria-label="종료 시간" placeholder="16:00"
+        <input type="text" inputMode="numeric" list="curriculum-time-options" value={draft.end_time ?? ''} aria-label="종료 시간" placeholder="10:00"
           onChange={(e) => patchDraft('end_time', e.target.value || null)}
           onBlur={(e) => { const n = normalizeTimeInput(e.target.value); if (n !== draft.end_time) patchDraft('end_time', n); }}
           className="h-8 px-2 rounded-md border border-violet-100 bg-white text-xs focus:outline-none focus:border-violet-400 tabular-nums" />
+        <datalist id="curriculum-time-options">
+          {Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00').map((t) => <option key={t} value={t} />)}
+        </datalist>
         <input type="text" value={draft.title}
           onChange={(e) => patchDraft('title', e.target.value)}
           placeholder="주제·차시명"

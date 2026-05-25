@@ -271,8 +271,10 @@ export interface Program {
   venue?: string | null;
   capacity?: number | null;
   description?: string | null;
-  /** STEP-PROGRAM-BUNDLE — 기관/단체명 */
+  /** STEP-PROGRAM-BUNDLE — 기관/단체명 (legacy 텍스트, host_client_id 도입 후 보존만) */
   client_org?: string | null;
+  /** 박경수님 요청 — 기관/단체를 clients FK 로. host_client_id 우선, 없으면 client_org 표시 */
+  host_client_id?: string | null;
   /** STEP-PROGRAM-BUNDLE — 부서 */
   department?: string | null;
   /** STEP-PROGRAM-BUNDLE — 교육 대상 */

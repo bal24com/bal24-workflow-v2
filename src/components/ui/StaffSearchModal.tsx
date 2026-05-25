@@ -34,6 +34,7 @@ interface SearchRow {
   organization?: string | null;
   department?: string | null;
   position?: string | null;
+  note?: string | null;  // 박경수님 요청 — '임시등록' 배지 체크
 }
 
 const ROLE_DESC: Record<CurriculumStaffRole, string> = {
@@ -41,12 +42,13 @@ const ROLE_DESC: Record<CurriculumStaffRole, string> = {
 };
 
 async function searchStaffPool(q: string): Promise<SearchRow[]> {
+  // 박경수님 요청 — note 컬럼 추가 fetch ('임시등록' 배지 표시용)
   if (!q.trim()) {
-    const r = await supabase.from('staff_pool').select('id, name, organization, position').order('name').limit(20);
+    const r = await supabase.from('staff_pool').select('id, name, organization, position, note').order('name').limit(20);
     if (r.error) { console.error('[staff-search] pool 조회 실패:', r.error.message); return []; }
     return (r.data ?? []) as SearchRow[];
   }
-  const r = await supabase.from('staff_pool').select('id, name, organization, position')
+  const r = await supabase.from('staff_pool').select('id, name, organization, position, note')
     .or(`name.ilike.%${q}%,organization.ilike.%${q}%`).order('name').limit(20);
   if (r.error) { console.error('[staff-search] pool 검색 실패:', r.error.message); return []; }
   return (r.data ?? []) as SearchRow[];
@@ -70,7 +72,29 @@ export default function StaffSearchModal({ open, onClose, onSelect, role, exclud
   const [debounced, setDebounced] = useState('');
   const [rows, setRows] = useState<SearchRow[]>([]);
   const [loading, setLoading] = useState(false);
+  // 박경수님 요청 — 검색 결과 0건 시 임시 인력 등록 미니폼
+  const [tempOpen, setTempOpen] = useState(false);
+  const [tempOrg, setTempOrg] = useState('');
+  const [tempSaving, setTempSaving] = useState(false);
   const excludeSet = useMemo(() => new Set(excludeIds), [excludeIds]);
+
+  async function handleAddTemp() {
+    const name = query.trim();
+    if (!name) return;
+    setTempSaving(true);
+    const { data, error } = await supabase.from('staff_pool')
+      .insert({ name, organization: tempOrg.trim() || null, note: '임시등록' })
+      .select('id, name, organization, position').single();
+    setTempSaving(false);
+    if (error || !data) {
+      console.error('[staff-search] 임시 등록 실패:', error?.message);
+      alert(`임시 등록 실패: ${error?.message ?? '원인 미상'}`);
+      return;
+    }
+    onSelect({ sourceType: 'staff_pool', id: data.id, name: data.name,
+      organization: data.organization ?? undefined, position: data.position ?? undefined });
+    onClose();
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +114,7 @@ export default function StaffSearchModal({ open, onClose, onSelect, role, exclud
   }, [tab, debounced, open]);
 
   // 모달 닫힐 때 상태 초기화
-  useEffect(() => { if (!open) { setQuery(''); setDebounced(''); setRows([]); setTab('staff_pool'); } }, [open]);
+  useEffect(() => { if (!open) { setQuery(''); setDebounced(''); setRows([]); setTab('staff_pool'); setTempOpen(false); setTempOrg(''); } }, [open]);
 
   const handlePick = (r: SearchRow) => {
     const subInfo = tab === 'staff_pool' ? r.organization : r.department;
@@ -127,12 +151,38 @@ export default function StaffSearchModal({ open, onClose, onSelect, role, exclud
             </div>
           ) : rows.length === 0 ? (
             <div className="text-center py-6 space-y-2">
-              <p className="text-xs text-slate-400 italic">{query ? '검색 결과가 없어요.' : '등록된 인력이 없어요.'}</p>
-              {allowManual && query.trim() && (
+              <p className="text-xs text-slate-400 italic">{query ? `'${query.trim()}' 검색 결과 없음` : '등록된 인력이 없어요.'}</p>
+              {/* 박경수님 요청 — 0건 + 검색어 있을 때 임시 등록 (staff_pool 만) */}
+              {tab === 'staff_pool' && query.trim() && !tempOpen && (
+                <button type="button" onClick={() => setTempOpen(true)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200">
+                  <UserPlus size={11} aria-hidden="true" /> + 임시 인력으로 등록
+                </button>
+              )}
+              {tempOpen && (
+                <div className="mx-3 mt-1 p-3 rounded-lg border border-violet-200 bg-violet-50/40 text-left space-y-2">
+                  <div className="text-xs"><span className="text-slate-500">이름:</span> <strong className="text-violet-700">{query.trim()}</strong></div>
+                  <input type="text" value={tempOrg} onChange={(e) => setTempOrg(e.target.value)} placeholder="소속 (선택)"
+                    className="w-full h-8 px-2 rounded border border-violet-200 bg-white text-xs focus:outline-none focus:border-violet-400" />
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <button type="button" onClick={() => setTempOpen(false)} disabled={tempSaving}
+                      className="px-2.5 py-1 rounded text-[11px] text-slate-500 hover:bg-slate-100">취소</button>
+                    <button type="button" onClick={() => void handleAddTemp()} disabled={tempSaving}
+                      className="px-3 py-1 rounded text-[11px] font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50">
+                      {tempSaving ? '등록 중…' : '등록'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">임시 등록된 인력은 전문가 목록에 [임시] 배지로 표시됩니다 (note='임시등록').</p>
+                </div>
+              )}
+              {tab === 'profile' && query.trim() && (
+                <p className="text-[11px] text-slate-400">팀원은 관리자 페이지에서 초대해야 합니다.</p>
+              )}
+              {allowManual && query.trim() && !tempOpen && (
                 <button type="button"
                   onClick={() => { onSelect({ sourceType: 'manual', id: '', name: query.trim() }); onClose(); }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200">
-                  <UserPlus size={11} aria-hidden="true" /> "{query.trim()}" 직접 추가 (미등록)
+                  className="block mx-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200">
+                  <UserPlus size={11} aria-hidden="true" /> "{query.trim()}" 직접 추가 (DB 저장 안 함)
                 </button>
               )}
             </div>
@@ -144,7 +194,10 @@ export default function StaffSearchModal({ open, onClose, onSelect, role, exclud
                 return (
                   <li key={r.id} className="flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-violet-50/40">
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-700 truncate">{r.name}</p>
+                      <p className="text-sm font-bold text-slate-700 truncate inline-flex items-center gap-1.5">
+                        {r.name}
+                        {r.note === '임시등록' && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-100 text-amber-700 font-bold">임시</span>}
+                      </p>
                       <p className="text-[11px] text-slate-500 truncate">
                         {[sub, r.position].filter(Boolean).join(' · ') || '소속·직위 미지정'}
                       </p>

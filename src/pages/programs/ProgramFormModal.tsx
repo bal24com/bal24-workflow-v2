@@ -66,6 +66,8 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
   const [phaseDates, setPhaseDates] = useState<PhaseDatesPatch>({});
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
+  // 박경수님 요청 — 기관/단체 clients 드롭다운
+  const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);
   const [loadingRefs, setLoadingRefs] = useState(false);
 
@@ -83,23 +85,18 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
     Promise.all([
       supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
       supabase.from('consortiums').select('id, name').is('deleted_at', null).in('status', ['구성중', '진행']).order('name', { ascending: true }),
+      supabase.from('clients').select('id, name').is('deleted_at', null).order('name', { ascending: true }),
     ])
-      .then(([projRes, conRes]) => {
+      .then(([projRes, conRes, cliRes]) => {
         if (cancelled) return;
-        if (projRes.error) {
-          console.error('[programs] 프로젝트 조회 실패:', projRes.error.message);
-        } else {
-          setProjects(projRes.data ?? []);
-        }
-        if (conRes.error) {
-          console.error('[programs] 컨소시엄 조회 실패:', conRes.error.message);
-        } else {
-          setConsortiums((conRes.data as ConsortiumOption[] | null) ?? []);
-        }
+        if (projRes.error) console.error('[programs] 프로젝트 조회 실패:', projRes.error.message);
+        else setProjects(projRes.data ?? []);
+        if (conRes.error) console.error('[programs] 컨소시엄 조회 실패:', conRes.error.message);
+        else setConsortiums((conRes.data as ConsortiumOption[] | null) ?? []);
+        if (cliRes.error) console.error('[programs] 고객사 조회 실패:', cliRes.error.message);
+        else setClients((cliRes.data as Array<{ id: string; name: string }> | null) ?? []);
       })
-      .finally(() => {
-        if (!cancelled) setLoadingRefs(false);
-      });
+      .finally(() => { if (!cancelled) setLoadingRefs(false); });
 
     return () => {
       cancelled = true;
@@ -122,7 +119,7 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
     setName, setDescription, setStartDate, setEndDate, setVenue,
     setProgramType: (v: ExtractedProgramType) => setProgramType(v as ExtendedProgramType),
     setOrg: (patch) => setOrgValues((p) => ({
-      clientOrg:       patch.client_org        ?? p.clientOrg,
+      hostClientId:    p.hostClientId,  // AI 추출은 텍스트 — 박경수님이 select 로 직접 선택
       department:      patch.department        ?? p.department,
       targetAudience:  patch.target_audience   ?? p.targetAudience,
       maxParticipants: patch.max_participants != null ? String(patch.max_participants) : p.maxParticipants,
@@ -180,7 +177,7 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
         capacity: parsedCapacity,
         description: description.trim() || null,
         // STEP-PROGRAM-BUNDLE
-        client_org: orgValues.clientOrg.trim() || null,
+        host_client_id: orgValues.hostClientId || null,
         department: orgValues.department.trim() || null,
         target_audience: orgValues.targetAudience.trim() || null,
         max_participants: parsedMaxParticipants,
@@ -369,7 +366,7 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
         </div>
 
         {/* STEP-PROGRAM-BUNDLE — 기관·부서·교육대상·정원 (분리 컴포넌트) */}
-        <ProgramOrgFields values={orgValues} onChange={setOrgValues} disabled={submitting} />
+        <ProgramOrgFields values={orgValues} onChange={setOrgValues} clients={clients} disabled={submitting} />
 
         <ProgramVisibilityField value={visibility} onChange={setVisibility} disabled={submitting} />
 
