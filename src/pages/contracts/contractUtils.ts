@@ -257,29 +257,36 @@ export async function safeAutoContractForProject(
   }
 }
 
-/** 프로그램 생성 시 계약 단계 계약 자동 생성 — 부모 프로젝트의 client_id 자동 prefill */
+/** 프로그램 생성 시 계약 단계 계약 자동 생성 — 부모 프로젝트의 client_id 자동 prefill.
+ *  박경수님 요청: 같은 프로젝트의 자동 계약이 이미 있으면 중복 INSERT 안 함.
+ *  (계약은 프로젝트 단위로 관리. 프로그램별 계약이 필요하면 수동 [+ 신규 계약]) */
 export async function autoCreateContractForProgram(params: {
   programId: string;
   programName: string;
   projectId: string | null;
   userId: string;
 }): Promise<void> {
-  // 부모 프로젝트의 client_id 자동 조회 (FOLLOWUP5 패턴)
+  // 1) 부모 프로젝트의 자동 생성 계약이 이미 있으면 skip (중복 방지)
+  if (params.projectId) {
+    const { data: existing } = await supabase.from('income_contracts')
+      .select('id').eq('project_id', params.projectId).eq('auto_created', true)
+      .is('deleted_at', null).limit(1).maybeSingle();
+    if (existing) {
+      console.info('[ContractAuto] 프로그램 생성 — 부모 프로젝트의 자동 계약이 이미 있어 skip');
+      return;
+    }
+  }
+  // 2) 부모 프로젝트의 client_id 자동 조회
   let clientId: string | null = null;
   if (params.projectId) {
     const { data } = await supabase.from('projects').select('client_id').eq('id', params.projectId).maybeSingle();
     clientId = (data as { client_id: string | null } | null)?.client_id ?? null;
   }
   const { error } = await supabase.from('income_contracts').insert({
-    project_id: params.projectId,
-    program_id: params.programId,
-    contract_name: params.programName,
-    client_id: clientId,
-    contract_amount: 0,
-    status: 'draft',
-    lifecycle_stage: 'contract',
-    auto_created: true,
-    doc_request_pending: true, // 주관기관 서류 요청 필요
+    project_id: params.projectId, program_id: params.programId,
+    contract_name: params.programName, client_id: clientId,
+    contract_amount: 0, status: 'draft', lifecycle_stage: 'contract',
+    auto_created: true, doc_request_pending: true,
     memo: '프로그램 생성 시 자동 등록됨. 계약서·세금계산서·서류 요청 링크를 처리해 주세요.',
     created_by: params.userId,
   });
