@@ -12,7 +12,7 @@ import SubToggle from './SubToggle';
 import PaymentRequestFormModal, { type PaymentTarget } from './PaymentRequestFormModal';
 import PaymentSummaryCards from './PaymentSummaryCards';
 import EstimateImportModal from './EstimateImportModal';
-import { isOutsourceType, isOperationType } from '../../payroll/payrollUtils';
+import { isOutsourceType, isOperationType, bulkSoftDeletePayroll } from '../../payroll/payrollUtils';
 
 type Group = 'outsource' | 'operation';
 
@@ -60,6 +60,9 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
   const [editTarget, setEditTarget] = useState<PaymentTarget | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [counts, setCounts] = useState({ outsource: 0, operation: 0 });
+  // 박경수님 + SkyClaw — 일괄 선택삭제
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -123,6 +126,31 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
     void reload();
   }
 
+  // 박경수님 + SkyClaw — 일괄 선택삭제 (visible 기준)
+  function toggleAll() {
+    if (visible.length === 0) return;
+    const allSelected = visible.every((r) => selectedIds.has(r.id));
+    setSelectedIds(allSelected ? new Set() : new Set(visible.map((r) => r.id)));
+  }
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`선택한 ${selectedIds.size}건을 휴지통으로 보낼까요?`)) return;
+    setBulkDeleting(true);
+    const err = await bulkSoftDeletePayroll(Array.from(selectedIds));
+    setBulkDeleting(false);
+    if (err) { toast.error(err); return; }
+    toast.success(`${selectedIds.size}건 삭제했어요.`);
+    setSelectedIds(new Set());
+    void reload();
+  }
+
   return (
     <div className="space-y-4">
       {/* 메인 — 제안 견적 vs 실제 집행 */}
@@ -139,6 +167,14 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
           onChange={(k) => setGroup(k as Group)}
         />
         <div className="flex items-center gap-2">
+          {/* 박경수님 + SkyClaw — 선택된 항목 있을 때만 [선택삭제] 노출 */}
+          {selectedIds.size > 0 && (
+            <Button variant="outline" size="sm" leftIcon={<Trash2 size={13} />}
+              onClick={() => void handleBulkDelete()} loading={bulkDeleting}
+              className="!border-rose-300 !text-rose-600 hover:!bg-rose-50">
+              선택삭제 ({selectedIds.size}건)
+            </Button>
+          )}
           <Button variant="outline" size="sm" leftIcon={<Download size={13} />} onClick={() => setImportOpen(true)}>견적에서 가져오기</Button>
           <Button variant="primary" size="sm" leftIcon={<Plus size={13} />} onClick={() => setFormOpen(true)}>
             {group === 'outsource' ? '인건비 추가' : '운영비 추가'}
@@ -170,6 +206,13 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs">
               <tr>
+                {/* 박경수님 + SkyClaw — 전체선택 (visible 기준) */}
+                <th className="w-8 px-3 py-2.5">
+                  <input type="checkbox" aria-label="전체 선택"
+                    checked={visible.length > 0 && visible.every((r) => selectedIds.has(r.id))}
+                    onChange={toggleAll}
+                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                </th>
                 <th className="text-left px-3 py-2.5 font-semibold">항목</th>
                 <th className="text-left px-3 py-2.5 font-semibold">세항목</th>
                 <th className="text-left px-3 py-2.5 font-semibold">지급처</th>
@@ -183,7 +226,15 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visible.map((r, idx) => (
-                <tr key={r.id} className="hover:bg-violet-50/40">
+                <tr key={r.id} className={`hover:bg-violet-50/40 ${selectedIds.has(r.id) ? 'bg-violet-50/30' : ''}`}>
+                  {/* 박경수님 + SkyClaw — 개별 선택 */}
+                  <td className="w-8 px-3 py-2">
+                    <input type="checkbox" aria-label={`${r.expense_type} 선택`}
+                      checked={selectedIds.has(r.id)}
+                      onChange={() => toggleOne(r.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                  </td>
                   <td className="px-3 py-2 text-xs font-semibold text-violet-700">{r.expense_type}</td>
                   <td className="px-3 py-2 text-xs text-text truncate max-w-[260px]">{r.description ?? '-'}</td>
                   <td className="px-3 py-2 text-xs text-muted">{r.payee_name || '-'}</td>
