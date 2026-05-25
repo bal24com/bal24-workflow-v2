@@ -87,6 +87,8 @@ export interface Client {
   bank_holder?: string | null;
   business_license_url?: string | null;
   note?: string | null;
+  /** STEP-TAGS-2B — 분류 태그 (주관기관·거래처·협력사 등, 중복 가능) */
+  tags?: string[] | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -1450,6 +1452,21 @@ export interface AccountingReviewItem {
   review_status: AccountingReviewItemStatus;
   revision_note: string | null;
   reviewed_at: string | null;
+  created_at: string;
+}
+
+// ============================================================
+// STEP-TAGS-2B-3B — 고객사·전문가 분류 태그 (관리자 동적 관리)
+// ============================================================
+export type TagScope = 'client' | 'staff';
+
+export interface TagCategory {
+  id: string;
+  scope: TagScope;
+  name: string;
+  order_index: number;
+  color: string | null;
+  created_by: string | null;
   created_at: string;
 }
 

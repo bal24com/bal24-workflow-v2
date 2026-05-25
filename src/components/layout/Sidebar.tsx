@@ -51,8 +51,8 @@ const SECTIONS: MenuSection[] = [
     heading: '사업',
     items: [
       { to: '/projects',   label: '프로젝트', Icon: FolderKanban },
-      // STEP-SIDEBAR-PROGRAM-RESTORE — 프로젝트 하위 메뉴로 들여쓰기 표시
-      { to: '/programs',   label: '프로그램', Icon: BookOpen, nested: true },
+      // STEP-MENU-INTEGRATION-1A — 프로그램 메뉴 제거. 프로젝트 상세 안의 "프로그램" 탭으로 통합 진입.
+      // 기존 /programs URL 은 라우트 보존 (북마크 호환).
       { to: '/consortium', label: '컨소시엄', Icon: Building2 },
     ],
   },
