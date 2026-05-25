@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LayoutGrid, List, Plus, Loader2, Search } from 'lucide-react';
+import { LayoutGrid, List, Plus, Loader2, Search, GraduationCap } from 'lucide-react';
 import {
   Button,
   Card,
@@ -323,6 +323,10 @@ export default function ProjectsPage() {
               <LayoutGrid size={16} />
             </button>
           </div>
+          <Link to="/programs" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-violet-200 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors">
+            <GraduationCap size={14} aria-hidden="true" />
+            프로그램
+          </Link>
           <Button variant="primary" leftIcon={<Plus size={16} />} onClick={() => setModalOpen(true)}>
             신규 등록
           </Button>
