@@ -1,47 +1,49 @@
 // bal24 WorkFlow v2 — 라우팅 + 인증 가드
 // 비로그인 → /login / 로그인 → Layout 안의 메뉴들 (14개)
-// STEP-BUNDLE-SPLIT — 공개 라우트 19종은 lazy import + Suspense 로 분리
+// STEP-BUNDLE-SPLIT-3 — 첫 진입 속도 개선 (박경수님 보고).
+//   eager: LoginPage, Layout, DashboardPage(/home 첫 진입) — 즉시 필요
+//   lazy : 나머지 모든 인증 후 페이지 + 공개 라우트
+//          → entry bundle 80~90KB → 30KB 수준으로 감소 기대.
 
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import Layout from './components/layout/Layout';
 import DashboardPage from './pages/dashboard/DashboardPage';
-import ProjectsPage from './pages/projects/ProjectsPage';
-import ProjectDetailPage from './pages/projects/ProjectDetailPage';
-import ClientsPage from './pages/clients/ClientsPage';
-import ExpertsPage from './pages/experts/ExpertsPage';
-import ConsortiumPage from './pages/consortium/ConsortiumPage';
-import ConsortiumDetailPage from './pages/consortium/ConsortiumDetailPage';
-import IncomePage from './pages/income/IncomePage';
-import ExpensesPage from './pages/expenses/ExpensesPage';
-import ReceiptsPage from './pages/receipts/ReceiptsPage';
-// STEP-ACCOUNTING-ALL P2 — 수입/계약 페이지
-import ContractsPage from './pages/contracts/ContractsPage';
-// STEP-ACCOUNTING-ALL P3 — 외주/급여 페이지
-import PayrollPage from './pages/payroll/PayrollPage';
-// STEP-ACCOUNTING-ALL P4 — 회계사무소 검토 (PM + 외부 포털)
-import AccountingReviewPage from './pages/accounting-portal/AccountingReviewPage';
-import AccountingReviewPortal from './pages/public/AccountingReviewPortal';
-import AttendancePage from './pages/attendance/AttendancePage';
-import AttendanceDetailPage from './pages/attendance/AttendanceDetailPage';
-import ActivityLogsPage from './pages/activity-logs/ActivityLogsPage';
-import FormManagePage from './pages/forms/FormManagePage';
-import PortalManagePage from './pages/portal/PortalManagePage';
-import PortalTemplatePage from './pages/portal/templates/PortalTemplatePage';
-import SchedulePage from './pages/schedule/SchedulePage';
-import MembersPage from './pages/members/MembersPage';
-import AdminPage from './pages/admin/AdminPage';
-import ReportsPage from './pages/reports/ReportsPage';
-import AiPage from './pages/ai/AiPage';
-import ApplicationPage from './pages/applications/ApplicationPage';
-import RecruitPage from './pages/recruit/RecruitPage';
-import MentoringPartnerView from './pages/mentoring/MentoringPartnerView';
-import PartnerHomePage from './pages/partner/PartnerHomePage';
-import MyReportPage from './pages/my-report/MyReportPage';
 import { useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
+
+// ── 인증 후 페이지 — 모두 lazy (DashboardPage 외) ──
+const ProjectsPage          = lazy(() => import('./pages/projects/ProjectsPage'));
+const ProjectDetailPage     = lazy(() => import('./pages/projects/ProjectDetailPage'));
+const ClientsPage           = lazy(() => import('./pages/clients/ClientsPage'));
+const ExpertsPage           = lazy(() => import('./pages/experts/ExpertsPage'));
+const ConsortiumPage        = lazy(() => import('./pages/consortium/ConsortiumPage'));
+const ConsortiumDetailPage  = lazy(() => import('./pages/consortium/ConsortiumDetailPage'));
+const IncomePage            = lazy(() => import('./pages/income/IncomePage'));
+const ExpensesPage          = lazy(() => import('./pages/expenses/ExpensesPage'));
+const ReceiptsPage          = lazy(() => import('./pages/receipts/ReceiptsPage'));
+const ContractsPage         = lazy(() => import('./pages/contracts/ContractsPage'));
+const PayrollPage           = lazy(() => import('./pages/payroll/PayrollPage'));
+const AccountingReviewPage  = lazy(() => import('./pages/accounting-portal/AccountingReviewPage'));
+const AttendancePage        = lazy(() => import('./pages/attendance/AttendancePage'));
+const AttendanceDetailPage  = lazy(() => import('./pages/attendance/AttendanceDetailPage'));
+const ActivityLogsPage      = lazy(() => import('./pages/activity-logs/ActivityLogsPage'));
+const FormManagePage        = lazy(() => import('./pages/forms/FormManagePage'));
+const PortalManagePage      = lazy(() => import('./pages/portal/PortalManagePage'));
+const PortalTemplatePage    = lazy(() => import('./pages/portal/templates/PortalTemplatePage'));
+const SchedulePage          = lazy(() => import('./pages/schedule/SchedulePage'));
+const MembersPage           = lazy(() => import('./pages/members/MembersPage'));
+const AdminPage             = lazy(() => import('./pages/admin/AdminPage'));
+const ReportsPage           = lazy(() => import('./pages/reports/ReportsPage'));
+const AiPage                = lazy(() => import('./pages/ai/AiPage'));
+const ApplicationPage       = lazy(() => import('./pages/applications/ApplicationPage'));
+const RecruitPage           = lazy(() => import('./pages/recruit/RecruitPage'));
+const MentoringPartnerView  = lazy(() => import('./pages/mentoring/MentoringPartnerView'));
+const PartnerHomePage       = lazy(() => import('./pages/partner/PartnerHomePage'));
+const MyReportPage          = lazy(() => import('./pages/my-report/MyReportPage'));
+const AccountingReviewPortal = lazy(() => import('./pages/public/AccountingReviewPortal'));
 
 // ── PrivateRoute 안쪽이지만 vendor-docs(docx/jspdf/html2canvas/xlsx) 를 끌어오는
 //    무거운 페이지들도 lazy 처리 (STEP-BUNDLE-SPLIT-2)

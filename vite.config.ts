@@ -48,6 +48,15 @@ export default defineConfig({
             return 'vendor-qr'
           }
 
+          // Recharts (차트 — 무거움. 사용 페이지: 리포트/대시보드/설문 결과)
+          if (
+            id.includes('node_modules/recharts') ||
+            id.includes('node_modules/d3-') ||
+            id.includes('node_modules/victory-vendor')
+          ) {
+            return 'vendor-charts'
+          }
+
           // 데이터 페칭/유틸
           if (
             id.includes('node_modules/@tanstack') ||
