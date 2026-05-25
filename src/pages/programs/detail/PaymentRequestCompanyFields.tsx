@@ -1,23 +1,24 @@
-// 지급요청 운영비/외주 폼 필드 그룹 (거래처 select + 사업자번호·은행·계좌 자동 + 부가세 10%)
-// PaymentRequestFormModal V-1 분리
+// 지급요청 운영비/외주 폼 필드 그룹 (거래처 검색 + 사업자번호·은행·계좌 자동 + 부가세 10%)
+// 박경수님 + SkyClaw 2026-05-26 — 거래처 select → 검색·미리보기·임시등록 통합 input
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Input } from '../../../components/ui';
+import { supabase } from '../../../lib/supabase';
 import { formatMoney } from '../../../lib/utils';
 import { calcTax } from '../../../utils/taxUtils';
 
 export interface CompanyClient {
   id: string;
   name: string;
-  business_number?: string | null;  // clients 의 사업자번호 컬럼
+  business_number?: string | null;
   bank_name?: string | null;
   bank_account?: string | null;
 }
 
 export interface CompanyValues {
-  client_id: string;           // clients FK
-  payee_name: string;          // 자동 채움 (거래처 이름) 또는 직접 입력
-  biz_reg_no: string;          // 사업자번호
+  client_id: string;
+  payee_name: string;
+  biz_reg_no: string;
   bank_name: string;
   bank_account: string;
 }
@@ -29,57 +30,148 @@ export const EMPTY_COMPANY: CompanyValues = {
 interface Props {
   values: CompanyValues;
   totalAmount: number;
-  clients: CompanyClient[];
+  clients: CompanyClient[]; // 부모에서 prefetch — 미사용 시에도 prop 유지 (호환)
   onChange: (next: CompanyValues) => void;
   disabled?: boolean;
 }
 
 export default function PaymentRequestCompanyFields({ values, totalAmount, clients, onChange, disabled }: Props) {
-  const [manual, setManual] = useState(!values.client_id && !!values.payee_name);
   const set = <K extends keyof CompanyValues>(k: K, v: CompanyValues[K]) => onChange({ ...values, [k]: v });
-  // 부가세 10% 포함 — calcTax('10') 사용
   const calc = calcTax(totalAmount, '10');
   const supply = totalAmount - calc.taxAmount;
 
-  function pickClient(id: string) {
-    const c = clients.find((x) => x.id === id);
-    if (!c) { onChange({ ...values, client_id: '', payee_name: '', biz_reg_no: '', bank_name: '', bank_account: '' }); return; }
+  // 거래처 검색 + 미리보기
+  const [results, setResults] = useState<CompanyClient[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [tempSaving, setTempSaving] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function runSearch(q: string) {
+    setSearching(true);
+    const trimmed = q.trim();
+    const isPreview = trimmed.length === 0;
+    let qBuilder = supabase.from('clients')
+      .select('id, name, business_number, bank_name, bank_account')
+      .is('deleted_at', null)
+      .order('name')
+      .limit(isPreview ? 8 : 10);
+    if (!isPreview) {
+      const like = `%${trimmed}%`;
+      qBuilder = qBuilder.or(`name.ilike.${like},business_number.ilike.${like}`);
+    }
+    const { data, error } = await qBuilder;
+    setSearching(false);
+    if (error) {
+      console.error('[PaymentRequestCompanyFields] 거래처 검색 실패:', error.message);
+      // 부모에서 prefetch 한 clients 로 fallback
+      setResults(clients.slice(0, 8));
+    } else {
+      setResults((data ?? []) as CompanyClient[]);
+    }
+    setShowDropdown(true);
+  }
+
+  function handleNameChange(v: string) {
+    // 직접 입력 즉시 반영. client_id 는 비움 (선택 해제)
+    onChange({ ...values, payee_name: v, client_id: '' });
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => { void runSearch(v); }, 200);
+  }
+
+  function pickClient(c: CompanyClient) {
     onChange({
       client_id: c.id, payee_name: c.name,
       biz_reg_no: c.business_number ?? '',
       bank_name: c.bank_name ?? '', bank_account: c.bank_account ?? '',
     });
+    setShowDropdown(false);
   }
+
+  async function handleTempRegister() {
+    const name = values.payee_name.trim();
+    if (!name) return;
+    setTempSaving(true);
+    const { data, error } = await supabase.from('clients')
+      .insert({ name, note: '임시등록' })
+      .select('id, name, business_number, bank_name, bank_account').single();
+    setTempSaving(false);
+    if (error || !data) {
+      console.error('[PaymentRequestCompanyFields] 임시등록 실패:', error?.message);
+      return;
+    }
+    onChange({
+      client_id: data.id, payee_name: data.name,
+      biz_reg_no: data.business_number ?? '',
+      bank_name: data.bank_name ?? '', bank_account: data.bank_account ?? '',
+    });
+    setShowDropdown(false);
+  }
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
+
+  const exactMatch = results.some((c) => c.name === values.payee_name.trim());
 
   return (
     <div className="space-y-3 rounded-xl border border-orange-100 bg-orange-50/30 p-3">
-      <div className="flex items-center justify-between">
-        <div className="text-xs font-bold text-orange-700">🏢 운영비/외주 (업체)</div>
-        <label className="inline-flex items-center gap-1 text-[11px] text-slate-600">
-          <input type="checkbox" checked={manual} onChange={(e) => { setManual(e.target.checked); if (e.target.checked) set('client_id', ''); }} disabled={disabled} />
-          직접 입력 (clients 미등록)
-        </label>
-      </div>
+      <div className="text-xs font-bold text-orange-700">🏢 운영비/외주 (업체)</div>
 
-      {!manual ? (
-        <div className="space-y-1.5">
-          <label className="text-sm font-semibold text-slate-700">거래처 <span className="text-rose-500">*</span></label>
-          <select value={values.client_id} onChange={(e) => pickClient(e.target.value)} disabled={disabled}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60">
-            <option value="">— 선택 —</option>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <p className="text-[10px] text-slate-400">선택 시 사업자번호·은행·계좌 자동 채움 (clients 등록 정보 기준)</p>
-        </div>
-      ) : (
-        <Input label="거래처명 (직접 입력)" required value={values.payee_name} onChange={(e) => set('payee_name', e.target.value)} disabled={disabled} placeholder="예) (주)홍길동렌탈" />
-      )}
+      <div className="relative space-y-1.5" ref={wrapperRef}>
+        <label className="text-sm font-semibold text-slate-700">
+          거래처 <span className="text-rose-500">*</span>
+          {values.client_id && <span className="ml-2 text-[10px] text-emerald-600">✓ 등록 거래처 선택됨</span>}
+        </label>
+        <input type="text" value={values.payee_name}
+          onChange={(e) => handleNameChange(e.target.value)}
+          onFocus={() => { void runSearch(values.payee_name); }}
+          disabled={disabled}
+          placeholder="거래처명 클릭/입력 — 등록된 회사 목록"
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60" />
+        {showDropdown && (
+          <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-64 overflow-y-auto">
+            {searching && <div className="px-3 py-2 text-xs text-slate-400">불러오는 중…</div>}
+            {!searching && results.length === 0 && (
+              <div className="px-3 py-2 text-xs text-slate-400">
+                {values.payee_name.trim() ? '검색 결과 없음' : '등록된 거래처가 없어요.'}
+              </div>
+            )}
+            {results.map((c) => (
+              <button key={c.id} type="button" onClick={() => pickClient(c)}
+                className="block w-full text-left px-3 py-2 text-sm hover:bg-violet-50 border-b border-slate-50">
+                <div className="font-semibold text-text">{c.name}</div>
+                <div className="text-[10px] text-slate-400">
+                  {c.business_number || '사업자번호 미등록'}
+                  {c.bank_name && ` · ${c.bank_name} ${c.bank_account ?? ''}`}
+                </div>
+              </button>
+            ))}
+            {/* 인라인 임시등록 */}
+            {!searching && values.payee_name.trim().length > 0 && !exactMatch && (
+              <button type="button" onClick={() => void handleTempRegister()} disabled={tempSaving}
+                className="block w-full text-left px-3 py-2.5 text-xs font-bold text-orange-700 bg-orange-50/60 hover:bg-orange-100 border-t border-orange-200">
+                {tempSaving ? '등록 중…' : `🆕 "${values.payee_name.trim()}" 거래처로 임시등록`}
+              </button>
+            )}
+          </div>
+        )}
+        <p className="text-[10px] text-slate-400">선택 시 사업자번호·은행·계좌 자동 채움. 미등록 거래처는 임시등록 후 사용하세요.</p>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Input label="사업자번호" value={values.biz_reg_no} onChange={(e) => set('biz_reg_no', e.target.value)} disabled={disabled || !manual} placeholder="000-00-00000" />
-        <Input label="은행명" value={values.bank_name} onChange={(e) => set('bank_name', e.target.value)} disabled={disabled || !manual} />
+        <Input label="사업자번호" value={values.biz_reg_no} onChange={(e) => set('biz_reg_no', e.target.value)} disabled={disabled} placeholder="000-00-00000" />
+        <Input label="은행명" value={values.bank_name} onChange={(e) => set('bank_name', e.target.value)} disabled={disabled} />
       </div>
-      <Input label="계좌번호" value={values.bank_account} onChange={(e) => set('bank_account', e.target.value)} disabled={disabled || !manual} />
+      <Input label="계좌번호" value={values.bank_account} onChange={(e) => set('bank_account', e.target.value)} disabled={disabled} />
 
       <div className="rounded-lg bg-white border border-orange-200 p-2.5 text-xs space-y-1">
         <div className="flex justify-between text-slate-600">

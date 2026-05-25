@@ -13,7 +13,7 @@ import PaymentRequestPersonFields, { EMPTY_PERSON, type PersonValues } from './P
 import PaymentRequestCompanyFields, { EMPTY_COMPANY, type CompanyClient, type CompanyValues } from './PaymentRequestCompanyFields';
 // 박경수님 + SkyClaw 2026-05-26 — 견적 항목 동적 로드
 import { useEstimateCategories } from '../../../hooks/useEstimateCategories';
-import { isOutsourceType, isOperationType } from '../../payroll/payrollUtils';
+import { isOutsourceType } from '../../payroll/payrollUtils';
 
 type Group = 'outsource' | 'operation';
 
@@ -53,9 +53,13 @@ const FALLBACK_CATEGORY_BY_GROUP: Record<Group, string[]> = {
   operation: ['호텔', '버스', '재료비', '식비', '장비', '인쇄', '운영비', '기타'],
 };
 
-// 견적 카테고리를 group 기준으로 필터 (prefix 매칭)
+// 견적 카테고리를 group 기준으로 필터.
+// 박경수님 보고 fix (2026-05-26) — 운영비는 isOperationType prefix 매칭 외에도
+// "숙식 및 임차" 같은 자유 카테고리를 포괄해야 함. 따라서 인건비가 아닌 모든 카테고리를 운영비에 노출.
 function filterByGroup(cats: string[], group: Group): string[] {
-  return cats.filter((c) => group === 'outsource' ? isOutsourceType(c) : isOperationType(c));
+  if (group === 'outsource') return cats.filter(isOutsourceType);
+  // operation = 인건비가 아닌 모든 자유 카테고리
+  return cats.filter((c) => !isOutsourceType(c));
 }
 
 function buildExpenseType(group: Group, category: string, custom: string): string {

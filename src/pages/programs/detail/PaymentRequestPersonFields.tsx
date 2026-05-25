@@ -21,15 +21,18 @@ export const EMPTY_PERSON: PersonValues = {
   payee_name: '', payee_id_no: '', bank_name: '', bank_account: '', tax_rate_type: '3.3',
 };
 
-// 박경수님 + SkyClaw — staff_pool 검색 결과 (필요한 컬럼만)
+// 박경수님 + SkyClaw — staff_pool / profiles 검색 결과
 interface StaffSearchResult {
+  source: 'staff_pool' | 'profile';
   id: string;
   name: string;
-  id_number: string | null;     // 박경수님 환경 컬럼명 (가이드의 resident_number 매핑)
+  id_number: string | null;     // staff_pool 만, profiles 는 null
   bank_name: string | null;
   bank_account: string | null;
-  staff_type: string | null;    // 가이드의 role 매핑
+  staff_type: string | null;    // staff_pool 만
   position: string | null;
+  organization: string | null;  // staff_pool 의 소속 / profiles 의 부서
+  note: string | null;          // '임시등록' 배지
 }
 
 function maskRrn(raw: string): string {
@@ -84,25 +87,61 @@ export default function PaymentRequestPersonFields({ values, totalAmount, onChan
     });
   }
 
+  // 박경수님 + SkyClaw — staff_pool + profiles 통합 검색
   async function runSearch(q: string) {
-    if (q.trim().length < 2) { setStaffResults([]); setShowDropdown(false); return; }
     setSearching(true);
-    const like = `%${q.trim()}%`;
-    // 가이드의 phone 외에 phone_mobile·phone_office 까지 OR 검색
-    const { data, error } = await supabase
-      .from('staff_pool')
-      .select('id, name, id_number, bank_name, bank_account, staff_type, position')
-      .or(`name.ilike.${like},phone.ilike.${like},phone_mobile.ilike.${like}`)
-      .is('deleted_at', null)
-      .limit(10);
-    setSearching(false);
-    if (error) {
-      console.error('[PaymentRequestPersonFields] staff 검색 실패:', error.message);
-      setStaffResults([]); setShowDropdown(true);
-      return;
+    const trimmed = q.trim();
+    const isPreview = trimmed.length === 0; // 빈 상태 = 미리보기 (상위 N건)
+    try {
+      // 1) staff_pool 검색
+      let staffQ = supabase.from('staff_pool')
+        .select('id, name, id_number, bank_name, bank_account, staff_type, position, organization, note')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(isPreview ? 8 : 10);
+      if (!isPreview) {
+        const like = `%${trimmed}%`;
+        staffQ = staffQ.or(`name.ilike.${like},phone.ilike.${like},phone_mobile.ilike.${like},organization.ilike.${like}`);
+      }
+      // 2) profiles (내부 팀원) 검색
+      let profileQ = supabase.from('profiles')
+        .select('id, name, position, department')
+        .eq('is_active', true)
+        .order('name')
+        .limit(isPreview ? 5 : 10);
+      if (!isPreview) {
+        const like = `%${trimmed}%`;
+        profileQ = profileQ.or(`name.ilike.${like},department.ilike.${like}`);
+      }
+      const [staffRes, profileRes] = await Promise.all([staffQ, profileQ]);
+      if (staffRes.error) console.error('[PaymentRequestPersonFields] staff_pool 검색 실패:', staffRes.error.message);
+      if (profileRes.error) console.error('[PaymentRequestPersonFields] profiles 검색 실패:', profileRes.error.message);
+
+      const staffRows: StaffSearchResult[] = (staffRes.data ?? []).map((s) => ({
+        source: 'staff_pool',
+        id: s.id, name: s.name,
+        id_number: s.id_number ?? null,
+        bank_name: s.bank_name ?? null,
+        bank_account: s.bank_account ?? null,
+        staff_type: s.staff_type ?? null,
+        position: s.position ?? null,
+        organization: s.organization ?? null,
+        note: s.note ?? null,
+      }));
+      const profileRows: StaffSearchResult[] = (profileRes.data ?? []).map((p) => ({
+        source: 'profile',
+        id: p.id, name: p.name,
+        id_number: null, bank_name: null, bank_account: null,
+        staff_type: null,
+        position: p.position ?? null,
+        organization: p.department ?? null,
+        note: null,
+      }));
+      setStaffResults([...staffRows, ...profileRows]);
+      setShowDropdown(true);
+    } finally {
+      setSearching(false);
     }
-    setStaffResults((data ?? []) as StaffSearchResult[]);
-    setShowDropdown(true);
   }
 
   function handleNameChange(v: string) {
@@ -112,8 +151,32 @@ export default function PaymentRequestPersonFields({ values, totalAmount, onChan
     timeoutRef.current = setTimeout(() => { void runSearch(v); }, 200);
   }
 
+  // 박경수님 요청 — 인라인 임시등록 (검색 결과 0건 + 1글자 이상 시 노출)
+  const [tempSaving, setTempSaving] = useState(false);
+  async function handleTempRegister() {
+    const name = values.payee_name.trim();
+    if (!name) return;
+    setTempSaving(true);
+    const { data, error } = await supabase.from('staff_pool')
+      .insert({ name, note: '임시등록' })
+      .select('id, name, id_number, bank_name, bank_account').single();
+    setTempSaving(false);
+    if (error || !data) {
+      console.error('[PaymentRequestPersonFields] 임시등록 실패:', error?.message);
+      return;
+    }
+    onChange({
+      ...values,
+      payee_name: data.name,
+      payee_id_no: data.id_number ?? '',
+      bank_name: data.bank_name ?? '',
+      bank_account: data.bank_account ?? '',
+    });
+    setShowDropdown(false);
+  }
+
   function selectStaff(s: StaffSearchResult) {
-    // 박경수님 요청 — 선택 시 주민번호·은행 자동채움
+    // 박경수님 요청 — 선택 시 주민번호·은행 자동채움 (profile 은 이름만 있음)
     onChange({
       ...values,
       payee_name: s.name,
@@ -122,7 +185,6 @@ export default function PaymentRequestPersonFields({ values, totalAmount, onChan
       bank_account: s.bank_account ?? '',
     });
     setShowDropdown(false);
-    setStaffResults([]);
   }
 
   // 외부 클릭 시 드롭다운 닫기
@@ -153,22 +215,26 @@ export default function PaymentRequestPersonFields({ values, totalAmount, onChan
           </div>
           <input type="text" value={values.payee_name}
             onChange={(e) => handleNameChange(e.target.value)}
-            onFocus={() => { if (staffResults.length > 0) setShowDropdown(true); }}
+            onFocus={() => { void runSearch(values.payee_name); }}
             disabled={disabled}
-            placeholder="이름 검색 (등록된 전문가·직원) — 직접 입력도 가능"
+            placeholder="이름 클릭/입력 — 등록된 전문가·직원 목록"
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60" />
           {showDropdown && (
-            <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
-              {searching && <div className="px-3 py-2 text-xs text-slate-400">검색 중…</div>}
-              {!searching && staffResults.length === 0 && values.payee_name.trim().length >= 2 && (
-                <div className="px-3 py-2 text-xs text-slate-400">검색 결과 없음 — 직접 입력하세요</div>
+            <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-72 overflow-y-auto">
+              {searching && <div className="px-3 py-2 text-xs text-slate-400">불러오는 중…</div>}
+              {/* staff_pool 섹션 */}
+              {!searching && staffResults.filter((s) => s.source === 'staff_pool').length > 0 && (
+                <div className="px-3 py-1 bg-cyan-50/60 text-[10px] font-bold text-cyan-700 border-b border-cyan-100 sticky top-0">🎓 전문가 (staff_pool)</div>
               )}
-              {staffResults.map((s) => (
-                <button key={s.id} type="button" onClick={() => selectStaff(s)}
-                  className="block w-full text-left px-3 py-2 text-sm hover:bg-violet-50 border-b border-slate-50 last:border-b-0">
+              {staffResults.filter((s) => s.source === 'staff_pool').map((s) => (
+                <button key={`s-${s.id}`} type="button" onClick={() => selectStaff(s)}
+                  className="block w-full text-left px-3 py-2 text-sm hover:bg-violet-50 border-b border-slate-50">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-text">{s.name}</span>
-                    <span className="text-[10px] text-slate-400">{s.staff_type ?? s.position ?? ''}</span>
+                    <span className="font-semibold text-text inline-flex items-center gap-1.5">
+                      {s.name}
+                      {s.note === '임시등록' && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-100 text-amber-700 font-bold">임시</span>}
+                    </span>
+                    <span className="text-[10px] text-slate-400">{s.staff_type ?? s.position ?? s.organization ?? ''}</span>
                   </div>
                   <div className="text-[10px] text-slate-400">
                     {s.bank_name ? `${s.bank_name} ${s.bank_account ?? ''}` : '계좌 미등록'}
@@ -176,6 +242,33 @@ export default function PaymentRequestPersonFields({ values, totalAmount, onChan
                   </div>
                 </button>
               ))}
+              {/* profiles 섹션 */}
+              {!searching && staffResults.filter((s) => s.source === 'profile').length > 0 && (
+                <div className="px-3 py-1 bg-slate-50 text-[10px] font-bold text-slate-600 border-b border-slate-100 sticky top-0">👥 내부 팀원 (profiles)</div>
+              )}
+              {staffResults.filter((s) => s.source === 'profile').map((s) => (
+                <button key={`p-${s.id}`} type="button" onClick={() => selectStaff(s)}
+                  className="block w-full text-left px-3 py-2 text-sm hover:bg-violet-50 border-b border-slate-50">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-text">{s.name}</span>
+                    <span className="text-[10px] text-slate-400">{s.organization ?? s.position ?? '팀원'}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">은행·주민번호는 직접 입력하세요</div>
+                </button>
+              ))}
+              {/* 0건 안내 + 인라인 임시등록 */}
+              {!searching && staffResults.length === 0 && (
+                <div className="px-3 py-2 text-xs text-slate-400">
+                  {values.payee_name.trim() ? '검색 결과 없음' : '등록된 인력이 없어요.'}
+                </div>
+              )}
+              {!searching && values.payee_name.trim().length > 0 &&
+                !staffResults.some((s) => s.source === 'staff_pool' && s.name === values.payee_name.trim()) && (
+                <button type="button" onClick={() => void handleTempRegister()} disabled={tempSaving}
+                  className="block w-full text-left px-3 py-2.5 text-xs font-bold text-violet-700 bg-violet-50/50 hover:bg-violet-100 border-t border-violet-200">
+                  {tempSaving ? '등록 중…' : `🆕 "${values.payee_name.trim()}" 전문가로 임시등록`}
+                </button>
+              )}
             </div>
           )}
         </div>
