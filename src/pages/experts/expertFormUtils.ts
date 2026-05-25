@@ -21,6 +21,7 @@ export interface ExpertFormState {
   bankAccount: string;
   bankHolder: string;
   idNumber: string;
+  tags: string[];          // STEP-TAGS-2C — 분류 태그
 }
 
 export const EMPTY_EXPERT_FORM: ExpertFormState = {
@@ -28,7 +29,7 @@ export const EMPTY_EXPERT_FORM: ExpertFormState = {
   phoneMobile: '', phoneOffice: '', email: '',
   mainDuties: '', careerSummary: '',
   bankName: '', bankAccount: '', bankHolder: '',
-  idNumber: '',
+  idNumber: '', tags: [],
 };
 
 export function expertToForm(s: StaffPool): ExpertFormState {
@@ -39,6 +40,7 @@ export function expertToForm(s: StaffPool): ExpertFormState {
     mainDuties: s.main_duties ?? '', careerSummary: s.career_summary ?? '',
     bankName: s.bank_name ?? '', bankAccount: s.bank_account ?? '', bankHolder: s.bank_holder ?? '',
     idNumber: s.id_number ?? '',
+    tags: Array.isArray(s.tags) ? s.tags : [],
   };
 }
 
@@ -127,6 +129,7 @@ export function buildExpertPayload(input: BuildPayloadInput) {
     bank_account: form.bankAccount.trim() || null,
     bank_holder: form.bankHolder.trim() || null,
     id_number: idDigits || null,
+    tags: form.tags ?? [],
     profile_image_url: photoUrl,
     staff_type: staffType || null,
     resume_url: resumeUrl,

@@ -19,6 +19,7 @@ import {
 } from './clientFormHelpers';
 import ClientContactsSection from './ClientContactsSection';
 import ClientCardScanSection from './ClientCardScanSection';
+import TagsSelector from '../../components/TagsSelector';
 import type { ClientCardExtracted } from '../../lib/clientCardAutoFill';
 
 type Props = {
@@ -198,6 +199,7 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
         bank_account: form.bankAccount.trim() || null,
         bank_holder: form.bankHolder.trim() || null,
         business_license_url: licenseUrl,
+        tags: form.tags ?? [],
       };
 
       let clientId: string | null = null;
@@ -303,6 +305,7 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
             </div>
             <Input label="법인명 (사업자등록증 상)" value={form.businessName} onChange={(e) => update('businessName', e.target.value)} disabled={submitting} placeholder="예) 주식회사 밸런스닷" />
           </div>
+          <TagsSelector scope="client" value={form.tags} onChange={(next) => update('tags', next)} disabled={submitting} />
           <Input label="대표자명" value={form.ceoName} onChange={(e) => update('ceoName', e.target.value)} disabled={submitting} placeholder="예) 박경수" />
           <Input
             label="사업자등록번호"

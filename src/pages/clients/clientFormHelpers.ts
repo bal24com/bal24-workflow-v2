@@ -23,6 +23,7 @@ export type ClientForm = {
   phone: string;
   email: string;
   note: string;
+  tags: string[];              // STEP-TAGS-2C — 분류 태그 (관리자 카테고리)
 };
 
 export const EMPTY_CLIENT: ClientForm = {
@@ -30,7 +31,7 @@ export const EMPTY_CLIENT: ClientForm = {
   representative: '', businessNumber: '', businessType: '', businessItem: '',
   department: '',
   bankName: '', bankAccount: '', bankHolder: '',
-  address: '', phone: '', email: '', note: '',
+  address: '', phone: '', email: '', note: '', tags: [],
 };
 
 export function clientToForm(c: Client): ClientForm {
@@ -51,6 +52,7 @@ export function clientToForm(c: Client): ClientForm {
     phone: c.phone ?? '',
     email: c.email ?? '',
     note: c.note ?? '',
+    tags: Array.isArray(c.tags) ? c.tags : [],
   };
 }
 

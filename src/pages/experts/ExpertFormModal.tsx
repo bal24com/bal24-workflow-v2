@@ -9,6 +9,7 @@ import { Modal, Button, Input, FileDropZone } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { extractBusinessCardInfo, ClaudeApiKeyMissingError, ClaudeApiError } from '../../lib/businessCardScan';
 import ExpertFormExtSection from './ExpertFormExtSection';
+import TagsSelector from '../../components/TagsSelector';
 import {
   EXPERT_STORAGE_BUCKET, EMPTY_EXPERT_FORM, expertToForm, maskIdNumber,
   translateInsertError, translateUploadError, uploadResume, buildExpertPayload,
@@ -227,6 +228,7 @@ export default function ExpertFormModal({ open, expert, onClose, onCreated }: Pr
             <Input label="직책" value={form.position} onChange={(e) => update('position', e.target.value)} disabled={submitting} placeholder="예) 교수 / 컨설턴트" />
             <Input label="분야" value={form.specialty} onChange={(e) => update('specialty', e.target.value)} disabled={submitting} placeholder="콤마로 구분 (예: 교육, 컨설팅)" helperText="필터·검색 키워드로 사용돼요." />
           </div>
+          <TagsSelector scope="staff" value={form.tags} onChange={(next) => update('tags', next)} disabled={submitting} />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input label="휴대폰" value={form.phoneMobile} onChange={(e) => update('phoneMobile', e.target.value)} disabled={submitting} placeholder="010-0000-0000" />
             <Input label="사무실" value={form.phoneOffice} onChange={(e) => update('phoneOffice', e.target.value)} disabled={submitting} />
