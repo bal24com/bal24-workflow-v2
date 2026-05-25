@@ -39,6 +39,8 @@ export default function EstimateTab({ projectId, projectName }: Props) {
   const [extractedFileName, setExtractedFileName] = useState('');
   // 박경수님 요청 — 템플릿 저장/불러오기 + 견적서 헤더 수정
   const [saveTplOpen, setSaveTplOpen] = useState(false); const [loadTplOpen, setLoadTplOpen] = useState(false); const [headerEditOpen, setHeaderEditOpen] = useState(false);
+  // 박경수님 보고 — 변경 감지: 사용자가 수정했는데 [저장] 모르는 경우 안내
+  const [dirty, setDirty] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -84,11 +86,14 @@ export default function EstimateTab({ projectId, projectName }: Props) {
   }
 
   function addItem() {
-    setItems((prev) => [...prev, emptyDraft(prev.length)]);
+    const defaultProgramId = programFilter || programs[0]?.id || null;
+    setItems((prev) => [...prev, { ...emptyDraft(prev.length), program_id: defaultProgramId }]);
+    setDirty(true);
   }
 
   function updateItem(idx: number, patch: Partial<DraftItem>) {
     setItems((prev) => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
+    setDirty(true);
   }
 
   async function removeItem(idx: number) {
@@ -116,6 +121,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
     setSaving(false);
     if (err) { toast.error(err); return; }
     toast.success('견적을 저장했어요.');
+    setDirty(false);
     void reload();
   }
 
@@ -215,12 +221,16 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           <Button variant="outline" size="sm" leftIcon={<Download size={12} />} onClick={() => setLoadTplOpen(true)}>템플릿 불러오기</Button>
           <Button variant="outline" size="sm" leftIcon={<BookOpen size={12} />} onClick={() => setSaveTplOpen(true)} disabled={items.length === 0}>템플릿 저장</Button>
           <Button variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={addItem}>항목 추가</Button>
-          <Button variant="primary" size="sm" leftIcon={<Save size={12} />} onClick={() => void handleSave()} loading={saving}>저장</Button>
+          <Button variant="primary" size="sm" leftIcon={<Save size={12} />} onClick={() => void handleSave()} loading={saving}
+            className={dirty ? 'ring-2 ring-amber-300 ring-offset-1 animate-pulse' : ''}>
+            {dirty ? '저장 (변경됨)' : '저장'}
+          </Button>
         </div>
       </div>
 
-      <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-2.5 text-xs text-violet-900">
-        💡 견적 항목을 [저장] 한 뒤 프로그램 → [지급요청] → [⬇ 견적에서 가져오기] 에서 박경수님이 선택·수정 후 지출로 등록하세요. (견적과 실집행이 다를 수 있어 자동 일괄 변환은 사용 안 함)
+      <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-2.5 text-xs text-violet-900 space-y-1">
+        <div>💡 <strong>수정 방법</strong>: 표의 각 셀을 직접 클릭해서 수정 → 우측 상단 <strong className="text-violet-700">[저장]</strong> 클릭. [항목 추가] 로 새 행 추가, [삭제] 로 즉시 DB 제거.</div>
+        <div>📤 저장한 항목은 프로그램 → [지급요청] → [⬇ 견적에서 가져오기] 에서 선택·수정 후 지출로 등록 (자동 일괄 변환 X).</div>
       </div>
 
       {/* 박경수님 요청 — 메인 탭: [종합] + 프로그램별 */}
@@ -281,7 +291,6 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs text-slate-500">
             <tr>
-              <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">프로그램</th>
               <EstSortTh k="category"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">항목</EstSortTh>
               <EstSortTh k="description"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">세항목</EstSortTh>
               <EstSortTh k="payee_name"    sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">내용</EstSortTh>
@@ -296,7 +305,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {visibleItems.length === 0 ? (
-              <tr><td colSpan={11} className="px-3 py-6 text-center text-xs text-slate-400 italic">
+              <tr><td colSpan={10} className="px-3 py-6 text-center text-xs text-slate-400 italic">
                 {items.length === 0 ? '견적 항목이 아직 없어요. [항목 추가] 로 시작해 보세요.' : '필터/검색 결과가 없어요.'}
               </td></tr>
             ) : visibleItems.map((it) => {
@@ -306,14 +315,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
               const locked = !!it._converted;
               return (
                 <tr key={idx} className={locked ? 'bg-emerald-50/30' : 'hover:bg-violet-50/30'}>
-                  <td className="px-2 py-1 w-40">
-                    {/* 박경수님 요청 — 항목별 프로그램 연결 */}
-                    <select value={it.program_id ?? ''} onChange={(e) => updateItem(idx, { program_id: e.target.value || null })}
-                      disabled={locked} className="w-full h-9 rounded-xl border border-slate-200 px-2 text-xs disabled:bg-slate-50">
-                      <option value="">{programs.length === 0 ? '프로그램 없음' : '미연결'}</option>
-                      {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                  </td>
+                  {/* 박경수님 요청 — 프로그램 컬럼 제거. addItem 시 자동 prefill. 프로그램별 메인 탭으로 분류 가능 */}
                   <td className="px-2 py-1">
                     <Input list="estimate-categories" value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} disabled={locked} />
                   </td>
