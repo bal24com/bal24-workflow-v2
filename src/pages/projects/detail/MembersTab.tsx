@@ -1,5 +1,5 @@
 // bal24 v2 — 프로젝트 상세 · 참여인력 탭
-// project_members ⨯ profiles 조인
+// project_members ⨯ profiles 조인 + projects.pm_id 자동 통합 (담당자가 비어 있으면 [PM] 배지로 노출)
 
 import { useEffect, useState } from 'react';
 import { Loader2, UserCircle2 } from 'lucide-react';
@@ -19,6 +19,16 @@ type MemberRow = {
   } | null;
 };
 
+// projects.pm_id 가 있는데 project_members 에 없을 때 동기화 row (가상)
+function synthesizePm(pm: { id: string; name: string; email: string; department: string | null; role: string }): MemberRow {
+  return {
+    id: `pm:${pm.id}`,
+    role: 'PM (담당자)',
+    created_at: '',
+    profile: pm,
+  };
+}
+
 type Props = {
   projectId: string;
 };
@@ -35,26 +45,27 @@ export default function MembersTab({ projectId }: Props) {
     let cancelled = false;
     setLoading(true);
     setErrorMsg(null);
-
-    supabase
-      .from('project_members')
-      .select(SELECT_COLUMNS)
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: true })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          console.error('[members] 조회 실패:', error.message);
-          setErrorMsg('참여인력 목록을 불러오지 못했어요.');
-        } else {
-          setMembers((data ?? []) as unknown as MemberRow[]);
-        }
+    void (async () => {
+      const [mRes, pRes] = await Promise.all([
+        supabase.from('project_members').select(SELECT_COLUMNS).eq('project_id', projectId).order('created_at', { ascending: true }),
+        supabase.from('projects').select('pm_id, pm:profiles!projects_pm_id_fkey(id, name, email, department, role)').eq('id', projectId).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      if (mRes.error) {
+        console.error('[members] 조회 실패:', mRes.error.message);
+        setErrorMsg('참여인력 목록을 불러오지 못했어요.');
         setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+        return;
+      }
+      const base = (mRes.data ?? []) as unknown as MemberRow[];
+      // projects.pm_id 가 있고 project_members 에 같은 profile 이 없으면 자동 합치기 (가상 row)
+      const pmRaw = (pRes.data as { pm: { id: string; name: string; email: string; department: string | null; role: string } | { id: string; name: string; email: string; department: string | null; role: string }[] | null } | null)?.pm;
+      const pm = Array.isArray(pmRaw) ? pmRaw[0] : pmRaw;
+      const merged = pm && !base.some((m) => m.profile?.id === pm.id) ? [synthesizePm(pm), ...base] : base;
+      setMembers(merged);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [projectId]);
 
   if (loading) {

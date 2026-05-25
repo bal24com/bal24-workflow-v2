@@ -87,9 +87,15 @@ export default function PortalCreateModal({
           setItems(drafts);
         });
     } else {
+      // 신규 모드 — 프로젝트명 자동 prefill (박경수님 요청: 기존 프로젝트 정보 가져오기)
       setForm(EMPTY);
       setItems([makeItemDraft('file_download')]);
       setSelectedTemplateId('');
+      void supabase.from('projects').select('name').eq('id', projectId).maybeSingle()
+        .then(({ data }) => {
+          const projectName = (data as { name: string } | null)?.name;
+          if (projectName) setForm((p) => ({ ...p, title: `${projectName} 계약 자료` }));
+        });
     }
 
     void supabase.from('portal_templates').select('*').order('created_at', { ascending: false })
