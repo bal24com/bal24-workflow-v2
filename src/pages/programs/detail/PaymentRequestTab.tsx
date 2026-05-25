@@ -9,11 +9,10 @@ import { useToast } from '../../../contexts/ToastContext';
 import { formatDateKo, formatMoney } from '../../../lib/utils';
 import EmptyState from '../../../components/EmptyState';
 import SubToggle from './SubToggle';
-import PaymentRequestFormModal from './PaymentRequestFormModal';
+import PaymentRequestFormModal, { type PaymentTarget } from './PaymentRequestFormModal';
 import PaymentSummaryCards from './PaymentSummaryCards';
 import EstimateImportModal from './EstimateImportModal';
-import PayrollExpenseFormModal from '../../payroll/PayrollExpenseFormModal';
-import { isOutsourceType, isOperationType, type PayrollRow } from '../../payroll/payrollUtils';
+import { isOutsourceType, isOperationType } from '../../payroll/payrollUtils';
 
 type Group = 'outsource' | 'operation';
 
@@ -22,6 +21,9 @@ interface Row {
   expense_type: string;
   description: string | null;
   payee_name: string;
+  payee_id_no: string | null;
+  bank_name: string | null;
+  bank_account: string | null;
   unit_price: number;
   quantity: number;
   subtotal: number;
@@ -30,12 +32,13 @@ interface Row {
   net_amount: number | null;
   payment_status: string;
   paid_at: string | null;
+  memo: string | null;
   order_index?: number | null;
-  // 박경수님 보고 — 수정 시 program_id/project_id/contract_id 가 null 로 덮어써져
-  // 그 행이 사라지는 버그. PayrollExpenseFormModal 의 prefill 위해 fetch 필수.
   program_id: string | null;
   project_id: string | null;
   contract_id: string | null;
+  client_id?: string | null;
+  biz_reg_no?: string | null;
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -54,7 +57,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<PayrollRow | null>(null);
+  const [editTarget, setEditTarget] = useState<PaymentTarget | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [counts, setCounts] = useState({ outsource: 0, operation: 0 });
 
@@ -62,8 +65,8 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
     setLoading(true);
     const { data, error } = await supabase
       .from('payroll_expenses')
-      // 박경수님 보고 fix — program_id/project_id/contract_id 도 fetch (수정 시 null 덮어쓰기 방지)
-      .select('id, expense_type, description, payee_name, unit_price, quantity, subtotal, tax_amount, tax_rate_type, net_amount, payment_status, paid_at, order_index, program_id, project_id, contract_id')
+      // 박경수님 보고 fix — 모든 필드 fetch (수정 시 null 덮어쓰기 방지). client_id/biz_reg_no 는 마이그레이션 후 작동
+      .select('id, expense_type, description, payee_name, payee_id_no, bank_name, bank_account, unit_price, quantity, subtotal, tax_amount, tax_rate_type, net_amount, payment_status, paid_at, memo, order_index, program_id, project_id, contract_id, client_id, biz_reg_no')
       .eq('program_id', programId)
       .is('deleted_at', null)
       .order('order_index', { ascending: true, nullsFirst: false })
@@ -204,7 +207,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                     <span className="inline-flex items-center gap-1">
                       <button type="button" onClick={() => void swap(idx, 'up')} disabled={idx === 0} aria-label="위로" title="위로" className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30"><ArrowUp size={11} aria-hidden="true" /></button>
                       <button type="button" onClick={() => void swap(idx, 'down')} disabled={idx === visible.length - 1} aria-label="아래로" title="아래로" className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30"><ArrowDown size={11} aria-hidden="true" /></button>
-                      <button type="button" onClick={() => setEditTarget(r as unknown as PayrollRow)} className="inline-flex items-center gap-0.5 text-xs text-violet-600 hover:underline ml-1"><Pencil size={11} aria-hidden="true" />수정</button>
+                      <button type="button" onClick={() => setEditTarget(r as PaymentTarget)} className="inline-flex items-center gap-0.5 text-xs text-violet-600 hover:underline ml-1"><Pencil size={11} aria-hidden="true" />수정</button>
                       <button type="button" onClick={() => void handleDelete(r)} disabled={acting === r.id} className="inline-flex items-center gap-0.5 text-xs text-rose-600 hover:underline disabled:opacity-40 ml-1"><Trash2 size={11} aria-hidden="true" />삭제</button>
                     </span>
                   </td>
@@ -225,9 +228,14 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
       />
       <EstimateImportModal open={importOpen} programId={programId} projectId={projectId} group={group}
         onClose={() => setImportOpen(false)} onSaved={() => { setImportOpen(false); void reload(); }} />
-      {/* 박경수님 요청 — 행 [수정] 클릭 시 풀 폼 모달 (외주/급여 페이지와 동일 모달 재사용) */}
-      <PayrollExpenseFormModal open={!!editTarget} target={editTarget} defaultType={editTarget?.expense_type ?? '강사료'}
-        onClose={() => setEditTarget(null)} onSaved={() => { setEditTarget(null); void reload(); }} />
+      {/* 박경수님 요청 — 행 [수정] 클릭 시 PaymentRequestFormModal 수정 모드 (group 자동 추론) */}
+      {editTarget && (
+        <PaymentRequestFormModal open={true} programId={programId} projectId={projectId}
+          group={isOutsourceType(editTarget.expense_type) ? 'outsource' : 'operation'}
+          target={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => { setEditTarget(null); void reload(); }} />
+      )}
     </div>
   );
 }
