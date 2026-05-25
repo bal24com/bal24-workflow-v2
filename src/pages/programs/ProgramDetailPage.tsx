@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Info, Loader2, Mic2, Pencil, FileBarChart, BookOpen, Users2, Settings, FileText, MessageSquare,
+  ArrowLeft, Info, Loader2, Mic2, Pencil, FileBarChart, BookOpen, Users2, Settings, FileText, MessageSquare, ReceiptText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui';
@@ -27,6 +27,7 @@ import InstructorManageTab from './detail/InstructorManageTab';
 import ReportManageTab from './detail/ReportManageTab';
 import ProgramReportTab from './detail/ProgramReportTab';
 import MentoringTab from './detail/MentoringTab';
+import PaymentRequestTab from './detail/PaymentRequestTab';
 import SettingsShareTab from './detail/SettingsShareTab';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { usePartnerProfile } from '../../hooks/usePartnerProfile';
@@ -40,7 +41,7 @@ type DetailProgram = Program & {
 // STEP-PROGRAM-UX-A — 'attendance' → 'activity-log' (출석은 교육생 탭으로 이동)
 // STEP-TAB-RESTRUCTURE-B — 'activity-log' / 'grant' 제거 → 설정·공유 sub로 이동
 // STEP-MENTORING-FULL — 'mentoring' 메인 탭 추가 (강사·만족도 사이) — 8 탭
-type TabKey = 'overview' | 'curriculum' | 'participants' | 'instructor' | 'mentoring' | 'report' | 'final-report' | 'settings';
+type TabKey = 'overview' | 'curriculum' | 'participants' | 'instructor' | 'mentoring' | 'payment' | 'report' | 'final-report' | 'settings';
 
 interface AuthCtx {
   isPM: boolean; isStaff: boolean; isMember: boolean; isPartner: boolean;
@@ -62,6 +63,8 @@ const TABS: TabDef[] = [
   { key: 'instructor',   label: '강사',         Icon: Mic2 },
   // STEP-MENTORING-FULL — 멘토링 메인 탭 (PM/Staff)
   { key: 'mentoring',    label: '멘토링',       Icon: MessageSquare,   hide: (c) => c.isMember || c.isPartner },
+  // 박경수님 요청 — 호텔/버스/재료비 지급요청 (운영 지출 → payroll_expenses)
+  { key: 'payment',      label: '지급요청',     Icon: ReceiptText,     hide: (c) => c.isMember || c.isPartner },
   { key: 'report',       label: '만족도·보고',  Icon: FileBarChart,
     hide: (c) => !c.isPM && !c.hasSurveyData && (c.isMember || c.isPartner) },
   // STEP-PROGRAM-REPORT-TAB — 결과보고서 (6섹션 자동집계·편집)
@@ -291,6 +294,7 @@ export default function ProgramDetailPage() {
         {tab === 'participants' && <ParticipantManageTab programId={programId} programName={program.name} canEdit={isStaff} />}
         {tab === 'instructor'   && <InstructorManageTab programId={programId} isPartner={isPartner} />}
         {tab === 'mentoring'    && <MentoringTab programId={programId} />}
+        {tab === 'payment'      && <PaymentRequestTab programId={programId} projectId={program.project_id ?? null} />}
         {tab === 'report'       && <ReportManageTab programId={programId} isPartner={isPartner} isMember={isMember} isStaff={isStaff} applicationType={program.application_type} />}
         {tab === 'final-report' && <ProgramReportTab programId={programId} />}
         {tab === 'settings'     && (
