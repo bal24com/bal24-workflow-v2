@@ -84,15 +84,11 @@ function StatusFilterTabs({
 }
 
 function ProjectMeta({ p }: { p: ProjectRow }) {
+  // 박경수님 요청 — 정보 순서: 주관기관(고객사) → 날짜 → 사업비 → 담당자
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
       <span>
-        담당자{' '}
-        <span className="text-slate-700 font-medium">{p.pm?.name ?? '미지정'}</span>
-      </span>
-      <span aria-hidden="true">·</span>
-      <span>
-        고객사{' '}
+        주관기관{' '}
         <span className="text-slate-700 font-medium">{p.client?.name ?? '미지정'}</span>
       </span>
       {(p.start_date || p.end_date) && (
@@ -106,9 +102,14 @@ function ProjectMeta({ p }: { p: ProjectRow }) {
       {p.budget != null && (
         <>
           <span aria-hidden="true">·</span>
-          <span>{formatMoney(p.budget)}</span>
+          <span>사업비 <span className="text-slate-700 font-medium">{formatMoney(p.budget)}</span></span>
         </>
       )}
+      <span aria-hidden="true">·</span>
+      <span>
+        담당자{' '}
+        <span className="text-slate-700 font-medium">{p.pm?.name ?? '미지정'}</span>
+      </span>
     </div>
   );
 }
@@ -177,7 +178,8 @@ export default function ProjectsPage() {
   const toast = useToast();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<ViewMode>('list');
+  // 박경수님 요청 — 카드 보기 우선
+  const [view, setView] = useState<ViewMode>('card');
   const [filter, setFilter] = useState<StatusFilter>('전체');
   const [filterConsortiumId, setFilterConsortiumId] = useState<ConsortiumFilter>(null);
   const [consortiums, setConsortiums] = useState<ConsortiumOption[]>([]);

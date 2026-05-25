@@ -4,13 +4,16 @@
 // - payload 에 undefined 필드 포함 시 Supabase 가 null 로 저장
 // - PaymentRequestPersonFields (인건비) / PaymentRequestCompanyFields (업체) 분리
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Modal, Button, Input } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import PaymentRequestPersonFields, { EMPTY_PERSON, type PersonValues } from './PaymentRequestPersonFields';
 import PaymentRequestCompanyFields, { EMPTY_COMPANY, type CompanyClient, type CompanyValues } from './PaymentRequestCompanyFields';
+// 박경수님 + SkyClaw 2026-05-26 — 견적 항목 동적 로드
+import { useEstimateCategories } from '../../../hooks/useEstimateCategories';
+import { isOutsourceType, isOperationType } from '../../payroll/payrollUtils';
 
 type Group = 'outsource' | 'operation';
 
@@ -44,10 +47,16 @@ interface Props {
   onSaved: () => void;
 }
 
-const CATEGORY_BY_GROUP: Record<Group, string[]> = {
+// 박경수님 + SkyClaw — 견적 항목이 없을 때 fallback 기본값. 견적 등록 후에는 견적 카테고리가 우선.
+const FALLBACK_CATEGORY_BY_GROUP: Record<Group, string[]> = {
   outsource: ['강사료', '촬영', '통역', '번역', '외주개발', '컨설팅', '기타외주'],
   operation: ['호텔', '버스', '재료비', '식비', '장비', '인쇄', '운영비', '기타'],
 };
+
+// 견적 카테고리를 group 기준으로 필터 (prefix 매칭)
+function filterByGroup(cats: string[], group: Group): string[] {
+  return cats.filter((c) => group === 'outsource' ? isOutsourceType(c) : isOperationType(c));
+}
 
 function buildExpenseType(group: Group, category: string, custom: string): string {
   const c = category === '기타' ? (custom.trim() || '기타') : category;
@@ -63,7 +72,16 @@ function cleanPayload<T extends Record<string, unknown>>(obj: T): Partial<T> {
 export default function PaymentRequestFormModal({ open, programId, projectId, group, target, onClose, onSaved }: Props) {
   const toast = useToast();
   const isEdit = !!target;
-  const categoryOptions = CATEGORY_BY_GROUP[group];
+  // 박경수님 + SkyClaw — 견적 항목 동적 로드 (fallback merge + 그룹 필터)
+  const { categories: estimateCats, loading: catsLoading } = useEstimateCategories(programId, projectId);
+  const categoryOptions = useMemo(() => {
+    const fromEstimate = filterByGroup(estimateCats, group);
+    const fallback = FALLBACK_CATEGORY_BY_GROUP[group];
+    // 견적 항목 우선, fallback 으로 누락 보강. 마지막은 항상 '기타' (직접 입력).
+    const merged = Array.from(new Set([...fromEstimate, ...fallback]));
+    const withoutEtc = merged.filter((c) => c !== '기타');
+    return [...withoutEtc, '기타'];
+  }, [estimateCats, group]);
   const [category, setCategory] = useState(categoryOptions[0]);
   const [customCategory, setCustomCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -190,10 +208,18 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
       <form id="payment-request-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-700">항목 <span className="text-rose-500">*</span></label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} disabled={submitting} className={SELECT_CLASS}>
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+              항목 <span className="text-rose-500">*</span>
+              {/* 박경수님 + SkyClaw — 견적 카테고리 로드 상태 표시 */}
+              {catsLoading && <span className="text-[10px] text-slate-400">(견적 불러오는 중…)</span>}
+            </label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} disabled={submitting || catsLoading} className={SELECT_CLASS}>
               {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
+            {/* 견적 항목 0건이면 안내 */}
+            {!catsLoading && filterByGroup(estimateCats, group).length === 0 && (
+              <p className="text-[10px] text-slate-400">💡 견적 탭에서 {group === 'outsource' ? '인건비' : '운영비'} 항목을 추가하면 여기 드롭다운에 자동 노출돼요.</p>
+            )}
           </div>
           {category === '기타'
             ? <Input label="항목 직접 입력" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} disabled={submitting} placeholder="예) 통역료" />
