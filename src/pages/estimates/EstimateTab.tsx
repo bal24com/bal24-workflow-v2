@@ -2,7 +2,7 @@
 // STEP-ACCOUNTING-FOLLOWUP7-Phase2 + Phase3 (AI 견적서 분석)
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Save, FileText, Wand2, Upload, Sparkles, BookOpen, Download, Search } from 'lucide-react';
+import { Loader2, Plus, Save, FileText, Wand2, BookOpen, Download, Search } from 'lucide-react';
 import { Button, Input } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../lib/supabase';
