@@ -2,7 +2,7 @@
 // 박경수님 요청 — 강사료(payroll 변환분 포함)도 인건비 탭에 통합 노출
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Trash2, Download } from 'lucide-react';
 import { Button } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
@@ -11,6 +11,7 @@ import EmptyState from '../../../components/EmptyState';
 import SubToggle from './SubToggle';
 import PaymentRequestFormModal from './PaymentRequestFormModal';
 import PaymentSummaryCards from './PaymentSummaryCards';
+import EstimateImportModal from './EstimateImportModal';
 import { isOutsourceType, isOperationType } from '../../payroll/payrollUtils';
 
 type Group = 'outsource' | 'operation';
@@ -45,6 +46,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
   const [counts, setCounts] = useState({ outsource: 0, operation: 0 });
 
@@ -102,9 +104,12 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
           active={group}
           onChange={(k) => setGroup(k as Group)}
         />
-        <Button variant="primary" size="sm" leftIcon={<Plus size={13} />} onClick={() => setFormOpen(true)}>
-          {group === 'outsource' ? '인건비 추가' : '운영비 추가'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" leftIcon={<Download size={13} />} onClick={() => setImportOpen(true)}>견적에서 가져오기</Button>
+          <Button variant="primary" size="sm" leftIcon={<Plus size={13} />} onClick={() => setFormOpen(true)}>
+            {group === 'outsource' ? '인건비 추가' : '운영비 추가'}
+          </Button>
+        </div>
       </div>
 
       <p className="text-[11px] text-slate-500">
@@ -185,6 +190,8 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
         onClose={() => setFormOpen(false)}
         onSaved={() => { setFormOpen(false); void reload(); }}
       />
+      <EstimateImportModal open={importOpen} programId={programId} projectId={projectId} group={group}
+        onClose={() => setImportOpen(false)} onSaved={() => { setImportOpen(false); void reload(); }} />
     </div>
   );
 }
