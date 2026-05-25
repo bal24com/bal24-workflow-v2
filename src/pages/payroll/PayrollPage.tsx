@@ -2,7 +2,7 @@
 // STEP-ACCOUNTING-ALL P3
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Loader2, Search, Users, Upload, ArrowUp, ArrowDown, ArrowUpDown, Filter, Download, FileText } from 'lucide-react';
+import { Plus, Loader2, Search, Users, Upload, ArrowUp, ArrowDown, ArrowUpDown, Filter, Download, FileText, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDateKo, formatMoney } from '../../lib/utils';
@@ -10,7 +10,7 @@ import EmptyState from '../../components/EmptyState';
 import { supabase } from '../../lib/supabase';
 import type { PayrollPaymentStatus } from '../../types/database';
 import {
-  fetchPayroll, softDeletePayroll, calcPayrollSummary, maskIdNo,
+  fetchPayroll, softDeletePayroll, bulkSoftDeletePayroll, calcPayrollSummary, maskIdNo,
   isOutsourceType, isOperationType,
   PAYROLL_STATUS_VALUES, PAYROLL_STATUS_STYLE,
   type PayrollRow,
@@ -54,6 +54,9 @@ export default function PayrollPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<PayrollRow | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  // 박경수님 + SkyClaw — 일괄 선택삭제
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -131,6 +134,31 @@ export default function PayrollPage() {
     void reload();
   }
 
+  // 박경수님 + SkyClaw — 일괄 선택삭제 (현재 화면 visible 기준 전체선택)
+  function toggleAll() {
+    if (visible.length === 0) return;
+    const allSelected = visible.every((r) => selectedIds.has(r.id));
+    setSelectedIds(allSelected ? new Set() : new Set(visible.map((r) => r.id)));
+  }
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`선택한 ${selectedIds.size}건을 휴지통으로 보낼까요?`)) return;
+    setBulkDeleting(true);
+    const err = await bulkSoftDeletePayroll(Array.from(selectedIds));
+    setBulkDeleting(false);
+    if (err) { toast.error(err); return; }
+    toast.success(`${selectedIds.size}건 삭제했어요.`);
+    setSelectedIds(new Set());
+    void reload();
+  }
+
   return (
     <div className="space-y-5 max-w-[1400px]">
       <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
@@ -198,6 +226,14 @@ export default function PayrollPage() {
             className="text-[11px] text-rose-600 hover:underline">초기화</button>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {/* 박경수님 + SkyClaw — 선택된 항목 있을 때만 [선택삭제] 노출 */}
+          {selectedIds.size > 0 && (
+            <Button variant="outline" size="sm" leftIcon={<Trash2 size={14} />}
+              onClick={() => void handleBulkDelete()} loading={bulkDeleting}
+              className="!border-rose-300 !text-rose-600 hover:!bg-rose-50">
+              선택삭제 ({selectedIds.size}건)
+            </Button>
+          )}
           <Button variant="outline" size="sm" leftIcon={<Download size={14} />} onClick={() => downloadPayrollExcel(visible)} disabled={visible.length === 0}>엑셀</Button>
           <Button variant="outline" size="sm" leftIcon={<FileText size={14} />}
             onClick={async () => { const r = await downloadPayrollPdf('payroll-table'); if (!r.ok) toast.error(`PDF 실패: ${r.reason}`); }}
@@ -232,6 +268,13 @@ export default function PayrollPage() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs">
               <tr>
+                {/* 박경수님 + SkyClaw — 전체선택 (visible 기준) */}
+                <th className="w-8 px-3 py-2.5">
+                  <input type="checkbox" aria-label="전체 선택"
+                    checked={visible.length > 0 && visible.every((r) => selectedIds.has(r.id))}
+                    onChange={toggleAll}
+                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                </th>
                 <SortableTh k="project"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">프로젝트</SortableTh>
                 <SortableTh k="expense_type"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">항목</SortableTh>
                 <SortableTh k="payee_name"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">성명/내용</SortableTh>
@@ -249,7 +292,15 @@ export default function PayrollPage() {
                 const hasReceipt = (r.receipt_urls?.length ?? 0) > 0;
                 const needReceipt = !hasReceipt && r.expense_type !== '운영인건비';
                 return (
-                  <tr key={r.id} className="hover:bg-violet-50/40">
+                  <tr key={r.id} className={`hover:bg-violet-50/40 ${selectedIds.has(r.id) ? 'bg-violet-50/30' : ''}`}>
+                    {/* 박경수님 + SkyClaw — 개별 선택 */}
+                    <td className="w-8 px-3 py-2">
+                      <input type="checkbox" aria-label={`${r.payee_name} 선택`}
+                        checked={selectedIds.has(r.id)}
+                        onChange={() => toggleOne(r.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                    </td>
                     <td className="px-3 py-2 text-xs text-muted">{r.project?.name ?? '-'}</td>
                     <td className="px-3 py-2 text-right text-xs whitespace-nowrap">
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border mr-1 ${

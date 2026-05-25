@@ -112,6 +112,23 @@ export async function softDeletePayroll(id: string): Promise<string | null> {
   return null;
 }
 
+// 박경수님 + SkyClaw — 일괄 선택삭제 (soft-delete). RLS UPDATE 정책 필수 (20260526_payroll_expenses_rls.sql)
+export async function bulkSoftDeletePayroll(ids: string[]): Promise<string | null> {
+  if (ids.length === 0) return null;
+  const { error } = await supabase
+    .from('payroll_expenses')
+    .update({ deleted_at: new Date().toISOString() })
+    .in('id', ids);
+  if (error) {
+    console.error('[payroll] 일괄 삭제 실패:', error.message);
+    if (error.message.toLowerCase().includes('row-level security')) {
+      return 'RLS 정책 누락 — 20260526_payroll_expenses_rls.sql 을 실행해 주세요.';
+    }
+    return '일괄 삭제 중 오류가 발생했어요.';
+  }
+  return null;
+}
+
 /** 합계 — 세전·원천세·실지급 */
 export interface PayrollSummary {
   subtotal: number;
