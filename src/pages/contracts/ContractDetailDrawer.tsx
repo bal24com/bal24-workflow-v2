@@ -73,11 +73,14 @@ export default function ContractDetailDrawer({ contract, onClose, onEdit, onChan
     );
   }
 
+  // 박경수님 + SkyClaw STEP-INCOME-CONTRACT-FIX — 입금일 직접 선택 (디폴트=오늘)
+  const [depositDate, setDepositDate] = useState('');
   async function handleConfirmDeposit() {
     if (!contract) return;
-    if (!window.confirm('입금이 확인되었나요? 상태가 "완료"로 변경됩니다.')) return;
+    const dateStr = depositDate || new Date().toISOString().slice(0, 10);
+    if (!window.confirm(`입금일을 ${dateStr} 로 처리하고 상태를 "완료"로 변경할까요?`)) return;
     setActing(true);
-    const err = await markContractDeposited(contract.id);
+    const err = await markContractDeposited(contract.id, dateStr);
     setActing(false);
     if (err) { toast.error(err); return; }
     toast.success('입금을 확인했어요.');
@@ -237,17 +240,17 @@ export default function ContractDetailDrawer({ contract, onClose, onEdit, onChan
           )}
         </div>
 
-        {/* Footer — 입금 확인 */}
+        {/* Footer — 입금 확인 + 입금일 직접 선택 (박경수님 + SkyClaw STEP-INCOME-CONTRACT-FIX) */}
         {!contract.deposited_at && contract.status !== '취소' && (
-          <footer className="px-5 py-3 border-t border-slate-200">
-            <Button
-              variant="primary"
-              size="md"
-              className="w-full"
-              leftIcon={<CheckCircle2 size={16} />}
-              onClick={() => void handleConfirmDeposit()}
-              loading={acting}
-            >
+          <footer className="px-5 py-3 border-t border-slate-200 space-y-2">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500 whitespace-nowrap">입금일</label>
+              <input type="date" value={depositDate} onChange={(e) => setDepositDate(e.target.value)}
+                className="flex-1 h-8 rounded-lg border border-slate-200 px-2 text-xs" />
+              <span className="text-[10px] text-slate-400">미선택 시 오늘</span>
+            </div>
+            <Button variant="primary" size="md" className="w-full" leftIcon={<CheckCircle2 size={16} />}
+              onClick={() => void handleConfirmDeposit()} loading={acting}>
               입금 확인 처리
             </Button>
           </footer>

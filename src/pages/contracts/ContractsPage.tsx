@@ -256,7 +256,14 @@ export default function ContractsPage() {
                       </button>
                     ) : <span className="text-muted">-</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-bold text-text tabular-nums whitespace-nowrap">{formatMoney(c.contract_amount)}</td>
+                  {/* 박경수님 + SkyClaw STEP-INCOME-CONTRACT-FIX — contract_amount=0 일 때 project.budget fallback */}
+                  <td className="px-4 py-2.5 text-right font-bold tabular-nums whitespace-nowrap">
+                    {(c.contract_amount ?? 0) > 0
+                      ? <span className="text-text">{formatMoney(c.contract_amount)}</span>
+                      : (c.project?.budget ?? 0) > 0
+                        ? <span className="text-amber-600">{formatMoney(c.project?.budget ?? 0)} <span className="text-[10px] font-normal">(예산기준)</span></span>
+                        : <span className="text-slate-400">{formatMoney(0)}</span>}
+                  </td>
                   <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">{billingProgressLabel(c.billing_schedule ?? [])}</td>
                   <td className="px-4 py-2.5 text-center">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-xs font-semibold whitespace-nowrap ${CONTRACT_STATUS_STYLE[c.status]}`}>

@@ -5,7 +5,8 @@ import { supabase } from '../../lib/supabase';
 import type { IncomeContract, ContractStatus, BillingScheduleItem } from '../../types/database';
 
 export type ContractRow = IncomeContract & {
-  project?: { id: string; name: string; deleted_at: string | null } | null;
+  // 박경수님 + SkyClaw STEP-INCOME-CONTRACT-FIX (2026-05-26) — project.budget fallback 표시용
+  project?: { id: string; name: string; budget: number | null; deleted_at: string | null } | null;
   program?: { id: string; name: string; deleted_at: string | null } | null;
   consortium?: { id: string; name: string; deleted_at: string | null } | null;
   client?: { id: string; name: string; department: string | null; deleted_at: string | null } | null;
@@ -14,7 +15,7 @@ export type ContractRow = IncomeContract & {
 };
 
 const SELECT_COLUMNS =
-  '*, project:projects(id, name, deleted_at), program:programs(id, name, deleted_at), consortium:consortiums(id, name, deleted_at), client:clients(id, name, department, deleted_at), billing_contact:client_contacts(id, name, position, email, phone_office, phone_mobile)';
+  '*, project:projects(id, name, budget, deleted_at), program:programs(id, name, deleted_at), consortium:consortiums(id, name, deleted_at), client:clients(id, name, department, deleted_at), billing_contact:client_contacts(id, name, position, email, phone_office, phone_mobile)';
 
 /** 휴지통 join row 제외 헬퍼 */
 function isLiveContract(c: ContractRow): boolean {
@@ -71,10 +72,12 @@ export async function softDeleteContract(id: string): Promise<string | null> {
 }
 
 /** 입금 확인 처리 — deposited_at + status='완료' */
-export async function markContractDeposited(id: string): Promise<string | null> {
+// 박경수님 + SkyClaw STEP-INCOME-CONTRACT-FIX (2026-05-26) — 입금일 직접 선택 가능 (디폴트=오늘)
+export async function markContractDeposited(id: string, isoDate?: string): Promise<string | null> {
+  const depositedAt = isoDate ? new Date(isoDate).toISOString() : new Date().toISOString();
   const { error } = await supabase
     .from('income_contracts')
-    .update({ deposited_at: new Date().toISOString(), status: '완료' })
+    .update({ deposited_at: depositedAt, status: '완료' })
     .eq('id', id);
   if (error) {
     console.error('[contracts] 입금 확인 실패:', error.message);
@@ -99,7 +102,9 @@ export interface ContractKpis {
 export function calcContractKpis(rows: ContractRow[]): ContractKpis {
   return rows.reduce<ContractKpis>(
     (acc, r) => {
-      if (r.status === '진행중') acc.inProgressTotal += Number(r.contract_amount || 0);
+      // 박경수님 + SkyClaw STEP-INCOME-CONTRACT-FIX — contract_amount=0 시 project.budget fallback
+      const amt = Number(r.contract_amount || 0) || Number(r.project?.budget || 0);
+      if (r.status === '진행중') acc.inProgressTotal += amt;
       if (r.status === '완료') acc.completedCount += 1;
       if (!r.deposited_at && r.status !== '취소') acc.notDepositedCount += 1;
       return acc;
