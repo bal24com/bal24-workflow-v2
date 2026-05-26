@@ -9,6 +9,8 @@ import ProgramFilesTab from './ProgramFilesTab';
 import AttendanceLogTab from './AttendanceLogTab';
 import GrantManageTab from './GrantManageTab';
 import CompletionThresholdPanel from './CompletionThresholdPanel';
+// 박경수님 + SkyClaw STEP-STAFF-PORTAL-REDESIGN PART E PM (2026-05-28) — 일정 4단계 등록 UI
+import ScheduleItemsManager from './ScheduleItemsManager';
 
 interface Props {
   programId: string;
@@ -18,13 +20,15 @@ interface Props {
   hasConsortium: boolean;
 }
 
-type SubKey = 'share' | 'files' | 'activity' | 'grant' | 'completion';
+type SubKey = 'share' | 'files' | 'activity' | 'schedule' | 'grant' | 'completion';
 
 export default function SettingsShareTab({ programId, isPM, consortiumId, applicationType, hasConsortium }: Props) {
   const items: { key: SubKey; label: string }[] = [
     { key: 'share',      label: '외부 공유' },
     { key: 'files',      label: '파일' },
     { key: 'activity',   label: '일지·수료증' },
+    // STEP-STAFF-PORTAL-REDESIGN PART E (2026-05-28) — PM 만 일정 4단계 등록
+    ...(isPM ? [{ key: 'schedule' as const, label: '일정 단계' }] : []),
     ...(isPM ? [{ key: 'grant' as const, label: '지원금' }] : []),
     { key: 'completion', label: '수료 기준' },
   ];
@@ -35,6 +39,7 @@ export default function SettingsShareTab({ programId, isPM, consortiumId, applic
       {sub === 'share'      && <ShareTab programId={programId} />}
       {sub === 'files'      && <ProgramFilesTab programId={programId} />}
       {sub === 'activity'   && <AttendanceLogTab programId={programId} />}
+      {sub === 'schedule'   && isPM && <ScheduleItemsManager programId={programId} />}
       {sub === 'grant'      && isPM && (
         <GrantManageTab
           programId={programId}
