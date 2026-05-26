@@ -12,7 +12,7 @@ import type {
   PayrollExpenseType, PayrollPaymentStatus, PayrollTaxRateType,
 } from '../../types/database';
 import {
-  PAYROLL_BASE_TYPES, PAYROLL_STATUS_VALUES,
+  PAYROLL_BASE_TYPES, PAYROLL_STATUS_VALUES, PAYROLL_STATUS_LABEL,
   isOperationType, isOutsourceType, isPersonCategory,
   type PayrollRow,
 } from './payrollUtils';
@@ -200,7 +200,7 @@ export default function PayrollExpenseFormModal({
       open={open}
       onClose={onClose}
       title={target ? '외주/급여 수정' : '신규 등록'}
-      size="lg"
+      size="xl"
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose} disabled={saving}>취소</Button>
@@ -361,7 +361,7 @@ export default function PayrollExpenseFormModal({
               onChange={(e) => setForm({ ...form, payment_status: e.target.value as PayrollPaymentStatus })}
               className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
             >
-              {PAYROLL_STATUS_VALUES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {PAYROLL_STATUS_VALUES.map((s) => <option key={s} value={s}>{PAYROLL_STATUS_LABEL[s]}</option>)}
             </select>
           </Field>
         </div>

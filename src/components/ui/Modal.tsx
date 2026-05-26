@@ -13,12 +13,14 @@ import { cn } from '../../lib/utils';
  *  - brand: 박경수님 디자인 시스템 (max-w-[560px] + rounded-[20px] + 강한 shadow)
  *    Q2=B 결정 — 기존 유지 + 신규 variant 추가, 점진 마이그레이션.
  */
-type Size = 'sm' | 'md' | 'lg' | 'brand';
+type Size = 'sm' | 'md' | 'lg' | 'xl' | 'brand';
 
 const SIZE_CLASS: Record<Size, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
   lg: 'max-w-2xl',
+  // 박경수님 + SkyClaw STEP-PAYROLL-UI-FIX (2026-05-28) — 외주/급여 수정 모달용 더 넓은 사이즈
+  xl: 'max-w-4xl',
   brand: 'max-w-[560px]',
 };
 
@@ -26,6 +28,7 @@ const ROUNDED_CLASS: Record<Size, string> = {
   sm: 'rounded-2xl',
   md: 'rounded-2xl',
   lg: 'rounded-2xl',
+  xl: 'rounded-2xl',
   brand: 'rounded-[20px]',
 };
 
@@ -33,6 +36,7 @@ const SHADOW_CLASS: Record<Size, string> = {
   sm: 'shadow-xl',
   md: 'shadow-xl',
   lg: 'shadow-xl',
+  xl: 'shadow-xl',
   brand: 'shadow-[0_20px_60px_rgba(30,27,75,0.15)]',
 };
 

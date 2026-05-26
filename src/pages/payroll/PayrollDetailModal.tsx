@@ -97,19 +97,18 @@ export default function PayrollDetailModal({ open, payrollId, onClose, onEdit, o
 
         {!loading && item && (
           <div className="pt-4 space-y-4">
-            {/* 정보 그리드 — 박경수님 + SkyClaw 2026-05-28: 2컬럼 좌(항목) 우(지급처) */}
+            {/* 정보 그리드 — STEP-PAYROLL-UI-FIX (2026-05-28): null/empty 필드 행 숨김 */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <Row label="항목" value={item.expense_type} />
-              <Row label="지급처" value={item.payee_name || '-'} />
-              <Row label="세부항목" value={item.description ?? '-'} />
-              {item.biz_reg_no ? (
-                <Row label="사업자번호" value={item.biz_reg_no} />
-              ) : (
+              {item.payee_name && <Row label="지급처" value={item.payee_name} />}
+              {item.description && <Row label="세부항목" value={item.description} />}
+              {item.biz_reg_no && <Row label="사업자번호" value={item.biz_reg_no} />}
+              {!item.biz_reg_no && item.payee_id_no && (
                 <div>
                   <p className="text-[11px] text-slate-400 mb-0.5">주민번호</p>
                   <p className="text-sm text-slate-800 font-mono inline-flex items-center gap-1.5">
-                    {item.payee_id_no ? (showResident && isFinance ? item.payee_id_no : maskIdNo(item.payee_id_no)) : '-'}
-                    {isFinance && item.payee_id_no && (
+                    {showResident && isFinance ? item.payee_id_no : maskIdNo(item.payee_id_no)}
+                    {isFinance && (
                       <button type="button" onClick={() => setShowResident((v) => !v)}
                         aria-label={showResident ? '주민번호 가리기' : '주민번호 보기'}
                         className="text-violet-500 hover:text-violet-700">
@@ -120,26 +119,28 @@ export default function PayrollDetailModal({ open, payrollId, onClose, onEdit, o
                 </div>
               )}
               <Row label="단가" value={`${(item.unit_price ?? 0).toLocaleString()}원`} />
-              <div>
-                <p className="text-[11px] text-slate-400 mb-0.5">계좌번호</p>
-                <p className="text-sm text-slate-800 font-mono inline-flex items-center gap-1.5">
-                  {item.bank_account ? (showAccount && isFinance ? item.bank_account : maskAccount(item.bank_account)) : '-'}
-                  {isFinance && item.bank_account && (
-                    <button type="button" onClick={() => setShowAccount((v) => !v)}
-                      aria-label={showAccount ? '계좌 가리기' : '계좌 보기'}
-                      className="text-violet-500 hover:text-violet-700">
-                      {showAccount ? <EyeOff size={12} /> : <Eye size={12} />}
-                    </button>
-                  )}
-                </p>
-              </div>
+              {item.bank_account && (
+                <div>
+                  <p className="text-[11px] text-slate-400 mb-0.5">계좌번호</p>
+                  <p className="text-sm text-slate-800 font-mono inline-flex items-center gap-1.5">
+                    {showAccount && isFinance ? item.bank_account : maskAccount(item.bank_account)}
+                    {isFinance && (
+                      <button type="button" onClick={() => setShowAccount((v) => !v)}
+                        aria-label={showAccount ? '계좌 가리기' : '계좌 보기'}
+                        className="text-violet-500 hover:text-violet-700">
+                        {showAccount ? <EyeOff size={12} /> : <Eye size={12} />}
+                      </button>
+                    )}
+                  </p>
+                </div>
+              )}
               <Row label="회수" value={`${item.quantity ?? 1}회`} />
-              <Row label="은행" value={item.bank_name ?? '-'} />
+              {item.bank_name && <Row label="은행" value={item.bank_name} />}
               <Row label="세전 합계" value={formatMoney(item.subtotal ?? 0)} />
-              <Row label={`세액 (${item.tax_rate_type})`} value={item.tax_amount ? formatMoney(item.tax_amount) : '-'} />
+              {item.tax_amount > 0 && <Row label={`세액 (${item.tax_rate_type})`} value={formatMoney(item.tax_amount)} />}
               <Row label="실지급" value={formatMoney(item.net_amount && item.net_amount > 0 ? item.net_amount : (item.subtotal ?? 0))} />
-              <Row label="지급일" value={fmtShortDate(item.paid_at)} />
-              <Row label="메모" value={item.memo ?? '-'} />
+              {item.paid_at && <Row label="지급일" value={fmtShortDate(item.paid_at)} />}
+              {item.memo && <Row label="메모" value={item.memo} />}
             </div>
 
             {/* 등록일 / 처리일 (강조 박스 2개) — 짧은 날짜 형식 */}

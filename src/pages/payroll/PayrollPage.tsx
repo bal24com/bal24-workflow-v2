@@ -12,7 +12,7 @@ import type { PayrollPaymentStatus } from '../../types/database';
 import {
   fetchPayroll, softDeletePayroll, calcPayrollSummary, maskIdNo,
   isPersonCategory,
-  PAYROLL_STATUS_VALUES, PAYROLL_STATUS_STYLE, PAYROLL_STATUS_LABEL,
+  PAYROLL_STATUS_VALUES, PAYROLL_STATUS_LABEL,
   type PayrollRow,
 } from './payrollUtils';
 import PayrollSummaryBar from './PayrollSummaryBar';
@@ -267,7 +267,7 @@ function PayrollPage() {
                 <SortableTh k="tax_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">세액 (원천/부가)</SortableTh>
                 <SortableTh k="net_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">실지급</SortableTh>
                 <SortableTh k="paid_at"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">지급일</SortableTh>
-                <SortableTh k="payment_status" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">상태</SortableTh>
+                {/* STEP-PAYROLL-UI-FIX (2026-05-28) — 상태 컬럼 제거. 일괄처리 바로 대체. */}
                 <SortableTh k="receipt"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center">증빙</SortableTh>
                 <th className="text-right px-3 py-2.5 font-semibold whitespace-nowrap">관리</th>
               </tr>
@@ -314,9 +314,7 @@ function PayrollPage() {
                     </td>
                     <td className="px-3 py-2 text-right font-bold text-violet-700 tabular-nums whitespace-nowrap">{formatMoney(r.net_amount && r.net_amount > 0 ? r.net_amount : r.subtotal)}</td>
                     <td className="px-3 py-2 text-xs text-muted whitespace-nowrap">{r.paid_at ? formatDateKo(r.paid_at) : '-'}</td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${PAYROLL_STATUS_STYLE[r.payment_status]}`}>{PAYROLL_STATUS_LABEL[r.payment_status]}</span>
-                    </td>
+                    {/* STEP-PAYROLL-UI-FIX (2026-05-28) — 상태 td 제거 (일괄처리 바로 대체) */}
                     <td className="px-3 py-2 text-center text-sm">
                       {/* STEP-PAYROLL-LIST-REDESIGN PART A — O/X 단순 표시. 운영인건비는 증빙 불필요 */}
                       {hasReceipt ? <span className="text-emerald-600 font-bold" title={`첨부 ${r.receipt_urls.length}건`}>O</span>
