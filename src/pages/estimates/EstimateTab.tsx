@@ -167,7 +167,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
 
   // 박경수님 + SkyClaw STEP-ESTIMATE-ADDON-FULL — 제경비·기술료·부가세·최종금액
   const addonConfig: EstimateAddonConfig = parseAddonConfig(estimate as Record<string, unknown> | null);
-  async function handleAddonSave(cfg: EstimateAddonConfig) { const est = await ensureEstimate(); if (!est) return; const { error } = await supabase.from('project_estimates').update(buildAddonPayload(cfg)).eq('id', est.id); if (error) { console.error('[EstimateTab] addon 저장 오류:', error.message); toast.error('견적 추가 요금 저장 중 오류가 발생했어요.'); return; } toast.success('견적 추가 요금을 저장했어요.'); void reload(); }
+  async function handleAddonSave(cfg: EstimateAddonConfig) { const est = await ensureEstimate(); if (!est) return; const { error } = await supabase.from('project_estimates').update(buildAddonPayload(cfg)).eq('id', est.id); if (error) { console.error('[EstimateTab] addon 저장 오류:', error.message); toast.error('견적 추가 요금 저장 중 오류가 발생했어요.'); return; } /* STEP-ESTIMATE-UPGRADE-FULL PART C — projects 동기화 (재무 요약 카드 즉시 반영) */ void supabase.from('projects').update({ estimate_includes_vat: cfg.useVat, estimate_final_amount: cfg.finalProposalAmount }).eq('id', projectId); toast.success('견적 추가 요금을 저장했어요.'); void reload(); }
   async function handleExcelDownload() {
     // 박경수님 + SkyClaw STEP-ESTIMATE-EXCEL-FIX — 7열 구조 (단가·시간·인원·소계 분리)
     const xItems = items.map((it) => { const up = Number(it.unit_price) || 0; const hrs = Number(it.quantity) || 0; const hc = Number(it.headcount ?? 1) || 1; return { category: it.category, name: it.description ?? '', unitPrice: up, hours: hrs, headcount: hc, amount: up * hrs * hc, note: it.memo ?? '' }; });

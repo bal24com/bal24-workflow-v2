@@ -83,14 +83,22 @@ export default function ProjectDetailPage() {
     if (!project) return;
     setConfirmingContract(true);
     try {
-      // 1) project_estimates 조회 — total_amount 사용 (DB 가 unit_price × quantity × headcount 3중 곱 후 저장)
+      // 1) project_estimates 조회 — 부가세 포함 여부도 함께. STEP-ESTIMATE-UPGRADE-FULL PART C (2026-05-28)
       const { data: estimates, error: estErr } = await supabase
         .from('project_estimates')
-        .select('id, total_amount')
+        .select('id, total_amount, use_vat, vat_rate, final_proposal_amount, created_at')
         .eq('project_id', project.id)
-        .is('deleted_at', null);
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
       if (estErr) throw estErr;
-      const totalEstimate = (estimates ?? []).reduce((s, e) => s + Number(e.total_amount ?? 0), 0);
+      const rawTotal = (estimates ?? []).reduce((s, e) => s + Number(e.total_amount ?? 0), 0);
+      // 부가세 설정은 head 행(가장 최근) 기준. final_proposal_amount 우선, 없으면 use_vat 으로 계산
+      const head = (estimates ?? [])[0];
+      const useVat = Boolean(head?.use_vat);
+      const vatRate = Number(head?.vat_rate ?? 10);
+      const totalEstimate = head?.final_proposal_amount != null
+        ? Number(head.final_proposal_amount)
+        : (useVat ? Math.floor(rawTotal * (1 + vatRate / 100)) : rawTotal);
 
       if (totalEstimate === 0) {
         toast.error('견적 항목이 없어요. 견적 탭에서 먼저 작성해 주세요.');
@@ -98,16 +106,18 @@ export default function ProjectDetailPage() {
       }
 
       const confirmed = window.confirm(
-        `견적 합계 ${totalEstimate.toLocaleString()}원을 사업비(예산)로 확정하고\n` +
+        `견적 합계 ${totalEstimate.toLocaleString()}원${useVat ? ' (부가세 포함)' : ''}을 사업비(예산)로 확정하고\n` +
         `프로젝트 단계를 "진행"으로 전환할까요?`,
       );
       if (!confirmed) return;
 
-      // 2) projects.budget + status='진행'
+      // 2) projects.budget + status='진행' + 견적 부가세 정보 동기화
       const nowIso = new Date().toISOString();
       const { error: pErr } = await supabase.from('projects').update({
         budget: totalEstimate,
         status: '진행',
+        estimate_includes_vat: useVat,
+        estimate_final_amount: totalEstimate,
         updated_at: nowIso,
       }).eq('id', project.id);
       if (pErr) throw pErr;
