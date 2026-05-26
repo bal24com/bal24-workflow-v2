@@ -12,6 +12,8 @@ import EmptyState from '../../../components/EmptyState';
 import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../../utils/statusStyles';
 import type { CurriculumStaffRole, InvitationStatus } from '../../../types/database';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
+// 박경수님 + SkyClaw STEP-STAFF-PORTAL-REDESIGN PART D (2026-05-28) — 강의 일지 카드
+import LectureLogSection from './LectureLogSection';
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -229,6 +231,14 @@ export default function StaffLectureTab({ staff, selectedProgramId }: Props) {
           </div>
         )}
       </section>
+
+      {/* STEP-STAFF-PORTAL-REDESIGN PART D (2026-05-28) — 강의 일지 카드 (내 담당 차시 only) */}
+      {selectedProgramId && (() => {
+        const myCurs = curriculums.filter((c) => c.program_id === selectedProgramId && lectureRoleMap.has(c.id))
+          .sort((a, b) => a.session_no - b.session_no);
+        if (myCurs.length === 0) return null;
+        return <LectureLogSection staff={staff} programId={selectedProgramId} curriculums={myCurs} />;
+      })()}
 
       {/* STEP-STAFF-PORTAL-REDESIGN PART C (2026-05-28) — 전체 커리큘럼 아코디언 (선택 프로그램 기준) */}
       {selectedProgramId && (() => {
