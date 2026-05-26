@@ -9,6 +9,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import { calcDurationMin, formatDuration } from '../../../types/mentoring';
 import TimeSelect from './TimeSelect';
 import MentoringFileUpload, { type UploadedFile } from './MentoringFileUpload';
+import PortalPhotoUpload, { type PortalPhoto } from '../../../components/portal/PortalPhotoUpload';
 
 interface AssignmentRow {
   id: string;
@@ -30,6 +31,9 @@ export interface MentoringLogInitial {
   recipient: string | null;
   team_name: string | null;
   mentee_ids: string[] | null;
+  /** 박경수님 2026-05-26 PART A — 멘토링 일지 사진 (photo_urls JSONB) */
+  photo_urls?: PortalPhoto[] | null;
+  program_id?: string | null;
 }
 
 interface Props {
@@ -100,6 +104,8 @@ export default function MentoringLogForm({
   });
   // STEP-MENTORING-LOG-UX — 멘티 기본 체크 해제 (빈 배열). 수정 모드면 기존 mentee_ids prefill.
   const [selectedMentees, setSelectedMentees] = useState<string[]>(initialLog?.mentee_ids ?? []);
+  // 박경수님 2026-05-26 PART A — 멘토링 일지 사진 (photo_urls)
+  const [photoUrls, setPhotoUrls] = useState<PortalPhoto[]>(initialLog?.photo_urls ?? []);
   // STEP-MENTORING-LOG-UX — 첨부 파일 (일지 저장 후 일괄 INSERT)
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([]);
   const [saving, setSaving] = useState(false);
@@ -170,6 +176,8 @@ export default function MentoringLogForm({
       next_plan: form.next_plan.trim() || null,
       recipient: form.recipient.trim() || null,
       team_name: form.team_name.trim() || null,
+      // 박경수님 2026-05-26 PART A — 멘토링 일지 사진 photo_urls JSONB
+      photo_urls: photoUrls,
       status: mode,
       submitted_at: mode === 'submitted' ? new Date().toISOString() : null,
     };
@@ -317,6 +325,21 @@ export default function MentoringLogForm({
           onChange={(e) => setForm({ ...form, subject: e.target.value })}
           placeholder="예) 프로젝트 주제 선정 및 현장조사 준비"
           className={INPUT_CLASS} />
+      </div>
+
+      {/* 박경수님 2026-05-26 PART A — 멘토링 일지 사진 (PortalPhotoUpload 공용 컴포넌트) */}
+      <div>
+        <label className="text-xs font-semibold text-slate-700 block mb-1">
+          📷 사진 첨부 <span className="text-[11px] text-slate-400 font-normal ml-1">(촬영·드래그·붙여넣기 모두 가능)</span>
+        </label>
+        <PortalPhotoUpload
+          photos={photoUrls}
+          onChange={setPhotoUrls}
+          bucket="mentoring-files"
+          pathPrefix={`${assignment.program?.id ?? 'no-program'}/${assignment.id}/${initialLog?.id ?? 'new'}`}
+          disabled={saving}
+          maxPhotos={10}
+        />
       </div>
 
       <div>

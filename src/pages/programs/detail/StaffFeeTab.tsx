@@ -21,6 +21,7 @@ import type { StaffFee } from '../../../types/staffFee';
 import StaffFeeFormModal from './StaffFeeFormModal';
 import { buildFeeFormFromStaffFee } from '../../../utils/feeFormPDF';
 import { useFeeDownload } from '../../../hooks/useFeeDownload';
+import PortalCommentSection from '../../../components/portal/PortalCommentSection';
 
 interface Props {
   programId: string;
@@ -302,6 +303,13 @@ export default function StaffFeeTab({ programId }: Props) {
                         </a>
                       )}
                     </div>
+
+                    {/* 박경수님 2026-05-26 PART G — PM 댓글 (expense_id 있을 때만 강사 포털과 연결됨) */}
+                    {f.expense_id && (
+                      <PortalCommentSection
+                        targetType="payroll_expense"
+                        targetId={f.expense_id} />
+                    )}
 
                     {/* 액션 */}
                     <div className="flex items-center gap-1 justify-end">

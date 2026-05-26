@@ -14,6 +14,7 @@ import { downloadMentoringLogPdf } from './mentoringLogPdf';
 import { approveMentoringLog, rejectMentoringLog } from './mentoringLogApproval';
 import MentoringRejectModal from './MentoringRejectModal';
 import { hasRole } from '../../../constants/roles';
+import PortalCommentSection from '../../../components/portal/PortalCommentSection';
 
 interface MenteeLite { id: string; name: string; organization: string | null }
 
@@ -255,6 +256,8 @@ export default function MentoringLogCard({ assignmentId, menteeIds, allAssignmen
                     <span className="font-bold">반려 사유:</span> {log.approval_note}
                   </p>
                 )}
+                {/* 박경수님 2026-05-26 PART G — PM 댓글 입력 (강사 포털에서 즉시 표시) */}
+                <PortalCommentSection targetType="mentoring_log" targetId={log.id} />
               </li>
             ))}
           </ul>
