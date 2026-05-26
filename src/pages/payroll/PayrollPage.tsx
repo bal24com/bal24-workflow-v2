@@ -250,7 +250,8 @@ function PayrollPage() {
       ) : (
         <div id="payroll-table" className="bg-white rounded-xl border border-slate-200 overflow-auto max-h-[70vh]">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 text-xs shadow-sm">
+            {/* STEP-TABLE-COMPACT-REDESIGN 보강 (2026-05-28) — 헤더 미니멀: 보라 배경 X, 라인 only */}
+            <thead className="sticky top-0 z-10 bg-white text-slate-500 text-xs border-b-2 border-slate-200">
               <tr>
                 {/* 박경수님 + SkyClaw — 전체선택 (visible 기준). hover 시 노출 */}
                 <th className="w-8 px-3 py-2.5 group">

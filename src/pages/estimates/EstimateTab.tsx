@@ -290,7 +290,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
       {/* 항목 테이블 */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-500">
+          <thead className="bg-white text-xs text-slate-500 border-b-2 border-slate-200">{/* TABLE-COMPACT 보강 — 헤더 미니멀 */}
             <tr>
               <EstSortTh k="category"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">항목</EstSortTh>
               <EstSortTh k="description"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">세항목</EstSortTh>
