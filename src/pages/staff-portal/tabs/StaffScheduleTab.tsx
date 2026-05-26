@@ -7,6 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import EmptyState from '../../../components/EmptyState';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
+import ScheduleStagesSection from './ScheduleStagesSection'; // STEP-STAFF-PORTAL-REDESIGN PART E (2026-05-28)
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -256,6 +257,9 @@ export default function StaffScheduleTab({ staff, selectedProgramId }: Props) {
           )}
         </section>
       )}
+
+      {/* STEP-STAFF-PORTAL-REDESIGN PART E (2026-05-28) — 일정 4단계 (program_schedule_items) */}
+      {selectedProgramId && <ScheduleStagesSection programId={selectedProgramId} />}
     </div>
   );
 }
