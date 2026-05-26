@@ -1,5 +1,5 @@
-// bal24 v2 — 프로젝트 개요 · 재무 요약 카드 (V7 차용 / V2 표준)
-// 예산·수입(입금완료)·지출(전체+대기)·잔여 + 진행률 바.
+// bal24 v2 — 프로젝트 개요 · 재무 요약 카드
+// 박경수님 + SkyClaw STEP-FINANCE-SUMMARY-REDESIGN (2026-05-28) — 예산·견적 삭제, 계약금액 기준 순지출·잔여·이익율
 
 import { useEffect, useState } from 'react';
 import { Wallet, Loader2 } from 'lucide-react';
@@ -47,61 +47,49 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
           <Loader2 className="animate-spin text-violet-400" size={18} aria-hidden="true" />
         </div>
       ) : (
+        (() => {
+          // STEP-FINANCE-SUMMARY-REDESIGN — 계약금액 기준 사업부가세·잔여·이익율 (인라인 계산)
+          const contractTotal = data.contractTotal;
+          const businessVat = Math.round(contractTotal * 0.1) - data.vatAmount; // 매출세액 − 매입세액
+          const remaining = contractTotal - data.netExpense;
+          const profitPct = contractTotal > 0
+            ? Math.round((remaining / contractTotal) * 1000) / 10
+            : 0;
+          return (
         <div className="flex flex-col gap-2.5">
-          {/* 박경수님 + SkyClaw 2026-05-26 — 전체 사업비 (계약금액 합) 상단 강조 */}
-          {data.contractTotal > 0 && (
-            <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 -mx-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-violet-700">전체 사업비 (계약금액)</span>
-                <span className="text-sm font-bold text-violet-700 tabular-nums">{formatMoney(data.contractTotal)}</span>
-              </div>
-              <div className="flex items-center justify-between mt-0.5">
-                <span className="text-[10px] text-violet-500">└ 입금 완료</span>
-                <span className="text-[10px] text-violet-500 tabular-nums">{formatMoney(data.incomeTotal)}</span>
-              </div>
+          {/* 전체 사업비 (계약금액 합) — 상단 강조 */}
+          <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 -mx-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-violet-700">전체 사업비 (계약금액)</span>
+              <span className="text-sm font-bold text-violet-700 tabular-nums">{formatMoney(contractTotal)}</span>
             </div>
-          )}
-          <Row label="예산" value={data.budget > 0 ? formatMoney(data.budget) : '미정'} accent="violet" />
-          {data.contractTotal === 0 && (
-            <Row label="수입 (입금완료)" value={formatMoney(data.incomeTotal)} accent="emerald" />
-          )}
-          {data.expectedIncomeTotal > 0 && (
-            <Row label="└ 예상 수입 (계약중)" value={formatMoney(data.expectedIncomeTotal)} accent="violet" small />
-          )}
-
-          {data.budget > 0 && (
-            <div className="flex flex-col gap-1">
-              <div className="h-2 rounded-full overflow-hidden bg-violet-50" aria-hidden="true">
-                <div
-                  className="h-full bg-gradient-to-r from-emerald-300 to-emerald-500 transition-all"
-                  style={{ width: `${data.settledPct}%` }}
-                />
-              </div>
-              <p className="text-[10px] text-slate-400 text-right tabular-nums">
-                예산 대비 수금 {data.settledPct}%
-              </p>
+            <div className="flex items-center justify-between mt-0.5">
+              <span className="text-[10px] text-violet-500">└ 입금 완료</span>
+              <span className="text-[10px] text-violet-500 tabular-nums">{formatMoney(data.incomeTotal)}</span>
             </div>
-          )}
+          </div>
 
-          {/* 박경수님 요청 — 견적(제안) 합계 라인 */}
-          {data.proposalTotal > 0 && (
-            <Row label="제안 견적 (총)" value={formatMoney(data.proposalTotal)} accent="violet" small />
-          )}
+          <Divider />
 
-          <Row label="지출 합계" value={formatMoney(data.expenseTotal)} accent="orange" />
-          {/* 박경수님 요청 — 인건비/운영비 분리 */}
-          {data.outsourceTotal > 0 && (
-            <Row label="└ 인건비 (외주·급여)" value={formatMoney(data.outsourceTotal)} accent="orange" small />
-          )}
-          {data.operationTotal > 0 && (
-            <Row label="└ 운영비 (호텔·버스·재료 등)" value={formatMoney(data.operationTotal)} accent="orange" small />
-          )}
-          {data.pendingExpenseTotal > 0 && (
-            <Row label="└ 미지급" value={formatMoney(data.pendingExpenseTotal)} accent="rose" small />
-          )}
+          {/* 지출계 (세액 포함) + 운영비·인건비 분리 */}
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-orange-700">지출계</span>
+                <span className="text-[10px] text-slate-400">운영비·인건비 등 세액 포함 전체</span>
+              </div>
+              <span className="text-sm font-bold text-orange-700 tabular-nums">{formatMoney(data.expenseTotal)}</span>
+            </div>
+            {data.operationTotal > 0 && (
+              <Row label="└ 운영비" value={formatMoney(data.operationTotal)} accent="orange" small />
+            )}
+            {data.outsourceTotal > 0 && (
+              <Row label="└ 인건비" value={formatMoney(data.outsourceTotal)} accent="orange" small />
+            )}
+          </div>
 
-          {/* 박경수님 + SkyClaw STEP-FINANCE-LABEL-VAT (2026-05-26) — 매입/매출/납부 부가세 + 원천세 + 순지출 */}
-          {(data.vatAmount > 0 || data.withholdingTax > 0 || data.salesVat > 0) && (
+          {/* 세액 박스 (원천세 + 외주부가세 + 사업부가세) */}
+          {(data.withholdingTax > 0 || data.vatAmount > 0 || contractTotal > 0) && (
             <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 space-y-1 -mx-1">
               {data.withholdingTax > 0 && (
                 <div className="flex items-center justify-between text-xs">
@@ -115,51 +103,65 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
                   <span className="text-orange-700 tabular-nums">{formatMoney(data.vatAmount)}</span>
                 </div>
               )}
-              {data.salesVat > 0 && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-blue-700">사업 부가세 (매출세액)</span>
-                  <span className="text-blue-700 tabular-nums">{formatMoney(data.salesVat)}</span>
+              {contractTotal > 0 && (
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-amber-200">
+                  <span className="text-blue-700">└ 사업 부가세 (매출세액 10% − 외주부가세)</span>
+                  <span className="text-blue-700 tabular-nums">{formatMoney(businessVat)}</span>
                 </div>
               )}
-              {(data.salesVat > 0 || data.vatAmount > 0) && (
-                <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-amber-200">
-                  <span className="text-slate-700">납부 부가세 (매출 − 매입)</span>
-                  <span className={`tabular-nums ${data.vatPayable > 0 ? 'text-rose-700' : 'text-slate-400'}`}>
-                    {formatMoney(data.vatPayable)}
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700 pt-1 border-t border-amber-200">
-                <span>순지출 (세액 제외)</span>
-                <span className="tabular-nums">{formatMoney(data.netExpense)}</span>
-              </div>
             </div>
           )}
 
-          <div className="pt-2 border-t border-violet-100 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">잔여 (예산 − 지출)</span>
-            <span
-              className={`text-sm font-bold tabular-nums ${
-                data.remaining < 0 ? 'text-rose-600' : 'text-violet-700'
-              }`}
-            >
-              {data.budget > 0 ? formatMoney(data.remaining) : '—'}
-            </span>
+          <Divider />
+
+          {/* 순지출 (세액 제외) */}
+          <div>
+            <Row label="순지출 (세액 제외)" value={formatMoney(data.netExpense)} accent="slate" />
+            <Row label="└ 지출 총액 (세액 포함)" value={formatMoney(data.expenseTotal)} accent="slate" small />
+          </div>
+
+          <Divider />
+
+          {/* 잔여 (전체 사업비 − 순지출) + 이익율 */}
+          <div>
+            <div className="flex items-center justify-between">
+              <span className={`text-xs font-bold ${remaining < 0 ? 'text-rose-600' : 'text-violet-700'}`}>
+                잔여 (전체 사업비 − 순지출)
+              </span>
+              <span className={`text-sm font-bold tabular-nums ${remaining < 0 ? 'text-rose-600' : 'text-violet-700'}`}>
+                {contractTotal > 0 ? formatMoney(remaining) : '—'}
+              </span>
+            </div>
+            {contractTotal > 0 && (
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[10px] text-slate-400">└ 예산 대비 (이익율)</span>
+                <span className={`text-[10px] tabular-nums font-semibold ${profitPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {profitPct >= 0 ? '+' : ''}{profitPct}%
+                </span>
+              </div>
+            )}
           </div>
         </div>
+          );
+        })()
       )}
     </section>
   );
 }
 
-type Accent = 'violet' | 'emerald' | 'orange' | 'rose';
+type Accent = 'violet' | 'emerald' | 'orange' | 'rose' | 'slate';
 
 const ACCENT_STYLE: Record<Accent, string> = {
   violet: 'text-violet-700',
   emerald: 'text-emerald-600',
   orange: 'text-orange-600',
   rose: 'text-rose-600',
+  slate: 'text-slate-700',
 };
+
+function Divider() {
+  return <div className="border-t border-violet-100 -mx-1" aria-hidden="true" />;
+}
 
 function Row({
   label,
