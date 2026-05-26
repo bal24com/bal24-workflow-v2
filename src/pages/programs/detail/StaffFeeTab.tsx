@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Plus, Pencil, Trash2, Receipt, Users2, AlertCircle, ExternalLink,
+  Loader2, Plus, Pencil, Trash2, Receipt, Users2, AlertCircle, ExternalLink, FileDown, Download,
 } from 'lucide-react';
 import { Button, Card, CardContent } from '../../../components/ui';
 import EmptyState from '../../../components/EmptyState';
@@ -19,6 +19,8 @@ import {
 } from '../../../types/staffFee';
 import type { StaffFee } from '../../../types/staffFee';
 import StaffFeeFormModal from './StaffFeeFormModal';
+import { buildFeeFormFromStaffFee } from '../../../utils/feeFormPDF';
+import { useFeeDownload } from '../../../hooks/useFeeDownload';
 
 interface Props {
   programId: string;
@@ -52,6 +54,8 @@ export default function StaffFeeTab({ programId }: Props) {
   const [fees, setFees] = useState<StaffFee[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalTarget, setModalTarget] = useState<StaffFee | null | 'new'>(null);
+  // 박경수님 2026-05-26 — 강사료 PDF 다운로드 (공용 훅)
+  const { downloadingId, batchProgress, downloadOne, downloadMany } = useFeeDownload();
   const { user } = useAuth();
 
   const refresh = useCallback(async () => {
@@ -147,6 +151,19 @@ export default function StaffFeeTab({ programId }: Props) {
     await refresh();
   }
 
+  // 박경수님 2026-05-26 — 강사료 확인서 PDF (공용 훅 사용)
+  async function handleDownloadOne(fee: StaffFee) {
+    await downloadOne(fee.id, () => buildFeeFormFromStaffFee(fee, programId));
+  }
+
+  async function handleDownloadAll() {
+    if (fees.length === 0) { toast.error('내려받을 강사료 항목이 없어요.'); return; }
+    if (!window.confirm(`강사 ${fees.length}명의 강사료 확인서를 순차 다운로드할까요?`)) return;
+    await downloadMany(fees.map((f) => ({
+      id: f.id, dataBuilder: () => buildFeeFormFromStaffFee(f, programId),
+    })));
+  }
+
   // STEP-ACCOUNTING-FOLLOWUP7-Phase2.5 — 외주/급여(payroll_expenses)로 일괄 변환
   async function handleConvertToPayroll() {
     if (fees.length === 0) { toast.error('변환할 항목이 없어요.'); return; }
@@ -173,7 +190,18 @@ export default function StaffFeeTab({ programId }: Props) {
           <Receipt size={18} className="text-violet-600" aria-hidden="true" />
           강사료 지급 기준
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 박경수님 2026-05-26 — 강사료 확인서 일괄 다운로드 */}
+          {fees.length > 0 && (
+            <Button variant="outline" size="sm"
+              leftIcon={batchProgress ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              disabled={!!batchProgress}
+              onClick={() => void handleDownloadAll()}>
+              {batchProgress
+                ? `다운로드 중 (${batchProgress.current}/${batchProgress.total})`
+                : `강사료 일괄 다운로드 (${fees.length}명)`}
+            </Button>
+          )}
           {/* STEP-ACCOUNTING-FOLLOWUP7-Phase2.5 — 강사료 → 외주/급여 일괄 변환 */}
           {fees.length > 0 && (
             <Button variant="outline" size="sm" onClick={() => void handleConvertToPayroll()}>
@@ -277,6 +305,18 @@ export default function StaffFeeTab({ programId }: Props) {
 
                     {/* 액션 */}
                     <div className="flex items-center gap-1 justify-end">
+                      {/* 박경수님 2026-05-26 — 강사료 확인서 PDF */}
+                      <button
+                        type="button"
+                        onClick={() => void handleDownloadOne(f)}
+                        disabled={downloadingId === f.id || !!batchProgress}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-violet-700 border border-violet-200 hover:bg-violet-50 disabled:opacity-50"
+                      >
+                        {downloadingId === f.id
+                          ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                          : <FileDown size={12} aria-hidden="true" />}
+                        강사료 PDF
+                      </button>
                       <button
                         type="button"
                         onClick={() => setModalTarget(f)}

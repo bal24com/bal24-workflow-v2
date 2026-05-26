@@ -3,12 +3,16 @@
 // staff_pool_id 기준 매칭 (name fallback 불필요).
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Wallet, CheckCircle2 } from 'lucide-react';
+import { Loader2, Wallet, CheckCircle2, FileDown } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import { useToast } from '../../../contexts/ToastContext';
 import { formatDateKo } from '../../../lib/utils';
 import type {
   PayrollExpense, PayrollPaymentStatus, PayrollTaxRateType,
 } from '../../../types/database';
+import {
+  buildFeeFormFromPayrollExpense, downloadFeeFormPDF, type PayrollExpenseLite,
+} from '../../../utils/feeFormPDF';
 
 interface Props {
   staffId: string;                       // staff_pool.id
@@ -44,9 +48,35 @@ const CARD_CLASS =
   'bg-white rounded-2xl border border-violet-100 shadow-[0_4px_16px_rgba(124,58,237,0.06)] p-5';
 
 export default function StaffFeeSection({ staffId, selectedProgramId }: Props) {
+  const toast = useToast();
   const [rows, setRows] = useState<FeeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // 박경수님 2026-05-26 — 강사료 확인서 PDF 다운로드 상태
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  async function handleDownload(row: FeeRow) {
+    setDownloadingId(row.id);
+    try {
+      const exp: PayrollExpenseLite = {
+        id: row.id,
+        program_id: row.program_id,
+        payee_name: row.payee_name,
+        subtotal: Number(row.subtotal ?? 0),
+        tax_rate_type: row.tax_rate_type,
+        tax_amount: Number(row.tax_amount ?? 0),
+        net_amount: Number(row.net_amount ?? 0),
+      };
+      const data = await buildFeeFormFromPayrollExpense(exp, staffId);
+      await downloadFeeFormPDF(data);
+      toast.success('강사료 확인서 PDF 다운로드가 시작됐어요.');
+    } catch (err) {
+      console.error('[staff-portal/fee] PDF 실패:', err);
+      toast.error('PDF 생성 중 오류가 발생했어요.');
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   useEffect(() => {
     if (!staffId) return;
@@ -243,6 +273,17 @@ export default function StaffFeeSection({ staffId, selectedProgramId }: Props) {
                   <span className="text-slate-400 truncate">메모 · {r.memo}</span>
                 )}
               </div>
+
+              {/* 박경수님 2026-05-26 — 강사 본인 강사료 확인서 PDF 다운로드 */}
+              <button type="button"
+                onClick={() => void handleDownload(r)}
+                disabled={downloadingId === r.id}
+                className="mt-3 w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border border-violet-300 text-violet-700 text-xs font-semibold hover:bg-violet-50 disabled:opacity-50">
+                {downloadingId === r.id
+                  ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                  : <FileDown size={12} aria-hidden="true" />}
+                강사료 확인서 PDF 저장
+              </button>
             </li>
           );
         })}

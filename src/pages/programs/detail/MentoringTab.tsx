@@ -2,7 +2,7 @@
 // 현황 카드 4개 + 보고서 목록 테이블 (멘토 필터 + 보고서/배정 추가).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, FileDown, Loader2, Plus, Users2, UserCheck, UserX, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { Copy, FileDown, Loader2, Plus, Users2, UserCheck, UserX, MessageSquare, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import MentoringLogCard from './MentoringLogCard';
 import { Button, Card, CardContent } from '../../../components/ui';
 import EmptyState from '../../../components/EmptyState';
@@ -13,13 +13,18 @@ import { formatDateKo } from '../../../lib/utils';
 import {
   fetchMentoringAssignments, downloadSessionAsWord, countCompletedSessions,
 } from './mentoringUtils';
+import { fetchStaffFees } from './staffFeeUtils';
 import { formatDuration, getMentorName, isUnregisteredMentor } from '../../../types/mentoring';
 import type {
   MentoringAssignment, MentoringSession,
 } from '../../../types/mentoring';
+import type { StaffFee } from '../../../types/staffFee';
 import MentoringAssignModal from './MentoringAssignModal';
 import MentoringSessionModal from './MentoringSessionModal';
 import MenteeAssignModal from './MenteeAssignModal';
+import MentoringStatCard from './MentoringStatCard';
+import { buildFeeFormFromStaffFee } from '../../../utils/feeFormPDF';
+import { useFeeDownload } from '../../../hooks/useFeeDownload';
 
 interface Props {
   programId: string;
@@ -41,6 +46,8 @@ export default function MentoringTab({ programId }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // STEP-MENTOR-MENTEE-MATCHING — 멘티 배정 모달 대상
   const [menteeTarget, setMenteeTarget] = useState<MentoringAssignment | null>(null);
+  // 박경수님 2026-05-26 — 강사료 PDF 다운로드 (공용 훅)
+  const { downloadingId: feeDownloadingId, batchProgress: feeBatchProgress, downloadOne, downloadMany } = useFeeDownload();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -95,14 +102,51 @@ export default function MentoringTab({ programId }: Props) {
     else toast.error('링크 복사에 실패했어요.');
   }
 
+  // 박경수님 2026-05-26 — 멘토에 매칭되는 program_staff_fees row 찾기
+  function findFeeForMentor(a: MentoringAssignment, fees: StaffFee[]): StaffFee | null {
+    return fees.find((f) =>
+      (a.mentor_pool_id && f.expert_id === a.mentor_pool_id)
+      || (a.mentor_profile_id && f.profile_id === a.mentor_profile_id),
+    ) ?? null;
+  }
+
+  async function handleDownloadMentorFee(a: MentoringAssignment) {
+    const fees = await fetchStaffFees(programId);
+    const fee = findFeeForMentor(a, fees);
+    if (!fee) {
+      toast.error(`${getMentorName(a)}님 강사료 기준이 [강사료 탭]에 등록돼 있지 않아요.`);
+      return;
+    }
+    await downloadOne(a.id, () => buildFeeFormFromStaffFee(fee, programId));
+  }
+
+  async function handleDownloadAllMentorFees() {
+    if (assignments.length === 0) { toast.error('멘토가 없어요.'); return; }
+    if (!window.confirm(`멘토 ${assignments.length}명의 강사료 확인서를 순차 다운로드할까요?`)) return;
+    const fees = await fetchStaffFees(programId);
+    const matched = assignments
+      .map((a) => ({ a, fee: findFeeForMentor(a, fees) }))
+      .filter((x): x is { a: MentoringAssignment; fee: StaffFee } => !!x.fee);
+    if (matched.length === 0) {
+      toast.error('매칭되는 강사료 기준이 [강사료 탭]에 없어요.');
+      return;
+    }
+    if (matched.length < assignments.length) {
+      toast.error(`${assignments.length - matched.length}명은 강사료 기준 미등록 — 등록된 ${matched.length}명만 다운로드해요.`);
+    }
+    await downloadMany(matched.map((x) => ({
+      id: x.a.id, dataBuilder: () => buildFeeFormFromStaffFee(x.fee, programId),
+    })));
+  }
+
   return (
     <div className="space-y-4">
       {/* 현황 카드 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon={<Users2 size={16} />} label="총 멘토 수" value={`${stats.total}명`} color="violet" />
-        <StatCard icon={<UserCheck size={16} />} label="배정 멘토" value={`${stats.assigned}명`} color="emerald" />
-        <StatCard icon={<UserX size={16} />} label="비활성 멘토" value={`${stats.inactive}명`} color="slate" />
-        <StatCard icon={<MessageSquare size={16} />} label="총 피드백" value={`${stats.feedback}건`} color="orange" />
+        <MentoringStatCard icon={<Users2 size={16} />} label="총 멘토 수" value={`${stats.total}명`} color="violet" />
+        <MentoringStatCard icon={<UserCheck size={16} />} label="배정 멘토" value={`${stats.assigned}명`} color="emerald" />
+        <MentoringStatCard icon={<UserX size={16} />} label="비활성 멘토" value={`${stats.inactive}명`} color="slate" />
+        <MentoringStatCard icon={<MessageSquare size={16} />} label="총 피드백" value={`${stats.feedback}건`} color="orange" />
       </div>
 
       {/* 보고서 목록 헤더 */}
@@ -123,6 +167,17 @@ export default function MentoringTab({ programId }: Props) {
               <option key={a.id} value={a.id}>{getMentorName(a)}</option>
             ))}
           </select>
+          {/* 박경수님 2026-05-26 — 강사료 확인서 일괄 다운로드 */}
+          {assignments.length > 0 && (
+            <Button variant="outline" size="sm"
+              leftIcon={feeBatchProgress ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              disabled={!!feeBatchProgress}
+              onClick={() => void handleDownloadAllMentorFees()}>
+              {feeBatchProgress
+                ? `다운로드 중 (${feeBatchProgress.current}/${feeBatchProgress.total})`
+                : `강사료 일괄 다운로드 (${assignments.length}명)`}
+            </Button>
+          )}
           <Button variant="primary" size="sm" leftIcon={<Plus size={14} />} onClick={() => setAssignOpen(true)}>
             멘토 배정
           </Button>
@@ -275,6 +330,19 @@ export default function MentoringTab({ programId }: Props) {
                         >
                           보고서 추가
                         </button>
+                        {/* 박경수님 2026-05-26 — 강사료 확인서 PDF */}
+                        <button
+                          type="button"
+                          onClick={() => void handleDownloadMentorFee(a)}
+                          disabled={feeDownloadingId === a.id || !!feeBatchProgress}
+                          title="강사료 확인서 PDF 다운로드"
+                          className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-700 hover:underline disabled:opacity-50"
+                        >
+                          {feeDownloadingId === a.id
+                            ? <Loader2 size={10} className="animate-spin" />
+                            : <FileDown size={10} aria-hidden="true" />}
+                          강사료 PDF
+                        </button>
                         {/* STEP-MENTOR-PORTAL-FULL — 펼침 토글 */}
                         <button type="button"
                           onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}
@@ -327,27 +395,4 @@ export default function MentoringTab({ programId }: Props) {
   );
 }
 
-interface StatCardProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  color: 'violet' | 'emerald' | 'slate' | 'orange';
-}
-
-function StatCard({ icon, label, value, color }: StatCardProps) {
-  const colorMap: Record<StatCardProps['color'], string> = {
-    violet:  'bg-violet-50 text-violet-700 border-violet-100',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    slate:   'bg-slate-50 text-slate-700 border-slate-100',
-    orange:  'bg-orange-50 text-orange-700 border-orange-100',
-  };
-  return (
-    <div className={`rounded-2xl border p-3 ${colorMap[color]}`}>
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold opacity-80">
-        {icon}
-        {label}
-      </div>
-      <p className="mt-1 text-xl font-bold tabular-nums">{value}</p>
-    </div>
-  );
-}
+// MentoringStatCard 는 ./MentoringStatCard 로 분리 (V-1).
