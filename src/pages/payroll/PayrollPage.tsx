@@ -17,7 +17,7 @@ import {
 } from './payrollUtils';
 import PayrollSummaryBar from './PayrollSummaryBar';
 import PayrollExpenseFormModal from './PayrollExpenseFormModal'; import PayrollImportModal from './PayrollImportModal'; import PayrollStatsPanel from './PayrollStatsPanel'; import PayrollDetailModal from './PayrollDetailModal';
-import { downloadPayrollExcel, downloadPayrollPdf } from './payrollDownload'; import { withFinanceGuard } from '../../hooks/useFinanceGuard'; // STEP-RBAC-SETUP
+import { downloadPayrollExcel, downloadPayrollPdf } from './payrollDownload'; import { withFinanceGuard } from '../../hooks/useFinanceGuard'; import PayrollRowStatusActions from './PayrollRowStatusActions'; // STEP-RBAC-SETUP + STEP-PAYROLL-STATUS-FLOW
 
 // 박경수님 요청 — 외주/운영 메인 탭 제거, [통계][지출] 2탭으로 재구성
 type MainTab = 'stats' | 'list';
@@ -339,8 +339,8 @@ function PayrollPage() {
                           : <span className="text-slate-400">-</span>}
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <button type="button" onClick={() => { setEditTarget(r); setFormOpen(true); }} className="text-xs text-violet-600 hover:underline mr-2">수정</button>
-                      <button type="button" onClick={() => void handleDelete(r)} className="text-xs text-rose-600 hover:underline">삭제</button>
+                      <PayrollRowStatusActions row={r} canAct onSaved={() => void reload()} />
+                      <button type="button" onClick={() => { setEditTarget(r); setFormOpen(true); }} className="text-xs text-violet-600 hover:underline ml-2">수정</button><button type="button" onClick={() => void handleDelete(r)} className="text-xs text-rose-600 hover:underline ml-1">삭제</button>
                     </td>
                   </tr>
                 );

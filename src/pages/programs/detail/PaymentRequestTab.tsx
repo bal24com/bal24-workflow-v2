@@ -12,7 +12,7 @@ import SubToggle from './SubToggle';
 import PaymentRequestFormModal, { type PaymentTarget } from './PaymentRequestFormModal';
 import PaymentSummaryCards from './PaymentSummaryCards';
 import EstimateImportModal from './EstimateImportModal';
-import { isPersonCategory, bulkSoftDeletePayroll, submitPaymentRequests, PAYROLL_STATUS_STYLE, PAYROLL_STATUS_LABEL } from '../../payroll/payrollUtils';
+import { isPersonCategory, bulkSoftDeletePayroll, submitPaymentRequests, cancelSubmitRequest, PAYROLL_STATUS_STYLE, PAYROLL_STATUS_LABEL } from '../../payroll/payrollUtils';
 // STEP-PAYROLL-DETAIL-COMMENT — 행 클릭 상세 팝업 / STEP-RBAC-SETUP PART D — PM 확정 행 수정/삭제 차단
 import PayrollDetailModal from '../../payroll/PayrollDetailModal';
 import { useUserProfile } from '../../../hooks/useUserProfile';
@@ -357,6 +357,9 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                           <button type="button" onClick={() => setEditTarget(r as PaymentTarget)} className="inline-flex items-center gap-0.5 text-xs text-violet-600 hover:underline ml-1"><Pencil size={11} aria-hidden="true" />수정</button>
                           <button type="button" onClick={() => void handleDelete(r)} disabled={acting === r.id} className="inline-flex items-center gap-0.5 text-xs text-rose-600 hover:underline disabled:opacity-40 ml-1"><Trash2 size={11} aria-hidden="true" />삭제</button>
                         </>
+                      ) : isPM && r.payment_status === 'submitted' ? (
+                        // STEP-PAYROLL-STATUS-FLOW — PM 전송취소 (received 전까지)
+                        <button type="button" onClick={async () => { const err = await cancelSubmitRequest(r.id); if (err) toast.error(`전송취소 실패: ${err}`); else { toast.success('전송을 취소했어요.'); void reload(); } }} className="text-xs text-amber-700 hover:underline ml-1">전송취소</button>
                       ) : (
                         <span title={isPM ? '확정된 항목은 재무만 수정 가능해요' : '수정 권한이 없어요'} className="text-[11px] text-slate-300 ml-1">잠김</span>
                       )}

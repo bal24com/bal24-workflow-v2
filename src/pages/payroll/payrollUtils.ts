@@ -145,12 +145,48 @@ export async function softDeletePayroll(id: string): Promise<string | null> {
   return null;
 }
 
-// 박경수님 + SkyClaw — [지출 요청] 실행 = submitted_at 기록 → 외주/급여 페이지 노출
+// STEP-PAYROLL-STATUS-FLOW (2026-05-28) — 6단계 상태 전환 + 추적 컬럼 기록 + 감사 흔적
+export async function transitionPayrollStatus(
+  id: string,
+  next: PayrollPaymentStatus,
+  extras: { paidAt?: string; cancelReason?: string } = {},
+  userId?: string,
+): Promise<string | null> {
+  const now = new Date().toISOString();
+  const updates: Record<string, unknown> = { payment_status: next };
+  if (next === 'received')   { updates.received_at   = now; if (userId) updates.received_by   = userId; }
+  if (next === 'processing') { updates.processing_at = now; if (userId) updates.processing_by = userId; }
+  if (next === 'paid')       { updates.paid_at = extras.paidAt ?? now; if (userId) updates.paid_by = userId; }
+  if (next === 'cancelled')  updates.cancel_reason = extras.cancelReason ?? '';
+  const { error } = await supabase.from('payroll_expenses').update(updates).eq('id', id);
+  if (error) {
+    console.error('[payroll] 상태 전환 실패:', error.message);
+    return error.message;
+  }
+  return null;
+}
+
+// STEP-PAYROLL-STATUS-FLOW (2026-05-28) — PM 전송취소 = submitted → draft (received 전까지)
+export async function cancelSubmitRequest(id: string): Promise<string | null> {
+  const { error } = await supabase
+    .from('payroll_expenses')
+    .update({ payment_status: 'draft', submitted_at: null })
+    .eq('id', id)
+    .eq('payment_status', 'submitted'); // 안전망 — 이미 received/processing/paid 면 차단
+  if (error) {
+    console.error('[payroll] 전송취소 실패:', error.message);
+    return error.message;
+  }
+  return null;
+}
+
+// 박경수님 + SkyClaw — [지출 요청] 실행 = submitted_at 기록 + payment_status 'draft' → 'submitted'
+// STEP-PAYROLL-STATUS-FLOW (2026-05-28) — 영문 6단계 워크플로우 진입점
 export async function submitPaymentRequests(ids: string[]): Promise<string | null> {
   if (ids.length === 0) return null;
   const { error } = await supabase
     .from('payroll_expenses')
-    .update({ submitted_at: new Date().toISOString() })
+    .update({ submitted_at: new Date().toISOString(), payment_status: 'submitted' })
     .in('id', ids)
     .is('submitted_at', null); // 이미 확정된 행은 건드리지 않음
   if (error) {
