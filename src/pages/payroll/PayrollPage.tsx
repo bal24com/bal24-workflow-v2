@@ -16,9 +16,7 @@ import {
   type PayrollRow,
 } from './payrollUtils';
 import PayrollSummaryBar from './PayrollSummaryBar';
-import PayrollExpenseFormModal from './PayrollExpenseFormModal';
-import PayrollImportModal from './PayrollImportModal';
-import PayrollStatsPanel from './PayrollStatsPanel';
+import PayrollExpenseFormModal from './PayrollExpenseFormModal'; import PayrollImportModal from './PayrollImportModal'; import PayrollStatsPanel from './PayrollStatsPanel'; import PayrollDetailModal from './PayrollDetailModal';
 import { downloadPayrollExcel, downloadPayrollPdf } from './payrollDownload';
 
 // 박경수님 요청 — 외주/운영 메인 탭 제거, [통계][지출] 2탭으로 재구성
@@ -57,6 +55,8 @@ export default function PayrollPage() {
   // 박경수님 + SkyClaw — 일괄 선택삭제
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  // 박경수님 + SkyClaw STEP-PAYROLL-DETAIL-COMMENT (2026-05-28) — 행 클릭 상세 팝업
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -269,12 +269,12 @@ export default function PayrollPage() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs">
               <tr>
-                {/* 박경수님 + SkyClaw — 전체선택 (visible 기준) */}
-                <th className="w-8 px-3 py-2.5">
+                {/* 박경수님 + SkyClaw — 전체선택 (visible 기준). hover 시 노출 */}
+                <th className="w-8 px-3 py-2.5 group">
                   <input type="checkbox" aria-label="전체 선택"
                     checked={visible.length > 0 && visible.every((r) => selectedIds.has(r.id))}
                     onChange={toggleAll}
-                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500 transition-opacity opacity-30 hover:opacity-100 focus:opacity-100" />
                 </th>
                 <SortableTh k="project"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">프로젝트</SortableTh>
                 <SortableTh k="expense_type"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">항목</SortableTh>
@@ -293,14 +293,14 @@ export default function PayrollPage() {
                 const hasReceipt = (r.receipt_urls?.length ?? 0) > 0;
                 const needReceipt = !hasReceipt && r.expense_type !== '운영인건비';
                 return (
-                  <tr key={r.id} className={`hover:bg-violet-50/40 ${selectedIds.has(r.id) ? 'bg-violet-50/30' : ''}`}>
-                    {/* 박경수님 + SkyClaw — 개별 선택 */}
-                    <td className="w-8 px-3 py-2">
+                  <tr key={r.id} className={`group hover:bg-violet-50/40 cursor-pointer ${selectedIds.has(r.id) ? 'bg-violet-50/30' : ''}`}
+                    onClick={() => setDetailId(r.id)}>
+                    {/* 박경수님 + SkyClaw — 개별 선택 (hover 시 노출, 평소 투명) */}
+                    <td className="w-8 px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" aria-label={`${r.payee_name} 선택`}
                         checked={selectedIds.has(r.id)}
                         onChange={() => toggleOne(r.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                        className={`rounded border-slate-300 text-violet-600 focus:ring-violet-500 transition-opacity ${selectedIds.has(r.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`} />
                     </td>
                     <td className="px-3 py-2 text-xs text-muted">{r.project?.name ?? '-'}</td>
                     {/* 박경수님 fix (2026-05-26) — isPersonCategory 통일 + 좌측 정렬 + '기타' 버킷 제거 */}
@@ -338,7 +338,7 @@ export default function PayrollPage() {
                           ? <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 font-bold">증빙없음</span>
                           : <span className="text-slate-400">-</span>}
                     </td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <button type="button" onClick={() => { setEditTarget(r); setFormOpen(true); }} className="text-xs text-violet-600 hover:underline mr-2">수정</button>
                       <button type="button" onClick={() => void handleDelete(r)} className="text-xs text-rose-600 hover:underline">삭제</button>
                     </td>
@@ -363,6 +363,7 @@ export default function PayrollPage() {
         onClose={() => setImportOpen(false)}
         onImported={() => { setImportOpen(false); void reload(); }}
       />
+      <PayrollDetailModal open={!!detailId} payrollId={detailId} onClose={() => setDetailId(null)} onEdit={() => { const r = items.find((x) => x.id === detailId); if (r) { setDetailId(null); setEditTarget(r); setFormOpen(true); } }} />
     </div>
   );
 }

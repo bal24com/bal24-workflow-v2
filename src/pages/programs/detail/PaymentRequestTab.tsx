@@ -13,6 +13,8 @@ import PaymentRequestFormModal, { type PaymentTarget } from './PaymentRequestFor
 import PaymentSummaryCards from './PaymentSummaryCards';
 import EstimateImportModal from './EstimateImportModal';
 import { isPersonCategory, bulkSoftDeletePayroll, submitPaymentRequests } from '../../payroll/payrollUtils';
+// 박경수님 + SkyClaw STEP-PAYROLL-DETAIL-COMMENT (2026-05-28) — 행 클릭 상세 팝업
+import PayrollDetailModal from '../../payroll/PayrollDetailModal';
 
 type Group = 'outsource' | 'operation';
 
@@ -65,6 +67,8 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
   // 박경수님 + SkyClaw — 일괄 선택삭제
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  // 박경수님 + SkyClaw STEP-PAYROLL-DETAIL-COMMENT — 행 클릭 상세 팝업
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -263,12 +267,12 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs">
               <tr>
-                {/* 박경수님 + SkyClaw — 전체선택 (visible 기준) */}
+                {/* 박경수님 + SkyClaw — 전체선택 (visible 기준). hover 시 노출 (DETAIL-COMMENT) */}
                 <th className="w-8 px-3 py-2.5">
                   <input type="checkbox" aria-label="전체 선택"
                     checked={visible.length > 0 && visible.every((r) => selectedIds.has(r.id))}
                     onChange={toggleAll}
-                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500 transition-opacity opacity-30 hover:opacity-100 focus:opacity-100" />
                 </th>
                 <th className="text-left px-3 py-2.5 font-semibold">항목</th>
                 <th className="text-left px-3 py-2.5 font-semibold">세항목</th>
@@ -283,14 +287,14 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {visible.map((r, idx) => (
-                <tr key={r.id} className={`hover:bg-violet-50/40 ${selectedIds.has(r.id) ? 'bg-violet-50/30' : ''}`}>
-                  {/* 박경수님 + SkyClaw — 개별 선택 */}
-                  <td className="w-8 px-3 py-2">
+                <tr key={r.id} className={`group hover:bg-violet-50/40 cursor-pointer ${selectedIds.has(r.id) ? 'bg-violet-50/30' : ''}`}
+                  onClick={() => setDetailId(r.id)}>
+                  {/* 박경수님 + SkyClaw — 개별 선택 (hover 노출) */}
+                  <td className="w-8 px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" aria-label={`${r.expense_type} 선택`}
                       checked={selectedIds.has(r.id)}
                       onChange={() => toggleOne(r.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                      className={`rounded border-slate-300 text-violet-600 focus:ring-violet-500 transition-opacity ${selectedIds.has(r.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`} />
                   </td>
                   <td className="px-3 py-2 text-xs font-semibold text-violet-700">
                     <div className="flex items-center gap-1.5">
@@ -338,7 +342,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                   <td className="px-3 py-2 text-center">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${STATUS_STYLE[r.payment_status] ?? STATUS_STYLE['대기']}`}>{r.payment_status}</span>
                   </td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                  <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     <span className="inline-flex items-center gap-1">
                       <button type="button" onClick={() => void swap(idx, 'up')} disabled={idx === 0} aria-label="위로" title="위로" className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30"><ArrowUp size={11} aria-hidden="true" /></button>
                       <button type="button" onClick={() => void swap(idx, 'down')} disabled={idx === visible.length - 1} aria-label="아래로" title="아래로" className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30"><ArrowDown size={11} aria-hidden="true" /></button>
@@ -371,6 +375,9 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
           onClose={() => setEditTarget(null)}
           onSaved={() => { setEditTarget(null); void reload(); }} />
       )}
+      {/* 박경수님 + SkyClaw STEP-PAYROLL-DETAIL-COMMENT — 행 클릭 상세 팝업 + 댓글 */}
+      <PayrollDetailModal open={!!detailId} payrollId={detailId} onClose={() => setDetailId(null)}
+        onEdit={() => { const r = rows.find((x) => x.id === detailId); if (r) { setDetailId(null); setEditTarget(r as PaymentTarget); } }} />
     </div>
   );
 }
