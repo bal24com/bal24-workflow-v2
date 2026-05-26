@@ -9,8 +9,9 @@ import { useToast } from '../../../contexts/ToastContext';
 import EmptyState from '../../../components/EmptyState';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 import ProfileFileSection from './ProfileFileSection';
+import StaffFeeSection from './StaffFeeSection';
 
-type MaterialSubTab = 'curriculum' | 'profile';
+type MaterialSubTab = 'curriculum' | 'profile' | 'fee';
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -35,6 +36,7 @@ function SubTabHeader({ active, onChange }: { active: MaterialSubTab; onChange: 
   const items: Array<{ key: MaterialSubTab; label: string; desc: string }> = [
     { key: 'curriculum', label: '교안', desc: '강사가 차시별 업로드' },
     { key: 'profile',    label: '프로필', desc: 'PM 업로드 (다운로드만)' },
+    { key: 'fee',        label: '강사료', desc: '내 지급 내역' },
   ];
   return (
     <div className="flex items-center gap-1 border-b border-violet-100 mb-3 -mx-1 px-1">
@@ -162,13 +164,33 @@ export default function StaffMaterialsTab({ staff, selectedProgramId }: Props) {
     void fetchData();
   }
 
-  // 박경수님 2026-05-26 — 프로필 서브탭은 별도 컴포넌트에서 처리.
+  // 박경수님 2026-05-26 — 프로필·강사료 서브탭은 별도 컴포넌트에서 처리.
   // 모든 hook 호출 뒤로 이동 (subTab 토글 시 hook 카운트 변화 방지).
   if (subTab === 'profile') {
     return (
       <div className="space-y-3">
         <SubTabHeader active={subTab} onChange={setSubTab} />
         <ProfileFileSection staff={staff} selectedProgramId={selectedProgramId} />
+      </div>
+    );
+  }
+  if (subTab === 'fee') {
+    if (staff.sourceType !== 'staff_pool') {
+      return (
+        <div className="space-y-3">
+          <SubTabHeader active={subTab} onChange={setSubTab} />
+          <div className="bg-white rounded-2xl border border-violet-100 p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
+            <p className="text-sm text-slate-400 italic text-center py-4">
+              내부 직원 강사의 강사료는 별도 시스템에서 관리돼요.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-3">
+        <SubTabHeader active={subTab} onChange={setSubTab} />
+        <StaffFeeSection staffId={staff.id} selectedProgramId={selectedProgramId} />
       </div>
     );
   }
