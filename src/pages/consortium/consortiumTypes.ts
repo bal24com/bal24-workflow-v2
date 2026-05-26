@@ -62,20 +62,24 @@ export interface ConsortiumMember {
   id: string;
   consortium_id: string;
   client_id: string | null; // 박경수님 + SkyClaw STEP-CONSORTIUM-UPGRADE-FULL (2026-05-28) — is_self=true 인 자사 멤버는 NULL
-  member_type: MemberType;
-  // STEP-CONSORTIUM-UPGRADE-FULL — 역할 3분류 (주관기관/주관사/참여사) 지원
+  member_type?: MemberType;     // (Legacy — 박경수님 환경 DB 엔 없음. 호환용 optional)
+  // STEP-CONSORTIUM-UPGRADE-FULL — 박경수님 환경의 실제 DB 컬럼명
+  org_name?: string;            // 박경수님 환경 DB 컬럼 (참여사 기관명, NOT NULL)
   is_self?: boolean;            // true = 밸런스닷 자사 (clients 미등록)
   role?: 'lead' | 'partner';    // lead = 주관사(컨소시엄 총괄), partner = 참여사
-  task_share_pct: number;
-  allocated_budget: number;
-  spent_amount: number;
+  budget_ratio?: number | null; // 박경수님 환경 DB 컬럼 (지분율 %, task_share_pct 대응)
+  budget_amount?: number | null;// 박경수님 환경 DB 컬럼 (배분 예산, allocated_budget 대응)
+  // (Legacy — 박경수님 환경엔 없는 컬럼. 호환용 optional)
+  task_share_pct?: number;
+  allocated_budget?: number;
+  spent_amount?: number;
+  portal_enabled?: boolean;
+  updated_at?: string;
   contact_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
-  portal_enabled: boolean;
   responsibilities: string | null;
   created_at: string;
-  updated_at: string;
   clients?: { id: string; name: string; business_name: string | null } | null;
 }
 

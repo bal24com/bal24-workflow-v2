@@ -2,9 +2,9 @@
 
 import type { ConsortiumMember, MemberBudget, ConsortiumStatus } from './consortiumTypes';
 
-/** 수행과업 지분율 합계 */
+/** 수행과업 지분율 합계 — 박경수님 환경의 budget_ratio + legacy task_share_pct 둘 다 지원 */
 export function sumSharePct(members: ConsortiumMember[]): number {
-  return members.reduce((acc, m) => acc + Number(m.task_share_pct ?? 0), 0);
+  return members.reduce((acc, m) => acc + Number(m.budget_ratio ?? m.task_share_pct ?? 0), 0);
 }
 
 // STEP-CONSORTIUM-UPGRADE-FULL (2026-05-28) — 역할 3분류 헬퍼
@@ -29,16 +29,19 @@ export function validateRatioSum(members: ConsortiumMember[]): { valid: boolean;
   return { valid: Math.abs(total - 100) < 0.01, total };
 }
 
-/** 참여사별 예산 집행 현황 집계 */
+/** 참여사별 예산 집행 현황 집계 — 박경수님 환경 컬럼 (budget_ratio/budget_amount/org_name) 우선 */
 export function buildMemberBudgets(members: ConsortiumMember[]): MemberBudget[] {
   return members.map((m) => {
-    const allocated = Number(m.allocated_budget ?? 0);
+    const allocated = Number(m.budget_amount ?? m.allocated_budget ?? 0);
     const spent = Number(m.spent_amount ?? 0);
+    const name = m.is_self ? '(주)밸런스닷' : (m.org_name ?? m.clients?.name ?? '(이름 없음)');
+    // member_type 호환: 신규 role 'lead' → 'lead', 'partner' → 'co' (기존 4종 중 대표값)
+    const legacyType = (m.member_type ?? (m.role === 'lead' ? 'lead' : 'co')) as MemberBudget['memberType'];
     return {
-      clientId: m.client_id ?? '',
-      clientName: m.is_self ? '(주)밸런스닷' : (m.clients?.name ?? '(이름 없음)'),
-      memberType: m.member_type,
-      taskSharePct: Number(m.task_share_pct ?? 0),
+      clientId: m.client_id ?? m.id,
+      clientName: name,
+      memberType: legacyType,
+      taskSharePct: Number(m.budget_ratio ?? m.task_share_pct ?? 0),
       allocatedBudget: allocated,
       spentAmount: spent,
       remainingBudget: allocated - spent,

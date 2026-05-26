@@ -159,11 +159,22 @@ export default function ConOverviewTab({ consortiumId, totalBudget, members, des
         <KpiCard label="집행률" value={`${execRate}%`} tone={execRate > 90 ? 'rose' : 'cyan'} sub={execRate > 90 ? '⚠ 집행률 과다' : undefined} />
       </div>
 
-      {/* 참여사 예산 집행 표 */}
+      {/* 참여사 예산 집행 표 — STEP-CONSORTIUM-UPGRADE-FULL PART A: 합계 100% 검증 */}
       <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
-        <div className="flex items-center gap-1.5 mb-3">
-          <Wallet size={16} className="text-violet-500" aria-hidden="true" />
-          <h2 className="text-sm font-bold text-[#1E1B4B]">참여사 예산 집행 (수행과업 지분율)</h2>
+        <div className="flex items-center justify-between gap-1.5 mb-3">
+          <div className="flex items-center gap-1.5">
+            <Wallet size={16} className="text-violet-500" aria-hidden="true" />
+            <h2 className="text-sm font-bold text-[#1E1B4B]">참여사 예산 집행 (수행과업 지분율)</h2>
+          </div>
+          {budgets.length > 0 && (() => {
+            const total = budgets.reduce((s, b) => s + Number(b.taskSharePct ?? 0), 0);
+            const valid = Math.abs(total - 100) < 0.01;
+            return (
+              <span className={`text-[11px] font-semibold tabular-nums px-2 py-0.5 rounded border ${valid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                합계 {total.toFixed(1)}% {valid ? '✓' : '⚠️'}
+              </span>
+            );
+          })()}
         </div>
         {budgets.length === 0 ? (
           <p className="text-sm text-slate-400 italic text-center py-6">참여사가 등록되지 않았어요.</p>

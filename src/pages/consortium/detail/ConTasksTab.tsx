@@ -80,7 +80,7 @@ export default function ConTasksTab({ consortiumId, members }: Props) {
         type: m.member_type as MemberType,
         total: 0,
         done: 0,
-        sharePct: m.task_share_pct,
+        sharePct: m.budget_ratio ?? m.task_share_pct ?? 0,
       });
     }
     for (const t of tasks) {
