@@ -31,6 +31,8 @@ const ContractsPage         = lazy(() => import('./pages/contracts/ContractsPage
 const PayrollPage           = lazy(() => import('./pages/payroll/PayrollPage'));
 // 박경수님 + SkyClaw STEP-PAYROLL-SYSTEM (2026-05-28) — 직원 급여 관리 + 지출결의서
 const PayrollMgmtPage       = lazy(() => import('./pages/payroll-mgmt/PayrollMgmtPage'));
+// 박경수님 + SkyClaw STEP-PAYROLL-MYPAGE (2026-05-28) — 본인 급여명세서
+const MyPayrollPage         = lazy(() => import('./pages/my-payroll/MyPayrollPage'));
 const AccountingReviewPage  = lazy(() => import('./pages/accounting-portal/AccountingReviewPage'));
 const AttendancePage        = lazy(() => import('./pages/attendance/AttendancePage'));
 const AttendanceDetailPage  = lazy(() => import('./pages/attendance/AttendanceDetailPage'));
@@ -200,6 +202,8 @@ export default function App() {
               <Route path="/payroll" element={<PayrollPage />} />
               {/* 박경수님 + SkyClaw STEP-PAYROLL-SYSTEM — 직원 급여 + 지출결의서 */}
               <Route path="/payroll-mgmt" element={<PayrollMgmtPage />} />
+              {/* 박경수님 + SkyClaw STEP-PAYROLL-MYPAGE — 본인 급여명세서 */}
+              <Route path="/my-payroll" element={<MyPayrollPage />} />
               {/* STEP-ACCOUNTING-ALL P4 — 회계 검토 (PM 측) */}
               <Route path="/accounting-reviews" element={<AccountingReviewPage />} />
 

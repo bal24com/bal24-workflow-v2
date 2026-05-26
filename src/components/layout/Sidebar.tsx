@@ -81,6 +81,8 @@ const SECTIONS: MenuSection[] = [
     items: [
       { to: '/logs', label: '일지', Icon: BookOpen },
       { to: '/ai',   label: 'AI',   Icon: Sparkles },
+      // 박경수님 + SkyClaw STEP-PAYROLL-MYPAGE (2026-05-28) — 본인 급여명세서
+      { to: '/my-payroll', label: '내 급여명세서', Icon: FileText },
     ],
   },
 ];
@@ -116,6 +118,8 @@ const PARTNER_SECTIONS: MenuSection[] = [
     items: [
       { to: '/logs', label: '일지', Icon: BookOpen },
       { to: '/ai',   label: 'AI',   Icon: Sparkles },
+      // 박경수님 + SkyClaw STEP-PAYROLL-MYPAGE (2026-05-28) — 본인 급여명세서
+      { to: '/my-payroll', label: '내 급여명세서', Icon: FileText },
     ],
   },
 ];
