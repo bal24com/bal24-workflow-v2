@@ -15,6 +15,7 @@ import MentoringLogForm from './MentoringLogForm';
 import { fetchLogForPdf } from '../../programs/detail/mentoringLogPdfFetch';
 import { downloadMentoringLogPdf, type MentoringLogForPdf } from '../../programs/detail/mentoringLogPdf';
 import SignaturePad from '../../../components/ui/SignaturePad';
+import SignatureUploadSection from '../SignatureUploadSection';
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -193,6 +194,11 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* 2026-05-26 박경수님 — 도장/사인 등록 카드 상단 노출 (staff_pool 강사만). PDF 출력 시 자동 적용. */}
+      {staff.sourceType === 'staff_pool' && (
+        <SignatureUploadSection staffId={staff.id} />
+      )}
+
       {tableMissing && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           멘토링 일지 기능이 아직 활성화되지 않았어요. PM에게 마이그레이션 실행을 요청해 주세요.
@@ -222,6 +228,7 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
           <section key={a.id} className={CARD_CLASS}>
             <h2 className="text-base font-bold text-[#1E1B4B] mb-4">{programName}</h2>
             <div className="space-y-4">
+              {/* 2026-05-26 박경수님 — 담당 멘티 세로 ul → 가로 chip 박스 */}
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center gap-1.5">
                   <Users2 size={12} aria-hidden="true" /> 담당 멘티 ({menteeList.length}명)
@@ -229,13 +236,19 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
                 {menteeList.length === 0 ? (
                   <p className="text-sm text-slate-400 italic">배정된 멘티가 없어요.</p>
                 ) : (
-                  <ul className="space-y-1">
-                    {menteeList.map((m) => (
-                      <li key={m.id} className="text-sm text-slate-700">
-                        · {m.name}{m.organization && <span className="text-slate-400"> ({m.organization})</span>}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="rounded-xl border border-violet-100 bg-violet-50/40 px-3 py-2.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {menteeList.map((m) => (
+                        <span key={m.id}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-violet-200 text-xs text-slate-700">
+                          <span className="font-semibold">{m.name}</span>
+                          {m.organization && (
+                            <span className="text-[10px] text-slate-400">{m.organization}</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
 

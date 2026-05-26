@@ -2,7 +2,7 @@
 // 멘토링 일지 작성 폼 (StaffMentoringTab에서 분리, V-1 400줄 유지용)
 // P1 추가: subject·recipient 필드, duration_min 저장, draft/submitted 모드 분리.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Clock, Loader2, Save, Send, X } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
@@ -81,6 +81,38 @@ export default function MentoringLogForm({
   // STEP-MENTORING-LOG-UX — 첨부 파일 (일지 저장 후 일괄 INSERT)
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([]);
   const [saving, setSaving] = useState(false);
+  // 2026-05-26 박경수님 — 주관기관 자동 채움 (programs → projects → clients.name)
+  const [defaultRecipient, setDefaultRecipient] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const programId = assignment.program?.id;
+      if (!programId) return;
+      const { data, error } = await supabase
+        .from('programs')
+        .select('project:projects(client:clients(name))')
+        .eq('id', programId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) {
+        console.warn('[mentoring-log-form] 주관기관 조회 경고:', error.message);
+        return;
+      }
+      type ProjectClient = { client?: { name?: string | null } | { name?: string | null }[] | null };
+      const proj = (data as { project?: ProjectClient | ProjectClient[] | null } | null)?.project ?? null;
+      const projRow = Array.isArray(proj) ? proj[0] : proj;
+      const cli = projRow?.client ?? null;
+      const cliRow = Array.isArray(cli) ? cli[0] : cli;
+      const name = cliRow?.name ?? '';
+      if (name) {
+        setDefaultRecipient(name);
+        // 사용자가 아직 손대지 않았다면 자동 채움
+        setForm((prev) => prev.recipient ? prev : { ...prev, recipient: name });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [assignment.program?.id]);
 
   const durationLabel = useMemo(
     () => formatDuration(calcDurationMin(form.start_time, form.end_time)),
@@ -238,14 +270,29 @@ export default function MentoringLogForm({
         userId={userId}
         disabled={saving} />
 
-      {/* STEP-MENTORING-P1 — 제출처 (선택, 출력 양식 하단 "OO 귀하"에 사용) */}
+      {/* 2026-05-26 박경수님 — 제출처: 주관기관 자동 채움 + 직접 수정 가능 */}
       <div>
-        <label className="text-xs font-semibold text-slate-700 block mb-1">제출처 (선택)</label>
-        <input type="text" value={form.recipient} disabled={saving}
-          onChange={(e) => setForm({ ...form, recipient: e.target.value })}
-          placeholder="예) 국립순천대학교"
-          className={INPUT_CLASS} />
-        <p className="text-[11px] text-slate-400 mt-1">PDF 출력 시 "OO 귀하" 형태로 표시돼요.</p>
+        <label className="text-xs font-semibold text-slate-700 block mb-1">제출처</label>
+        <div className="flex items-stretch gap-2">
+          <input type="text" value={form.recipient} disabled={saving}
+            onChange={(e) => setForm({ ...form, recipient: e.target.value })}
+            placeholder={defaultRecipient || '예) 국립순천대학교'}
+            className={INPUT_CLASS + ' flex-1'} />
+          {defaultRecipient && form.recipient !== defaultRecipient && (
+            <button type="button" disabled={saving}
+              onClick={() => setForm({ ...form, recipient: defaultRecipient })}
+              title="주관기관으로 채우기"
+              className="px-3 rounded-[10px] border border-violet-200 text-violet-700 text-xs font-semibold hover:bg-violet-50 disabled:opacity-50">
+              주관기관 자동
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-slate-400 mt-1">
+          {defaultRecipient
+            ? <>기본값은 주관기관 <span className="font-semibold text-slate-600">{defaultRecipient}</span>. 직접 입력해도 돼요.</>
+            : '비워두면 PDF 출력 시 제출처 표시가 생략돼요.'}
+          {' '}PDF 출력 시 "OO 귀하" 형태로 표시돼요.
+        </p>
       </div>
 
       {/* STEP-MENTORING-P1 — 임시저장 / 제출 분리 */}

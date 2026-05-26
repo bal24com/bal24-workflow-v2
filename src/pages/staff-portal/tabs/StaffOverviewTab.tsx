@@ -2,7 +2,7 @@
 // 강사 통합 포털 · 개요 탭 — 담당 프로그램 카드 + D-7 일정 + 교육 개요·전체 커리큘럼 (PART B 2026-05-28)
 
 import { useEffect, useState } from 'react';
-import { Loader2, BookOpen, CheckCircle2, Info, ListChecks, User } from 'lucide-react';
+import { Loader2, BookOpen, CheckCircle2, Info, ListChecks, User, Calendar, MapPin, Users } from 'lucide-react';
 import { formatDateKo } from '../../../lib/utils';
 import EmptyState from '../../../components/EmptyState';
 import { BADGE_BASE } from '../../../utils/statusStyles';
@@ -160,20 +160,43 @@ export default function StaffOverviewTab({
       {/* STEP-TABLE-COMPACT PART C (2026-05-28) — D-7 다가오는 일정 위젯 제거 (일정 탭으로 통합)
           기존 fetchUpcomingSchedule 호출은 유지하되 UI 만 미노출 → 다른 활용처(useEffect) 영향 X */}
 
-      {/* PART B — 교육 개요 (선택 프로그램) */}
+      {/* 2026-05-26 박경수님 — 교육 개요 단정화. 메타 인라인 한 줄 + 본문 단일 영역. */}
       {selectedProgramId && programDetail && (
         <section className={CARD_CLASS}>
           <h2 className="text-base font-bold text-[#1E1B4B] mb-3 flex items-center gap-2">
             <Info size={16} className="text-blue-500" aria-hidden="true" /> 교육 개요
           </h2>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            {clientName && (<><dt className="text-slate-500">주관기관</dt><dd className="font-semibold text-slate-800">{clientName}</dd></>)}
-            <dt className="text-slate-500">기간</dt>
-            <dd className="text-slate-800">{formatDateKo(programDetail.start_date) || '미정'} ~ {formatDateKo(programDetail.end_date) || '미정'}</dd>
-            {programDetail.venue && (<><dt className="text-slate-500">장소</dt><dd className="text-slate-800">{programDetail.venue}</dd></>)}
-            {programDetail.capacity != null && (<><dt className="text-slate-500">인원</dt><dd className="text-slate-800 tabular-nums">{programDetail.capacity}명</dd></>)}
-            {programDetail.description && (<><dt className="text-slate-500 col-span-2 mt-1">목적·설명</dt><dd className="col-span-2 text-slate-700 whitespace-pre-line text-xs">{programDetail.description}</dd></>)}
-          </dl>
+          {/* 메타 인라인 — 기간 · 장소 · 인원 · 주관기관 */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-700 mb-3 pb-3 border-b border-slate-100">
+            <span className="inline-flex items-center gap-1">
+              <Calendar size={13} className="text-violet-500" aria-hidden="true" />
+              <span className="tabular-nums">{formatDateKo(programDetail.start_date) || '미정'} ~ {formatDateKo(programDetail.end_date) || '미정'}</span>
+            </span>
+            {programDetail.venue && (
+              <span className="inline-flex items-center gap-1">
+                <MapPin size={13} className="text-violet-500" aria-hidden="true" />
+                <span>{programDetail.venue}</span>
+              </span>
+            )}
+            {programDetail.capacity != null && (
+              <span className="inline-flex items-center gap-1">
+                <Users size={13} className="text-violet-500" aria-hidden="true" />
+                <span className="tabular-nums">{programDetail.capacity}명</span>
+              </span>
+            )}
+            {clientName && (
+              <span className="inline-flex items-center gap-1 ml-auto">
+                <span className="text-[11px] text-slate-400">주관기관</span>
+                <span className="font-semibold text-slate-800">{clientName}</span>
+              </span>
+            )}
+          </div>
+          {/* 본문 — 목적·설명 */}
+          {programDetail.description ? (
+            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{programDetail.description}</p>
+          ) : (
+            <p className="text-xs text-slate-400 italic">목적·설명이 아직 등록되지 않았어요.</p>
+          )}
         </section>
       )}
 
@@ -211,13 +234,7 @@ export default function StaffOverviewTab({
         </section>
       )}
 
-      {/* STEP-TABLE-COMPACT PART C (2026-05-28) — 프로젝트 설명 카드 (description 있을 때만) */}
-      {selectedProgramId && programDetail?.description && (
-        <section className={CARD_CLASS}>
-          <h3 className="text-sm font-bold text-violet-700 mb-2">📝 프로젝트 설명</h3>
-          <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{programDetail.description}</p>
-        </section>
-      )}
+      {/* 2026-05-26 박경수님 — 프로젝트 설명 카드는 교육 개요와 중복이라 제거. */}
     </div>
   );
 }
