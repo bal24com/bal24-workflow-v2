@@ -176,9 +176,13 @@ export function estimateItemStatusLabel(
   return { label: '집행 대기', tone: 'amber' };
 }
 
-/** 자주 쓰이는 견적 카테고리 (datalist 후보) */
+/** 자주 쓰이는 견적 카테고리 (datalist 후보)
+ *  박경수님 + SkyClaw STEP-ESTIMATE-UPGRADE-FULL PART B (2026-05-28) — 4종 표준 카테고리 우선 노출 */
 export const ESTIMATE_CATEGORY_SUGGESTIONS = [
+  // 표준 4종 (먼저 노출)
+  '인건비', '운영비', '숙식 및 임차', '기타',
+  // 기존 세부 카테고리 (자유 입력 호환)
   '강사료', '강사료-OT', '강사료-메인', '특강료',
-  '운영비', '운영인건비', '교통비', '숙박비', '식대',
+  '운영인건비', '교통비', '숙박비', '식대',
   '인쇄·제작', '시설·장비', '기타외주',
 ];
