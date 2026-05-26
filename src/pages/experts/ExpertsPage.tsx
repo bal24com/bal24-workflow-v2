@@ -16,30 +16,32 @@ import EmptyState from '../../components/EmptyState';
 import { useToast } from '../../contexts/ToastContext';
 import { softDelete } from '../../lib/softDeleteUtils';
 import { copyToClipboard } from '../../lib/clipboard';
-import type { StaffPool } from '../../types/database';
-import TagFilterTabs from '../../components/TagFilterTabs';
-import { useTagFilter } from '../../hooks/useTagFilter';
+import type { StaffPool, StaffType } from '../../types/database';
 import ExpertFormModal from './ExpertFormModal';
 import ExpertActivityDrawer from './ExpertActivityDrawer';
 import ExpertListRow from './ExpertListRow';
+import ExpertRecentPrograms from './ExpertRecentPrograms';
+import { fetchRecentProgramsForExperts, type ExpertProgramRef } from './expertProgramsFetch';
 
 type ViewMode = 'card' | 'list';
-type FieldFilter = '전체' | '교육' | '컨설팅' | '행사' | '기타';
+// 박경수님 2026-05-26 STEP-EXPERTS-UI-REFINE — staff_type 기반 역할 필터로 단순화.
+type RoleFilter = 'all' | StaffType;
+const ROLE_FILTERS: Array<{ key: RoleFilter; label: string }> = [
+  { key: 'all',   label: '전체' },
+  { key: '강사',  label: '강사' },
+  { key: '멘토',  label: '멘토' },
+  { key: 'FT',    label: 'FT' },
+  { key: 'TA',    label: 'TA' },
+  { key: '운영진', label: '운영진' },
+  { key: '기타',  label: '기타' },
+];
 
-const FIELD_FILTERS: FieldFilter[] = ['전체', '교육', '컨설팅', '행사', '기타'];
-const KNOWN_FIELDS = ['교육', '컨설팅', '행사'];
-
-function expertMatchesField(s: StaffPool, filter: FieldFilter): boolean {
-  if (filter === '전체') return true;
-  const tags = s.specialty ?? [];
-  if (filter === '기타') {
-    if (tags.length === 0) return true;
-    return tags.every((t) => !KNOWN_FIELDS.includes(t));
-  }
-  return tags.includes(filter);
+function expertMatchesRole(s: StaffPool, filter: RoleFilter): boolean {
+  if (filter === 'all') return true;
+  return s.staff_type === filter;
 }
 
-function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity, onResetPin }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void; onShowActivity: () => void; onResetPin: () => void }) {
+function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity, onResetPin, recentPrograms }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void; onShowActivity: () => void; onResetPin: () => void; recentPrograms?: ExpertProgramRef[] }) {
   return (
     // STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일한 min-h
     <Card className="group hover:border-primary/30 hover:shadow-md transition min-h-[260px] flex flex-col">
@@ -96,6 +98,8 @@ function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity, onR
         {s.main_duties && (
           <p className="text-xs text-muted line-clamp-2 pt-1">{s.main_duties}</p>
         )}
+        {/* 박경수님 2026-05-26 STEP-EXPERTS-UI-REFINE — 최근 참여 프로그램 (최대 3개) */}
+        <ExpertRecentPrograms programs={recentPrograms} variant="card" />
       </CardContent>
       {/* STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일 3 버튼 + STEP-STAFF-PORTAL-P2 포털 링크 복사 */}
       <div className="flex items-center gap-2 px-5 pb-4">
@@ -133,16 +137,16 @@ export default function ExpertsPage() {
   const [experts, setExperts] = useState<StaffPool[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ViewMode>('card');
-  const [field, setField] = useState<FieldFilter>('전체');
+  // 박경수님 2026-05-26 STEP-EXPERTS-UI-REFINE — 분야 필터(FIELD_FILTERS)·TagFilterTabs 제거, 역할 필터 1행만.
+  const [role, setRole] = useState<RoleFilter>('all');
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   // STEP-EXPERT-CRUD-FULL — 수정 대상 (null = 신규 등록)
   const [editTarget, setEditTarget] = useState<StaffPool | null>(null);
   // STEP-STAFF-PORTAL-P4 — 활동 이력 드로어 대상
   const [activityTarget, setActivityTarget] = useState<StaffPool | null>(null);
-
-  // STEP-TAGS-3B — 분류 탭 (관리자 등록 태그)
-  const tagFilter = useTagFilter('staff', experts);
+  // 박경수님 2026-05-26 STEP-EXPERTS-UI-REFINE — 카드별 최근 참여 프로그램 (staff_id → ExpertProgramRef[])
+  const [programsByStaff, setProgramsByStaff] = useState<Map<string, ExpertProgramRef[]>>(new Map());
 
   const fetchExperts = useCallback(async () => {
     setLoading(true);
@@ -154,7 +158,16 @@ export default function ExpertsPage() {
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setExperts((data ?? []) as StaffPool[]);
+      const list = (data ?? []) as StaffPool[];
+      setExperts(list);
+      // 박경수님 2026-05-26 — 참여 프로그램 배치 fetch (N+1 방지)
+      const ids = list.map((e) => e.id);
+      if (ids.length > 0) {
+        const map = await fetchRecentProgramsForExperts(ids);
+        setProgramsByStaff(map);
+      } else {
+        setProgramsByStaff(new Map());
+      }
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[experts] 목록 조회 실패:', raw);
@@ -211,13 +224,13 @@ export default function ExpertsPage() {
     void fetchExperts();
   };
 
-  const counts = useMemo<Record<FieldFilter, number>>(() => {
-    const acc: Record<FieldFilter, number> = { 전체: experts.length, 교육: 0, 컨설팅: 0, 행사: 0, 기타: 0 };
+  // 박경수님 2026-05-26 STEP-EXPERTS-UI-REFINE — staff_type 기반 카운트.
+  const counts = useMemo<Record<RoleFilter, number>>(() => {
+    const acc: Record<RoleFilter, number> = {
+      all: experts.length, '강사': 0, '멘토': 0, 'FT': 0, 'TA': 0, '운영진': 0, '기타': 0,
+    };
     for (const s of experts) {
-      for (const f of ['교육', '컨설팅', '행사'] as const) {
-        if (expertMatchesField(s, f)) acc[f] += 1;
-      }
-      if (expertMatchesField(s, '기타')) acc['기타'] += 1;
+      if (s.staff_type) acc[s.staff_type] = (acc[s.staff_type] ?? 0) + 1;
     }
     return acc;
   }, [experts]);
@@ -225,13 +238,12 @@ export default function ExpertsPage() {
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return experts.filter((s) => {
-      if (!tagFilter.matches(s)) return false; // STEP-TAGS-3B
-      if (!expertMatchesField(s, field)) return false;
+      if (!expertMatchesRole(s, role)) return false;
       if (!q) return true;
       const haystack = [s.name, s.organization, ...(s.specialty ?? [])].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(q);
     });
-  }, [experts, field, search, tagFilter]);
+  }, [experts, role, search]);
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -240,29 +252,27 @@ export default function ExpertsPage() {
         전문가
       </h1>
 
-      {/* STEP-TAGS-3B — 분류 탭 (관리자 등록 태그, 한 전문가가 여러 분류 가능) */}
-      <TagFilterTabs categories={tagFilter.categories} active={tagFilter.active} counts={tagFilter.counts} onChange={tagFilter.setActive} />
-
+      {/* 박경수님 2026-05-26 STEP-EXPERTS-UI-REFINE — TagFilterTabs·FIELD_FILTERS 제거. 역할(staff_type) 1행만. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="분야 필터">
-          {FIELD_FILTERS.map((f) => {
-            const active = field === f;
+        <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="역할 필터">
+          {ROLE_FILTERS.map((f) => {
+            const active = role === f.key;
             return (
               <button
-                key={f}
+                key={f.key}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                onClick={() => setField(f)}
+                onClick={() => setRole(f.key)}
                 className={[
                   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors',
                   active ? 'bg-primary text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50',
                 ].join(' ')}
               >
-                {f}
+                {f.label}
                 <span className={['inline-flex items-center justify-center min-w-[1.25rem] px-1 rounded text-[10px]',
                   active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'].join(' ')}>
-                  {counts[f] ?? 0}
+                  {counts[f.key] ?? 0}
                 </span>
               </button>
             );
@@ -305,10 +315,10 @@ export default function ExpertsPage() {
       ) : visible.length === 0 ? (
         <EmptyState
           emoji="👥"
-          title={search.trim() || field !== '전체' ? '조건에 맞는 전문가가 없어요.' : '아직 등록된 전문가가 없어요.'}
-          description={!search.trim() && field === '전체' ? '첫 전문가를 등록해 보세요.' : undefined}
+          title={search.trim() || role !== 'all' ? '조건에 맞는 전문가가 없어요.' : '아직 등록된 전문가가 없어요.'}
+          description={!search.trim() && role === 'all' ? '첫 전문가를 등록해 보세요.' : undefined}
           action={
-            !search.trim() && field === '전체' && (
+            !search.trim() && role === 'all' && (
               <Button variant="primary" leftIcon={<Plus size={14} />} onClick={() => { setEditTarget(null); setModalOpen(true); }}>
                 + 전문가 등록
               </Button>
@@ -323,7 +333,8 @@ export default function ExpertsPage() {
               onDelete={() => void handleDelete(s)}
               onCopyPortal={() => void handleCopyPortalLink(s)}
               onShowActivity={() => setActivityTarget(s)}
-              onResetPin={() => void handleResetPin(s)} />
+              onResetPin={() => void handleResetPin(s)}
+              recentPrograms={programsByStaff.get(s.id)} />
           ))}
         </div>
       ) : (
@@ -334,7 +345,8 @@ export default function ExpertsPage() {
               onDelete={() => void handleDelete(s)}
               onCopyPortal={() => void handleCopyPortalLink(s)}
               onShowActivity={() => setActivityTarget(s)}
-              onResetPin={() => void handleResetPin(s)} />
+              onResetPin={() => void handleResetPin(s)}
+              recentPrograms={programsByStaff.get(s.id)} />
           ))}
         </ul>
       )}

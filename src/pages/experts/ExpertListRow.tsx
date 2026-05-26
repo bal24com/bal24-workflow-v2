@@ -2,6 +2,8 @@
 
 import { Pencil, Trash2, Link2, Activity, UserStar } from 'lucide-react';
 import type { StaffPool } from '../../types/database';
+import ExpertRecentPrograms from './ExpertRecentPrograms';
+import type { ExpertProgramRef } from './expertProgramsFetch';
 
 interface Props {
   s: StaffPool;
@@ -10,10 +12,11 @@ interface Props {
   onCopyPortal: () => void;
   onShowActivity: () => void;
   onResetPin: () => void;
+  recentPrograms?: ExpertProgramRef[];
 }
 
 export default function ExpertListRow({
-  s, onEdit, onDelete, onCopyPortal, onShowActivity, onResetPin,
+  s, onEdit, onDelete, onCopyPortal, onShowActivity, onResetPin, recentPrograms,
 }: Props) {
   return (
     <li className="group flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition relative">
@@ -49,11 +52,9 @@ export default function ExpertListRow({
             <span className="text-slate-400">분야 미지정</span>
           )}
         </div>
-        <div className="min-w-0 text-xs text-muted truncate">
-          {s.phone_mobile && <>{s.phone_mobile}</>}
-          {s.phone_mobile && s.email && ' · '}
-          {s.email && <>{s.email}</>}
-          {!s.phone_mobile && !s.email && <span className="text-slate-400">연락처 미지정</span>}
+        <div className="min-w-0 text-xs text-muted">
+          {/* 박경수님 2026-05-26 STEP-EXPERTS-UI-REFINE — 최근 참여 프로그램 chip (리스트형) */}
+          <ExpertRecentPrograms programs={recentPrograms} variant="list" />
         </div>
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
