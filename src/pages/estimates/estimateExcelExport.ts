@@ -67,18 +67,26 @@ export function downloadEstimateExcel(params: ExportParams): void {
   // [4] 항목 테이블 헤더 — 박경수님 가이드 STEP-ESTIMATE-EXCEL-FIX (7열 구조)
   const headerRow = aoa.push(['항목', '세세항목', '단가(원)', '시간·횟수', '수량·인원', '소계(원)', '비고']);
 
-  // [5] 항목 데이터 (7열)
+  // [5] 항목 데이터 (7열). 소계(F)는 이후에 셀 수식으로 덮어씀
   for (const it of items) {
     aoa.push([it.category, it.name, it.unitPrice, it.hours, it.headcount, it.amount, it.note ?? '']);
   }
   aoa.push([]);
 
   // [6] 합계 요약 (7열: 라벨은 E=4번 컬럼, 금액은 F=5번 컬럼)
+  // 박경수님 + SkyClaw STEP-ESTIMATE-EXCEL-FIX (2026-05-28) — 합계 영역도 셀 수식으로 덮어 Excel에서 자동 재계산
+  // 행 인덱스 추적: aoa.length 시점이 곧 다음 push 의 0-based 인덱스
+  const directRowAoa = aoa.length;
   aoa.push(['', '', '', '', '직접비 소계', result.directTotal, '']);
+  const overheadRowAoa = cfg.useOverhead ? aoa.length : null;
   if (cfg.useOverhead) aoa.push(['', '', '', '', `${cfg.overheadLabel} (${cfg.overheadRate}%)`, result.overheadAmount, '']);
+  const techFeeRowAoa = cfg.useTechFee ? aoa.length : null;
   if (cfg.useTechFee)  aoa.push(['', '', '', '', `${cfg.techFeeLabel} (${cfg.techFeeRate}%)`, result.techFeeAmount, '']);
+  const supplyRowAoa = aoa.length;
   aoa.push(['', '', '', '', '공급가액', result.supplyTotal, '']);
+  const vatRowAoa = aoa.length;
   aoa.push(['', '', '', '', `부 가 세 (${cfg.useVat ? cfg.vatRate + '%' : '미적용'})`, cfg.useVat ? result.vatAmount : '-', '']);
+  const grandRowAoa = aoa.length;
   aoa.push(['', '', '', '', '견적금액 (부가세 포함)', result.grandTotal, '']);
   aoa.push(['', '', '', '', '최종 제안금액 (만단위 절사)', finalAmount, '']);
   aoa.push([]);
@@ -121,6 +129,56 @@ export function downloadEstimateExcel(params: ExportParams): void {
     const cellF = XLSX.utils.encode_cell({ r, c: 5 });
     if (ws[cellF] && typeof ws[cellF].v === 'number') ws[cellF].z = '#,##0';
   }
+
+  // 박경수님 + SkyClaw STEP-ESTIMATE-EXCEL-FIX (2026-05-28) — 셀 수식 적용
+  // Excel 에서 단가·시간·인원 수정 시 소계·합계가 자동 재계산되도록 정적 값 위에 수식 덮어씀.
+  // (aoa 인덱스는 0-based, Excel 행 번호는 1-based)
+  // (1) 항목 소계 = C × D × E
+  for (let i = 0; i < items.length; i += 1) {
+    const r = itemStart + i;
+    const ref = XLSX.utils.encode_cell({ r, c: 5 });
+    const excelRow = r + 1;
+    ws[ref] = { t: 'n', f: `C${excelRow}*D${excelRow}*E${excelRow}`, v: items[i].amount, z: '#,##0' };
+  }
+  // (2) 직접비 소계 = SUM(소계 범위)
+  const directRowExcel = directRowAoa + 1;
+  const itemFirstExcel = itemStart + 1;
+  const itemLastExcel  = itemEnd + 1;
+  {
+    const ref = XLSX.utils.encode_cell({ r: directRowAoa, c: 5 });
+    ws[ref] = { t: 'n', f: `SUM(F${itemFirstExcel}:F${itemLastExcel})`, v: result.directTotal, z: '#,##0' };
+  }
+  // (3) 제경비·기술료 = ROUND(직접비 × rate / 100, 0)
+  if (overheadRowAoa !== null) {
+    const ref = XLSX.utils.encode_cell({ r: overheadRowAoa, c: 5 });
+    ws[ref] = { t: 'n', f: `ROUND(F${directRowExcel}*${cfg.overheadRate}/100,0)`, v: result.overheadAmount, z: '#,##0' };
+  }
+  if (techFeeRowAoa !== null) {
+    const ref = XLSX.utils.encode_cell({ r: techFeeRowAoa, c: 5 });
+    ws[ref] = { t: 'n', f: `ROUND(F${directRowExcel}*${cfg.techFeeRate}/100,0)`, v: result.techFeeAmount, z: '#,##0' };
+  }
+  // (4) 공급가액 = 직접비 + 제경비 + 기술료
+  const supplyRowExcel = supplyRowAoa + 1;
+  {
+    const parts: string[] = [`F${directRowExcel}`];
+    if (overheadRowAoa !== null) parts.push(`F${overheadRowAoa + 1}`);
+    if (techFeeRowAoa  !== null) parts.push(`F${techFeeRowAoa + 1}`);
+    const ref = XLSX.utils.encode_cell({ r: supplyRowAoa, c: 5 });
+    ws[ref] = { t: 'n', f: parts.join('+'), v: result.supplyTotal, z: '#,##0' };
+  }
+  // (5) 부가세 = ROUND(공급가액 × vatRate / 100, 0) — useVat 일 때만
+  const vatRowExcel = vatRowAoa + 1;
+  if (cfg.useVat) {
+    const ref = XLSX.utils.encode_cell({ r: vatRowAoa, c: 5 });
+    ws[ref] = { t: 'n', f: `ROUND(F${supplyRowExcel}*${cfg.vatRate}/100,0)`, v: result.vatAmount, z: '#,##0' };
+  }
+  // (6) 견적금액 = 공급가액 + 부가세 (또는 공급가액만)
+  {
+    const ref = XLSX.utils.encode_cell({ r: grandRowAoa, c: 5 });
+    const formula = cfg.useVat ? `F${supplyRowExcel}+F${vatRowExcel}` : `F${supplyRowExcel}`;
+    ws[ref] = { t: 'n', f: formula, v: result.grandTotal, z: '#,##0' };
+  }
+  // 최종 제안금액은 사용자가 만단위 절사한 정적 값이므로 수식 적용 안 함
 
   // 워크북 생성 + 다운로드
   const wb = XLSX.utils.book_new();
