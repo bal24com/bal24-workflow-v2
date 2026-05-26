@@ -247,35 +247,72 @@ export function buildMentoringLogHtml(log: MentoringLogForPdf): string {
 `.trim();
 }
 
-/** 동적 import 로 html2pdf.js 로드 후 PDF 다운로드. */
+/** 모든 이미지 로드 대기 (CORS 차단·로딩 지연 시 캡쳐 백지 방지). */
+function waitForImages(root: HTMLElement, timeoutMs = 8000): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll('img'));
+  if (imgs.length === 0) return Promise.resolve();
+  const waits = imgs.map((img) => {
+    if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const done = () => resolve();
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
+  });
+  const timeout = new Promise<void>((resolve) => setTimeout(() => resolve(), timeoutMs));
+  return Promise.race([Promise.all(waits).then(() => undefined), timeout]);
+}
+
+/** 박경수님 2026-05-26 — PDF 백지 fix.
+ *  · 화면 밖 fixed 대신 화면 안 fixed (opacity 0 + pointer-events none) 로 두어 html2canvas 가 정상 캡쳐.
+ *  · html/head/body 전체가 아닌 본문 div 만 container 에 주입 + style 태그 별도.
+ *  · 이미지 모두 로드된 후 캡쳐.
+ *
+ *  동적 import 로 html2pdf.js 로드 후 PDF 다운로드. */
 export async function downloadMentoringLogPdf(log: MentoringLogForPdf): Promise<void> {
-  const html = buildMentoringLogHtml(log);
+  const fullHtml = buildMentoringLogHtml(log);
+
+  // body 안쪽 HTML + style 태그 분리 추출 (html2canvas 는 fragment 더 안정적)
+  const styleMatch = fullHtml.match(/<style[\s\S]*?<\/style>/);
+  const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/);
+  const styleHtml = styleMatch?.[0] ?? '';
+  const bodyInner = bodyMatch?.[1] ?? fullHtml;
+
   const mod = await import('html2pdf.js');
   const html2pdf = mod.default;
 
   const container = document.createElement('div');
+  container.setAttribute('id', 'pdf-render-container');
+  // 화면 안에 두되 보이지 않게 (off-screen 은 일부 환경에서 캡쳐 실패)
   container.style.position = 'fixed';
-  container.style.left = '-9999px';
   container.style.top = '0';
-  container.innerHTML = html;
+  container.style.left = '0';
+  container.style.width = '794px';
+  container.style.opacity = '0';
+  container.style.pointerEvents = 'none';
+  container.style.zIndex = '-1';
+  container.style.background = '#fff';
+  container.innerHTML = styleHtml + bodyInner;
   document.body.appendChild(container);
 
   const fileNameParts = ['멘토링상담일지', log.mentor_name, log.log_date ?? ''].filter(Boolean);
   const fileName = fileNameParts.join('_') + '.pdf';
 
   try {
-    const bodyEl = container.querySelector('body');
+    // 이미지 로드 완료 대기 (서명·첨부 사진)
+    await waitForImages(container);
+
     await html2pdf()
       .set({
         margin: [10, 10, 10, 10],
         filename: fileName,
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       })
-      .from((bodyEl ?? container) as HTMLElement)
+      .from(container)
       .save();
   } finally {
-    document.body.removeChild(container);
+    if (container.parentElement) document.body.removeChild(container);
   }
 }

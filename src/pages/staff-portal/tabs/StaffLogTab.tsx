@@ -4,62 +4,29 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, BookOpen, ListChecks, ChevronDown, ChevronUp, FileText, Pencil, FileDown } from 'lucide-react';
-import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { formatDateKo } from '../../../lib/utils';
 import EmptyState from '../../../components/EmptyState';
-import type { ActivityLog, ActivityLogType } from '../../../types/database';
+import type { ActivityLogType } from '../../../types/database';
 import {
-  type MentoringLog, type MentoringLogStatus,
   MENTORING_LOG_STATUS_LABEL, MENTORING_LOG_STATUS_STYLE,
   canEditMentoringLog,
 } from '../../../types/mentoring';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 import MentoringLogForm, { type MentoringLogInitial } from './MentoringLogForm';
-import MentoringLogDetailTable from './MentoringLogDetailTable';
 import { fetchLogForPdf } from '../../programs/detail/mentoringLogPdfFetch';
+import type { MentoringLogForPdf } from '../../programs/detail/mentoringLogPdf';
 import { downloadMentoringLogPdf } from '../../programs/detail/mentoringLogPdf';
+import MentoringLogExpandedView from './MentoringLogExpandedView';
+import { fetchStaffLogs, type UnifiedLog, type UnifiedKind, type AssignmentLite, type MenteeLite } from './staffLogFetch';
 
 interface Props {
   staff: StaffPortalIdentity;
   selectedProgramId: string | null;
 }
 
-type UnifiedKind = 'mentoring' | 'activity';
 type FilterKind = 'all' | UnifiedKind;
-
-interface UnifiedLog {
-  kind: UnifiedKind;
-  id: string;
-  date: string;
-  programId: string | null;
-  programName: string | null;
-  sessionNo: number | null;
-  title: string | null;
-  content: string;
-  nextPlan: string | null;
-  logType?: ActivityLogType | null;
-  // 멘토링 일지 상세 양식 표시용
-  subject?: string | null;
-  teamName?: string | null;
-  menteeIds?: string[] | null;
-  menteeNames?: string[];
-  startTime?: string | null;
-  endTime?: string | null;
-  durationMin?: number | null;
-  recipient?: string | null;
-  status?: MentoringLogStatus;
-  assignmentId?: string | null;
-}
-
-interface AssignmentLite {
-  id: string;
-  mentee_ids: string[] | null;
-  program: { id: string; name: string } | null;
-}
-
-interface MenteeLite { id: string; name: string; organization: string | null }
 
 const CARD_CLASS =
   'bg-white rounded-2xl border border-violet-100 shadow-[0_4px_16px_rgba(124,58,237,0.08)] p-5';
@@ -81,114 +48,19 @@ export default function StaffLogTab({ staff, selectedProgramId }: Props) {
   const [assignmentsById, setAssignmentsById] = useState<Map<string, AssignmentLite>>(new Map());
   const [menteesById, setMenteesById] = useState<Map<string, MenteeLite>>(new Map());
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  // 박경수님 2026-05-26 — 상세 펼침 시 양식 표용 풀 데이터 캐시 (멘토 정보·사진 URL)
+  const [detailByLogId, setDetailByLogId] = useState<Map<string, MentoringLogForPdf>>(new Map());
 
   const fetchData = useCallback(async () => {
     if (!selectedProgramId) { setLogs([]); setLoading(false); return; }
     setLoading(true);
-    const unified: UnifiedLog[] = [];
-
-    const mentorCol = staff.sourceType === 'staff_pool' ? 'mentor_pool_id' : 'mentor_profile_id';
-    const { data: asn } = await supabase.from('mentoring_assignments')
-      .select('id, mentee_ids, program:programs!mentoring_assignments_program_id_fkey(id, name)')
-      .eq(mentorCol, staff.id)
-      .eq('program_id', selectedProgramId);
-    type AsnRow = { id: string; mentee_ids: string[] | null; program: { id: string; name: string } | null };
-    const asnRows = ((asn ?? []) as unknown) as AsnRow[];
-    const asnMap = new Map<string, AssignmentLite>(
-      asnRows.map((a) => [a.id, { id: a.id, mentee_ids: a.mentee_ids, program: a.program }]),
-    );
-    setAssignmentsById(asnMap);
-    const asnIds = asnRows.map((a) => a.id);
-
-    // 멘티 이름 캐시 (수정 모드 + 상세 표시용)
-    const allMenteeIds = Array.from(new Set(asnRows.flatMap((a) => a.mentee_ids ?? [])));
-    const menteeMap = new Map<string, MenteeLite>();
-    if (allMenteeIds.length > 0) {
-      const { data: mn } = await supabase.from('program_participants')
-        .select('id, name, organization').in('id', allMenteeIds);
-      ((mn ?? []) as MenteeLite[]).forEach((m) => menteeMap.set(m.id, m));
-    }
-    setMenteesById(menteeMap);
-
-    if (asnIds.length > 0) {
-      const { data: ml, error: mlErr } = await supabase.from('mentoring_logs')
-        .select('*').in('assignment_id', asnIds).order('log_date', { ascending: false });
-      if (mlErr) {
-        const m = (mlErr.message ?? '').toLowerCase();
-        if (!m.includes('does not exist') && !m.includes('pgrst205')) {
-          console.warn('[staff-portal/log] mentoring_logs 경고:', mlErr.message);
-          toast.error('멘토링 일지 조회 중 오류가 발생했어요.');
-        }
-      } else {
-        ((ml ?? []) as MentoringLog[]).forEach((l) => {
-          const prog = l.assignment_id ? asnMap.get(l.assignment_id)?.program : null;
-          const menteeIds = l.mentee_ids ?? [];
-          const menteeNames = menteeIds
-            .map((id) => menteeMap.get(id)?.name)
-            .filter((n): n is string => !!n);
-          unified.push({
-            kind: 'mentoring',
-            id: l.id,
-            date: l.log_date,
-            programId: prog?.id ?? l.program_id,
-            programName: prog?.name ?? null,
-            sessionNo: l.session_no ?? null,
-            title: l.subject ?? null,
-            content: l.content,
-            nextPlan: l.next_plan,
-            subject: l.subject,
-            teamName: l.team_name,
-            menteeIds,
-            menteeNames,
-            startTime: l.start_time,
-            endTime: l.end_time,
-            durationMin: l.duration_min,
-            recipient: l.recipient,
-            status: l.status,
-            assignmentId: l.assignment_id,
-          });
-        });
-      }
-    }
-
-    if (staff.sourceType === 'staff_pool') {
-      const { data: al, error: alErr } = await supabase.from('activity_logs')
-        .select('*').eq('expert_id', staff.id)
-        .eq('program_id', selectedProgramId)
-        .is('deleted_at', null)
-        .order('activity_date', { ascending: false });
-      if (alErr) {
-        const m = (alErr.message ?? '').toLowerCase();
-        if (!m.includes('does not exist') && !m.includes('pgrst205')) {
-          console.warn('[staff-portal/log] activity_logs 경고:', alErr.message);
-        }
-      } else {
-        const progIds = new Set<string>();
-        ((al ?? []) as ActivityLog[]).forEach((l) => { if (l.program_id) progIds.add(l.program_id); });
-        let progMap = new Map<string, string>();
-        if (progIds.size > 0) {
-          const { data: prog } = await supabase.from('programs').select('id, name').in('id', Array.from(progIds));
-          (prog ?? []).forEach((p) => progMap.set(p.id as string, p.name as string));
-        }
-        ((al ?? []) as ActivityLog[]).forEach((l) => {
-          unified.push({
-            kind: 'activity',
-            id: l.id,
-            date: l.activity_date,
-            programId: l.program_id ?? null,
-            programName: l.program_id ? progMap.get(l.program_id) ?? null : null,
-            sessionNo: null,
-            title: l.title,
-            content: l.content ?? '',
-            nextPlan: l.next_plan ?? null,
-            logType: l.log_type,
-          });
-        });
-      }
-    }
-
-    unified.sort((a, b) => b.date.localeCompare(a.date));
-    setLogs(unified);
+    const result = await fetchStaffLogs({
+      staffId: staff.id, sourceType: staff.sourceType, programId: selectedProgramId,
+    });
+    setAssignmentsById(result.assignmentsById);
+    setMenteesById(result.menteesById);
+    setLogs(result.logs);
+    if (result.error) toast.error('멘토링 일지 조회 중 오류가 발생했어요.');
     setLoading(false);
   }, [staff.id, staff.sourceType, selectedProgramId, toast]);
 
@@ -203,7 +75,9 @@ export default function StaffLogTab({ staff, selectedProgramId }: Props) {
 
   async function handleDownloadPdf(logId: string) {
     setDownloadingId(logId);
-    const data = await fetchLogForPdf(logId);
+    // 캐시된 detail 재사용 (양식 표 펼침 시 이미 fetch 됐을 수 있음)
+    const cached = detailByLogId.get(logId);
+    const data = cached ?? await fetchLogForPdf(logId);
     if (!data) { setDownloadingId(null); toast.error('일지 정보를 불러오지 못했어요.'); return; }
     try {
       await downloadMentoringLogPdf(data);
@@ -214,6 +88,14 @@ export default function StaffLogTab({ staff, selectedProgramId }: Props) {
     } finally {
       setDownloadingId(null);
     }
+  }
+
+  function cacheDetail(logId: string, d: MentoringLogForPdf) {
+    setDetailByLogId((prev) => {
+      const next = new Map(prev);
+      next.set(logId, d);
+      return next;
+    });
   }
 
   if (!selectedProgramId) {
@@ -339,18 +221,26 @@ export default function StaffLogTab({ staff, selectedProgramId }: Props) {
                   {l.title && <p className="text-sm font-semibold text-[#1E1B4B] mt-2">{l.title}</p>}
                   <p className={`mt-1.5 text-sm text-slate-700 whitespace-pre-wrap ${expanded ? '' : 'line-clamp-2'}`}>{l.content}</p>
 
-                  {/* 박경수님 2026-05-26 — 멘토링 일지 상세 양식 표 (펼침 시) */}
+                  {/* 박경수님 2026-05-26 — 멘토링 일지 상세 양식 표 (펼침 시). PDF 와 동일 구조. */}
                   {expanded && l.kind === 'mentoring' && (
-                    <MentoringLogDetailTable
-                      teamName={l.teamName}
-                      menteeNames={l.menteeNames}
-                      date={l.date}
-                      startTime={l.startTime}
-                      endTime={l.endTime}
-                      durationMin={l.durationMin}
-                      subject={l.subject}
-                      nextPlan={l.nextPlan}
-                      recipient={l.recipient}
+                    <MentoringLogExpandedView
+                      logId={l.id}
+                      cached={detailByLogId.get(l.id)}
+                      onLoaded={(d) => cacheDetail(l.id, d)}
+                      fallback={{
+                        teamName: l.teamName,
+                        subject: l.subject,
+                        content: l.content,
+                        date: l.date,
+                        startTime: l.startTime,
+                        endTime: l.endTime,
+                        durationMin: l.durationMin,
+                        recipient: l.recipient,
+                        menteeNames: l.menteeNames,
+                        programName: l.programName,
+                        mentorName: staff.name,
+                        mentorAffiliation: staff.affiliation,
+                      }}
                     />
                   )}
 

@@ -126,7 +126,7 @@ export default function StaffPortalPage() {
               selectedProgramId={selectedProgramId}
               onSelectProgram={setSelectedProgramId} />
           )}
-          {activeTab === 'mentoring' && <StaffMentoringTab staff={staff} selectedProgramId={selectedProgramId} />}
+          {activeTab === 'mentoring' && <StaffMentoringTab staff={staff} selectedProgramId={selectedProgramId} onNavigateToLogTab={() => setActiveTab('log')} />}
           {activeTab === 'lecture'   && <StaffLectureTab   staff={staff} selectedProgramId={selectedProgramId} />}
           {activeTab === 'log'       && <StaffLogTab       staff={staff} selectedProgramId={selectedProgramId} />}
           {activeTab === 'schedule'  && <StaffScheduleTab  staff={staff} selectedProgramId={selectedProgramId} />}

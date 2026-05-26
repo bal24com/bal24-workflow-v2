@@ -3,13 +3,13 @@
 // mentoring_logs 테이블 미적용(PGRST205) 안전 처리.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Users2, BookOpen, Plus, Clock, Paperclip, FileDown } from 'lucide-react';
+import { Loader2, Users2, BookOpen, Plus, Clock, FileDown } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { formatDateKo } from '../../../lib/utils';
 import EmptyState from '../../../components/EmptyState';
-import { type MentoringLog, type MentoringLogFile } from '../../../types/mentoring';
+import { type MentoringLog } from '../../../types/mentoring';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 import MentoringLogForm from './MentoringLogForm';
 import { fetchLogForPdf } from '../../programs/detail/mentoringLogPdfFetch';
@@ -20,6 +20,8 @@ import SignatureUploadSection from '../SignatureUploadSection';
 interface Props {
   staff: StaffPortalIdentity;
   selectedProgramId: string | null;
+  /** 박경수님 2026-05-26 — 멘티 카운트 클릭 시 [일지] 탭으로 이동 콜백 */
+  onNavigateToLogTab?: () => void;
 }
 
 interface AssignmentRow {
@@ -36,14 +38,12 @@ const BTN_PRIMARY =
   'inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-violet-600 ' +
   'rounded-[10px] hover:bg-violet-700 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100';
 
-export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
+export default function StaffMentoringTab({ staff, selectedProgramId, onNavigateToLogTab }: Props) {
   const toast = useToast();
   const { user } = useAuth();
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [mentees, setMentees] = useState<MenteeLite[]>([]);
   const [logs, setLogs] = useState<MentoringLog[]>([]);
-  // STEP-MENTORING-LOG-UX — log_id → 파일 목록
-  const [filesByLog, setFilesByLog] = useState<Map<string, MentoringLogFile[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
   const [formOpenId, setFormOpenId] = useState<string | null>(null);
@@ -115,7 +115,6 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
     } else setMentees([]);
 
     const asnIds = rows.map((r) => r.id);
-    let logRows: MentoringLog[] = [];
     if (asnIds.length > 0) {
       const { data: lg, error: lgErr } = await supabase.from('mentoring_logs')
         .select('*').in('assignment_id', asnIds).order('log_date', { ascending: false });
@@ -128,33 +127,11 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
           setLogs([]);
         }
       } else {
-        logRows = (lg ?? []) as MentoringLog[];
-        setLogs(logRows);
+        setLogs(lg ?? []);
       }
     } else setLogs([]);
 
-    // STEP-MENTORING-LOG-UX — 일지별 첨부 파일 fetch (마이그레이션 미적용 안전)
-    const logIds = logRows.map((l) => l.id);
-    const map = new Map<string, MentoringLogFile[]>();
-    if (logIds.length > 0) {
-      const { data: filesData, error: filesErr } = await supabase
-        .from('mentoring_log_files').select('*').in('log_id', logIds)
-        .order('created_at', { ascending: true });
-      if (filesErr) {
-        const m = (filesErr.message ?? '').toLowerCase();
-        if (!m.includes('does not exist') && !m.includes('pgrst205')) {
-          console.warn('[staff-portal/mentoring] 파일 조회 경고:', filesErr.message);
-        }
-      } else {
-        (filesData ?? []).forEach((f) => {
-          const row = f as MentoringLogFile;
-          const arr = map.get(row.log_id) ?? [];
-          arr.push(row); map.set(row.log_id, arr);
-        });
-      }
-    }
-    setFilesByLog(map);
-
+    // 박경수님 2026-05-26 — [최근 일지] 간략화 후 mentoring_log_files fetch 불필요. (상세는 [일지] 탭에서.)
     setLoading(false);
   }, [staff.id, staff.sourceType, selectedProgramId, toast]);
 
@@ -168,6 +145,15 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
       const arr = m.get(l.assignment_id) ?? [];
       arr.push(l);
       m.set(l.assignment_id, arr);
+    });
+    return m;
+  }, [logs]);
+
+  // 박경수님 2026-05-26 — 멘티별 일지 카운트 (mentee_ids 포함 일지 수)
+  const menteeLogCount = useMemo(() => {
+    const m = new Map<string, number>();
+    logs.forEach((l) => {
+      (l.mentee_ids ?? []).forEach((id) => m.set(id, (m.get(id) ?? 0) + 1));
     });
     return m;
   }, [logs]);
@@ -228,7 +214,7 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
           <section key={a.id} className={CARD_CLASS}>
             <h2 className="text-base font-bold text-[#1E1B4B] mb-4">{programName}</h2>
             <div className="space-y-4">
-              {/* 2026-05-26 박경수님 — 담당 멘티 세로 ul → 가로 chip 박스 */}
+              {/* 2026-05-26 박경수님 — 담당 멘티 chip + 멘토링 횟수 카운트 + 클릭 시 [일지] 탭 이동 */}
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center gap-1.5">
                   <Users2 size={12} aria-hidden="true" /> 담당 멘티 ({menteeList.length}명)
@@ -238,16 +224,34 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
                 ) : (
                   <div className="rounded-xl border border-violet-100 bg-violet-50/40 px-3 py-2.5">
                     <div className="flex flex-wrap gap-1.5">
-                      {menteeList.map((m) => (
-                        <span key={m.id}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-violet-200 text-xs text-slate-700">
-                          <span className="font-semibold">{m.name}</span>
-                          {m.organization && (
-                            <span className="text-[10px] text-slate-400">{m.organization}</span>
-                          )}
-                        </span>
-                      ))}
+                      {menteeList.map((m) => {
+                        const cnt = menteeLogCount.get(m.id) ?? 0;
+                        const clickable = cnt > 0 && !!onNavigateToLogTab;
+                        return (
+                          <span key={m.id}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-violet-200 text-xs text-slate-700 ${clickable ? 'hover:bg-violet-50 hover:border-violet-400 transition-colors' : ''}`}>
+                            <span className="font-semibold">{m.name}</span>
+                            {m.organization && (
+                              <span className="text-[10px] text-slate-400">{m.organization}</span>
+                            )}
+                            {clickable ? (
+                              <button type="button" onClick={() => onNavigateToLogTab?.()}
+                                title={`${m.name}님 멘토링 ${cnt}회 — 일지 탭으로 이동`}
+                                className="ml-0.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-violet-600 text-white text-[10px] font-bold tabular-nums hover:bg-violet-700 cursor-pointer">
+                                {cnt}회
+                              </button>
+                            ) : (
+                              <span className="ml-0.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-slate-100 text-slate-400 text-[10px] font-semibold tabular-nums">
+                                0
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })}
                     </div>
+                    {onNavigateToLogTab && (
+                      <p className="text-[10px] text-slate-400 mt-1.5">멘티 이름 옆 횟수 배지를 누르면 [일지] 탭으로 이동해요.</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -267,65 +271,55 @@ export default function StaffMentoringTab({ staff, selectedProgramId }: Props) {
                 )
               )}
 
-              {/* 최근 일지 5건 */}
+              {/* 박경수님 2026-05-26 — [최근 일지] 간략화. 멘티(차수)·날짜·시간만. 상세는 [일지] 탭에서. */}
               {!tableMissing && asnLogs.length > 0 && (
                 <div className="pt-3 border-t border-slate-100">
-                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center gap-1.5">
-                    <BookOpen size={12} aria-hidden="true" /> 최근 일지 ({asnLogs.length}건)
-                  </p>
-                  <ul className="space-y-2">
-                    {asnLogs.slice(0, 5).map((l) => {
-                      const timeRange = (l.start_time && l.end_time) ? `${l.start_time}~${l.end_time}` : null;
-                      const logFiles = filesByLog.get(l.id) ?? [];
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1.5">
+                      <BookOpen size={12} aria-hidden="true" /> 최근 일지 ({asnLogs.length}건)
+                    </p>
+                    {onNavigateToLogTab && (
+                      <button type="button" onClick={() => onNavigateToLogTab()}
+                        className="text-[11px] text-violet-600 hover:underline font-semibold">
+                        일지 탭에서 전체 보기 →
+                      </button>
+                    )}
+                  </div>
+                  <ul className="space-y-1">
+                    {asnLogs.slice(0, 8).map((l) => {
+                      const timeRange = (l.start_time && l.end_time)
+                        ? `${l.start_time.slice(0, 5)}~${l.end_time.slice(0, 5)}` : null;
+                      const menteeNames = (l.mentee_ids ?? [])
+                        .map((id) => menteeMap.get(id)?.name).filter(Boolean) as string[];
+                      const menteeStr = menteeNames.length > 0
+                        ? menteeNames.length <= 2
+                          ? menteeNames.join(', ')
+                          : `${menteeNames[0]} 외 ${menteeNames.length - 1}명`
+                        : null;
                       return (
-                        <li key={l.id} className="rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2">
-                          <div className="flex items-center gap-2 text-xs flex-wrap">
-                            <span className="font-bold text-slate-700 tabular-nums">{formatDateKo(l.log_date)}</span>
-                            {timeRange && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold text-[10px] tabular-nums">
-                                <Clock size={9} aria-hidden="true" />{timeRange}
-                              </span>
-                            )}
-                            {!timeRange && l.session_no != null && (
-                              <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold text-[10px]">
-                                {l.session_no}회차
-                              </span>
-                            )}
-                            {l.location && (
-                              <span className="text-[10px] text-slate-500 truncate">· {l.location}</span>
-                            )}
-                            {logFiles.length > 0 && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] text-violet-600 font-semibold">
-                                <Paperclip size={9} aria-hidden="true" />{logFiles.length}
-                              </span>
-                            )}
-                            {/* STEP-MENTORING-P2-PDF — PDF 다운로드 버튼 */}
-                            <button type="button" onClick={() => void handleDownloadPdf(l.id)}
-                              disabled={downloadingId === l.id}
-                              className="ml-auto inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-violet-200 text-violet-700 text-[10px] hover:bg-violet-50 disabled:opacity-50">
-                              {downloadingId === l.id ? <Loader2 size={10} className="animate-spin" /> : <FileDown size={10} aria-hidden="true" />}
-                              PDF
-                            </button>
-                          </div>
-                          <p className="mt-1.5 text-sm text-slate-700 line-clamp-2 whitespace-pre-wrap">{l.content}</p>
-                          {/* 첨부 파일 미리보기 */}
-                          {logFiles.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {logFiles.map((f) => (
-                                f.file_type === 'image' ? (
-                                  <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer">
-                                    <img src={f.file_url} alt={f.file_name}
-                                      className="w-12 h-12 object-cover rounded-md border border-violet-100 hover:opacity-80" />
-                                  </a>
-                                ) : (
-                                  <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-[10px] text-violet-700 bg-violet-100 rounded-md px-2 py-1 hover:bg-violet-200 truncate max-w-[140px]">
-                                    📎 {f.file_name}
-                                  </a>
-                                )
-                              ))}
-                            </div>
+                        <li key={l.id}
+                          className="flex items-center gap-2 text-xs rounded-lg border border-violet-100 bg-violet-50/30 px-2.5 py-1.5 hover:bg-violet-50 transition-colors">
+                          {l.session_no != null && (
+                            <span className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold text-[10px] tabular-nums shrink-0">
+                              {l.session_no}회차
+                            </span>
                           )}
+                          <span className="font-semibold text-slate-700 tabular-nums shrink-0">{formatDateKo(l.log_date)}</span>
+                          {timeRange && (
+                            <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-500 tabular-nums shrink-0">
+                              <Clock size={9} aria-hidden="true" />{timeRange}
+                            </span>
+                          )}
+                          {menteeStr && (
+                            <span className="text-[11px] text-slate-500 truncate flex-1 min-w-0">· {menteeStr}</span>
+                          )}
+                          <button type="button" onClick={() => void handleDownloadPdf(l.id)}
+                            disabled={downloadingId === l.id}
+                            title="PDF 다운로드"
+                            className="ml-auto inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-violet-600 hover:bg-violet-100 text-[10px] shrink-0 disabled:opacity-50">
+                            {downloadingId === l.id ? <Loader2 size={10} className="animate-spin" /> : <FileDown size={10} aria-hidden="true" />}
+                            PDF
+                          </button>
                         </li>
                       );
                     })}
