@@ -32,7 +32,7 @@ interface FormState {
 }
 
 const EMPTY: FormState = {
-  client_id: '', org_name: '', role: '공동', share_rate: 0,
+  client_id: '', org_name: '', role: '참여', share_rate: 0,
   settlement_direction: 'outbound', budget_amount: 0,
   responsibilities: '', notes: '', is_self: false,
 };
@@ -72,7 +72,7 @@ export default function ConsortiumMemberModal({
       setForm({
         client_id: member.client_id ?? '',
         org_name: member.org_name ?? '',
-        role: (member.role as ConsortiumRole) ?? '공동',
+        role: (member.role as ConsortiumRole) ?? '참여',
         share_rate: Number(member.share_rate ?? 0),
         settlement_direction: (member.settlement_direction as ConsortiumSettlementDirection) ?? 'outbound',
         budget_amount: Number(member.budget_amount ?? 0),
@@ -188,16 +188,21 @@ export default function ConsortiumMemberModal({
               className={INPUT_CLASS} />
           </div>
 
-          {/* 역할 */}
+          {/* 역할 — 박경수님 2026-05-27 A안: 총괄(운영사) / 참여(참여사) 2종 */}
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1.5">역할</label>
-            <div className="flex items-center gap-3">
-              {(['주관', '공동', '위탁'] as ConsortiumRole[]).map((r) => (
-                <label key={r} className="inline-flex items-center gap-1.5 cursor-pointer">
-                  <input type="radio" name="role" value={r} checked={form.role === r}
-                    onChange={() => setForm({ ...form, role: r })} disabled={saving}
+            <div className="flex items-center gap-4">
+              {([
+                { v: '총괄' as ConsortiumRole, label: '총괄', desc: '운영사' },
+                { v: '참여' as ConsortiumRole, label: '참여', desc: '참여사' },
+              ]).map((r) => (
+                <label key={r.v} className="inline-flex items-center gap-1.5 cursor-pointer">
+                  <input type="radio" name="role" value={r.v} checked={form.role === r.v}
+                    onChange={() => setForm({ ...form, role: r.v })} disabled={saving}
                     className="text-violet-600" />
-                  <span className="text-sm text-slate-700">{r}</span>
+                  <span className="text-sm text-slate-700">
+                    {r.label} <span className="text-[11px] text-slate-400">({r.desc})</span>
+                  </span>
                 </label>
               ))}
             </div>

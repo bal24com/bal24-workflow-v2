@@ -62,7 +62,7 @@ type ConsortiumForm = {
 
 const EMPTY: ConsortiumForm = {
   name: '', projectId: '', status: '구성중',
-  leadClientId: '', leadRole: '주관',
+  leadClientId: '', leadRole: '총괄',
   description: '',
   startDate: '', endDate: '', totalBudget: '',
 };
@@ -73,7 +73,7 @@ function fromInitial(d: ConsortiumInitialData): ConsortiumForm {
     projectId: d.project_id ?? '',
     status: d.status,
     leadClientId: d.lead_client_id ?? '',
-    leadRole: '주관',
+    leadRole: '총괄',
     description: d.description,
     startDate: d.start_date,
     endDate: d.end_date,
@@ -327,10 +327,11 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
         </section>
 
         <section className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">주관사</h3>
+          {/* 박경수님 2026-05-27 A안 — 의뢰기관(주관기관) 명칭 통일 */}
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">의뢰기관 (주관기관)</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">주관사 (clients 선택)</label>
+              <label className="text-sm font-semibold text-slate-700">의뢰기관 (clients 선택)</label>
               <select
                 value={form.leadClientId}
                 onChange={(e) => update('leadClientId', e.target.value)}
@@ -356,7 +357,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
             )}
           </div>
           {!isEditMode && (
-            <p className="text-xs text-muted">선택한 주관사는 참여사 목록에도 자동 추가돼요.</p>
+            <p className="text-xs text-muted">선택한 의뢰기관은 참여사 목록에도 자동 추가돼요.</p>
           )}
         </section>
 

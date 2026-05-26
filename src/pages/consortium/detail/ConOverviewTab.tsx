@@ -1,7 +1,8 @@
 // bal24 v2 — 컨소시엄 탭1: 개요 (재무 격리·예산 집행·태스크 요약·타임라인)
+// STEP-CONSORTIUM-REDESIGN A안 (박경수님 2026-05-27) — 참여사 새 필드(지분율·정산방향·자사) 동기화 섹션 추가.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, AlertTriangle, Wallet, ListChecks, Activity, BookOpen } from 'lucide-react';
+import { Loader2, AlertTriangle, Wallet, ListChecks, Activity, BookOpen, Users2 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import {
@@ -11,6 +12,10 @@ import {
   type MemberType,
 } from '../consortiumTypes';
 import { buildMemberBudgets, formatKRW, formatConDate } from '../consortiumUtils';
+import {
+  getDirectionBadge, getRoleBadge, calcTotalShareRate,
+  formatShareRate, formatBudget,
+} from '../consortiumMemberUtils';
 
 interface Props {
   consortiumId: string;
@@ -127,6 +132,8 @@ export default function ConOverviewTab({ consortiumId, totalBudget, members, des
   }, [consortiumId, toast]);
 
   const budgets = useMemo(() => buildMemberBudgets(members), [members]);
+  // 박경수님 2026-05-27 A안 — 새 필드(share_rate/settlement_direction/is_self) 동기화
+  const newShareTotal = useMemo(() => calcTotalShareRate(members), [members]);
   const remaining = totalBudget - expense;
   const execRate = totalBudget > 0 ? Math.round((expense / totalBudget) * 100) : 0;
 
@@ -158,6 +165,65 @@ export default function ConOverviewTab({ consortiumId, totalBudget, members, des
         <KpiCard label="잔여" value={formatKRW(remaining)} tone={remaining < 0 ? 'rose' : 'emerald'} />
         <KpiCard label="집행률" value={`${execRate}%`} tone={execRate > 90 ? 'rose' : 'cyan'} sub={execRate > 90 ? '⚠ 집행률 과다' : undefined} />
       </div>
+
+      {/* 박경수님 2026-05-27 A안 — 참여사 요약 (새 필드: 지분율·정산방향·자사) */}
+      <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">
+        <div className="flex items-center justify-between gap-1.5 mb-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <Users2 size={16} className="text-violet-500" aria-hidden="true" />
+            <h2 className="text-sm font-bold text-[#1E1B4B]">참여사 요약</h2>
+          </div>
+          {members.length > 0 && (
+            <span className={`text-[11px] font-semibold tabular-nums px-2 py-0.5 rounded border ${
+              Math.abs(newShareTotal - 100) < 0.01
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              지분율 합계 {formatShareRate(newShareTotal)}
+              {Math.abs(newShareTotal - 100) >= 0.01 && ' (100% 미달)'}
+            </span>
+          )}
+        </div>
+        {members.length === 0 ? (
+          <p className="text-sm text-slate-400 italic text-center py-6">아직 등록된 참여사가 없어요.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-violet-50/40 text-slate-500 text-xs">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold">참여사명</th>
+                  <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">역할</th>
+                  <th className="text-right px-3 py-2 font-semibold whitespace-nowrap">지분율</th>
+                  <th className="text-right px-3 py-2 font-semibold whitespace-nowrap">예산 배정액</th>
+                  <th className="text-center px-3 py-2 font-semibold whitespace-nowrap">정산 방향</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {members.map((m) => (
+                  <tr key={`new-${m.id}`} className={m.is_self ? 'bg-violet-50/40' : 'hover:bg-violet-50/30'}>
+                    <td className="px-3 py-2 text-sm font-medium text-slate-800">
+                      <div className="inline-flex items-center gap-1.5">
+                        {m.is_self && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded">자사</span>
+                        )}
+                        <span>{m.org_name || m.clients?.name || '미지정'}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">{getRoleBadge(m.role ?? null, m.is_self)}</td>
+                    <td className="px-3 py-2 text-right text-sm font-semibold text-violet-700 tabular-nums">
+                      {formatShareRate(m.share_rate)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-xs text-slate-700 tabular-nums">
+                      {formatBudget(m.budget_amount)}
+                    </td>
+                    <td className="px-3 py-2 text-center">{getDirectionBadge(m.settlement_direction)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* 참여사 예산 집행 표 — STEP-CONSORTIUM-UPGRADE-FULL PART A: 합계 100% 검증 */}
       <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)]">

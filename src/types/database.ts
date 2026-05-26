@@ -19,7 +19,11 @@ export type SurveyType = '사전' | '사후';
 export type ProgramType = '교육' | '캠프' | '행사' | '기타';
 export type ProgramStatus = '준비' | '진행' | '완료' | '취소';
 export type ConsortiumStatus = '구성중' | '진행' | '완료' | '해산';
-export type ConsortiumRole = '주관' | '공동' | '위탁';
+// STEP-CONSORTIUM-REDESIGN A안 (박경수님 2026-05-27) — '주관/공동/위탁' → '총괄/참여' 2종 단순화.
+//   '총괄' = 운영사 (밸런스닷 등 PM)
+//   '참여' = 참여사 1·2·3...
+//   의뢰기관(대학 등)은 consortiums.lead_client_id 로 별도.
+export type ConsortiumRole = '총괄' | '참여';
 export type LedgerType = 'own' | 'consortium';
 export type IncomeStatus = '대기' | '입금완료' | '반려';
 export type ExpenseStatus = '대기' | '출금완료' | '반려';

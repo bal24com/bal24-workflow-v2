@@ -5,7 +5,8 @@ import type { ConsortiumRole, ConsortiumStatus } from '../../types/database';
 import type { BadgeProps } from '../../components/ui';
 
 export const CONSORTIUM_STATUS_VALUES: ConsortiumStatus[] = ['구성중', '진행', '완료', '해산'];
-export const CONSORTIUM_ROLE_VALUES: ConsortiumRole[] = ['주관', '공동', '위탁'];
+// STEP-CONSORTIUM-REDESIGN A안 (박경수님 2026-05-27) — '주관/공동/위탁' → '총괄/참여' 2종.
+export const CONSORTIUM_ROLE_VALUES: ConsortiumRole[] = ['총괄', '참여'];
 
 export function consortiumStatusToBadgeVariant(
   status: ConsortiumStatus,
@@ -22,9 +23,8 @@ export function roleToBadgeVariant(
   role?: ConsortiumRole | null,
 ): NonNullable<BadgeProps['variant']> {
   switch (role) {
-    case '주관': return 'primary';
-    case '공동': return 'accent';
-    case '위탁': return 'secondary';
+    case '총괄': return 'primary';
+    case '참여': return 'accent';
     default:     return 'default';
   }
 }

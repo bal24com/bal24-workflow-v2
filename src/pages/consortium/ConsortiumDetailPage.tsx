@@ -202,6 +202,16 @@ export default function ConsortiumDetailPage() {
                 {consortium.status}
               </span>
             </div>
+            {/* 박경수님 2026-05-27 A안 — 의뢰기관(주관기관) 라벨 강조 */}
+            {consortium.lead_client && (
+              <div className="inline-flex items-center gap-1.5 text-sm">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
+                  의뢰기관
+                </span>
+                <span className="font-semibold text-[#1E1B4B]">{consortium.lead_client.name}</span>
+                <span className="text-[10px] text-slate-400">(주관기관)</span>
+              </div>
+            )}
             <div className="text-xs text-slate-500">
               {formatConDate(consortium.start_date)} ~ {formatConDate(consortium.end_date)}
               {consortium.project && (
@@ -276,6 +286,8 @@ export default function ConsortiumDetailPage() {
         <aside className="lg:w-64 shrink-0 space-y-3">
           <div className="rounded-2xl border border-violet-100 bg-white p-4 shadow-[0_4px_16px_rgba(124,58,237,0.06)] space-y-2">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wide">요약</div>
+            {/* 박경수님 2026-05-27 A안 — 사이드 요약에도 의뢰기관 강조 */}
+            <SummaryRow label="의뢰기관" value={consortium.lead_client?.name ?? '미지정'} />
             <SummaryRow label="총사업비" value={formatKRW(Number(consortium.total_budget ?? 0))} />
             <SummaryRow label="기간" value={`${formatConDate(consortium.start_date)} ~ ${formatConDate(consortium.end_date)}`} />
             <SummaryRow label="참여사" value={`${members.length}곳`} />

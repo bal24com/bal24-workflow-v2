@@ -77,7 +77,7 @@ function ConsortiumGridCard({ c }: { c: ConsortiumRow }) {
                 <span className={`${BADGE_BASE} ${CONSORTIUM_STATUS_STYLE[c.status]}`}>{c.status}</span>
               </div>
               <CardDescription>
-                {c.lead_client?.name ? `주관 ${c.lead_client.name}` : '주관사 미지정'}
+                {c.lead_client?.name ? `의뢰기관 ${c.lead_client.name}` : '의뢰기관 미지정'}
               </CardDescription>
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function ConsortiumPage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="컨소시엄명 또는 주관사로 검색"
+          placeholder="컨소시엄명 또는 의뢰기관으로 검색"
           className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
       </div>
