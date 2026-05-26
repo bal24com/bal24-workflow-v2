@@ -15,18 +15,22 @@ export default function PayrollStatsPanel({ rows }: Props) {
     const byProj = new Map<string, ProjLine>();
     let outsourceSum = 0; let operationSum = 0;
     let vatSum = 0; let withholdingSum = 0;
+    // 박경수님 + SkyClaw STEP-PAYROLL-LIST-REDESIGN PART B (2026-05-28) — 처리/미처리 건수 분리
+    let laborDone = 0, laborPending = 0, opsDone = 0, opsPending = 0;
 
     for (const r of rows) {
       const sub = Number(r.subtotal ?? 0);
       const tax = Number(r.tax_amount ?? 0);
       const net = Number(r.net_amount ?? sub - tax);
+      const isPaid = r.payment_status === 'paid';
       if (r.tax_rate_type === '10') vatSum += tax;
       else if (r.tax_rate_type === '3.3' || r.tax_rate_type === '8.8') withholdingSum += tax;
       const grp: CatLine['group'] = isOutsourceType(r.expense_type)
         ? '인건비'
         : isOperationType(r.expense_type) ? '운영비' : '기타';
-      if (grp === '인건비') outsourceSum += sub;
-      else if (grp === '운영비') operationSum += sub;
+      if (grp === '인건비') { outsourceSum += sub; if (isPaid) laborDone += 1; else laborPending += 1; }
+      else if (grp === '운영비') { operationSum += sub; if (isPaid) opsDone += 1; else opsPending += 1; }
+      else { if (isPaid) opsDone += 1; else opsPending += 1; } // 기타는 운영비로 합산
 
       const cur = byCat.get(r.expense_type) ?? { category: r.expense_type, group: grp, subtotal: 0, tax: 0, net: 0, count: 0 };
       cur.subtotal += sub; cur.tax += tax; cur.net += net; cur.count += 1;
@@ -44,16 +48,19 @@ export default function PayrollStatsPanel({ rows }: Props) {
       catLines: Array.from(byCat.values()).sort((a, b) => b.subtotal - a.subtotal),
       projLines: Array.from(byProj.values()).sort((a, b) => b.subtotal - a.subtotal).slice(0, 8),
       outsourceSum, operationSum, totalSub, vatSum, withholdingSum,
+      laborDone, laborPending, opsDone, opsPending, totalCount: rows.length,
     };
   }, [rows]);
 
   return (
     <div className="space-y-4">
-      {/* 그룹 비교 — 인건비 vs 운영비 + 세액 합계 */}
+      {/* 그룹 비교 — 인건비 vs 운영비 + 처리/미처리 건수 + 세액 합계 */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KpiCard label="총 집행" value={formatMoney(stats.totalSub)} tone="violet" />
-        <KpiCard label="인건비 (외주)" value={formatMoney(stats.outsourceSum)} sub={`${ratio(stats.outsourceSum, stats.totalSub)}%`} tone="cyan" />
-        <KpiCard label="운영비" value={formatMoney(stats.operationSum)} sub={`${ratio(stats.operationSum, stats.totalSub)}%`} tone="orange" />
+        <KpiCard label={`총 집행 (${stats.totalCount}건)`} value={formatMoney(stats.totalSub)} tone="violet" />
+        <KpiCard label="인건비 (외주)" value={formatMoney(stats.outsourceSum)}
+          sub={`처리 ${stats.laborDone}건 · 미처리 ${stats.laborPending}건`} tone="cyan" />
+        <KpiCard label="운영비" value={formatMoney(stats.operationSum)}
+          sub={`처리 ${stats.opsDone}건 · 미처리 ${stats.opsPending}건`} tone="orange" />
         <KpiCard label="원천세 합계" value={formatMoney(stats.withholdingSum)} sub="인건비 차감" tone="rose" />
         <KpiCard label="부가세 (포함)" value={formatMoney(stats.vatSum)} sub="운영비 10%" tone="blue" />
       </div>
@@ -122,10 +129,6 @@ export default function PayrollStatsPanel({ rows }: Props) {
       </section>
     </div>
   );
-}
-
-function ratio(part: number, total: number): number {
-  return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
 type Tone = 'violet' | 'cyan' | 'orange' | 'rose' | 'blue';

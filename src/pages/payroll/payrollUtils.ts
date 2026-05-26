@@ -148,6 +148,19 @@ export async function softDeletePayroll(id: string): Promise<string | null> {
   return null;
 }
 
+// STEP-PAYROLL-LIST-REDESIGN PART A (2026-05-28) — 일괄 상태 전환 (선택삭제와 동일 패턴)
+export async function bulkTransitionPayroll(ids: string[], next: PayrollPaymentStatus, userId?: string): Promise<string | null> {
+  if (ids.length === 0) return null;
+  const now = new Date().toISOString();
+  const updates: Record<string, unknown> = { payment_status: next };
+  if (next === 'received')   { updates.received_at   = now; if (userId) updates.received_by   = userId; }
+  if (next === 'processing') { updates.processing_at = now; if (userId) updates.processing_by = userId; }
+  if (next === 'paid')       { updates.paid_at       = now; if (userId) updates.paid_by       = userId; }
+  const { error } = await supabase.from('payroll_expenses').update(updates).in('id', ids);
+  if (error) { console.error('[payroll] 일괄 전환 실패:', error.message); return error.message; }
+  return null;
+}
+
 // STEP-PAYROLL-STATUS-FLOW (2026-05-28) — 6단계 상태 전환 + 추적 컬럼 기록 + 감사 흔적
 export async function transitionPayrollStatus(
   id: string,

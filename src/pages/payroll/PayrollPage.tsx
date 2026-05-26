@@ -2,7 +2,7 @@
 // STEP-ACCOUNTING-ALL P3
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Loader2, Search, Users, Upload, ArrowUp, ArrowDown, ArrowUpDown, Filter, Download, FileText, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Search, Users, Upload, ArrowUp, ArrowDown, ArrowUpDown, Filter, Download, FileText } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
 import { formatDateKo, formatMoney } from '../../lib/utils';
@@ -10,14 +10,14 @@ import EmptyState from '../../components/EmptyState';
 import { supabase } from '../../lib/supabase';
 import type { PayrollPaymentStatus } from '../../types/database';
 import {
-  fetchPayroll, softDeletePayroll, bulkSoftDeletePayroll, calcPayrollSummary, maskIdNo,
+  fetchPayroll, softDeletePayroll, calcPayrollSummary, maskIdNo,
   isPersonCategory,
   PAYROLL_STATUS_VALUES, PAYROLL_STATUS_STYLE, PAYROLL_STATUS_LABEL,
   type PayrollRow,
 } from './payrollUtils';
 import PayrollSummaryBar from './PayrollSummaryBar';
 import PayrollExpenseFormModal from './PayrollExpenseFormModal'; import PayrollImportModal from './PayrollImportModal'; import PayrollStatsPanel from './PayrollStatsPanel'; import PayrollDetailModal from './PayrollDetailModal';
-import { downloadPayrollExcel, downloadPayrollPdf } from './payrollDownload'; import { withFinanceGuard } from '../../hooks/useFinanceGuard'; import PayrollRowStatusActions from './PayrollRowStatusActions'; // STEP-RBAC-SETUP + STEP-PAYROLL-STATUS-FLOW
+import { downloadPayrollExcel, downloadPayrollPdf } from './payrollDownload'; import { withFinanceGuard } from '../../hooks/useFinanceGuard'; import PayrollRowStatusActions from './PayrollRowStatusActions'; import PayrollBulkActions from './PayrollBulkActions'; // STEP-RBAC-SETUP + STEP-PAYROLL-STATUS-FLOW + STEP-PAYROLL-LIST-REDESIGN
 
 // 박경수님 요청 — 외주/운영 메인 탭 제거, [통계][지출] 2탭으로 재구성
 type MainTab = 'stats' | 'list';
@@ -54,7 +54,6 @@ function PayrollPage() {
   const [importOpen, setImportOpen] = useState(false);
   // 박경수님 + SkyClaw — 일괄 선택삭제
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkDeleting, setBulkDeleting] = useState(false);
   // 박경수님 + SkyClaw STEP-PAYROLL-DETAIL-COMMENT (2026-05-28) — 행 클릭 상세 팝업
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -147,17 +146,7 @@ function PayrollPage() {
       return next;
     });
   }
-  async function handleBulkDelete() {
-    if (selectedIds.size === 0) return;
-    if (!window.confirm(`선택한 ${selectedIds.size}건을 휴지통으로 보낼까요?`)) return;
-    setBulkDeleting(true);
-    const err = await bulkSoftDeletePayroll(Array.from(selectedIds));
-    setBulkDeleting(false);
-    if (err) { toast.error(err); return; }
-    toast.success(`${selectedIds.size}건 삭제했어요.`);
-    setSelectedIds(new Set());
-    void reload();
-  }
+  // STEP-PAYROLL-LIST-REDESIGN PART A — handleBulkDelete 는 PayrollBulkActions 로 흡수
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -227,14 +216,8 @@ function PayrollPage() {
             className="text-[11px] text-rose-600 hover:underline">초기화</button>
         )}
         <div className="ml-auto flex items-center gap-2">
-          {/* 박경수님 + SkyClaw — 선택된 항목 있을 때만 [선택삭제] 노출 */}
-          {selectedIds.size > 0 && (
-            <Button variant="outline" size="sm" leftIcon={<Trash2 size={14} />}
-              onClick={() => void handleBulkDelete()} loading={bulkDeleting}
-              className="!border-rose-300 !text-rose-600 hover:!bg-rose-50">
-              선택삭제 ({selectedIds.size}건)
-            </Button>
-          )}
+          {/* STEP-PAYROLL-LIST-REDESIGN PART A — 선택 시 일괄 액션 바 (수신확인·처리중·지급완료·반려·휴지통) */}
+          <PayrollBulkActions selectedIds={selectedIds} onCleared={() => setSelectedIds(new Set())} onSaved={() => void reload()} />
           <Button variant="outline" size="sm" leftIcon={<Download size={14} />} onClick={() => downloadPayrollExcel(visible)} disabled={visible.length === 0}>엑셀</Button>
           <Button variant="outline" size="sm" leftIcon={<FileText size={14} />}
             onClick={async () => { const r = await downloadPayrollPdf('payroll-table'); if (!r.ok) toast.error(`PDF 실패: ${r.reason}`); }}
@@ -265,9 +248,9 @@ function PayrollPage() {
           description="신규 등록 또는 일괄 등록(Excel) 으로 추가해 보세요."
         />
       ) : (
-        <div id="payroll-table" className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+        <div id="payroll-table" className="bg-white rounded-xl border border-slate-200 overflow-auto max-h-[70vh]">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500 text-xs">
+            <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 text-xs shadow-sm">
               <tr>
                 {/* 박경수님 + SkyClaw — 전체선택 (visible 기준). hover 시 노출 */}
                 <th className="w-8 px-3 py-2.5 group">
@@ -331,12 +314,11 @@ function PayrollPage() {
                     <td className="px-3 py-2 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${PAYROLL_STATUS_STYLE[r.payment_status]}`}>{PAYROLL_STATUS_LABEL[r.payment_status]}</span>
                     </td>
-                    <td className="px-3 py-2 text-center text-[11px]">
-                      {hasReceipt
-                        ? <span className="text-emerald-600 font-bold">{r.receipt_urls.length}</span>
-                        : needReceipt
-                          ? <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 font-bold">증빙없음</span>
-                          : <span className="text-slate-400">-</span>}
+                    <td className="px-3 py-2 text-center text-sm">
+                      {/* STEP-PAYROLL-LIST-REDESIGN PART A — O/X 단순 표시. 운영인건비는 증빙 불필요 */}
+                      {hasReceipt ? <span className="text-emerald-600 font-bold" title={`첨부 ${r.receipt_urls.length}건`}>O</span>
+                        : needReceipt ? <span className="text-rose-500 font-bold" title="증빙 첨부 필요">X</span>
+                        : <span className="text-slate-300">-</span>}
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <PayrollRowStatusActions row={r} canAct onSaved={() => void reload()} />
