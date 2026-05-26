@@ -125,10 +125,11 @@ export default function MentoringLogDetailTable({
           </tr>
 
           {/* 사진첨부 */}
-          {imageUrls.length > 0 && (
-            <tr>
-              <th className={TH_LABEL} colSpan={2}>멘토링<br />사진첨부</th>
-              <td className={TD_VAL} colSpan={3}>
+          {/* 박경수님 2026-05-26 — 사진 행 항상 표시 (없으면 "사진 없음" 안내). */}
+          <tr>
+            <th className={TH_LABEL} colSpan={2}>멘토링<br />사진첨부</th>
+            <td className={TD_VAL} colSpan={3}>
+              {imageUrls.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {imageUrls.slice(0, 6).map((url, idx) => (
                     <a key={`${idx}-${url}`} href={url} target="_blank" rel="noopener noreferrer">
@@ -137,9 +138,11 @@ export default function MentoringLogDetailTable({
                     </a>
                   ))}
                 </div>
-              </td>
-            </tr>
-          )}
+              ) : (
+                <p className="text-[11px] text-slate-400 italic">첨부된 사진이 없어요.</p>
+              )}
+            </td>
+          </tr>
         </tbody>
       </table>
 

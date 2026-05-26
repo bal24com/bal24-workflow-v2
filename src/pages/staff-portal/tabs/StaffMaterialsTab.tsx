@@ -20,6 +20,8 @@ interface Props {
 
 interface CurriculumRow {
   id: string; session_no: number; title: string; program_id: string; program_name: string | null;
+  /** 박경수님 2026-05-26 — 본인 담당 차시 여부 (전체 표시 + 담당만 업로드 버튼) */
+  mine: boolean;
 }
 interface MaterialRow {
   id: string; curriculum_id: string; uploader_id: string; uploader_source: string;
@@ -65,27 +67,35 @@ export default function StaffMaterialsTab({ staff, selectedProgramId }: Props) {
   const fetchData = useCallback(async () => {
     if (!selectedProgramId) { setCurriculums([]); setMaterials([]); setLoading(false); return; }
     setLoading(true);
+    // 박경수님 2026-05-26 — 전체 커리큘럼 표시 + 본인 담당 차시만 업로드 버튼.
     const staffCol = staff.sourceType === 'staff_pool' ? 'staff_pool_id' : 'profile_id';
+
+    // 1) 본인 담당 차시 id 수집 (curriculum_staff)
     const { data: cs } = await supabase.from('curriculum_staff')
       .select('curriculum_id').eq(staffCol, staff.id);
-    const curIds = ((cs ?? []) as Array<{ curriculum_id: string }>).map((r) => r.curriculum_id);
-    if (curIds.length === 0) {
-      setCurriculums([]); setMaterials([]); setLoading(false); return;
-    }
+    const mineSet = new Set(((cs ?? []) as Array<{ curriculum_id: string }>).map((r) => r.curriculum_id));
+
+    // 2) 선택 프로그램의 전체 커리큘럼
     const { data: pc } = await supabase.from('program_curriculum')
-      .select('id, session_no, title, program_id').in('id', curIds)
+      .select('id, session_no, title, program_id')
       .eq('program_id', selectedProgramId)
       .order('session_no', { ascending: true });
-    const pcRows = ((pc ?? []) as Array<Omit<CurriculumRow, 'program_name'>>);
+    const pcRows = ((pc ?? []) as Array<{ id: string; session_no: number; title: string; program_id: string }>);
+    if (pcRows.length === 0) {
+      setCurriculums([]); setMaterials([]); setLoading(false); return;
+    }
     const progIds = Array.from(new Set(pcRows.map((r) => r.program_id)));
-    let progMap = new Map<string, string>();
+    const progMap = new Map<string, string>();
     if (progIds.length > 0) {
       const { data: prog } = await supabase.from('programs').select('id, name').in('id', progIds);
       (prog ?? []).forEach((p) => progMap.set(p.id as string, p.name as string));
     }
-    setCurriculums(pcRows.map((r) => ({ ...r, program_name: progMap.get(r.program_id) ?? null })));
+    setCurriculums(pcRows.map((r) => ({
+      ...r, program_name: progMap.get(r.program_id) ?? null,
+      mine: mineSet.has(r.id),
+    })));
 
-    // 선택 프로그램에 속한 curriculum_id만 자료 조회 대상
+    // 3) 전체 차시의 자료 조회 (담당이 아닌 차시도 다른 강사가 올린 자료 조회만 가능)
     const filteredCurIds = pcRows.map((r) => r.id);
     if (filteredCurIds.length === 0) {
       setMaterials([]); setLoading(false); return;
@@ -232,48 +242,66 @@ export default function StaffMaterialsTab({ staff, selectedProgramId }: Props) {
         <Info size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
         <p>본인이 올린 자료는 삭제할 수 있어요. PM이 올린 자료는 다운로드만 가능합니다.</p>
       </div>
+      {/* 박경수님 2026-05-26 — 전체 차시 표 + 담당 차시에만 작은 업로드 버튼. */}
       {Array.from(curByProgram.entries()).map(([pid, items]) => (
         <section key={pid} className={CARD_CLASS}>
           <p className="text-base font-bold text-[#1E1B4B] mb-3">{items[0]?.program_name ?? '(프로그램 미지정)'}</p>
-          <ul className="space-y-2">
-            {items.map((c) => (
-              <li key={c.id} className="rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2.5">
-                <p className="text-sm font-semibold text-[#1E1B4B] mb-2">{c.session_no}차시 — {c.title}</p>
-                <ul className="space-y-1 mb-2">
-                  {(materialsByCur.get(c.id) ?? []).length === 0 && (
-                    <li className="text-xs text-slate-400 italic">아직 자료가 없어요.</li>
+          <ul className="divide-y divide-violet-100 border border-violet-100 rounded-lg overflow-hidden bg-white">
+            {items.map((c) => {
+              const mats = materialsByCur.get(c.id) ?? [];
+              return (
+                <li key={c.id} className={`px-3 py-2 ${c.mine ? 'bg-violet-50/40' : ''}`}>
+                  {/* 차시 한 줄 — 차시·담당 배지·제목·업로드·자료 수 */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center justify-center min-w-[3rem] h-6 px-2 rounded bg-violet-100 text-violet-700 text-xs font-bold tabular-nums shrink-0">
+                      {c.session_no}차시
+                    </span>
+                    {c.mine && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-600 text-white shrink-0">👤 담당</span>
+                    )}
+                    <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-700">{c.title}</span>
+                    {mats.length > 0 && (
+                      <span className="text-[10px] text-slate-500 shrink-0">자료 {mats.length}건</span>
+                    )}
+                    {c.mine && (
+                      <label className="inline-flex items-center gap-0.5 px-2 py-1 rounded text-[11px] font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 cursor-pointer shrink-0">
+                        {uploadingId === c.id ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />}
+                        업로드
+                        <input type="file" className="hidden" disabled={uploadingId === c.id}
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f, c.id); e.target.value = ''; }} />
+                      </label>
+                    )}
+                  </div>
+                  {/* 자료 목록 (있을 때만) */}
+                  {mats.length > 0 && (
+                    <ul className="mt-1.5 space-y-1">
+                      {mats.map((m) => {
+                        const mine = m.uploader_id === staff.id;
+                        return (
+                          <li key={m.id} className="flex items-center gap-2 rounded border border-violet-100 bg-violet-50/30 px-2 py-1 ml-12">
+                            <FileText size={11} className="shrink-0 text-violet-500" aria-hidden="true" />
+                            <span className="flex-1 min-w-0 truncate text-[11px] text-slate-700">{m.file_name}</span>
+                            {m.file_size != null && (
+                              <span className="shrink-0 text-[10px] text-slate-400 tabular-nums">{Math.round(m.file_size / 1024)}KB</span>
+                            )}
+                            <a href={m.file_url} target="_blank" rel="noreferrer"
+                              className="text-[10px] font-bold text-violet-700 hover:underline">
+                              <Download size={10} className="inline" /> 다운로드
+                            </a>
+                            {mine && (
+                              <button type="button" onClick={() => void handleDelete(m)} aria-label="삭제"
+                                className="inline-flex items-center justify-center w-5 h-5 rounded text-red-500 hover:bg-red-50">
+                                <Trash2 size={10} />
+                              </button>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
                   )}
-                  {(materialsByCur.get(c.id) ?? []).map((m) => {
-                    const mine = m.uploader_id === staff.id;
-                    return (
-                      <li key={m.id} className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-2.5 py-2">
-                        <FileText size={14} className="shrink-0 text-violet-500" aria-hidden="true" />
-                        <span className="flex-1 min-w-0 truncate text-xs font-semibold text-slate-700">{m.file_name}</span>
-                        {m.file_size != null && (
-                          <span className="shrink-0 text-[10px] text-slate-400 tabular-nums">{Math.round(m.file_size / 1024)}KB</span>
-                        )}
-                        <a href={m.file_url} target="_blank" rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-violet-700 hover:bg-violet-100">
-                          <Download size={11} /> 다운로드
-                        </a>
-                        {mine && (
-                          <button type="button" onClick={() => void handleDelete(m)} aria-label="삭제"
-                            className="inline-flex items-center justify-center w-6 h-6 rounded text-red-500 hover:bg-red-50 transition-colors">
-                            <Trash2 size={11} />
-                          </button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-                <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[10px] bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 hover:scale-[1.02] transition-all duration-200 cursor-pointer">
-                  {uploadingId === c.id ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                  파일 선택하여 업로드
-                  <input type="file" className="hidden" disabled={uploadingId === c.id}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f, c.id); e.target.value = ''; }} />
-                </label>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </section>
       ))}

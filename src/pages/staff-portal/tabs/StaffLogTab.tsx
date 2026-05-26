@@ -204,8 +204,24 @@ export default function StaffLogTab({ staff, selectedProgramId }: Props) {
                       <span className="text-xs text-slate-500 ml-auto truncate max-w-[40%]">{l.programName}</span>
                     )}
                   </div>
-                  {l.title && <p className="text-sm font-semibold text-[#1E1B4B] mt-2">{l.title}</p>}
-                  <p className={`mt-1.5 text-sm text-slate-700 whitespace-pre-wrap ${expanded ? '' : 'line-clamp-2'}`}>{l.content}</p>
+                  {/* 박경수님 2026-05-26 — 펼친 상태에서는 본문 line-clamp 표시 제거 (양식 표와 중복).
+                      접힌 상태에서만 제목·내용 요약 표시. */}
+                  {!expanded && l.title && <p className="text-sm font-semibold text-[#1E1B4B] mt-2">{l.title}</p>}
+                  {!expanded && (
+                    <p className="mt-1.5 text-sm text-slate-700 whitespace-pre-wrap line-clamp-2">{l.content}</p>
+                  )}
+                  {/* 펼친 상태 — 헤더 한 줄 (제목·차수·멘티) */}
+                  {expanded && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap text-xs text-slate-600 border-b border-slate-100 pb-2">
+                      {l.subject && <span className="font-semibold text-slate-800">{l.subject}</span>}
+                      {l.sessionNo != null && (
+                        <span className="px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 text-[10px] font-semibold">{l.sessionNo}회차</span>
+                      )}
+                      {l.menteeNames && l.menteeNames.length > 0 && (
+                        <span className="text-slate-500">멘티 · {l.menteeNames.join(', ')}</span>
+                      )}
+                    </div>
+                  )}
 
                   {expanded && (
                     <>
