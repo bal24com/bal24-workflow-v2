@@ -165,17 +165,14 @@ export default function EstimateTab({ projectId, projectName }: Props) {
   // 박경수님 요청 — 단가 × 회수 × 수량(인원) 3중 곱
   const total = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1), 0);
 
-  // 박경수님 + SkyClaw STEP-ESTIMATE-ADDON-FULL — 제경비·기술료·부가세·최종금액 + 엑셀
+  // 박경수님 + SkyClaw STEP-ESTIMATE-ADDON-FULL — 제경비·기술료·부가세·최종금액
   const addonConfig: EstimateAddonConfig = parseAddonConfig(estimate as Record<string, unknown> | null);
-  async function handleAddonSave(cfg: EstimateAddonConfig) {
-    const est = await ensureEstimate(); if (!est) return;
-    const { error } = await supabase.from('project_estimates').update(buildAddonPayload(cfg)).eq('id', est.id);
-    if (error) { console.error('[EstimateTab] addon 저장 오류:', error.message); toast.error('견적 추가 요금 저장 중 오류가 발생했어요.'); return; }
-    toast.success('견적 추가 요금을 저장했어요.'); void reload();
-  }
-  function handleExcelDownload() {
+  async function handleAddonSave(cfg: EstimateAddonConfig) { const est = await ensureEstimate(); if (!est) return; const { error } = await supabase.from('project_estimates').update(buildAddonPayload(cfg)).eq('id', est.id); if (error) { console.error('[EstimateTab] addon 저장 오류:', error.message); toast.error('견적 추가 요금 저장 중 오류가 발생했어요.'); return; } toast.success('견적 추가 요금을 저장했어요.'); void reload(); }
+  async function handleExcelDownload() {
+    // 박경수님 + SkyClaw STEP-ESTIMATE-EXCEL-UX — xItems + clientName fetch + 엑셀 양식 호출
     const xItems = items.map((it) => { const qty = (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1); const up = Number(it.unit_price) || 0; return { category: it.category, name: it.description ?? '', unitPrice: up, quantity: qty, amount: up * qty, note: it.memo ?? '' }; });
-    downloadEstimateExcel(projectName, xItems, addonConfig, calcEstimateAddon(total, addonConfig));
+    const { data: prj } = await supabase.from('projects').select('client:clients(name)').eq('id', projectId).maybeSingle();
+    downloadEstimateExcel({ title: estimate?.title ?? projectName, clientName: (prj as { client?: { name?: string } | null } | null)?.client?.name ?? '', items: xItems, cfg: addonConfig, result: calcEstimateAddon(total, addonConfig) });
   }
 
   // 박경수님 요청 — 필터/검색/정렬 + 프로그램 연동
@@ -220,6 +217,8 @@ export default function EstimateTab({ projectId, projectName }: Props) {
           <span className="text-xs text-slate-500">· 항목 {items.length}건 · 총 <span className="font-bold text-violet-700 tabular-nums">{formatMoney(total)}</span></span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* 박경수님 + SkyClaw STEP-ESTIMATE-EXCEL-UX — 엑셀 다운로드 상단 이동 */}
+          <Button variant="outline" size="sm" leftIcon={<Download size={12} />} onClick={() => void handleExcelDownload()} className="!border-emerald-300 !text-emerald-700 !bg-emerald-50 hover:!bg-emerald-100">엑셀 다운로드</Button>
           <Button variant="outline" size="sm" leftIcon={<Download size={12} />} onClick={() => setLoadTplOpen(true)}>템플릿 불러오기</Button>
           <Button variant="outline" size="sm" leftIcon={<BookOpen size={12} />} onClick={() => setSaveTplOpen(true)} disabled={items.length === 0}>템플릿 저장</Button>
           <Button variant="outline" size="sm" leftIcon={<Plus size={12} />} onClick={addItem}>항목 추가</Button>
@@ -366,7 +365,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
 
       {/* 박경수님 + SkyClaw STEP-ESTIMATE-ADDON-FULL — 제경비·기술료·부가세·최종금액 + 엑셀 */}
       <div className="bg-white rounded-xl border border-slate-200 p-4">
-        <div className="flex items-center justify-between mb-2"><h3 className="text-sm font-semibold text-slate-800">견적 합계 (제경비·기술료·부가세·최종 제안금액)</h3><Button variant="outline" size="sm" leftIcon={<Download size={13} />} onClick={handleExcelDownload}>엑셀 다운로드</Button></div>
+        <div className="mb-2"><h3 className="text-sm font-semibold text-slate-800">견적 합계 (제경비·기술료·부가세·최종 제안금액)</h3></div>
         <EstimateAddonSection directTotal={total} addonConfig={addonConfig} onSave={handleAddonSave} />
       </div>
 
