@@ -335,8 +335,15 @@ export async function fetchStaffActivity(programId: string): Promise<StaffActivi
     result.push(entry);
   });
 
-  // 이름 가나다순 정렬
-  result.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  // STEP-STAFF-PIN-RESET 보강 — 팀원(profile 강사)은 맨 아래 그룹으로, 같은 그룹 내 가나다순.
+  // 그룹 0: staff_pool 강사 + raw 강사 (외부 인력풀)
+  // 그룹 1: profile 강사 (내부 임직원이 강사로 배정)
+  result.sort((a, b) => {
+    const groupA = a.profile_id && !a.staff_pool_id ? 1 : 0;
+    const groupB = b.profile_id && !b.staff_pool_id ? 1 : 0;
+    if (groupA !== groupB) return groupA - groupB;
+    return a.name.localeCompare(b.name, 'ko');
+  });
   return result;
 }
 

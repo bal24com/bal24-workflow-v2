@@ -152,8 +152,14 @@ export default function StaffStudentsTab({ programId }: Props) {
             const unregistered = !s.staff_pool_id && !s.profile_id;
             const feeMissing = !s.feeRule;
             const feeRegistered = !!s.feeRule?.expense_id;
+            // STEP-STAFF-PIN-RESET 보강 — 팀원(profile) 강사는 회색 배경으로 그룹 시각 구분
+            const isTeamMember = !!s.profile_id && !s.staff_pool_id;
             return (
-              <li key={k} className="rounded-xl border border-violet-100 bg-violet-50/30 overflow-hidden">
+              <li key={k} className={`rounded-xl border overflow-hidden ${
+                isTeamMember
+                  ? 'border-slate-200 bg-slate-50/60'
+                  : 'border-violet-100 bg-violet-50/30'
+              }`}>
                 {/* 강사 요약 행 */}
                 <div className="flex items-center gap-3 p-3 flex-wrap">
                   <div className="min-w-0 flex-1">
@@ -165,9 +171,23 @@ export default function StaffStudentsTab({ programId }: Props) {
                       {unregistered && (
                         <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded px-1">미등록</span>
                       )}
+                      {isTeamMember && (
+                        <span className="text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 rounded px-1">팀원</span>
+                      )}
                       {s.invitationStatus && (
                         <span className={`${BADGE_BASE} ${INVITATION_STATUS_STYLE[s.invitationStatus]}`}>
                           {s.invitationStatus}
+                        </span>
+                      )}
+                      {/* PIN 상태 라벨 — staff_pool 강사만 (hasPin: true/false 명확 시) */}
+                      {s.staff_pool_id && s.hasPin === true && (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 inline-flex items-center gap-0.5">
+                          <KeyRound size={9} aria-hidden="true" />PIN 설정됨
+                        </span>
+                      )}
+                      {s.staff_pool_id && s.hasPin === false && (
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded px-1">
+                          PIN 미설정
                         </span>
                       )}
                     </div>
@@ -219,15 +239,20 @@ export default function StaffStudentsTab({ programId }: Props) {
                       className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-violet-700 border border-violet-200 hover:bg-violet-50 disabled:opacity-40">
                       {s.staffPortalToken ? <ExternalLink size={11} aria-hidden="true" /> : <Send size={11} aria-hidden="true" />}
                     </button>
-                    {/* STEP-STAFF-PIN-RESET — PIN 초기화 (staff_pool 강사 + PIN 설정된 경우만 활성) */}
+                    {/* STEP-STAFF-PIN-RESET — PIN 초기화 (staff_pool 강사만 표시).
+                        PIN 설정됨 → 황색 채움 강조 / PIN 미설정 → 옅은 회색 비활성 */}
                     {s.staff_pool_id && (
                       <button type="button"
                         onClick={() => void handleResetPin(s)}
                         disabled={pinBusyKey === k || s.hasPin === false}
-                        title={s.hasPin === false ? 'PIN 미설정 (초기화 불필요)'
+                        title={s.hasPin === false ? 'PIN 미설정 — 초기화 불필요 (강사가 첫 접속 시 직접 설정)'
                           : s.hasPin === null ? 'PIN 상태 확인 불가 — 초기화 시도 가능'
-                          : '강사 PIN 초기화 (강사가 새 PIN을 다시 설정)'}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-amber-700 border border-amber-200 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                          : '강사 PIN 초기화 — 강사가 새 PIN을 다시 설정해야 해요'}
+                        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                          s.hasPin === true
+                            ? 'text-amber-800 bg-amber-100 border-amber-300 hover:bg-amber-200 shadow-sm'
+                            : 'text-slate-400 bg-slate-50 border-slate-200'
+                        }`}>
                         {pinBusyKey === k
                           ? <Loader2 size={11} className="animate-spin" />
                           : <KeyRound size={11} aria-hidden="true" />}
