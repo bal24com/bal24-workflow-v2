@@ -80,9 +80,16 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
     const fallback = FALLBACK_CATEGORY_BY_GROUP[group];
     // 견적 항목 우선, fallback 으로 누락 보강. 마지막은 항상 '기타' (직접 입력).
     const merged = Array.from(new Set([...fromEstimate, ...fallback]));
+    // 박경수님 + SkyClaw STEP-PAYROLL-FORM-FINAL (2026-05-26) — 수정 모드의 expense_type 이
+    // 옵션에 없으면 자동 포함. '기타' 폴백으로 원래 값 잃어버리는 버그 방지.
+    if (target?.expense_type) {
+      const ty = target.expense_type;
+      const stripped = ty.replace(/^운영비-/, '');
+      if (!merged.includes(ty) && !merged.includes(stripped) && ty !== '기타') merged.unshift(ty);
+    }
     const withoutEtc = merged.filter((c) => c !== '기타');
     return [...withoutEtc, '기타'];
-  }, [estimateCats, group]);
+  }, [estimateCats, group, target]);
   const [category, setCategory] = useState(categoryOptions[0]);
   const [customCategory, setCustomCategory] = useState('');
   const [description, setDescription] = useState('');
