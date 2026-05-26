@@ -1,10 +1,9 @@
-// bal24 v2 — STEP-STAFF-PORTAL-P3 / STEP-STAFF-PORTAL-UI-UNIFY
-// 강사 포털 · 강의 탭 — 대기 초대 + 프로그램별 차시 그룹핑.
-// curriculum_staff → program_curriculum 2단 join (sourceType 분기).
-// instructor_invitations 수락/거절 (status '대기' → '수락'/'거절').
+// bal24 v2 — STEP-PORTAL-LECTURE-LOG-REDESIGN (박경수님 2026-05-26)
+// 강사 포털 · 강의 탭 심플화 — 대기 초대 + 담당 차시 테이블 1개만.
+// 일지 섹션·전체 커리큘럼 아코디언은 [일지] 탭의 [강의일지] 서브탭으로 이동.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Mail, BookOpen, CheckCircle2, XCircle, Calendar, Clock } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Loader2, Mail, BookOpen, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { formatDateKo } from '../../../lib/utils';
@@ -12,24 +11,25 @@ import EmptyState from '../../../components/EmptyState';
 import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../../utils/statusStyles';
 import type { CurriculumStaffRole, InvitationStatus } from '../../../types/database';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
-// 박경수님 + SkyClaw STEP-STAFF-PORTAL-REDESIGN PART D (2026-05-28) — 강의 일지 카드
-import LectureLogSection from './LectureLogSection';
 
 interface Props {
   staff: StaffPortalIdentity;
   selectedProgramId: string | null;
 }
 
-interface LectureRow { id: string; role: CurriculumStaffRole; curriculum_id: string }
-interface CurriculumRow {
-  id: string; session_no: number; title: string;
-  session_date: string | null; start_time: string | null; end_time: string | null;
-  program_id: string;
+interface MyLectureRow {
+  curriculum_id: string;
+  session_no: number;
+  title: string;
+  session_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  role: CurriculumStaffRole;
 }
-interface ProgramLite { id: string; name: string }
+
 interface InvitationRow {
   id: string; status: InvitationStatus; program_id: string | null;
-  notes: string | null; program: ProgramLite | null;
+  notes: string | null; program: { id: string; name: string } | null;
 }
 
 const CARD_CLASS =
@@ -47,82 +47,65 @@ function trimTime(t: string | null): string { return t ? t.slice(0, 5) : ''; }
 
 export default function StaffLectureTab({ staff, selectedProgramId }: Props) {
   const toast = useToast();
-  const [lectures, setLectures] = useState<LectureRow[]>([]);
-  const [curriculums, setCurriculums] = useState<CurriculumRow[]>([]);
-  const [programs, setPrograms] = useState<ProgramLite[]>([]);
+  const [rows, setRows] = useState<MyLectureRow[]>([]);
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!selectedProgramId) {
-      setLectures([]); setCurriculums([]); setInvitations([]); setPrograms([]);
+      setRows([]); setInvitations([]);
       setLoading(false); return;
     }
     setLoading(true);
     const staffCol = staff.sourceType === 'staff_pool' ? 'staff_pool_id' : 'profile_id';
 
-    const { data: cs, error: csErr } = await supabase.from('curriculum_staff')
-      .select('id, role, curriculum_id').eq(staffCol, staff.id);
-    if (csErr) console.warn('[staff-portal/lecture] curriculum_staff 경고:', csErr.message);
-    const csRows = (cs ?? []) as LectureRow[];
-
+    // 1) 본인 담당 차시 (curriculum_staff → program_curriculum 2단 join)
+    const { data: cs } = await supabase.from('curriculum_staff')
+      .select('curriculum_id, role').eq(staffCol, staff.id);
+    type CsRow = { curriculum_id: string; role: CurriculumStaffRole };
+    const csRows = (cs ?? []) as CsRow[];
+    const roleMap = new Map(csRows.map((r) => [r.curriculum_id, r.role]));
     const curIds = csRows.map((r) => r.curriculum_id);
-    let curRows: CurriculumRow[] = [];
+
+    let myRows: MyLectureRow[] = [];
     if (curIds.length > 0) {
-      const { data: cur, error: curErr } = await supabase.from('program_curriculum')
-        .select('id, session_no, title, session_date, start_time, end_time, program_id')
+      const { data: cur } = await supabase.from('program_curriculum')
+        .select('id, session_no, title, session_date, start_time, end_time')
         .in('id', curIds)
         .eq('program_id', selectedProgramId)
         .order('session_no', { ascending: true });
-      if (curErr) console.warn('[staff-portal/lecture] program_curriculum 경고:', curErr.message);
-      curRows = (cur ?? []) as CurriculumRow[];
+      type CurRow = {
+        id: string; session_no: number; title: string;
+        session_date: string | null; start_time: string | null; end_time: string | null;
+      };
+      myRows = ((cur ?? []) as CurRow[]).map((c) => ({
+        curriculum_id: c.id,
+        session_no: c.session_no,
+        title: c.title,
+        session_date: c.session_date,
+        start_time: c.start_time,
+        end_time: c.end_time,
+        role: roleMap.get(c.id) ?? '강사',
+      }));
     }
-    // 선택 프로그램의 curriculum_id만 csRows에 남김 (배지 역할 매핑 정확화)
-    const filteredCurIds = new Set(curRows.map((c) => c.id));
-    const filteredCsRows = csRows.filter((r) => filteredCurIds.has(r.curriculum_id));
 
-    const { data: inv, error: invErr } = await supabase.from('instructor_invitations')
+    // 2) 대기 초대
+    const { data: inv } = await supabase.from('instructor_invitations')
       .select('id, status, program_id, notes, program:programs!instructor_invitations_program_id_fkey(id, name)')
       .eq(staffCol, staff.id)
       .eq('program_id', selectedProgramId)
       .order('created_at', { ascending: false });
-    if (invErr) console.warn('[staff-portal/lecture] 초대 조회 경고:', invErr.message);
     const invRows = ((inv ?? []) as unknown) as InvitationRow[];
 
-    const progIds = new Set<string>();
-    curRows.forEach((c) => c.program_id && progIds.add(c.program_id));
-    invRows.forEach((i) => i.program_id && progIds.add(i.program_id));
-    let progRows: ProgramLite[] = [];
-    if (progIds.size > 0) {
-      const { data: prog } = await supabase.from('programs').select('id, name').in('id', Array.from(progIds));
-      progRows = (prog ?? []) as ProgramLite[];
-    }
-
-    setLectures(filteredCsRows); setCurriculums(curRows);
-    setInvitations(invRows); setPrograms(progRows);
+    setRows(myRows);
+    setInvitations(invRows);
     setLoading(false);
   }, [staff.id, staff.sourceType, selectedProgramId]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
-  const programMap = useMemo(() => new Map(programs.map((p) => [p.id, p])), [programs]);
-  const curByProgram = useMemo(() => {
-    const m = new Map<string, CurriculumRow[]>();
-    curriculums.forEach((c) => {
-      const arr = m.get(c.program_id) ?? [];
-      arr.push(c);
-      m.set(c.program_id, arr);
-    });
-    return m;
-  }, [curriculums]);
-  const lectureRoleMap = useMemo(() => {
-    const m = new Map<string, CurriculumStaffRole>();
-    lectures.forEach((l) => m.set(l.curriculum_id, l.role));
-    return m;
-  }, [lectures]);
   const pendingInvs = invitations.filter((i) => i.status === '대기');
-  const programIds = Array.from(curByProgram.keys());
 
   async function handleInviteAction(invitationId: string, next: '수락' | '거절') {
     setActingId(invitationId);
@@ -182,102 +165,50 @@ export default function StaffLectureTab({ staff, selectedProgramId }: Props) {
         </section>
       )}
 
+      {/* 박경수님 2026-05-26 — 담당 차시 심플 테이블 (4컬럼) */}
       <section className={CARD_CLASS}>
         <h2 className="text-base font-bold text-[#1E1B4B] mb-3 flex items-center gap-2">
           <BookOpen size={16} className="text-violet-500" aria-hidden="true" />
-          담당 강의 ({lectures.length}차시)
+          담당 강의 ({rows.length}차시)
         </h2>
-        {programIds.length === 0 ? (
-          <EmptyState emoji="📖" title="아직 배정된 강의가 없어요." />
+        {rows.length === 0 ? (
+          <EmptyState emoji="📖" title="배정된 강의가 없어요." />
         ) : (
-          <div className="space-y-4">
-            {programIds.map((pid) => {
-              const program = programMap.get(pid);
-              const items = curByProgram.get(pid) ?? [];
-              return (
-                <div key={pid}>
-                  <p className="text-sm font-bold text-[#1E1B4B] mb-2">
-                    {program?.name ?? '(프로그램 미지정)'}
-                    <span className="text-xs text-slate-400 font-normal ml-1.5">· {items.length}차시</span>
-                  </p>
-                  <ul className="space-y-1.5">
-                    {items.map((c) => (
-                      <li key={c.id} className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2.5">
-                        <span className="inline-flex items-center justify-center min-w-[2.5rem] h-6 px-2 rounded-md bg-violet-100 text-violet-700 text-xs font-bold tabular-nums">
-                          {c.session_no}차시
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-[#1E1B4B] truncate">{c.title}</p>
-                          <p className="text-xs text-slate-500 tabular-nums flex items-center gap-2 flex-wrap mt-0.5">
-                            {c.session_date && (
-                              <span className="inline-flex items-center gap-1"><Calendar size={11} />{formatDateKo(c.session_date)}</span>
-                            )}
-                            {(c.start_time || c.end_time) && (
-                              <span className="inline-flex items-center gap-1">
-                                <Clock size={11} />{trimTime(c.start_time)}{c.end_time && `~${trimTime(c.end_time)}`}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        <span className={`${BADGE_BASE} bg-violet-50 text-violet-600 border-violet-200`}>
-                          {lectureRoleMap.get(c.id) ?? '강사'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-violet-50/50 text-slate-500 text-xs">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold w-16">차시</th>
+                  <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">날짜</th>
+                  <th className="text-left px-3 py-2 font-semibold">제목</th>
+                  <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">시간</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((r) => (
+                  <tr key={r.curriculum_id} className="hover:bg-violet-50/40">
+                    <td className="px-3 py-2 text-xs font-bold text-violet-700 tabular-nums">
+                      {r.session_no}차시
+                    </td>
+                    <td className="px-3 py-2 text-xs text-slate-600 tabular-nums whitespace-nowrap">
+                      {formatDateKo(r.session_date) || '-'}
+                    </td>
+                    <td className="px-3 py-2 text-sm font-medium text-slate-800">{r.title}</td>
+                    <td className="px-3 py-2 text-xs text-slate-600 tabular-nums whitespace-nowrap">
+                      {r.start_time || r.end_time
+                        ? `${trimTime(r.start_time)}${r.end_time ? `~${trimTime(r.end_time)}` : ''}`
+                        : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-3 text-[11px] text-slate-400">
+              💡 강의 일지는 [일지] 탭 → [강의일지] 서브탭에서 작성·제출하실 수 있어요.
+            </p>
           </div>
         )}
       </section>
-
-      {/* STEP-STAFF-PORTAL-REDESIGN PART D (2026-05-28) — 강의 일지 카드 (내 담당 차시 only) */}
-      {selectedProgramId && (() => {
-        const myCurs = curriculums.filter((c) => c.program_id === selectedProgramId && lectureRoleMap.has(c.id))
-          .sort((a, b) => a.session_no - b.session_no);
-        if (myCurs.length === 0) return null;
-        return <LectureLogSection staff={staff} programId={selectedProgramId} curriculums={myCurs} />;
-      })()}
-
-      {/* STEP-STAFF-PORTAL-REDESIGN PART C (2026-05-28) — 전체 커리큘럼 아코디언 (선택 프로그램 기준) */}
-      {selectedProgramId && (() => {
-        const all = curriculums.filter((c) => c.program_id === selectedProgramId).sort((a, b) => a.session_no - b.session_no);
-        if (all.length === 0) return null;
-        return (
-          <details className="rounded-2xl border border-violet-100 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700 flex items-center gap-2 py-1">
-              <BookOpen size={14} className="text-violet-500" aria-hidden="true" />
-              전체 커리큘럼 ({all.length}차시) — 본인 차시는 강조
-            </summary>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-violet-50/40 text-slate-500 text-xs">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-semibold">차시</th>
-                    <th className="text-left px-3 py-2 font-semibold">날짜·시간</th>
-                    <th className="text-left px-3 py-2 font-semibold">제목</th>
-                    <th className="text-center px-3 py-2 font-semibold">담당</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {all.map((c) => {
-                    const mine = lectureRoleMap.has(c.id);
-                    return (
-                      <tr key={c.id} className={mine ? 'bg-violet-50' : 'hover:bg-violet-50/40'}>
-                        <td className="px-3 py-1.5 text-xs font-bold text-violet-700 tabular-nums">{c.session_no}</td>
-                        <td className="px-3 py-1.5 text-xs text-slate-600 tabular-nums whitespace-nowrap">{formatDateKo(c.session_date)}{c.start_time ? ` · ${trimTime(c.start_time)}` : ''}</td>
-                        <td className="px-3 py-1.5 text-xs text-slate-800">{c.title}</td>
-                        <td className="px-3 py-1.5 text-center text-[11px]">{mine ? <span className="inline-flex items-center gap-1 text-violet-700 font-semibold">👤 본인</span> : <span className="text-slate-400">-</span>}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        );
-      })()}
     </div>
   );
 }
