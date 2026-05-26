@@ -70,6 +70,8 @@ const SECTIONS: MenuSection[] = [
       // STEP-ACCOUNTING-ALL — 수입→수입/계약, 지출→외주/급여, 증빙 제거, 회계 검토 신규
       { to: '/contracts',          label: '수입/계약', Icon: FileText },
       { to: '/payroll',            label: '외주/급여', Icon: Users },
+      // 박경수님 + SkyClaw STEP-PAYROLL-SYSTEM (2026-05-28) — 직원 급여 + 지출결의서
+      { to: '/payroll-mgmt',       label: '급여 관리', Icon: Users },
       { to: '/accounting-reviews', label: '회계 검토', Icon: ClipboardCheck },
       { to: '/reports',            label: '리포트',    Icon: BarChart3 },
     ],
@@ -145,6 +147,8 @@ const FINANCE_SECTIONS: MenuSection[] = [
       // STEP-ACCOUNTING-ALL — 수입→수입/계약, 지출→외주/급여, 증빙 제거, 회계 검토 신규
       { to: '/contracts',          label: '수입/계약', Icon: FileText },
       { to: '/payroll',            label: '외주/급여', Icon: Users },
+      // 박경수님 + SkyClaw STEP-PAYROLL-SYSTEM (2026-05-28) — 직원 급여 + 지출결의서
+      { to: '/payroll-mgmt',       label: '급여 관리', Icon: Users },
       { to: '/accounting-reviews', label: '회계 검토', Icon: ClipboardCheck },
       { to: '/reports',            label: '리포트',    Icon: BarChart3 },
     ],
