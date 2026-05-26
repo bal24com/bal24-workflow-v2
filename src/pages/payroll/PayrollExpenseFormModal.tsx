@@ -13,7 +13,7 @@ import type {
 } from '../../types/database';
 import {
   PAYROLL_BASE_TYPES, PAYROLL_STATUS_VALUES,
-  isOperationType, isOutsourceType,
+  isOperationType, isOutsourceType, isPersonCategory,
   type PayrollRow,
 } from './payrollUtils';
 // 박경수님 보고 fix (2026-05-26) — 외주/급여 등록 모달도 견적 카테고리를 datalist 에 노출
@@ -30,7 +30,7 @@ interface Props { open: boolean; target: PayrollRow | null; defaultType: Payroll
 const BANK_OPTIONS = ['국민은행', '신한은행', '우리은행', '하나은행', '농협은행', '기업은행', '카카오뱅크', '토스뱅크', '새마을금고', '우체국', '기타'];
 
 function emptyForm(t: PayrollExpenseType) {
-  return { expense_type: t, description: '', payee_name: '', payee_id_no: '', bank_name: '', bank_account: '', unit_price: '', quantity: '1', tax_rate_type: '3.3' as PayrollTaxRateType, payment_status: '대기' as PayrollPaymentStatus, paid_at: '', project_id: '', program_id: '', contract_id: '', memo: '' };
+  return { expense_type: t, description: '', payee_name: '', payee_id_no: '', biz_reg_no: '', bank_name: '', bank_account: '', unit_price: '', quantity: '1', tax_rate_type: '3.3' as PayrollTaxRateType, payment_status: '대기' as PayrollPaymentStatus, paid_at: '', project_id: '', program_id: '', contract_id: '', memo: '' };
 }
 
 export default function PayrollExpenseFormModal({
@@ -81,6 +81,7 @@ export default function PayrollExpenseFormModal({
         description: target.description ?? '',
         payee_name: target.payee_name,
         payee_id_no: target.payee_id_no ?? '',
+        biz_reg_no: target.biz_reg_no ?? '',
         bank_name: target.bank_name ?? '',
         bank_account: target.bank_account ?? '',
         unit_price: String(target.unit_price ?? ''),
@@ -126,19 +127,7 @@ export default function PayrollExpenseFormModal({
     return programs.filter((g) => g.project_id === form.project_id);
   }, [programs, form.project_id]);
 
-  // STEP-ACCOUNTING-FOLLOWUP7 — 계약 선택 시 project/program 자동 prefill
-  function selectContract(contractId: string) {
-    const c = contracts.find((x) => x.id === contractId);
-    setForm((f) => ({
-      ...f, contract_id: contractId,
-      project_id: c?.project_id ?? f.project_id,
-      program_id: c?.program_id ?? f.program_id,
-    }));
-    if (c?.project_id) {
-      const proj = projects.find((p) => p.id === c.project_id);
-      if (proj) setProjectSearch(proj.name);
-    }
-  }
+  // 박경수님 + SkyClaw FORM-HARDFIX — 연결계약 select 삭제. 프로그램 onChange 의 자동 연결만 사용.
 
   const subtotal = useMemo(
     () => (Number(form.unit_price) || 0) * (Number(form.quantity) || 0),
@@ -157,11 +146,14 @@ export default function PayrollExpenseFormModal({
     }
     setSaving(true);
     try {
+      // 박경수님 + SkyClaw FORM-HARDFIX — 인건비=payee_id_no / 외주=biz_reg_no. 반대편 컬럼은 null 저장
+      const submitIsPerson = isPersonCategory(form.expense_type);
       const payload = {
         expense_type: form.expense_type.trim() || '강사료',
         description: form.description.trim() || null,
         payee_name: form.payee_name.trim(),
-        payee_id_no: form.payee_id_no.trim() || null,
+        payee_id_no: submitIsPerson ? (form.payee_id_no.trim() || null) : null,
+        biz_reg_no: submitIsPerson ? null : (form.biz_reg_no.trim() || null),
         bank_name: form.bank_name || null,
         bank_account: form.bank_account.trim() || null,
         unit_price: Number(form.unit_price) || 0,
@@ -196,6 +188,12 @@ export default function PayrollExpenseFormModal({
     }
   }
 
+  // 박경수님 + SkyClaw STEP-PAYROLL-FORM-HARDFIX (2026-05-26) — 인건비/외주 인라인 분기
+  // isPersonCategory 한글 키워드 매칭 ('인건비'·'강사'·'멘토'·'운영진'·'TA'·'튜터'·'컨설') 활용.
+  // expense_type 이 '운영비-숙식 및 임차' 같은 자유 카테고리도 정상 분기됨.
+  const isPerson = isPersonCategory(form.expense_type);
+  const isCompany = !isPerson;
+
   return (
     <Modal
       open={open}
@@ -210,20 +208,8 @@ export default function PayrollExpenseFormModal({
       }
     >
       <div className="space-y-4">
-        {/* STEP-ACCOUNTING-FOLLOWUP7 — 연결 계약 (선택 시 project/program 자동 prefill) */}
-        <Field label="연결 계약 (선택)">
-          <select
-            value={form.contract_id}
-            onChange={(e) => selectContract(e.target.value)}
-            className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
-          >
-            <option value="">선택 안함</option>
-            {contracts.map((c) => <option key={c.id} value={c.id}>{c.contract_name}</option>)}
-          </select>
-          {form.contract_id && (
-            <p className="text-[10px] text-violet-600 mt-1">선택한 계약의 프로젝트·프로그램이 자동 채워졌어요.</p>
-          )}
-        </Field>
+        {/* 박경수님 + SkyClaw STEP-PAYROLL-FORM-HARDFIX (2026-05-26) — 연결 계약 select 숨김. */}
+        {/* 프로그램 선택 시 백그라운드 자동 연결 (아래 onChange). 사용자 노출 X. */}
 
         <div className="grid grid-cols-2 gap-3">
           {/* 박경수님 보고 fix (2026-05-26) — 견적 카테고리 동적 + 기본 5개 + 자유 입력 통합 datalist */}
@@ -295,12 +281,20 @@ export default function PayrollExpenseFormModal({
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="성명" required>
-            <Input value={form.payee_name} onChange={(e) => setForm({ ...form, payee_name: e.target.value })} placeholder="홍길동" />
+          <Field label={isPerson ? '성명' : '거래처명'} required>
+            <Input value={form.payee_name} onChange={(e) => setForm({ ...form, payee_name: e.target.value })} placeholder={isPerson ? '홍길동' : '(주)OO상사'} />
           </Field>
-          <Field label="주민번호 (선택)">
-            <Input value={form.payee_id_no} onChange={(e) => setForm({ ...form, payee_id_no: e.target.value })} placeholder="앞 6자리만 노출됩니다" />
-          </Field>
+          {/* 박경수님 + SkyClaw FORM-HARDFIX — 주민번호는 인건비만, 사업자번호는 외주만 */}
+          {isPerson && (
+            <Field label="주민번호 (선택)">
+              <Input value={form.payee_id_no} onChange={(e) => setForm({ ...form, payee_id_no: e.target.value })} placeholder="앞 6자리만 노출됩니다" />
+            </Field>
+          )}
+          {isCompany && (
+            <Field label="사업자번호 (선택)">
+              <Input value={form.biz_reg_no} onChange={(e) => setForm({ ...form, biz_reg_no: e.target.value })} placeholder="000-00-00000" />
+            </Field>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -342,10 +336,11 @@ export default function PayrollExpenseFormModal({
           </Field>
         </div>
 
+        {/* 박경수님 + SkyClaw FORM-HARDFIX — 인건비=원천세 / 외주=부가세 레이블 + 색상 분기 */}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="원천세 (자동)">
-            <div className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm flex items-center text-rose-600 font-semibold tabular-nums">
-              {formatMoney(taxAmount)}
+          <Field label={isPerson ? '원천세 (자동)' : '부가세 (포함)'}>
+            <div className={`h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm flex items-center font-semibold tabular-nums ${isPerson ? 'text-rose-600' : 'text-blue-600'}`}>
+              {isPerson ? '-' : '+'}{formatMoney(taxAmount)}
             </div>
           </Field>
           <Field label="실지급액 (자동)">

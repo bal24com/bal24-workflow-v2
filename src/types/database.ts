@@ -1430,6 +1430,9 @@ export interface PayrollExpense {
   paid_at: string | null;
   receipt_urls: string[];
   staff_pool_id: string | null;
+  // 박경수님 + SkyClaw STEP-PAYROLL-FORM-HARDFIX (2026-05-26) — 외주/업체 사업자번호 + clients FK
+  biz_reg_no: string | null;
+  client_id: string | null;
   memo: string | null;
   // 박경수님 + SkyClaw — 지출요청 워크플로우. NULL=초안, NOT NULL=외주/급여 노출
   submitted_at: string | null;
