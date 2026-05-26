@@ -75,7 +75,7 @@ export default function ConTasksTab({ consortiumId, members }: Props) {
   const memberStats = useMemo(() => {
     const map = new Map<string, { name: string; type: MemberType; total: number; done: number; sharePct: number }>();
     for (const m of members) {
-      map.set(m.client_id, {
+      map.set(m.client_id ?? m.id, {
         name: m.clients?.name ?? '미지정',
         type: m.member_type as MemberType,
         total: 0,
@@ -117,9 +117,9 @@ export default function ConTasksTab({ consortiumId, members }: Props) {
             <button
               key={m.id}
               type="button"
-              onClick={() => setFilterClientId(m.client_id)}
+              onClick={() => setFilterClientId(m.client_id ?? '')}
               className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition ${
-                filterClientId === m.client_id ? 'bg-violet-600 text-white' : 'text-slate-600 hover:bg-violet-50'
+                filterClientId === (m.client_id ?? '') ? 'bg-violet-600 text-white' : 'text-slate-600 hover:bg-violet-50'
               }`}
             >
               {m.clients?.name ?? '미지정'}

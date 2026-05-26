@@ -7,14 +7,36 @@ export function sumSharePct(members: ConsortiumMember[]): number {
   return members.reduce((acc, m) => acc + Number(m.task_share_pct ?? 0), 0);
 }
 
+// STEP-CONSORTIUM-UPGRADE-FULL (2026-05-28) — 역할 3분류 헬퍼
+/** 멤버 표시 이름 — 자사면 '(주)밸런스닷', 외부 협력사면 client.name */
+export function memberDisplayName(m: ConsortiumMember): string {
+  if (m.is_self) return '(주)밸런스닷';
+  return m.clients?.name ?? '(이름 없음)';
+}
+/** 멤버 역할 라벨 (주관사/참여사) */
+export function memberRoleLabel(m: ConsortiumMember): string {
+  return m.role === 'lead' ? '주관사' : '참여사';
+}
+/** 멤버 배지 스타일 — 주관사=보라, 자사 참여사=노랑, 외부 참여사=에메랄드 */
+export function memberRoleBadgeClass(m: ConsortiumMember): string {
+  if (m.role === 'lead') return 'bg-violet-100 text-violet-700 border-violet-200';
+  if (m.is_self) return 'bg-amber-100 text-amber-800 border-amber-200';
+  return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+}
+/** 지분율 합계 100% 검증 */
+export function validateRatioSum(members: ConsortiumMember[]): { valid: boolean; total: number } {
+  const total = sumSharePct(members);
+  return { valid: Math.abs(total - 100) < 0.01, total };
+}
+
 /** 참여사별 예산 집행 현황 집계 */
 export function buildMemberBudgets(members: ConsortiumMember[]): MemberBudget[] {
   return members.map((m) => {
     const allocated = Number(m.allocated_budget ?? 0);
     const spent = Number(m.spent_amount ?? 0);
     return {
-      clientId: m.client_id,
-      clientName: m.clients?.name ?? '(이름 없음)',
+      clientId: m.client_id ?? '',
+      clientName: m.is_self ? '(주)밸런스닷' : (m.clients?.name ?? '(이름 없음)'),
       memberType: m.member_type,
       taskSharePct: Number(m.task_share_pct ?? 0),
       allocatedBudget: allocated,

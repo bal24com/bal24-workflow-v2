@@ -61,8 +61,11 @@ export const STAFF_ROLE_LABEL: Record<StaffRole, string> = {
 export interface ConsortiumMember {
   id: string;
   consortium_id: string;
-  client_id: string;
+  client_id: string | null; // 박경수님 + SkyClaw STEP-CONSORTIUM-UPGRADE-FULL (2026-05-28) — is_self=true 인 자사 멤버는 NULL
   member_type: MemberType;
+  // STEP-CONSORTIUM-UPGRADE-FULL — 역할 3분류 (주관기관/주관사/참여사) 지원
+  is_self?: boolean;            // true = 밸런스닷 자사 (clients 미등록)
+  role?: 'lead' | 'partner';    // lead = 주관사(컨소시엄 총괄), partner = 참여사
   task_share_pct: number;
   allocated_budget: number;
   spent_amount: number;
@@ -74,6 +77,15 @@ export interface ConsortiumMember {
   created_at: string;
   updated_at: string;
   clients?: { id: string; name: string; business_name: string | null } | null;
+}
+
+// STEP-CONSORTIUM-UPGRADE-FULL — Consortium 헤더에 lead_is_self 추가
+export interface ConsortiumLite {
+  id: string;
+  name: string;
+  status: ConsortiumStatus;
+  lead_is_self?: boolean; // true = 밸런스닷 주관사 / false = 밸런스닷 참여사
+  total_budget?: number | null;
 }
 
 export interface ConsortiumLink {
