@@ -49,9 +49,6 @@ export interface StaffActivity extends StaffKey {
   calcNet: number;
   /** 멘토링 일지 카운트 */
   mentoringLogCount: number;
-  /** STEP-STAFF-PIN-RESET — staff_pool 강사의 PIN 설정 여부 (boolean).
-   *  null 이면 staff_pool 미등록(외부 초빙·이름만 입력) 또는 portal_pin_hash 컬럼 미적용 환경. */
-  hasPin: boolean | null;
 }
 
 function staffKeyOf(k: StaffKey): string {
@@ -129,43 +126,23 @@ export async function fetchStaffActivity(programId: string): Promise<StaffActivi
   });
 
   // 5) staff_pool / profiles 이름·소속·포털토큰 fetch
-  //   STEP-STAFF-PIN-RESET — portal_pin_hash 컬럼은 NULL 여부만 확인 (해시는 클라이언트 노출 X)
+  //   STEP-STAFF-TOKEN-SIMPLIFY — PIN 관련 필드 제거. 토큰만 fetch.
   const poolInfo = new Map<string, {
-    name: string; organization: string | null; token: string | null; hasPin: boolean | null;
+    name: string; organization: string | null; token: string | null;
   }>();
   if (allPoolIds.size > 0) {
-    let pinColAvailable = true;
     const { data, error } = await supabase.from('staff_pool')
-      .select('id, name, organization, staff_portal_token, portal_pin_hash')
+      .select('id, name, organization, staff_portal_token')
       .in('id', Array.from(allPoolIds));
-    let rows: Array<{
+    if (error) console.warn('[staff-activity] staff_pool 조회 경고:', error.message);
+    ((data ?? []) as Array<{
       id: string; name: string | null; organization: string | null;
-      staff_portal_token: string | null; portal_pin_hash: string | null;
-    }> = [];
-    if (error) {
-      const m = (error.message ?? '').toLowerCase();
-      if (m.includes('portal_pin_hash') || m.includes('does not exist') || m.includes('column')) {
-        // 보안 마이그레이션 (20260607_pin_security_hardening.sql) 미적용 환경 → PIN 컬럼 없이 폴백
-        console.warn('[staff-activity] portal_pin_hash 컬럼 미적용 — PIN 상태 표시 비활성.');
-        pinColAvailable = false;
-        const fb = await supabase.from('staff_pool')
-          .select('id, name, organization, staff_portal_token')
-          .in('id', Array.from(allPoolIds));
-        if (fb.error) console.warn('[staff-activity] staff_pool 폴백 조회 경고:', fb.error.message);
-        rows = ((fb.data ?? []) as typeof rows).map((r) => ({ ...r, portal_pin_hash: null }));
-      } else {
-        console.warn('[staff-activity] staff_pool 조회 경고:', error.message);
-      }
-    } else {
-      rows = (data ?? []) as typeof rows;
-    }
-    rows.forEach((r) => {
-      const hashStr = (r.portal_pin_hash ?? '').trim();
+      staff_portal_token: string | null;
+    }>).forEach((r) => {
       poolInfo.set(r.id, {
         name: r.name ?? '',
         organization: r.organization ?? null,
         token: r.staff_portal_token ?? null,
-        hasPin: pinColAvailable ? hashStr.length > 0 : null,
       });
     });
   }
@@ -271,7 +248,6 @@ export async function fetchStaffActivity(programId: string): Promise<StaffActivi
         completedCount: 0, calcGross: 0, calcTax: 0, calcNet: 0,
         mentoringLogCount: (cs.staff_pool_id ? logsByPool.get(cs.staff_pool_id) ?? 0 : 0)
           + (cs.profile_id ? logsByProf.get(cs.profile_id) ?? 0 : 0),
-        hasPin: cs.staff_pool_id ? (poolInfo.get(cs.staff_pool_id)?.hasPin ?? null) : null,
       };
       byKey.set(key, existing);
     }
@@ -309,7 +285,6 @@ export async function fetchStaffActivity(programId: string): Promise<StaffActivi
         completedCount: 0, calcGross: 0, calcTax: 0, calcNet: 0,
         mentoringLogCount: (inv.staff_pool_id ? logsByPool.get(inv.staff_pool_id) ?? 0 : 0)
           + (inv.profile_id ? logsByProf.get(inv.profile_id) ?? 0 : 0),
-        hasPin: inv.staff_pool_id ? (poolInfo.get(inv.staff_pool_id)?.hasPin ?? null) : null,
       };
       byKey.set(key, existing);
     } else if (!existing.invitationStatus) {
@@ -373,21 +348,4 @@ export async function setActualInstructor(
   return true;
 }
 
-/** STEP-STAFF-PIN-RESET — 강사 PIN 초기화 (PM 전용).
- *  RPC reset_staff_pin (SECURITY DEFINER) 로 위임 — anon 차단·트리거 우회.
- *  초기화 후 강사가 다음 접속 시 새 PIN 을 직접 설정. */
-export async function resetStaffPin(staffPoolId: string): Promise<{ ok: boolean; reason?: string }> {
-  const { data, error } = await supabase.rpc('reset_staff_pin', { p_staff_id: staffPoolId });
-  if (error) {
-    const msg = (error.message ?? '').toLowerCase();
-    console.error('[staff-activity] reset_staff_pin 실패:', error.message);
-    if (msg.includes('does not exist') || msg.includes('could not find') || msg.includes('schema cache')) {
-      return { ok: false, reason: 'reset_staff_pin RPC 가 없어요. supabase/migrations/20260616_reset_staff_pin.sql 을 실행해 주세요.' };
-    }
-    if (msg.includes('permission') || msg.includes('rls')) {
-      return { ok: false, reason: 'PIN 초기화 권한이 없어요. 관리자에게 문의해 주세요.' };
-    }
-    return { ok: false, reason: error.message };
-  }
-  return { ok: Boolean(data) };
-}
+// STEP-STAFF-TOKEN-SIMPLIFY — resetStaffPin 제거. PIN 자체가 사라져 RPC 호출 불필요.

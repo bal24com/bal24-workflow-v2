@@ -1,5 +1,5 @@
-// bal24 v2 — STEP-STAFF-PORTAL-P2 / STEP-STAFF-PORTAL-PROGRAM-SELECT
-// /staff-portal/:token (비로그인 공개) — 토큰 검증 + 프로그램 선택 컨텍스트 + 6탭 디스패처.
+// bal24 v2 — STEP-STAFF-TOKEN-SIMPLIFY (PIN 제거 · staff_pool 영구 토큰 단순화)
+// /staff-portal/:token (비로그인 공개) — staff_pool.staff_portal_token 으로 직접 조회 + 6탭 디스패처.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -12,13 +12,10 @@ import StaffLogTab from './tabs/StaffLogTab';
 import StaffScheduleTab from './tabs/StaffScheduleTab';
 import StaffMaterialsTab from './tabs/StaffMaterialsTab';
 import StaffInfoEditModal from './StaffInfoEditModal';
-import StaffPinGate from './StaffPinGate';
 import {
   resolveStaffByToken, fetchStaffPrograms,
   type StaffPortalIdentity, type StaffPortalProgram,
 } from './staffPortalUtils';
-
-const PIN_OK_KEY = (id: string) => `staff_pin_ok_${id}`;
 
 const TABS = [
   { key: 'overview',   label: '개요' },
@@ -42,9 +39,6 @@ export default function StaffPortalPage() {
   const [programsLoading, setProgramsLoading] = useState(false);
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
 
-  // STEP-STAFF-PORTAL-PIN — sessionStorage 기반 인증 (탭 닫으면 만료)
-  const [isPinVerified, setIsPinVerified] = useState(false);
-
   useEffect(() => {
     if (!token) { setLoading(false); return; }
     let cancelled = false;
@@ -58,29 +52,8 @@ export default function StaffPortalPage() {
     return () => { cancelled = true; };
   }, [token]);
 
-  // 강사 식별 후 sessionStorage에 기존 인증 흔적이 있으면 즉시 통과
   useEffect(() => {
     if (!staff) return;
-    if (staff.sourceType !== 'staff_pool') {
-      // 내부 직원은 PIN 미사용 (이 페이지 자체가 토큰 기반이라 충분)
-      setIsPinVerified(true);
-      return;
-    }
-    try {
-      const ok = sessionStorage.getItem(PIN_OK_KEY(staff.id));
-      if (ok === '1') setIsPinVerified(true);
-    } catch { /* noop */ }
-  }, [staff]);
-
-  function handlePinVerified() {
-    if (!staff) return;
-    try { sessionStorage.setItem(PIN_OK_KEY(staff.id), '1'); } catch { /* noop */ }
-    setIsPinVerified(true);
-  }
-
-  useEffect(() => {
-    if (!staff) return;
-    if (!isPinVerified) return;            // 인증 통과 후에만 프로그램 fetch
     let cancelled = false;
     setProgramsLoading(true);
     void (async () => {
@@ -91,7 +64,7 @@ export default function StaffPortalPage() {
       setProgramsLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [staff, isPinVerified]);
+  }, [staff]);
 
   const selectedProgram = useMemo(
     () => programs.find((p) => p.id === selectedProgramId) ?? null,
@@ -111,20 +84,9 @@ export default function StaffPortalPage() {
       <div className="min-h-screen flex items-center justify-center bg-[#F8F7FF] px-4">
         <div className="max-w-md w-full bg-white rounded-2xl border border-violet-100 shadow-[0_4px_16px_rgba(124,58,237,0.08)] p-8 text-center">
           <p className="text-[#1E1B4B] font-semibold">유효하지 않은 링크예요.</p>
-          <p className="text-sm text-slate-500 mt-2">PM에게 새 링크를 요청해 주세요.</p>
+          <p className="text-sm text-slate-500 mt-2">담당 PM에게 링크를 다시 요청해 주세요.</p>
         </div>
       </div>
-    );
-  }
-
-  // STEP-STAFF-PORTAL-PIN / STEP-PIN-SECURITY — PIN 게이트 (staff_pool만, RPC 기반)
-  if (staff.sourceType === 'staff_pool' && !isPinVerified) {
-    return (
-      <StaffPinGate
-        staffId={staff.id}
-        staffName={staff.name}
-        hasPinSet={staff.hasPin}
-        onVerified={handlePinVerified} />
     );
   }
 

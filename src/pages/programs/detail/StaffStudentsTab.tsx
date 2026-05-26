@@ -6,15 +6,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Loader2, Mic2, ExternalLink, Send, ChevronDown, ChevronUp,
-  Receipt, AlertCircle, KeyRound,
+  Receipt, AlertCircle, Link2,
 } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { supabase } from '../../../lib/supabase';
 import { formatMoney } from '../../../lib/utils';
 import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../../utils/statusStyles';
 import StaffCurriculumChecklist from './StaffCurriculumChecklist';
 import {
-  fetchStaffActivity, resetStaffPin, type StaffActivity,
+  fetchStaffActivity, type StaffActivity,
 } from './staffActivityUtils';
 import { markStaffFeeAsPaid } from './staffFeeUtils';
 
@@ -27,8 +28,8 @@ export default function StaffStudentsTab({ programId }: Props) {
   const [loading, setLoading] = useState(true);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  // STEP-STAFF-PIN-RESET — PIN 초기화 진행 중인 강사 key
-  const [pinBusyKey, setPinBusyKey] = useState<string | null>(null);
+  // STEP-STAFF-TOKEN-SIMPLIFY — 포털 링크 복사 진행 중인 강사 key
+  const [copyBusyKey, setCopyBusyKey] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -55,27 +56,47 @@ export default function StaffStudentsTab({ programId }: Props) {
     toast.error('포털 토큰이 없어요. 강사가 인력풀에 등록되어 있는지 확인해 주세요.');
   }
 
-  // STEP-STAFF-PIN-RESET — 강사 PIN 분실 시 초기화 (PM 전용)
-  async function handleResetPin(s: StaffActivity) {
-    if (!s.staff_pool_id) {
-      toast.error('인력풀 미등록 강사는 PIN 초기화 대상이 아니에요.');
-      return;
+  // STEP-STAFF-TOKEN-SIMPLIFY — 포털 영구 링크 클립보드 복사 (PIN 제거).
+  //  · staff_pool 강사: staff_portal_token 조회 → 없으면 자동 생성.
+  //  · profile 강사: 이미 fetch 된 staffPortalToken 사용.
+  async function handleCopyPortalLink(s: StaffActivity) {
+    setCopyBusyKey(keyOf(s));
+    try {
+      let token = s.staffPortalToken;
+      if (!token && s.staff_pool_id) {
+        // staff_pool 에서 staff_portal_token 조회. NULL 이면 새 UUID 발급 후 저장.
+        const { data, error } = await supabase
+          .from('staff_pool')
+          .select('staff_portal_token')
+          .eq('id', s.staff_pool_id)
+          .maybeSingle();
+        if (error) throw new Error(error.message);
+        token = data?.staff_portal_token ?? null;
+        if (!token) {
+          const newToken = crypto.randomUUID();
+          const { error: upErr } = await supabase
+            .from('staff_pool')
+            .update({ staff_portal_token: newToken })
+            .eq('id', s.staff_pool_id);
+          if (upErr) throw new Error(upErr.message);
+          token = newToken;
+        }
+      }
+      if (!token) {
+        toast.error('포털 토큰이 없어요. 강사가 인력풀에 등록되어 있는지 확인해 주세요.');
+        return;
+      }
+      const link = `${window.location.origin}/staff-portal/${token}`;
+      await navigator.clipboard.writeText(link);
+      toast.success(`${s.name}님 포털 링크가 복사됐어요.`);
+      void fetchData();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[StaffStudentsTab] 포털 링크 복사 오류:', msg);
+      toast.error('링크 복사 중 오류가 발생했어요.');
+    } finally {
+      setCopyBusyKey(null);
     }
-    const ok = window.confirm(
-      `${s.name}님의 포털 PIN을 초기화할까요?\n\n` +
-      `· 초기화 후 강사가 다음 접속 시 새 PIN 4~6자리를 직접 설정해요.\n` +
-      `· 이전 PIN으로는 더 이상 로그인할 수 없어요.`
-    );
-    if (!ok) return;
-    setPinBusyKey(keyOf(s));
-    const r = await resetStaffPin(s.staff_pool_id);
-    setPinBusyKey(null);
-    if (!r.ok) {
-      toast.error(r.reason ?? 'PIN 초기화에 실패했어요.');
-      return;
-    }
-    toast.success(`${s.name}님 PIN이 초기화됐어요. 강사 포털 재접속 안내해 주세요.`);
-    void fetchData();
   }
 
   // STEP-STAFF-ASSIGNMENT-FEE — 완료 차시 강사료를 지출로 등록 (program_staff_fees 경유)
@@ -179,17 +200,7 @@ export default function StaffStudentsTab({ programId }: Props) {
                           {s.invitationStatus}
                         </span>
                       )}
-                      {/* PIN 상태 라벨 — staff_pool 강사만 (hasPin: true/false 명확 시) */}
-                      {s.staff_pool_id && s.hasPin === true && (
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 inline-flex items-center gap-0.5">
-                          <KeyRound size={9} aria-hidden="true" />PIN 설정됨
-                        </span>
-                      )}
-                      {s.staff_pool_id && s.hasPin === false && (
-                        <span className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded px-1">
-                          PIN 미설정
-                        </span>
-                      )}
+                      {/* STEP-STAFF-TOKEN-SIMPLIFY — PIN 배지 제거. 토큰 단일화 후 PIN 개념 사라짐. */}
                     </div>
                     <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-2 flex-wrap tabular-nums">
                       <span>담당 <strong className="text-slate-700">{s.curriculums.length}</strong>차시</span>
@@ -239,23 +250,17 @@ export default function StaffStudentsTab({ programId }: Props) {
                       className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-violet-700 border border-violet-200 hover:bg-violet-50 disabled:opacity-40">
                       {s.staffPortalToken ? <ExternalLink size={11} aria-hidden="true" /> : <Send size={11} aria-hidden="true" />}
                     </button>
-                    {/* STEP-STAFF-PIN-RESET — PIN 초기화 (staff_pool 강사만 표시).
-                        PIN 설정됨 → 황색 채움 강조 / PIN 미설정 → 옅은 회색 비활성 */}
+                    {/* STEP-STAFF-TOKEN-SIMPLIFY — 포털 링크 복사 (PIN 제거 후 핵심 액션).
+                        staff_pool 강사는 토큰 없으면 즉석에서 자동 발급. */}
                     {s.staff_pool_id && (
                       <button type="button"
-                        onClick={() => void handleResetPin(s)}
-                        disabled={pinBusyKey === k || s.hasPin === false}
-                        title={s.hasPin === false ? 'PIN 미설정 — 초기화 불필요 (강사가 첫 접속 시 직접 설정)'
-                          : s.hasPin === null ? 'PIN 상태 확인 불가 — 초기화 시도 가능'
-                          : '강사 PIN 초기화 — 강사가 새 PIN을 다시 설정해야 해요'}
-                        className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
-                          s.hasPin === true
-                            ? 'text-amber-800 bg-amber-100 border-amber-300 hover:bg-amber-200 shadow-sm'
-                            : 'text-slate-400 bg-slate-50 border-slate-200'
-                        }`}>
-                        {pinBusyKey === k
+                        onClick={() => void handleCopyPortalLink(s)}
+                        disabled={copyBusyKey === k}
+                        title="강사 포털 링크 복사 — 강사에게 전달하면 PIN 없이 바로 접속 가능"
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-cyan-700 bg-cyan-50 border border-cyan-200 hover:bg-cyan-100 transition-colors disabled:opacity-50">
+                        {copyBusyKey === k
                           ? <Loader2 size={11} className="animate-spin" />
-                          : <KeyRound size={11} aria-hidden="true" />}
+                          : <Link2 size={11} aria-hidden="true" />}
                       </button>
                     )}
                     <button type="button"

@@ -1,6 +1,6 @@
-// bal24 v2 — STEP-STAFF-PORTAL-P1P2
+// bal24 v2 — STEP-STAFF-TOKEN-SIMPLIFY (PIN 제거 · staff_pool 영구 토큰 단순화)
 // 강사 통합 포털 fetch 유틸 — 토큰 검증 + 담당 프로그램 + D-7 일정.
-// 박경수님 지시문 컬럼명 보정 적용 (organization·name·curriculum_staff 2단 join).
+// 박경수님 2026-05-26 — PIN 게이트 제거. staff_pool.staff_portal_token 으로 직접 조회.
 
 import { supabase } from '../../lib/supabase';
 
@@ -12,8 +12,6 @@ export interface StaffPortalIdentity {
   affiliation: string | null;   // staff_pool.organization 또는 profile.department
   sourceType: StaffSource;
   portalToken: string;
-  /** STEP-PIN-SECURITY — PIN 평문 노출 차단. hasPin boolean만 클라이언트에 전달 (해시는 서버에만) */
-  hasPin: boolean;
 }
 
 export interface StaffPortalProgram {
@@ -32,51 +30,29 @@ export interface StaffUpcomingSession {
   program_id: string;
 }
 
-/** 토큰 → 강사 식별 (staff_pool 우선, profiles 차순).
- *  STEP-PIN-SECURITY — portal_pin 컬럼은 절대 클라이언트로 SELECT 하지 않음.
- *  PIN 존재 여부만 hasPin (boolean) 으로 전달. */
+/** 토큰 → 강사 식별.
+ *  1차: staff_pool.staff_portal_token
+ *  2차: profiles.staff_portal_token (내부 직원 강사 겸임)
+ *  3차: 구 invitation_token (instructor_invitations.token) — 하위 호환 fallback. */
 export async function resolveStaffByToken(token: string): Promise<StaffPortalIdentity | null> {
-  // staff_pool: portal_pin_hash 존재 여부만 가져옴 (해시 자체는 안 가져옴 — IS NOT NULL boolean)
+  // 1차 — staff_pool
   const { data: sp, error: spErr } = await supabase
     .from('staff_pool')
-    .select('id, name, organization, staff_portal_token, portal_pin_hash')
+    .select('id, name, organization, staff_portal_token')
     .eq('staff_portal_token', token)
     .maybeSingle();
-  if (spErr) {
-    const m = (spErr.message ?? '').toLowerCase();
-    if (m.includes('portal_pin_hash') || m.includes('does not exist')) {
-      // 보안 마이그레이션 (20260607_pin_security_hardening.sql) 미적용 — PIN 없이 진행
-      console.warn('[staff-portal] portal_pin_hash 컬럼 미적용 — PIN 인증 비활성.');
-      const { data: spFallback } = await supabase
-        .from('staff_pool')
-        .select('id, name, organization, staff_portal_token')
-        .eq('staff_portal_token', token)
-        .maybeSingle();
-      if (spFallback) {
-        return {
-          id: spFallback.id,
-          name: spFallback.name,
-          affiliation: spFallback.organization ?? null,
-          sourceType: 'staff_pool',
-          portalToken: spFallback.staff_portal_token,
-          hasPin: false,
-        };
-      }
-    } else {
-      console.warn('[staff-portal] staff_pool 조회 경고:', spErr.message);
-    }
-  }
+  if (spErr) console.warn('[staff-portal] staff_pool 조회 경고:', spErr.message);
   if (sp) {
-    const hashStr = (sp.portal_pin_hash as string | null) ?? '';
     return {
       id: sp.id,
       name: sp.name,
       affiliation: sp.organization ?? null,
       sourceType: 'staff_pool',
       portalToken: sp.staff_portal_token,
-      hasPin: hashStr.trim().length > 0,
     };
   }
+
+  // 2차 — profiles
   const { data: pr, error: prErr } = await supabase
     .from('profiles')
     .select('id, name, department, staff_portal_token')
@@ -90,39 +66,56 @@ export async function resolveStaffByToken(token: string): Promise<StaffPortalIde
       affiliation: (pr.department as string | null) ?? null,
       sourceType: 'profile',
       portalToken: pr.staff_portal_token,
-      hasPin: false,  // 내부 직원은 PIN 미사용 (사이트 로그인으로 인증)
     };
   }
-  return null;
-}
 
-/** STEP-PIN-SECURITY — PIN 설정·검증을 RPC 로 위임 (해시·rate limit 모두 서버 측). */
-export interface PinVerifyResult {
-  ok: boolean;
-  reason?: 'no_pin' | 'mismatch' | 'locked';
-  secondsLeft?: number;
-  remaining?: number;
-}
-
-export async function setStaffPin(staffId: string, pin: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('set_staff_pin', { p_staff_id: staffId, p_pin: pin });
-  if (error) { console.error('[pin-security] set_staff_pin 실패:', error.message); return false; }
-  return Boolean(data);
-}
-
-export async function verifyStaffPin(staffId: string, pin: string): Promise<PinVerifyResult> {
-  const { data, error } = await supabase.rpc('verify_staff_pin', { p_staff_id: staffId, p_pin: pin });
-  if (error) {
-    console.error('[pin-security] verify_staff_pin 실패:', error.message);
-    return { ok: false, reason: 'mismatch' };
+  // 3차 — 구 invitation_token fallback (예전에 발송된 링크 호환).
+  // instructor_invitations.token 으로 staff_id 찾고 → staff_pool 또는 profiles 로 재조회.
+  const { data: inv, error: invErr } = await supabase
+    .from('instructor_invitations')
+    .select('staff_pool_id, profile_id')
+    .eq('token', token)
+    .maybeSingle();
+  if (invErr) {
+    const m = (invErr.message ?? '').toLowerCase();
+    // token 컬럼 미존재 환경에서는 silent fallthrough
+    if (!m.includes('does not exist') && !m.includes('column') && !m.includes('schema cache')) {
+      console.warn('[staff-portal] invitation_token fallback 조회 경고:', invErr.message);
+    }
   }
-  const r = (data ?? {}) as { ok?: boolean; reason?: string; seconds_left?: number; remaining?: number };
-  return {
-    ok: !!r.ok,
-    reason: (r.reason as PinVerifyResult['reason']) ?? undefined,
-    secondsLeft: r.seconds_left,
-    remaining: r.remaining,
-  };
+  if (inv?.staff_pool_id) {
+    const { data: sp2 } = await supabase
+      .from('staff_pool')
+      .select('id, name, organization, staff_portal_token')
+      .eq('id', inv.staff_pool_id)
+      .maybeSingle();
+    if (sp2) {
+      return {
+        id: sp2.id,
+        name: sp2.name,
+        affiliation: sp2.organization ?? null,
+        sourceType: 'staff_pool',
+        portalToken: sp2.staff_portal_token,
+      };
+    }
+  }
+  if (inv?.profile_id) {
+    const { data: pr2 } = await supabase
+      .from('profiles')
+      .select('id, name, department, staff_portal_token')
+      .eq('id', inv.profile_id)
+      .maybeSingle();
+    if (pr2) {
+      return {
+        id: pr2.id,
+        name: pr2.name ?? '이름 없음',
+        affiliation: (pr2.department as string | null) ?? null,
+        sourceType: 'profile',
+        portalToken: pr2.staff_portal_token,
+      };
+    }
+  }
+  return null;
 }
 
 /** 해당 강사의 담당 프로그램 목록 (curriculum_staff + mentoring_assignments + instructor_invitations 합집합) */

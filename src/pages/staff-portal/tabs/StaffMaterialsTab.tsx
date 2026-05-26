@@ -57,15 +57,8 @@ export default function StaffMaterialsTab({ staff, selectedProgramId }: Props) {
   const [tableMissing, setTableMissing] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
-  // 프로필 서브탭은 별도 컴포넌트에서 처리 — 여기서 early return
-  if (subTab === 'profile') {
-    return (
-      <div className="space-y-3">
-        <SubTabHeader active={subTab} onChange={setSubTab} />
-        <ProfileFileSection staff={staff} selectedProgramId={selectedProgramId} />
-      </div>
-    );
-  }
+  // 박경수님 2026-05-26 — hooks 순서 위반 수정. early return 을 모든 hook 호출 뒤로 옮김.
+  // (이전: 여기서 subTab==='profile' early return → 아래 useCallback/useEffect/useMemo 조건부 skip → React #310)
 
   const fetchData = useCallback(async () => {
     if (!selectedProgramId) { setCurriculums([]); setMaterials([]); setLoading(false); return; }
@@ -169,9 +162,21 @@ export default function StaffMaterialsTab({ staff, selectedProgramId }: Props) {
     void fetchData();
   }
 
+  // 박경수님 2026-05-26 — 프로필 서브탭은 별도 컴포넌트에서 처리.
+  // 모든 hook 호출 뒤로 이동 (subTab 토글 시 hook 카운트 변화 방지).
+  if (subTab === 'profile') {
+    return (
+      <div className="space-y-3">
+        <SubTabHeader active={subTab} onChange={setSubTab} />
+        <ProfileFileSection staff={staff} selectedProgramId={selectedProgramId} />
+      </div>
+    );
+  }
+
   if (!selectedProgramId) {
     return (
       <div className={CARD_CLASS}>
+        <SubTabHeader active={subTab} onChange={setSubTab} />
         <EmptyState emoji="🎯" title="먼저 개요 탭에서 프로그램을 선택해 주세요."
           description="선택된 프로그램의 차시 자료가 표시돼요." />
       </div>

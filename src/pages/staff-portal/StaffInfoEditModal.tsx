@@ -3,20 +3,16 @@
 // WorkFlow 디자인 시스템 통일 (brand 모달 560px + rounded-[20px] + 입력 42px).
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Save, X, Lock } from 'lucide-react';
+import { Loader2, Save, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
-import { verifyStaffPin, setStaffPin, type StaffPortalIdentity } from './staffPortalUtils';
+import { type StaffPortalIdentity } from './staffPortalUtils';
 
 interface Props {
   open: boolean;
   staff: StaffPortalIdentity;
   onClose: () => void;
   onSaved: (next: { name: string; affiliation: string | null }) => void;
-}
-
-function isPinShape(s: string): boolean {
-  return /^\d{4,6}$/.test(s);
 }
 
 interface FormState {
@@ -175,9 +171,7 @@ export default function StaffInfoEditModal({ open, staff, onClose, onSaved }: Pr
 
             {/* STEP-MENTORING-P3-APPROVE — 도장/사인 등록 (staff_pool만) */}
             <SignatureUploadSection staffId={staff.id} />
-
-            {/* STEP-STAFF-PORTAL-PIN / STEP-PIN-SECURITY — 비밀번호 변경 (RPC 기반) */}
-            <PinChangeSection staffId={staff.id} hasPin={staff.hasPin} />
+            {/* STEP-STAFF-TOKEN-SIMPLIFY — PIN 게이트 제거. 비밀번호 변경 섹션 삭제됨. */}
           </>
         )}
       </div>
@@ -194,77 +188,6 @@ function Field({ label, required, hint, children }: { label: string; required?: 
       </label>
       {children}
     </div>
-  );
-}
-
-// ─── 비밀번호 변경 섹션 (STEP-PIN-SECURITY — RPC 기반) ─────────────────
-function PinChangeSection({ staffId, hasPin }: { staffId: string; hasPin: boolean }) {
-  const toast = useToast();
-  const [oldPin, setOldPin] = useState('');
-  const [newPin, setNewPin] = useState('');
-  const [newPinConfirm, setNewPinConfirm] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  async function handleChange() {
-    if (!hasPin) {
-      toast.error('PIN이 설정돼 있지 않아요. 다음 접속 시 설정 화면이 표시돼요.');
-      return;
-    }
-    if (!isPinShape(newPin)) { toast.error('새 비밀번호는 4~6자리 숫자여야 해요.'); return; }
-    if (newPin !== newPinConfirm) { toast.error('새 비밀번호 확인이 일치하지 않아요.'); return; }
-    if (newPin === oldPin) { toast.error('새 비밀번호가 현재 비밀번호와 같아요.'); return; }
-    setSaving(true);
-    // 1) 현재 PIN 검증 (서버 측 — 평문 노출 없음)
-    const verify = await verifyStaffPin(staffId, oldPin);
-    if (!verify.ok) {
-      setSaving(false);
-      if (verify.reason === 'locked') {
-        toast.error(`5회 실패로 잠겼어요. ${verify.secondsLeft ?? 300}초 후 다시 시도해 주세요.`);
-      } else {
-        toast.error('현재 비밀번호가 일치하지 않아요.');
-      }
-      return;
-    }
-    // 2) 새 PIN 설정 (해시 저장 — set_staff_pin RPC)
-    const ok = await setStaffPin(staffId, newPin);
-    setSaving(false);
-    if (!ok) { toast.error('비밀번호 변경에 실패했어요.'); return; }
-    setOldPin(''); setNewPin(''); setNewPinConfirm('');
-    toast.success('비밀번호가 변경됐어요.');
-  }
-
-  return (
-    <section className="mt-7 pt-6 border-t border-slate-100">
-      <h3 className="text-base font-bold text-[#1E1B4B] mb-3 flex items-center gap-2">
-        <Lock size={16} className="text-violet-500" aria-hidden="true" /> 비밀번호 변경
-      </h3>
-      {!hasPin ? (
-        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-          아직 PIN이 설정돼 있지 않아요. 로그아웃 후 다시 접속하면 PIN 설정 화면이 표시돼요.
-        </p>
-      ) : (
-        <div className="space-y-3">
-          <input type="password" inputMode="numeric" maxLength={6}
-            placeholder="현재 비밀번호" value={oldPin} disabled={saving}
-            onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ''))}
-            className={INPUT_CLASS} />
-          <input type="password" inputMode="numeric" maxLength={6}
-            placeholder="새 비밀번호 (4~6자리 숫자)" value={newPin} disabled={saving}
-            onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-            className={INPUT_CLASS} />
-          <input type="password" inputMode="numeric" maxLength={6}
-            placeholder="새 비밀번호 확인" value={newPinConfirm} disabled={saving}
-            onChange={(e) => setNewPinConfirm(e.target.value.replace(/\D/g, ''))}
-            className={INPUT_CLASS} />
-          <div className="flex justify-end">
-            <button type="button" onClick={() => void handleChange()} disabled={saving}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-violet-600 border border-violet-600 rounded-[10px] hover:bg-violet-50 transition-all duration-200 disabled:opacity-50">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />} 비밀번호 변경
-            </button>
-          </div>
-        </div>
-      )}
-    </section>
   );
 }
 
