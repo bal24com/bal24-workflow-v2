@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Loader2, Mic2, ExternalLink, Send, ChevronDown, ChevronUp,
-  Receipt, AlertCircle,
+  Receipt, AlertCircle, KeyRound,
 } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -14,7 +14,7 @@ import { formatMoney } from '../../../lib/utils';
 import { BADGE_BASE, INVITATION_STATUS_STYLE } from '../../../utils/statusStyles';
 import StaffCurriculumChecklist from './StaffCurriculumChecklist';
 import {
-  fetchStaffActivity, type StaffActivity,
+  fetchStaffActivity, resetStaffPin, type StaffActivity,
 } from './staffActivityUtils';
 import { markStaffFeeAsPaid } from './staffFeeUtils';
 
@@ -27,6 +27,8 @@ export default function StaffStudentsTab({ programId }: Props) {
   const [loading, setLoading] = useState(true);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  // STEP-STAFF-PIN-RESET — PIN 초기화 진행 중인 강사 key
+  const [pinBusyKey, setPinBusyKey] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -51,6 +53,29 @@ export default function StaffStudentsTab({ programId }: Props) {
       return;
     }
     toast.error('포털 토큰이 없어요. 강사가 인력풀에 등록되어 있는지 확인해 주세요.');
+  }
+
+  // STEP-STAFF-PIN-RESET — 강사 PIN 분실 시 초기화 (PM 전용)
+  async function handleResetPin(s: StaffActivity) {
+    if (!s.staff_pool_id) {
+      toast.error('인력풀 미등록 강사는 PIN 초기화 대상이 아니에요.');
+      return;
+    }
+    const ok = window.confirm(
+      `${s.name}님의 포털 PIN을 초기화할까요?\n\n` +
+      `· 초기화 후 강사가 다음 접속 시 새 PIN 4~6자리를 직접 설정해요.\n` +
+      `· 이전 PIN으로는 더 이상 로그인할 수 없어요.`
+    );
+    if (!ok) return;
+    setPinBusyKey(keyOf(s));
+    const r = await resetStaffPin(s.staff_pool_id);
+    setPinBusyKey(null);
+    if (!r.ok) {
+      toast.error(r.reason ?? 'PIN 초기화에 실패했어요.');
+      return;
+    }
+    toast.success(`${s.name}님 PIN이 초기화됐어요. 강사 포털 재접속 안내해 주세요.`);
+    void fetchData();
   }
 
   // STEP-STAFF-ASSIGNMENT-FEE — 완료 차시 강사료를 지출로 등록 (program_staff_fees 경유)
@@ -194,6 +219,20 @@ export default function StaffStudentsTab({ programId }: Props) {
                       className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-violet-700 border border-violet-200 hover:bg-violet-50 disabled:opacity-40">
                       {s.staffPortalToken ? <ExternalLink size={11} aria-hidden="true" /> : <Send size={11} aria-hidden="true" />}
                     </button>
+                    {/* STEP-STAFF-PIN-RESET — PIN 초기화 (staff_pool 강사 + PIN 설정된 경우만 활성) */}
+                    {s.staff_pool_id && (
+                      <button type="button"
+                        onClick={() => void handleResetPin(s)}
+                        disabled={pinBusyKey === k || s.hasPin === false}
+                        title={s.hasPin === false ? 'PIN 미설정 (초기화 불필요)'
+                          : s.hasPin === null ? 'PIN 상태 확인 불가 — 초기화 시도 가능'
+                          : '강사 PIN 초기화 (강사가 새 PIN을 다시 설정)'}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-amber-700 border border-amber-200 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                        {pinBusyKey === k
+                          ? <Loader2 size={11} className="animate-spin" />
+                          : <KeyRound size={11} aria-hidden="true" />}
+                      </button>
+                    )}
                     <button type="button"
                       onClick={() => setExpandedKey(expanded ? null : k)}
                       aria-label={expanded ? '접기' : '펼치기'}
