@@ -11,7 +11,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { Button } from '../../components/ui';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Receipt } from 'lucide-react';
 import { softDelete } from '../../lib/softDeleteUtils';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +31,7 @@ import {
 } from './consortiumUtils';
 import ConOverviewTab from './detail/ConOverviewTab';
 import ConProgramsTab from './detail/ConProgramsTab';
+import ConEstimateTab from './detail/ConEstimateTab'; // STEP-CONSORTIUM-UPGRADE-FULL PART B (2026-05-28)
 import ConTasksTab from './detail/ConTasksTab';
 import ConFinanceTab from './detail/ConFinanceTab';
 import ConStaffTab from './detail/ConStaffTab';
@@ -53,12 +54,14 @@ interface ConsortiumDetail {
   project: { id: string; name: string } | null;
 }
 
-type TabKey = 'overview' | 'programs' | 'tasks' | 'finance' | 'staff' | 'links' | 'portal' | 'files';
+type TabKey = 'overview' | 'programs' | 'tasks' | 'estimate' | 'finance' | 'staff' | 'links' | 'portal' | 'files';
 
+// STEP-CONSORTIUM-UPGRADE-FULL PART B (2026-05-28) — 견적 탭 추가 (재무 앞)
 const TAB_LIST: Array<{ key: TabKey; label: string; Icon: typeof Briefcase }> = [
   { key: 'overview', label: '개요', Icon: Building2 },
   { key: 'programs', label: '프로그램', Icon: GraduationCap },
   { key: 'tasks', label: '태스크', Icon: ListChecks },
+  { key: 'estimate', label: '견적', Icon: Receipt },
   { key: 'finance', label: '재무', Icon: Wallet },
   { key: 'staff', label: '인력·자원', Icon: Users },
   { key: 'links', label: '외부공유', Icon: Share2 },
@@ -166,6 +169,8 @@ export default function ConsortiumDetailPage() {
   const TabContent: Record<TabKey, ReactNode> = {
     overview: <ConOverviewTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} description={consortium.description} />,
     programs: <ConProgramsTab consortiumId={id} members={members} />,
+    // STEP-CONSORTIUM-UPGRADE-FULL PART B (2026-05-28) — 견적 탭
+    estimate: <ConEstimateTab consortiumId={id} projectId={consortium.project_id ?? null} totalBudget={Number(consortium.total_budget ?? 0)} members={members} />,
     tasks: <ConTasksTab consortiumId={id} members={members} />,
     finance: <ConFinanceTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} />,
     staff: <ConStaffTab consortiumId={id} />,
