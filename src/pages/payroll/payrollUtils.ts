@@ -17,7 +17,10 @@ export type PayrollRow = PayrollExpense & {
 export const OUTSOURCE_PREFIXES = ['강사료', '촬영', '기타외주'];
 export const OPERATION_PREFIXES = ['운영비', '운영인건비'];
 
+// 박경수님 + SkyClaw STEP-ESTIMATE-UPGRADE-FULL PART D (2026-05-28) — 4종 표준 카테고리 우선 추천
+import { ESTIMATE_CATEGORIES } from '../../constants/estimateCategories';
 export const PAYROLL_BASE_TYPES: PayrollExpenseType[] = [
+  ...ESTIMATE_CATEGORIES,
   ...OUTSOURCE_PREFIXES, ...OPERATION_PREFIXES,
 ];
 
