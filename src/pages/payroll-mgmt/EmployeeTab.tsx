@@ -2,12 +2,14 @@
 // employee_details + profiles join. 주민번호 마스킹. 상세·수정 폼 통합 모달.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Loader2, UserCog } from 'lucide-react';
+import { Plus, Loader2, UserCog, Eye, EyeOff } from 'lucide-react';
 import { Button, Modal, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { formatMoney } from '../../lib/utils';
-import { maskResidentNo } from './payrollMgmtUtils';
+import { useUserProfile } from '../../hooks/useUserProfile';
+// 박경수님 + SkyClaw STEP-RBAC-RLS-PHASE1 (2026-05-28) — DB 의 resident_number 는 암호문. 표시는 항상 고정 마스크.
+const MASK_RN = '******-*******';
 
 interface EmployeeRow {
   id: string;
@@ -29,6 +31,7 @@ const EMPTY_FORM = { employee_no: '', department: '', position: '', employment_t
 
 export default function EmployeeTab() {
   const toast = useToast();
+  const { isFinance } = useUserProfile(); // admin/finance 만 🔓 노출
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [profiles, setProfiles] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,30 @@ export default function EmployeeTab() {
   const [profileId, setProfileId] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  // 박경수님 + SkyClaw STEP-RBAC-RLS-PHASE1 — 🔓 복호화 결과 임시 보관 (id → 평문)
+  const [revealed, setRevealed] = useState<Record<string, string>>({});
+  const [revealing, setRevealing] = useState<string | null>(null);
+
+  async function handleReveal(employeeId: string) {
+    if (revealed[employeeId]) {
+      // 이미 표시 중이면 다시 가림
+      setRevealed((prev) => { const next = { ...prev }; delete next[employeeId]; return next; });
+      return;
+    }
+    setRevealing(employeeId);
+    const { data, error } = await supabase.functions.invoke('decrypt-pii', {
+      body: { employeeId },
+    });
+    setRevealing(null);
+    if (error) {
+      console.error('[EmployeeTab] 복호화 실패:', error.message);
+      toast.error(`주민번호 복호화에 실패했어요: ${error.message}`);
+      return;
+    }
+    const rn = (data as { residentNumber: string | null } | null)?.residentNumber;
+    if (!rn) { toast.warning('등록된 주민번호가 없어요.'); return; }
+    setRevealed((prev) => ({ ...prev, [employeeId]: rn }));
+  }
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -62,7 +89,8 @@ export default function EmployeeTab() {
     setForm({
       employee_no: r.employee_no ?? '', department: r.department ?? '', position: r.position ?? '',
       employment_type: r.employment_type, hire_date: r.hire_date ?? '',
-      base_salary: String(r.base_salary), resident_number: r.resident_number ?? '',
+      // 박경수님 + SkyClaw STEP-RBAC-RLS-PHASE1 — 주민번호는 보안상 모달에서 미표시. 변경 시만 재입력
+      base_salary: String(r.base_salary), resident_number: '',
       bank_name: r.bank_name ?? '', account_number: r.account_number ?? '', account_holder: r.account_holder ?? '',
     });
     setFormOpen(true);
@@ -71,7 +99,10 @@ export default function EmployeeTab() {
   async function handleSave() {
     if (!profileId) { toast.error('팀원을 선택해 주세요.'); return; }
     setSaving(true);
-    const payload = { profile_id: profileId, employee_no: form.employee_no || null, department: form.department || null, position: form.position || null, employment_type: form.employment_type, hire_date: form.hire_date || null, base_salary: Number(form.base_salary) || 0, resident_number: form.resident_number || null, bank_name: form.bank_name || null, account_number: form.account_number || null, account_holder: form.account_holder || null };
+    // 박경수님 + SkyClaw STEP-RBAC-RLS-PHASE1 — 수정 시 resident_number 빈 값이면 미변경 (기존 암호문 보존)
+    const skipRn = !!editTarget && !form.resident_number;
+    const payload: Record<string, unknown> = { profile_id: profileId, employee_no: form.employee_no || null, department: form.department || null, position: form.position || null, employment_type: form.employment_type, hire_date: form.hire_date || null, base_salary: Number(form.base_salary) || 0, bank_name: form.bank_name || null, account_number: form.account_number || null, account_holder: form.account_holder || null };
+    if (!skipRn) payload.resident_number = form.resident_number || null;
     const res = editTarget
       ? await supabase.from('employee_details').update(payload).eq('id', editTarget.id)
       : await supabase.from('employee_details').insert(payload);
@@ -114,7 +145,22 @@ export default function EmployeeTab() {
                   <td className="px-3 py-2 text-xs">{[r.department, r.position].filter(Boolean).join(' · ') || '-'}</td>
                   <td className="px-3 py-2 text-xs">{r.hire_date ?? '-'}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatMoney(r.base_salary)}</td>
-                  <td className="px-3 py-2 text-xs font-mono">{maskResidentNo(r.resident_number)}</td>
+                  <td className="px-3 py-2 text-xs font-mono">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>{revealed[r.id] ?? MASK_RN}</span>
+                      {isFinance && r.resident_number && (
+                        <button type="button" onClick={() => void handleReveal(r.id)}
+                          disabled={revealing === r.id}
+                          aria-label={revealed[r.id] ? '주민번호 가리기' : '주민번호 보기'}
+                          title={revealed[r.id] ? '가리기' : '보기 (admin/finance 전용)'}
+                          className="text-violet-500 hover:text-violet-700 disabled:opacity-40">
+                          {revealing === r.id ? <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                            : revealed[r.id] ? <EyeOff size={12} aria-hidden="true" />
+                            : <Eye size={12} aria-hidden="true" />}
+                        </button>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-3 py-2 text-xs">{r.bank_name && r.account_number ? `${r.bank_name} ${r.account_number}` : '-'}</td>
                   <td className="px-3 py-2 text-right">
                     <button type="button" onClick={() => openEdit(r)} className="text-xs text-violet-600 hover:underline">수정</button>
@@ -142,7 +188,8 @@ export default function EmployeeTab() {
           <Input label="부서" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
           <Input label="직급" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
           <Input label="기본급 (원)" type="number" value={form.base_salary} onChange={(e) => setForm({ ...form, base_salary: e.target.value })} />
-          <Input label="주민번호" value={form.resident_number} onChange={(e) => setForm({ ...form, resident_number: e.target.value })} placeholder="앞6자리만 표시" />
+          <Input label="주민번호" value={form.resident_number} onChange={(e) => setForm({ ...form, resident_number: e.target.value })}
+            placeholder={editTarget ? '변경 시 새로 입력 (빈 값 = 미변경)' : '13자리 (저장 시 자동 암호화)'} />
           <Input label="은행명" value={form.bank_name} onChange={(e) => setForm({ ...form, bank_name: e.target.value })} />
           <Input label="계좌번호" value={form.account_number} onChange={(e) => setForm({ ...form, account_number: e.target.value })} />
           <Input label="예금주" value={form.account_holder} onChange={(e) => setForm({ ...form, account_holder: e.target.value })} />
