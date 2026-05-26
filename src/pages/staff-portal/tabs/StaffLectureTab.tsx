@@ -229,6 +229,45 @@ export default function StaffLectureTab({ staff, selectedProgramId }: Props) {
           </div>
         )}
       </section>
+
+      {/* STEP-STAFF-PORTAL-REDESIGN PART C (2026-05-28) — 전체 커리큘럼 아코디언 (선택 프로그램 기준) */}
+      {selectedProgramId && (() => {
+        const all = curriculums.filter((c) => c.program_id === selectedProgramId).sort((a, b) => a.session_no - b.session_no);
+        if (all.length === 0) return null;
+        return (
+          <details className="rounded-2xl border border-violet-100 bg-white p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700 flex items-center gap-2 py-1">
+              <BookOpen size={14} className="text-violet-500" aria-hidden="true" />
+              전체 커리큘럼 ({all.length}차시) — 본인 차시는 강조
+            </summary>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-violet-50/40 text-slate-500 text-xs">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold">차시</th>
+                    <th className="text-left px-3 py-2 font-semibold">날짜·시간</th>
+                    <th className="text-left px-3 py-2 font-semibold">제목</th>
+                    <th className="text-center px-3 py-2 font-semibold">담당</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {all.map((c) => {
+                    const mine = lectureRoleMap.has(c.id);
+                    return (
+                      <tr key={c.id} className={mine ? 'bg-violet-50' : 'hover:bg-violet-50/40'}>
+                        <td className="px-3 py-1.5 text-xs font-bold text-violet-700 tabular-nums">{c.session_no}</td>
+                        <td className="px-3 py-1.5 text-xs text-slate-600 tabular-nums whitespace-nowrap">{formatDateKo(c.session_date)}{c.start_time ? ` · ${trimTime(c.start_time)}` : ''}</td>
+                        <td className="px-3 py-1.5 text-xs text-slate-800">{c.title}</td>
+                        <td className="px-3 py-1.5 text-center text-[11px]">{mine ? <span className="inline-flex items-center gap-1 text-violet-700 font-semibold">👤 본인</span> : <span className="text-slate-400">-</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        );
+      })()}
     </div>
   );
 }
