@@ -29,6 +29,8 @@ export default function PhaseDateSection({ programId, programEndDate }: Props) {
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<SaveDatesPayload>({
     pre_date: null, ready_date: null, progress_date: null, result_date: null,
+    // 박경수님 + SkyClaw 2026-05-28 — 각 단계 종료일
+    pre_end_date: null, ready_end_date: null, progress_end_date: null, result_end_date: null,
   });
 
   const refresh = useCallback(async () => {
@@ -44,6 +46,11 @@ export default function PhaseDateSection({ programId, programEndDate }: Props) {
       ready_date: next.ready_date ?? null,
       progress_date: next.progress_date ?? null,
       result_date: next.result_date ?? null,
+      // 박경수님 + SkyClaw 2026-05-28 — 각 단계 종료일
+      pre_end_date: next.pre_end_date ?? null,
+      ready_end_date: next.ready_end_date ?? null,
+      progress_end_date: next.progress_end_date ?? null,
+      result_end_date: next.result_end_date ?? null,
     });
     setLoading(false);
   }, [programId, toast]);
@@ -69,7 +76,12 @@ export default function PhaseDateSection({ programId, programEndDate }: Props) {
     return draft.pre_date !== (share.pre_date ?? null)
       || draft.ready_date !== (share.ready_date ?? null)
       || draft.progress_date !== (share.progress_date ?? null)
-      || draft.result_date !== (share.result_date ?? null);
+      || draft.result_date !== (share.result_date ?? null)
+      // 박경수님 + SkyClaw 2026-05-28 — 종료일 비교
+      || draft.pre_end_date !== (share.pre_end_date ?? null)
+      || draft.ready_end_date !== (share.ready_end_date ?? null)
+      || draft.progress_end_date !== (share.progress_end_date ?? null)
+      || draft.result_end_date !== (share.result_end_date ?? null);
   }, [draft, share]);
 
   async function handleSave() {

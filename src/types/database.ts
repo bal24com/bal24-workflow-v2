@@ -441,6 +441,11 @@ export interface ProgramShare {
   ready_date?: string | null;
   progress_date?: string | null;
   result_date?: string | null;
+  // 박경수님 + SkyClaw 2026-05-28 — 각 단계 종료일 (시작·종료 2개로 확장)
+  pre_end_date?: string | null;
+  ready_end_date?: string | null;
+  progress_end_date?: string | null;
+  result_end_date?: string | null;
   /** 학생 만족도 노출 시점 PM이 직접 설정 (Stage 3-B-2 / 2026-05-08 추가) */
   survey_open_at?: string | null;
   client_token: string;

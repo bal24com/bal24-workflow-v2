@@ -45,6 +45,8 @@ export default function ShareTab({ programId }: { programId: string }) {
   const [audienceTab, setAudienceTab] = useState<ShareAudience>('client');
   const [draftDates, setDraftDates] = useState<SaveDatesPayload>({
     pre_date: null, ready_date: null, progress_date: null, result_date: null,
+    // 박경수님 + SkyClaw 2026-05-28 — 각 단계 종료일
+    pre_end_date: null, ready_end_date: null, progress_end_date: null, result_end_date: null,
   });
   const [savingDates, setSavingDates] = useState(false);
 
@@ -67,6 +69,11 @@ export default function ShareTab({ programId }: { programId: string }) {
       ready_date: next.ready_date ?? null,
       progress_date: next.progress_date ?? null,
       result_date: next.result_date ?? null,
+      // 박경수님 + SkyClaw 2026-05-28 — 각 단계 종료일
+      pre_end_date: next.pre_end_date ?? null,
+      ready_end_date: next.ready_end_date ?? null,
+      progress_end_date: next.progress_end_date ?? null,
+      result_end_date: next.result_end_date ?? null,
     });
   }, [programId, toast]);
 

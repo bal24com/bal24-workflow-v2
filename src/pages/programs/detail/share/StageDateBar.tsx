@@ -42,23 +42,32 @@ export default function StageDateBar({
         </span>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+      {/* 박경수님 + SkyClaw 2026-05-28 — 각 단계 시작일·종료일 2개 input */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {STAGE_ORDER.map((stage) => {
-          const key = `${stage}_date` as const;
-          const value = draft[key as keyof SaveDatesPayload];
+          const startKey = `${stage}_date` as keyof SaveDatesPayload;
+          const endKey = `${stage}_end_date` as keyof SaveDatesPayload;
+          const startVal = draft[startKey];
+          const endVal = draft[endKey];
           return (
-            <div key={stage} className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold text-slate-500">
+            <div key={stage} className="flex flex-col gap-1.5 rounded-xl border border-violet-100 bg-violet-50/30 p-2.5">
+              <label className="text-[11px] font-bold text-slate-700 inline-flex items-center gap-1">
+                <span className={`inline-block w-2 h-2 rounded-full ${STAGE_TONE[stage].replace('text-', 'bg-').replace('-700', '-500').replace('-100', '-500').split(' ')[0]}`} aria-hidden="true" />
                 {SHARE_STAGE_LABEL[stage]}
               </label>
-              <input
-                type="date"
-                value={value ?? ''}
-                onChange={(e) =>
-                  onChange(key as keyof SaveDatesPayload, e.target.value || null)
-                }
-                className="h-9 px-2 rounded-xl border border-violet-100 bg-white text-sm text-[#1E1B4B] focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-colors"
-              />
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-500">시작일</span>
+                <input type="date" value={startVal ?? ''}
+                  onChange={(e) => onChange(startKey, e.target.value || null)}
+                  className="h-8 px-2 rounded-md border border-violet-200 bg-white text-xs tabular-nums focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-500">종료일</span>
+                <input type="date" value={endVal ?? ''}
+                  onChange={(e) => onChange(endKey, e.target.value || null)}
+                  min={startVal ?? undefined}
+                  className="h-8 px-2 rounded-md border border-violet-200 bg-white text-xs tabular-nums focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100" />
+              </div>
             </div>
           );
         })}

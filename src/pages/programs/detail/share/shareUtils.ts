@@ -92,6 +92,11 @@ export interface SaveDatesPayload {
   ready_date: string | null;
   progress_date: string | null;
   result_date: string | null;
+  // 박경수님 + SkyClaw 2026-05-28 — 각 단계 종료일
+  pre_end_date: string | null;
+  ready_end_date: string | null;
+  progress_end_date: string | null;
+  result_end_date: string | null;
 }
 
 /** STEP-AUTOFILL-PHASE-DATES — 빈 문자열도 null로 정규화 (DB date 컬럼 invalid input syntax 방지) */
@@ -113,12 +118,17 @@ export async function saveStageDates(
   // STEP-PHASE-DATE-FIX — seed + update 2단계를 단일 upsert로 단순화
   // 다른 NOT NULL 컬럼(client_token 등)은 DB default가 채워 주므로 신규 row도 안전.
   const safePayload = {
-    program_id:    programId,
-    pre_date:      toDateOrNull(dates.pre_date),
-    ready_date:    toDateOrNull(dates.ready_date),
-    progress_date: toDateOrNull(dates.progress_date),
-    result_date:   toDateOrNull(dates.result_date),
-    updated_at:    new Date().toISOString(),
+    program_id:        programId,
+    pre_date:          toDateOrNull(dates.pre_date),
+    ready_date:        toDateOrNull(dates.ready_date),
+    progress_date:     toDateOrNull(dates.progress_date),
+    result_date:       toDateOrNull(dates.result_date),
+    // 박경수님 + SkyClaw 2026-05-28 — 각 단계 종료일
+    pre_end_date:      toDateOrNull(dates.pre_end_date),
+    ready_end_date:    toDateOrNull(dates.ready_end_date),
+    progress_end_date: toDateOrNull(dates.progress_end_date),
+    result_end_date:   toDateOrNull(dates.result_end_date),
+    updated_at:        new Date().toISOString(),
   };
   const { error } = await supabase
     .from('program_share')
