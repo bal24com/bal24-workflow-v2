@@ -27,13 +27,16 @@ interface EmployeeRow {
   profile: { id: string; name: string; email: string | null } | null;
 }
 
-const EMPTY_FORM = { employee_no: '', department: '', position: '', employment_type: 'full_time', hire_date: '', base_salary: '0', resident_number: '', bank_name: '', account_number: '', account_holder: '' };
+// 박경수님 + SkyClaw 2026-05-28 — 부서/직급은 profiles 에서 자동 prefill (중복 입력 제거)
+const EMPTY_FORM = { employee_no: '', employment_type: 'full_time', hire_date: '', base_salary: '0', resident_number: '', bank_name: '', account_number: '', account_holder: '' };
+
+interface ProfileLite { id: string; name: string; department: string | null; position: string | null; joined_at: string | null }
 
 export default function EmployeeTab() {
   const toast = useToast();
   const { isFinance } = useUserProfile(); // admin/finance 만 🔓 노출
   const [rows, setRows] = useState<EmployeeRow[]>([]);
-  const [profiles, setProfiles] = useState<Array<{ id: string; name: string }>>([]);
+  const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EmployeeRow | null>(null);
@@ -77,9 +80,13 @@ export default function EmployeeTab() {
 
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => {
-    void supabase.from('profiles').select('id, name').eq('is_active', true).order('name')
-      .then(({ data }) => setProfiles((data ?? []) as Array<{ id: string; name: string }>));
+    // 박경수님 2026-05-28 — 부서/직급/입사일 자동 채우려 함께 fetch
+    void supabase.from('profiles').select('id, name, department, position, joined_at').eq('is_active', true).order('name')
+      .then(({ data }) => setProfiles((data ?? []) as ProfileLite[]));
   }, []);
+
+  // 박경수님 2026-05-28 — 선택된 팀원 정보 (부서/직급/입사일 자동 채움용)
+  const selectedProfile = profiles.find((p) => p.id === profileId) ?? null;
 
   function openNew() {
     setEditTarget(null); setProfileId(''); setForm(EMPTY_FORM); setFormOpen(true);
@@ -87,7 +94,7 @@ export default function EmployeeTab() {
   function openEdit(r: EmployeeRow) {
     setEditTarget(r); setProfileId(r.profile_id);
     setForm({
-      employee_no: r.employee_no ?? '', department: r.department ?? '', position: r.position ?? '',
+      employee_no: r.employee_no ?? '',
       employment_type: r.employment_type, hire_date: r.hire_date ?? '',
       // 박경수님 + SkyClaw STEP-RBAC-RLS-PHASE1 — 주민번호는 보안상 모달에서 미표시. 변경 시만 재입력
       base_salary: String(r.base_salary), resident_number: '',
@@ -101,7 +108,11 @@ export default function EmployeeTab() {
     setSaving(true);
     // 박경수님 + SkyClaw STEP-RBAC-RLS-PHASE1 — 수정 시 resident_number 빈 값이면 미변경 (기존 암호문 보존)
     const skipRn = !!editTarget && !form.resident_number;
-    const payload: Record<string, unknown> = { profile_id: profileId, employee_no: form.employee_no || null, department: form.department || null, position: form.position || null, employment_type: form.employment_type, hire_date: form.hire_date || null, base_salary: Number(form.base_salary) || 0, bank_name: form.bank_name || null, account_number: form.account_number || null, account_holder: form.account_holder || null };
+    // 박경수님 2026-05-28 — 부서/직급은 profiles 에서 자동 동기화 (중복 입력 제거). 입사일도 profiles.joined_at 우선
+    const dept = selectedProfile?.department ?? null;
+    const pos  = selectedProfile?.position ?? null;
+    const hire = form.hire_date || selectedProfile?.joined_at || null;
+    const payload: Record<string, unknown> = { profile_id: profileId, employee_no: form.employee_no || null, department: dept, position: pos, employment_type: form.employment_type, hire_date: hire, base_salary: Number(form.base_salary) || 0, bank_name: form.bank_name || null, account_number: form.account_number || null, account_holder: form.account_holder || null };
     if (!skipRn) payload.resident_number = form.resident_number || null;
     const res = editTarget
       ? await supabase.from('employee_details').update(payload).eq('id', editTarget.id)
@@ -183,10 +194,19 @@ export default function EmployeeTab() {
               {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
+          {/* 박경수님 2026-05-28 — 부서/직급은 팀원 정보 자동 가져옴 (중복 입력 제거). 변경하려면 [팀원 관리] 메뉴에서 수정 */}
+          {selectedProfile && (
+            <div className="col-span-2 rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-xs text-slate-600">
+              <span className="font-semibold text-violet-700">팀원 정보 자동 가져옴:</span>{' '}
+              부서 <strong>{selectedProfile.department ?? '미등록'}</strong> ·{' '}
+              직급 <strong>{selectedProfile.position ?? '미등록'}</strong>
+              <span className="text-slate-400"> (변경은 팀원 관리에서)</span>
+            </div>
+          )}
           <Input label="사원번호" value={form.employee_no} onChange={(e) => setForm({ ...form, employee_no: e.target.value })} placeholder="001" />
-          <Input label="입사일" type="date" value={form.hire_date} onChange={(e) => setForm({ ...form, hire_date: e.target.value })} />
-          <Input label="부서" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
-          <Input label="직급" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
+          <Input label="입사일" type="date" value={form.hire_date}
+            onChange={(e) => setForm({ ...form, hire_date: e.target.value })}
+            placeholder={selectedProfile?.joined_at ? `팀원 등록일: ${selectedProfile.joined_at}` : ''} />
           <Input label="기본급 (원)" type="number" value={form.base_salary} onChange={(e) => setForm({ ...form, base_salary: e.target.value })} />
           <Input label="주민번호" value={form.resident_number} onChange={(e) => setForm({ ...form, resident_number: e.target.value })}
             placeholder={editTarget ? '변경 시 새로 입력 (빈 값 = 미변경)' : '13자리 (저장 시 자동 암호화)'} />
