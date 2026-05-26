@@ -18,6 +18,10 @@ verify_jwt = true
 [functions.create-member]
 verify_jwt = true
 
+# 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-AI-AUTOFILL — 로그인 사용자만 호출.
+[functions.consortium-autofill]
+verify_jwt = true
+
 # 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — 비로그인(/portal) 호출 함수.
 # 비로그인 강사가 이름·PIN 으로 인증하므로 JWT 검증을 꺼야 함.
 # 보안은 함수 본문 자체 검증 (이름+PIN 매칭 실패 시 401, 3회 잠금) + SERVICE_ROLE 로 처리.

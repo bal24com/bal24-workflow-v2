@@ -215,6 +215,64 @@ async function extractText(file: File): Promise<ExtractedDoc> {
   };
 }
 
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-AI-AUTOFILL — PDF 텍스트 추출.
+// pdfjs-dist 는 선택 패키지 — 미설치 시 친화 에러로 안내.
+interface PdfjsModule {
+  getDocument: (opts: { data: ArrayBuffer }) => { promise: Promise<PdfjsDoc> };
+  GlobalWorkerOptions: { workerSrc: string };
+}
+interface PdfjsDoc {
+  numPages: number;
+  getPage: (pageNum: number) => Promise<{
+    getTextContent: () => Promise<{ items: Array<{ str?: string }> }>;
+  }>;
+}
+
+async function extractPdf(file: File): Promise<ExtractedDoc> {
+  const moduleName = 'pdfjs-dist';
+  let pdfjs: PdfjsModule | null = null;
+  try {
+    const mod = (await import(/* @vite-ignore */ moduleName)) as Record<string, unknown>;
+    const direct = mod as unknown as PdfjsModule;
+    const def = mod.default as PdfjsModule | undefined;
+    if (def && typeof def.getDocument === 'function') {
+      pdfjs = def;
+    } else if (typeof direct.getDocument === 'function') {
+      pdfjs = direct;
+    }
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : '';
+    console.error('[file-to-text] pdfjs-dist 로드 실패:', raw);
+    throw new Error('PDF 처리 라이브러리(pdfjs-dist)가 설치되지 않았어요. 관리자에게 문의해 주세요.');
+  }
+  if (!pdfjs) throw new Error('pdfjs-dist 라이브러리 로드 실패');
+
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  const maxPages = Math.min(pdf.numPages, 30);
+  const pages: string[] = [];
+  for (let i = 1; i <= maxPages; i += 1) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items
+      .map((item) => (typeof item.str === 'string' ? item.str : ''))
+      .filter(Boolean)
+      .join(' ');
+    pages.push(text.trim());
+  }
+  return {
+    source: 'pdf',
+    fileName: file.name,
+    text: pages.filter((p) => p).join('\n\n').trim(),
+    bytes: file.size,
+    pages: pdf.numPages,
+    warnings:
+      pdf.numPages > maxPages
+        ? [`⚠ ${pdf.numPages}쪽 중 처음 ${maxPages}쪽만 분석했어요.`]
+        : undefined,
+  };
+}
+
 /** 파일 → 텍스트 (포맷 자동 판별, 실패 시 null) */
 export async function fileToText(file: File): Promise<ExtractedDoc | null> {
   const kind = classifyFile(file);
@@ -228,6 +286,8 @@ export async function fileToText(file: File): Promise<ExtractedDoc | null> {
         return await extractDocx(file);
       case 'text':
         return await extractText(file);
+      case 'pdf':
+        return await extractPdf(file);
       default:
         return null;
     }

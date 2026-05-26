@@ -24,21 +24,22 @@ import type {
   ConsortiumStatus,
   Project,
 } from '../../types/database';
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-AI-AUTOFILL — 문서 업로드 → AI 자동채우기
+import ConsortiumAutoFillSection from './components/ConsortiumAutoFillSection';
+import { useConsortiumAutoFill } from './hooks/useConsortiumAutoFill';
+import {
+  buildFormPatch, buildMemberDrafts, countFilledFields, isOnlyEmptyDefault,
+} from './consortiumAutoFillUtils';
 
 type ClientOption = Pick<Client, 'id' | 'name'>;
 type ProjectOption = Pick<Project, 'id' | 'name'>;
 
-export interface ConsortiumInitialData {
-  id: string;
-  name: string;
-  description: string;
-  lead_client_id: string | null;
-  project_id: string | null;
-  status: ConsortiumStatus;
-  start_date: string;
-  end_date: string;
-  total_budget: number | null;     // 박경수님 요청 — 사업비 입력 칸
-}
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-AI-AUTOFILL — 타입·초기값·fromInitial 분리.
+import {
+  EMPTY_CONSORTIUM_FORM as EMPTY, fromInitialConsortium as fromInitial,
+  type ConsortiumForm, type ConsortiumInitialData,
+} from './consortiumFormTypes';
+export type { ConsortiumInitialData };
 
 type Props = {
   open: boolean;
@@ -47,39 +48,6 @@ type Props = {
   /** 수정 모드 — 값이 있으면 UPDATE 모드로 동작 */
   initialData?: ConsortiumInitialData;
 };
-
-type ConsortiumForm = {
-  name: string;
-  projectId: string;
-  status: ConsortiumStatus;
-  leadClientId: string;
-  leadRole: ConsortiumRole;
-  description: string;
-  startDate: string;
-  endDate: string;
-  totalBudget: string;          // 사업비 (콤마 허용 입력값)
-};
-
-const EMPTY: ConsortiumForm = {
-  name: '', projectId: '', status: '구성중',
-  leadClientId: '', leadRole: '총괄',
-  description: '',
-  startDate: '', endDate: '', totalBudget: '',
-};
-
-function fromInitial(d: ConsortiumInitialData): ConsortiumForm {
-  return {
-    name: d.name,
-    projectId: d.project_id ?? '',
-    status: d.status,
-    leadClientId: d.lead_client_id ?? '',
-    leadRole: '총괄',
-    description: d.description,
-    startDate: d.start_date,
-    endDate: d.end_date,
-    totalBudget: d.total_budget != null ? String(d.total_budget) : '',
-  };
-}
 
 export default function ConsortiumFormModal({ open, onClose, onCreated, initialData }: Props) {
   const toast = useToast();
@@ -94,6 +62,9 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
   const [submitting, setSubmitting] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-AI-AUTOFILL — 자동채우기 훅
+  const { analyze, isAnalyzing, analyzeError, setAnalyzeError } = useConsortiumAutoFill();
 
   useEffect(() => {
     if (!open) return;
@@ -149,6 +120,20 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
 
   const update = <K extends keyof ConsortiumForm>(key: K, value: ConsortiumForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-AI-AUTOFILL — AI 결과 → 폼 매칭.
+  // 매칭 규칙. 기존 입력값이 비어 있을 때만 덮어쓰기, 채워진 값은 보존.
+  const handleAutoFill = async (file: File) => {
+    setErrorMsg(null);
+    const result = await analyze(file);
+    if (!result) return;
+    setForm((prev) => ({ ...prev, ...buildFormPatch(prev, result, clients) }));
+    if (isOnlyEmptyDefault(members)) {
+      const drafts = buildMemberDrafts(result, clients);
+      if (drafts.length > 0) setMembers(drafts);
+    }
+    toast.success(`AI 가 ${countFilledFields(result)}개 항목을 채웠어요. 확인 후 수정해 주세요.`);
   };
 
   const validate = (): boolean => {
@@ -272,6 +257,17 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
       }
     >
       <form id="consortium-form" onSubmit={handleSubmit} className="space-y-5" noValidate>
+        {/* 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-AI-AUTOFILL — 신규 등록 시 문서 업로드 자동채우기 */}
+        {!isEditMode && (
+          <ConsortiumAutoFillSection
+            isAnalyzing={isAnalyzing}
+            disabled={submitting}
+            analyzeError={analyzeError}
+            onFile={(file) => void handleAutoFill(file)}
+            onClearError={() => setAnalyzeError(null)}
+          />
+        )}
+
         <section className="space-y-3">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">기본 정보</h3>
           <Input label="컨소시엄명" required value={form.name} onChange={(e) => update('name', e.target.value)} disabled={submitting} error={nameError} placeholder="예) 2026 청년 리더십 컨소시엄" />
