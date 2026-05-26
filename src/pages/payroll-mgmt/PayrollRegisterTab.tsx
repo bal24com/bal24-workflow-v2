@@ -2,12 +2,14 @@
 // 월별 헤더 + 직원별 슬립 자동 생성. 직전월 슬립값을 새 달에 복사 (소득세 등).
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Table2 } from 'lucide-react';
+import { Loader2, Plus, Table2, Upload } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { formatMoney } from '../../lib/utils';
 import { calcDeductions, calcNetPayment } from './payrollMgmtUtils';
+// 박경수님 + SkyClaw STEP-PAYROLL-IMPORT (2026-05-28) — 파일 업로드 + AI 자동매칭
+import PayrollImportModal from './PayrollImportModal';
 
 interface RegisterRow { id: string; year: number; month: number; payment_date: string | null; status: string; }
 interface SlipRow {
@@ -28,6 +30,7 @@ export default function PayrollRegisterTab() {
   const [slips, setSlips] = useState<SlipRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -98,6 +101,9 @@ export default function PayrollRegisterTab() {
         {!register && (
           <Button variant="primary" size="sm" leftIcon={<Plus size={12} />} onClick={() => void createRegister()} loading={creating}>새 급여대장 생성</Button>
         )}
+        {/* 박경수님 + SkyClaw STEP-PAYROLL-IMPORT — 파일 업로드 AI 자동매칭 */}
+        <Button variant="outline" size="sm" leftIcon={<Upload size={12} />} onClick={() => setImportOpen(true)}
+          className="!border-violet-300 !text-violet-700 !bg-violet-50 hover:!bg-violet-100">파일로 가져오기</Button>
         {register && <span className="ml-auto text-[11px] text-slate-500">상태: {register.status} · 등록 {registers.length}개월</span>}
       </div>
 
@@ -150,6 +156,8 @@ export default function PayrollRegisterTab() {
           </table>
         </div>
       )}
+
+      <PayrollImportModal open={importOpen} onClose={() => setImportOpen(false)} onImported={() => { setImportOpen(false); void reload(); }} />
     </div>
   );
 }
