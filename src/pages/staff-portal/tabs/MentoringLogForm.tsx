@@ -40,6 +40,8 @@ interface Props {
   userId: string | null;
   /** 박경수님 2026-05-26 — 신규 작성이면 undefined, 수정이면 기존 일지 데이터 */
   initialLog?: MentoringLogInitial | null;
+  /** 박경수님 2026-05-26 PART F — AI 생성 내용 prefill (신규 작성 시 content 초기값) */
+  prefillContent?: string;
   onSaved: () => void;
   onCancel: () => void;
 }
@@ -81,7 +83,7 @@ function todayIso(): string {
 }
 
 export default function MentoringLogForm({
-  assignment, mentees, programName, mentorName, userId, initialLog, onSaved, onCancel,
+  assignment, mentees, programName, mentorName, userId, initialLog, prefillContent, onSaved, onCancel,
 }: Props) {
   const toast = useToast();
   const isEdit = !!initialLog;
@@ -91,7 +93,7 @@ export default function MentoringLogForm({
     start_time: initialLog?.start_time ?? '09:00',
     end_time: initialLog?.end_time ?? '11:00',
     location: initialLog?.location ?? '',
-    content: initialLog?.content ?? '',
+    content: initialLog?.content ?? prefillContent ?? '',
     next_plan: initialLog?.next_plan ?? '',
     recipient: initialLog?.recipient ?? '',
     team_name: initialLog?.team_name ?? '',

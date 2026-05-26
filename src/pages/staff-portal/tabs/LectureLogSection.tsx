@@ -10,6 +10,7 @@ import { formatDateKo } from '../../../lib/utils';
 import EmptyState from '../../../components/EmptyState';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 import LectureLogForm, { type LectureLogRow, type LectureLogPhoto } from './LectureLogForm';
+import PortalCommentView from '../../../components/portal/PortalCommentView';
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -184,6 +185,10 @@ export default function LectureLogSection({ staff, programId }: Props) {
                           onClose={() => setExpandedId(null)}
                           toast={toast}
                         />
+                        {/* 박경수님 2026-05-26 PART G — 강의일지 PM 댓글 (저장된 일지 있을 때만) */}
+                        {log?.id && (
+                          <PortalCommentView targetType="curriculum_log" targetId={log.id} />
+                        )}
                       </td>
                     </tr>
                   )}

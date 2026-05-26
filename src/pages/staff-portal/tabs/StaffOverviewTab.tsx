@@ -2,7 +2,8 @@
 // 강사 통합 포털 · 개요 탭 — 담당 프로그램 카드 + D-7 일정 + 교육 개요·전체 커리큘럼 (PART B 2026-05-28)
 
 import { useEffect, useState } from 'react';
-import { Loader2, BookOpen, CheckCircle2, Info, ListChecks, User, Calendar, MapPin, Users } from 'lucide-react';
+import { Loader2, BookOpen, CheckCircle2, Info, ListChecks, User, Calendar, MapPin, Users, CalendarDays } from 'lucide-react';
+import ScheduleStagesSection from './ScheduleStagesSection';
 import { formatDateKo } from '../../../lib/utils';
 import EmptyState from '../../../components/EmptyState';
 import { BADGE_BASE } from '../../../utils/statusStyles';
@@ -235,6 +236,18 @@ export default function StaffOverviewTab({
       )}
 
       {/* 2026-05-26 박경수님 — 프로젝트 설명 카드는 교육 개요와 중복이라 제거. */}
+
+      {/* 박경수님 2026-05-26 STEP-PORTAL-MULTI-FIX PART E — 일정 탭 → 개요 하단으로 이동 */}
+      {selectedProgramId && (
+        <section className={CARD_CLASS}>
+          <header className="mb-3 flex items-center gap-2">
+            <CalendarDays size={16} className="text-violet-500" aria-hidden="true" />
+            <h2 className="text-base font-bold text-[#1E1B4B]">일정</h2>
+            <span className="text-[11px] text-slate-400">PM이 등록한 일정 (읽기 전용)</span>
+          </header>
+          <ScheduleStagesSection programId={selectedProgramId} />
+        </section>
+      )}
     </div>
   );
 }

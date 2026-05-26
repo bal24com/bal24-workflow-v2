@@ -3,7 +3,7 @@
 // mentoring_logs 테이블 미적용(PGRST205) 안전 처리.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Users2, BookOpen, Plus, Clock, FileDown } from 'lucide-react';
+import { Loader2, Users2, BookOpen, Plus, Clock, FileDown, Sparkles } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -12,6 +12,7 @@ import EmptyState from '../../../components/EmptyState';
 import { type MentoringLog } from '../../../types/mentoring';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
 import MentoringLogForm from './MentoringLogForm';
+import MentoringAIFileModal from '../MentoringAIFileModal';
 import { fetchLogForPdf } from '../../programs/detail/mentoringLogPdfFetch';
 import { downloadMentoringLogPdf, type MentoringLogForPdf } from '../../programs/detail/mentoringLogPdf';
 import SignaturePad from '../../../components/ui/SignaturePad';
@@ -47,6 +48,9 @@ export default function StaffMentoringTab({ staff, selectedProgramId, onNavigate
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
   const [formOpenId, setFormOpenId] = useState<string | null>(null);
+  // 박경수님 2026-05-26 PART F — AI 파일 일지 생성 모달
+  const [aiTargetAsnId, setAiTargetAsnId] = useState<string | null>(null);
+  const [prefillContent, setPrefillContent] = useState<string>('');
   // STEP-MENTORING-P2-PDF — PDF 다운로드 진행 중인 일지 id
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   // STEP-MENTORING-P3-APPROVE — SignaturePad 모달 (서명 미등록 시)
@@ -262,13 +266,37 @@ export default function StaffMentoringTab({ staff, selectedProgramId, onNavigate
                   <MentoringLogForm assignment={a} mentees={menteeList}
                     programName={programName} mentorName={staff.name}
                     userId={user?.id ?? null}
-                    onSaved={() => { setFormOpenId(null); void fetchData(); }}
-                    onCancel={() => setFormOpenId(null)} />
+                    prefillContent={prefillContent || undefined}
+                    onSaved={() => { setFormOpenId(null); setPrefillContent(''); void fetchData(); }}
+                    onCancel={() => { setFormOpenId(null); setPrefillContent(''); }} />
                 ) : (
-                  <button type="button" onClick={() => setFormOpenId(a.id)} className={BTN_PRIMARY}>
-                    <Plus size={14} aria-hidden="true" /> 일지 작성
-                  </button>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button type="button" onClick={() => setFormOpenId(a.id)} className={BTN_PRIMARY}>
+                      <Plus size={14} aria-hidden="true" /> 일지 작성
+                    </button>
+                    {/* 박경수님 2026-05-26 PART F — 파일로 AI 일지 생성 */}
+                    <button type="button" onClick={() => setAiTargetAsnId(a.id)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-violet-700 border border-violet-300 rounded-[10px] hover:bg-violet-50 transition-colors">
+                      <Sparkles size={13} aria-hidden="true" /> 📎 파일로 일지 작성 🤖
+                    </button>
+                  </div>
                 )
+              )}
+
+              {/* AI 파일 모달 (해당 assignment 만 활성) */}
+              {aiTargetAsnId === a.id && (
+                <MentoringAIFileModal
+                  open={true}
+                  onClose={() => setAiTargetAsnId(null)}
+                  onApply={(content) => {
+                    setPrefillContent(content);
+                    setAiTargetAsnId(null);
+                    setFormOpenId(a.id);
+                  }}
+                  programName={programName}
+                  mentorName={staff.name}
+                  menteeNames={menteeList.map((m) => m.name)}
+                  sessionNo={(asnLogs[0]?.session_no ?? asnLogs.length) + 1} />
               )}
 
               {/* 박경수님 2026-05-26 — [최근 일지] 간략화. 멘티(차수)·날짜·시간만. 상세는 [일지] 탭에서. */}

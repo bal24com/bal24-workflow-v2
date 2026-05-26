@@ -102,37 +102,51 @@ export default function SignatureUploadSection({ staffId, showBorder = true, sho
           )}
         </h3>
       )}
-      {currentUrl ? (
-        <div className="mb-3">
-          <p className="text-xs text-slate-500 mb-1.5">현재 등록된 서명</p>
-          <div className="flex items-center gap-3">
-            <img src={currentUrl} alt="등록된 서명" className="h-16 max-w-[200px] object-contain border border-slate-200 rounded-lg p-1 bg-white" />
-            <button type="button" onClick={() => void handleDelete()}
-              className="text-xs text-rose-600 hover:bg-rose-50 px-2 py-1 rounded">
-              삭제
-            </button>
-          </div>
+      {/* 박경수님 2026-05-26 — 좌우 반반 레이아웃 (새 파일 등록 / 현재 등록된 서명) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* 좌측 — 새 파일 등록 */}
+        <div>
+          <p className="text-xs font-semibold text-slate-500 mb-1.5">새 파일 등록</p>
+          <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-violet-300 rounded-xl bg-violet-50 cursor-pointer hover:border-violet-500 hover:bg-violet-100 transition-colors">
+            <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleFileChange} disabled={uploading} />
+            <span className="text-2xl mb-1" aria-hidden="true">🖊️</span>
+            <span className="text-xs font-semibold text-violet-700">PNG / JPG 파일 선택</span>
+            <span className="text-[11px] text-slate-400 mt-0.5">최대 2MB · 흰 배경 권장</span>
+          </label>
+          {preview && (
+            <div className="mt-2 flex items-center gap-2">
+              <img src={preview} alt="미리보기" className="h-10 max-w-[120px] object-contain border border-slate-200 rounded p-1" />
+              <button type="button" onClick={() => void handleUpload()} disabled={uploading}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-white bg-violet-600 rounded-md hover:bg-violet-700 disabled:opacity-50">
+                {uploading ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+                저장
+              </button>
+            </div>
+          )}
         </div>
-      ) : (
-        <p className="text-xs text-slate-500 mb-3">
-          아직 등록된 서명이 없어요. 등록해 두면 멘토링 일지 PDF 출력 시 자동으로 들어가요.
+
+        {/* 우측 — 현재 등록된 서명 */}
+        <div>
+          <p className="text-xs font-semibold text-slate-500 mb-1.5">현재 등록된 서명</p>
+          {currentUrl ? (
+            <div className="h-32 border border-slate-200 rounded-xl flex flex-col items-center justify-center bg-white relative">
+              <img src={currentUrl} alt="등록된 서명" className="max-h-20 max-w-full object-contain" />
+              <button type="button" onClick={() => void handleDelete()}
+                className="mt-2 text-xs text-rose-600 hover:bg-rose-50 px-2 py-0.5 rounded">
+                삭제
+              </button>
+            </div>
+          ) : (
+            <div className="h-32 border border-dashed border-slate-200 rounded-xl flex items-center justify-center text-xs text-slate-400">
+              등록된 서명 없음
+            </div>
+          )}
+        </div>
+      </div>
+      {!currentUrl && (
+        <p className="text-[11px] text-slate-500 mt-2">
+          💡 도장/서명을 등록하면 멘토링 일지 PDF 출력 시 자동 적용돼요.
         </p>
-      )}
-      <label className="block border-2 border-dashed border-violet-300 rounded-xl p-4 text-center cursor-pointer hover:border-violet-500 transition-colors">
-        <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={handleFileChange} disabled={uploading} />
-        <div className="text-2xl mb-1">🖊️</div>
-        <p className="text-xs font-semibold text-violet-700">PNG 또는 JPG 파일 선택</p>
-        <p className="text-[11px] text-slate-400 mt-1">최대 2MB · 흰 배경 권장</p>
-      </label>
-      {preview && (
-        <div className="mt-3 flex items-center gap-3">
-          <img src={preview} alt="미리보기" className="h-12 max-w-[160px] object-contain border border-slate-200 rounded p-1" />
-          <button type="button" onClick={() => void handleUpload()} disabled={uploading}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-violet-600 rounded-[10px] hover:bg-violet-700 disabled:opacity-50">
-            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-            서명 저장
-          </button>
-        </div>
       )}
     </section>
   );

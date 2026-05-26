@@ -20,6 +20,7 @@ import { downloadMentoringLogPdf } from '../../programs/detail/mentoringLogPdf';
 import MentoringLogExpandedView from './MentoringLogExpandedView';
 import { fetchStaffLogs, type UnifiedLog, type AssignmentLite, type MenteeLite } from './staffLogFetch';
 import LectureLogSection from './LectureLogSection';
+import PortalCommentView from '../../../components/portal/PortalCommentView';
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -207,16 +208,20 @@ export default function StaffLogTab({ staff, selectedProgramId }: Props) {
                   <p className={`mt-1.5 text-sm text-slate-700 whitespace-pre-wrap ${expanded ? '' : 'line-clamp-2'}`}>{l.content}</p>
 
                   {expanded && (
-                    <MentoringLogExpandedView
-                      logId={l.id} cached={detailByLogId.get(l.id)}
-                      onLoaded={(d) => cacheDetail(l.id, d)}
-                      fallback={{
-                        teamName: l.teamName, subject: l.subject, content: l.content,
-                        date: l.date, startTime: l.startTime, endTime: l.endTime,
-                        durationMin: l.durationMin, recipient: l.recipient,
-                        menteeNames: l.menteeNames, programName: l.programName,
-                        mentorName: staff.name, mentorAffiliation: staff.affiliation,
-                      }} />
+                    <>
+                      <MentoringLogExpandedView
+                        logId={l.id} cached={detailByLogId.get(l.id)}
+                        onLoaded={(d) => cacheDetail(l.id, d)}
+                        fallback={{
+                          teamName: l.teamName, subject: l.subject, content: l.content,
+                          date: l.date, startTime: l.startTime, endTime: l.endTime,
+                          durationMin: l.durationMin, recipient: l.recipient,
+                          menteeNames: l.menteeNames, programName: l.programName,
+                          mentorName: staff.name, mentorAffiliation: staff.affiliation,
+                        }} />
+                      {/* 박경수님 2026-05-26 PART G — PM 댓글 표시 (읽기 + 자동 read 처리) */}
+                      <PortalCommentView targetType="mentoring_log" targetId={l.id} />
+                    </>
                   )}
 
                   <div className="flex justify-end items-center gap-2 mt-2">

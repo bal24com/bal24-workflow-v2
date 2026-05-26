@@ -26,3 +26,7 @@ verify_jwt = false
 
 [functions.change-staff-pin]
 verify_jwt = false
+
+# 박경수님 2026-05-26 STEP-PORTAL-MULTI-FIX PART F — 비로그인 강사가 AI 일지 생성 요청.
+[functions.mentoring-log-ai]
+verify_jwt = false

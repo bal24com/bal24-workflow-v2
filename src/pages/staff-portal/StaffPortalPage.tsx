@@ -9,7 +9,6 @@ import StaffOverviewTab from './tabs/StaffOverviewTab';
 import StaffMentoringTab from './tabs/StaffMentoringTab';
 import StaffLectureTab from './tabs/StaffLectureTab';
 import StaffLogTab from './tabs/StaffLogTab';
-import StaffScheduleTab from './tabs/StaffScheduleTab';
 import StaffMaterialsTab from './tabs/StaffMaterialsTab';
 import StaffInfoEditModal from './StaffInfoEditModal';
 import {
@@ -17,12 +16,12 @@ import {
   type StaffPortalIdentity, type StaffPortalProgram,
 } from './staffPortalUtils';
 
+// 박경수님 2026-05-26 STEP-PORTAL-MULTI-FIX PART E — 일정 탭 제거 (개요 탭 하단으로 이동).
 const TABS = [
   { key: 'overview',   label: '개요' },
   { key: 'mentoring',  label: '멘토링' },
   { key: 'lecture',    label: '강의' },
   { key: 'log',        label: '일지' },
-  { key: 'schedule',   label: '일정' },
   { key: 'materials',  label: '자료' },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
@@ -129,7 +128,6 @@ export default function StaffPortalPage() {
           {activeTab === 'mentoring' && <StaffMentoringTab staff={staff} selectedProgramId={selectedProgramId} onNavigateToLogTab={() => setActiveTab('log')} />}
           {activeTab === 'lecture'   && <StaffLectureTab   staff={staff} selectedProgramId={selectedProgramId} />}
           {activeTab === 'log'       && <StaffLogTab       staff={staff} selectedProgramId={selectedProgramId} />}
-          {activeTab === 'schedule'  && <StaffScheduleTab  staff={staff} selectedProgramId={selectedProgramId} />}
           {activeTab === 'materials' && <StaffMaterialsTab staff={staff} selectedProgramId={selectedProgramId} />}
         </div>
       </div>

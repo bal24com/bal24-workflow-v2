@@ -13,6 +13,7 @@ import type {
 import {
   buildFeeFormFromPayrollExpense, downloadFeeFormPDF, type PayrollExpenseLite,
 } from '../../../utils/feeFormPDF';
+import PortalCommentView from '../../../components/portal/PortalCommentView';
 
 interface Props {
   staffId: string;                       // staff_pool.id
@@ -284,6 +285,9 @@ export default function StaffFeeSection({ staffId, selectedProgramId }: Props) {
                   : <FileDown size={12} aria-hidden="true" />}
                 강사료 확인서 PDF 저장
               </button>
+
+              {/* 박경수님 2026-05-26 PART G — 강사료 PM 댓글 표시 */}
+              <PortalCommentView targetType="payroll_expense" targetId={r.id} />
             </li>
           );
         })}

@@ -1,20 +1,14 @@
-// bal24 v2 — STEP-PORTAL-LECTURE-LOG-REDESIGN (박경수님 2026-05-26)
-// 강의일지 인라인 폼 — textarea + 사진 업로드 + 임시저장 / 제출 / 취소.
-// LectureLogSection 의 펼침 영역에서 렌더.
+// bal24 v2 — STEP-PORTAL-MULTI-FIX PART D (박경수님 2026-05-26)
+// 강의일지 인라인 폼 — 사진 우선 배치 + PortalPhotoUpload(공용) + 텍스트 영역 보조.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, ImageIcon, Trash2, Save, Send, X } from 'lucide-react';
+import { Loader2, Save, Send, X } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { formatDateKo } from '../../../lib/utils';
 import { useToast } from '../../../contexts/ToastContext';
+import PortalPhotoUpload, { type PortalPhoto } from '../../../components/portal/PortalPhotoUpload';
 
-export interface LectureLogPhoto {
-  url: string;
-  path: string;
-  filename: string;
-  size: number;
-  uploaded_at: string;
-}
+export type LectureLogPhoto = PortalPhoto;
 
 export interface LectureLogRow {
   id?: string;
@@ -45,7 +39,6 @@ export default function LectureLogForm({
   const [content, setContent] = useState<string>(existing?.content ?? '');
   const [photos, setPhotos] = useState<LectureLogPhoto[]>(existing?.photos ?? []);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const isSubmitted = existing?.status === 'submitted';
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -86,36 +79,8 @@ export default function LectureLogForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, photos]);
 
-  async function handleUpload(file: File) {
-    if (file.size > 10 * 1024 * 1024) { toast.error('사진은 10MB 이하만 업로드할 수 있어요.'); return; }
-    if (photos.length >= 10) { toast.error('사진은 최대 10장까지 첨부할 수 있어요.'); return; }
-    setUploading(true);
-    const safe = file.name.replace(/[^\w.\- ]/g, '_');
-    const path = `${programId}/${curriculum.id}/${staffId}/${Date.now()}_${safe}`;
-    const { error } = await supabase.storage.from('curriculum-photos').upload(path, file, { upsert: false });
-    if (error) {
-      setUploading(false);
-      const msg = error.message.toLowerCase().includes('not found')
-        ? 'curriculum-photos 버킷이 없어요. PM에게 생성을 요청해 주세요.'
-        : `업로드 실패: ${error.message}`;
-      toast.error(msg);
-      return;
-    }
-    const { data: pub } = supabase.storage.from('curriculum-photos').getPublicUrl(path);
-    const newPhoto: LectureLogPhoto = {
-      url: pub.publicUrl, path, filename: file.name, size: file.size,
-      uploaded_at: new Date().toISOString(),
-    };
-    const next = [...photos, newPhoto];
-    setPhotos(next);
-    setUploading(false);
-    void saveDraft(content, next);
-  }
-
-  async function handleRemovePhoto(photo: LectureLogPhoto) {
-    if (!window.confirm(`사진 "${photo.filename}" 을 삭제할까요?`)) return;
-    await supabase.storage.from('curriculum-photos').remove([photo.path]);
-    const next = photos.filter((p) => p.path !== photo.path);
+  // photos 변경 시 즉시 저장
+  function handlePhotosChange(next: LectureLogPhoto[]) {
     setPhotos(next);
     void saveDraft(content, next);
   }
@@ -146,6 +111,7 @@ export default function LectureLogForm({
   }
 
   const affiliationLabel = staffAffiliation ? ` (${staffAffiliation})` : '';
+  const pathPrefix = `${programId}/${curriculum.id}/${staffId}`;
 
   return (
     <div className="space-y-3">
@@ -170,9 +136,8 @@ export default function LectureLogForm({
 
       {isSubmitted ? (
         <div className="rounded-md border border-emerald-200 bg-emerald-50/40 px-3 py-3">
-          {content && <p className="text-sm text-slate-700 whitespace-pre-wrap mb-2">{content}</p>}
           {photos.length > 0 && (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-2">
               {photos.map((p) => (
                 <a key={p.path} href={p.url} target="_blank" rel="noopener noreferrer"
                   className="block aspect-square rounded-md overflow-hidden border border-emerald-200">
@@ -181,61 +146,56 @@ export default function LectureLogForm({
               ))}
             </div>
           )}
+          {content && <p className="text-sm text-slate-700 whitespace-pre-wrap">{content}</p>}
           <p className="mt-2 text-[10px] text-emerald-700 font-semibold">✓ 제출 완료 — 수정 불가</p>
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] text-slate-500">내용을 작성하면 2초 후 자동으로 저장돼요.</p>
-            {saveStatus === 'saving' && <span className="text-[10px] text-slate-400 inline-flex items-center gap-1"><Loader2 size={10} className="animate-spin" />저장 중…</span>}
-            {saveStatus === 'saved' && <span className="text-[10px] text-emerald-600">✓ 저장됨</span>}
-            {saveStatus === 'error' && <span className="text-[10px] text-rose-600">⚠ 저장 실패</span>}
+          {/* 박경수님 2026-05-26 — 사진 우선 배치 (텍스트보다 먼저) */}
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+              📷 강의 사진 첨부 <span className="text-[11px] text-slate-400 font-normal ml-1">(촬영·드래그·붙여넣기)</span>
+            </label>
+            <PortalPhotoUpload
+              photos={photos}
+              onChange={handlePhotosChange}
+              bucket="curriculum-photos"
+              pathPrefix={pathPrefix}
+              disabled={submitting}
+              maxPhotos={10}
+            />
           </div>
 
-          <label className="text-xs font-semibold text-slate-700 block">
-            일지 내용 <span className="text-rose-500">*</span>
-          </label>
-          <textarea value={content} onChange={(e) => setContent(e.target.value)}
-            placeholder="강의 진행 내용·특이사항·다음 차시 준비 등을 자유롭게 작성해 주세요."
-            className="w-full min-h-[150px] rounded-md border border-amber-200 px-3 py-2 text-sm focus:border-violet-400 focus:ring-2 focus:ring-violet-200 outline-none resize-y" />
-
-          {photos.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-slate-700 mb-1.5">📷 강의 사진 ({photos.length}/10)</p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {photos.map((p) => (
-                  <div key={p.path} className="relative group aspect-square rounded-md overflow-hidden border border-amber-200">
-                    <img src={p.url} alt={p.filename} className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => void handleRemovePhoto(p)} aria-label="사진 삭제"
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-rose-600/90 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Trash2 size={11} aria-hidden="true" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-700">
+                일지 내용 <span className="text-[11px] text-slate-400 font-normal">(선택)</span>
+              </label>
+              {saveStatus === 'saving' && <span className="text-[10px] text-slate-400 inline-flex items-center gap-1"><Loader2 size={10} className="animate-spin" />저장 중…</span>}
+              {saveStatus === 'saved' && <span className="text-[10px] text-emerald-600">✓ 저장됨</span>}
+              {saveStatus === 'error' && <span className="text-[10px] text-rose-600">⚠ 저장 실패</span>}
             </div>
-          )}
+            <textarea value={content} onChange={(e) => setContent(e.target.value)}
+              placeholder="강의 진행 내용·특이사항·다음 차시 준비 등 (사진이 충분하면 비워둬도 OK)"
+              className="w-full min-h-[100px] rounded-md border border-amber-200 px-3 py-2 text-sm focus:border-violet-400 focus:ring-2 focus:ring-violet-200 outline-none resize-y" />
+          </div>
 
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <label className={`inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md border cursor-pointer ${uploading ? 'opacity-50 pointer-events-none border-slate-200' : 'border-violet-200 text-violet-700 hover:bg-violet-50'}`}>
-              {uploading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} aria-hidden="true" />}
-              사진 추가
-              <input type="file" accept="image/*" className="hidden" disabled={uploading}
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f); e.target.value = ''; }} />
-            </label>
-            <div className="flex items-center gap-1.5">
-              <button type="button" onClick={() => void saveDraft(content, photos)}
-                disabled={saveStatus === 'saving'}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50">
-                <Save size={12} aria-hidden="true" /> 임시저장
-              </button>
-              <button type="button" onClick={() => void handleSubmit()}
-                disabled={submitting || saveStatus === 'saving'}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50">
-                {submitting ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} aria-hidden="true" />}
-                제출하기
-              </button>
-            </div>
+          <div className="flex items-center justify-end gap-1.5 pt-1">
+            <button type="button" onClick={onClose} disabled={submitting}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-md disabled:opacity-50">
+              <X size={12} aria-hidden="true" /> 취소
+            </button>
+            <button type="button" onClick={() => void saveDraft(content, photos)}
+              disabled={saveStatus === 'saving'}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50">
+              <Save size={12} aria-hidden="true" /> 임시저장
+            </button>
+            <button type="button" onClick={() => void handleSubmit()}
+              disabled={submitting || saveStatus === 'saving'}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50">
+              {submitting ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} aria-hidden="true" />}
+              제출하기
+            </button>
           </div>
         </>
       )}
