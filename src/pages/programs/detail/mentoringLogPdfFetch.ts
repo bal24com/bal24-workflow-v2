@@ -6,12 +6,14 @@ import { supabase } from '../../../lib/supabase';
 import type { MentoringLogForPdf } from './mentoringLogPdf';
 
 export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf | null> {
-  // 1) mentoring_logs 기본 (mentee_ids는 mentoring_logs 자체 컬럼)
+  // 1) mentoring_logs 기본 (mentee_ids는 mentoring_logs 자체 컬럼).
+  //    박경수님 2026-05-26 — team_name (참여팀명) + start_time/end_time 도 fetch (양식 일시 표기용).
   const { data: log, error } = await supabase
     .from('mentoring_logs')
     .select(`
       id, subject, content, log_date, duration_min, recipient,
-      mentor_signature_url, status, assignment_id, program_id, mentee_ids
+      mentor_signature_url, status, assignment_id, program_id, mentee_ids,
+      team_name, start_time, end_time
     `)
     .eq('id', logId)
     .maybeSingle();
@@ -25,6 +27,7 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
     mentor_signature_url: string | null; status: string;
     assignment_id: string | null; program_id: string | null;
     mentee_ids: string[] | null;
+    team_name: string | null; start_time: string | null; end_time: string | null;
   };
   const l = log as LogRow;
 
@@ -123,5 +126,9 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
     program_name: programName,
     project_name: projectName,
     image_urls: imageUrls,
+    // 박경수님 2026-05-26 양식 보강
+    team_name: l.team_name,
+    start_time: l.start_time,
+    end_time: l.end_time,
   };
 }

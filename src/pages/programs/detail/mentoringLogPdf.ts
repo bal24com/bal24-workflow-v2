@@ -1,6 +1,17 @@
-// bal24 v2 — STEP-MENTORING-P2-PDF
-// 멘토링 일지 PDF 양식 HTML 빌더 + 동적 import 다운로드.
-// PDF 양식: [서식 3] 멘토링 상담일지 (사업명 / 멘토 / 일시 / 멘티 / 주제 / 내용 / 사진 / 제출문 / 수신처)
+// bal24 v2 — STEP-MENTORING-P2-PDF · 박경수님 2026-05-26 양식 보강
+// 멘토링 (컨설팅) 상담일지 PDF 양식 HTML 빌더 + 동적 import 다운로드.
+// 양식 구조 (박경수님 PDF 기준).
+//   제목: 멘 토 링 (컨설팅) 상 담 일 지
+//   표 1행 헤더: [프로그램명] colspan 5
+//   멘 토 행 — 소속/직위 | (소속/직위 값) | 성 명 | (성명 값)        ← 4 셀
+//   멘 티 행 — 참여팀명 | (팀명 값) colspan 3                          ← 멘티는 rowspan=2
+//             참 여 자 | (참여자 이름들) colspan 3
+//   멘토링 일시 | (날짜 시간 범위) colspan 4
+//   주    제   | (주제) colspan 4
+//   멘토링 내용 | (긴 텍스트) colspan 4
+//   사진첨부   | (이미지 그리드) colspan 4
+//   하단 제출문: 위와 같이 ... 제출합니다. + 날짜 + 성명·서명
+//   수신처: 좌측 하단 "OO 귀하"
 
 export interface MentoringLogForPdf {
   id: string;
@@ -15,19 +26,34 @@ export interface MentoringLogForPdf {
   mentor_name: string;
   mentor_org: string;
   mentor_position: string;
-  // 멘티 목록
+  // 멘티 정보
   mentee_names: string[];
   // 프로그램
   program_name: string;
   project_name: string;
   // 첨부 이미지 URL (최대 3개)
   image_urls: string[];
+  // 박경수님 2026-05-26 양식 보강
+  team_name: string | null;
+  start_time: string | null;        // HH:MM
+  end_time: string | null;          // HH:MM
 }
 
 function formatKoDate(d: string | null | undefined): string {
   if (!d) return '　　년 　월 　일';
   const [y, m, day] = d.split('-');
-  return `${y}년 ${m}월 ${day}일`;
+  return `${y}년 ${Number(m)}월 ${Number(day)}일`;
+}
+
+function formatDateWithTime(date: string | null, start: string | null, end: string | null): string {
+  if (!date) return '—';
+  const [y, m, d] = date.split('-');
+  const dateStr = `${y}.${m}.${d}.`;
+  const s = (start ?? '').slice(0, 5);
+  const e = (end ?? '').slice(0, 5);
+  if (s && e) return `${dateStr} ${s} ~ ${e}`;
+  if (s) return `${dateStr} ${s}~`;
+  return dateStr;
 }
 
 function escapeHtml(s: string | null | undefined): string {
@@ -42,17 +68,33 @@ function escapeHtml(s: string | null | undefined): string {
 
 export function buildMentoringLogHtml(log: MentoringLogForPdf): string {
   const formattedDate = formatKoDate(log.log_date);
+  const datetimeStr = formatDateWithTime(log.log_date, log.start_time, log.end_time);
   const menteeStr = log.mentee_names.length > 0 ? log.mentee_names.join(', ') : '—';
-  const imagesHtml = log.image_urls.slice(0, 3)
+  const teamStr = log.team_name && log.team_name.trim() ? log.team_name : '—';
+  const orgPosition = [log.mentor_org, log.mentor_position].filter(Boolean).join(' / ') || '—';
+
+  const imagesHtml = log.image_urls.slice(0, 6)
     .map((url) =>
-      `<img src="${escapeHtml(url)}" style="max-width:200px;max-height:170px;object-fit:contain;border:1px solid #ddd;border-radius:4px;" />`,
+      `<img src="${escapeHtml(url)}" style="width:180px;height:135px;object-fit:cover;border:1px solid #ccc;border-radius:3px;" />`,
     ).join('');
+
   const signatureHtml = log.mentor_signature_url
-    ? `<img src="${escapeHtml(log.mentor_signature_url)}" style="height:42px;vertical-align:middle;" />`
-    : `<span style="font-family:serif;font-size:14px;border-bottom:1px solid #aaa;padding:2px 24px;">${escapeHtml(log.mentor_name)}</span>`;
-  const programLine = log.project_name
-    ? `${escapeHtml(log.program_name)} — ${escapeHtml(log.project_name)}`
+    ? `<img src="${escapeHtml(log.mentor_signature_url)}" style="height:38px;vertical-align:middle;" />`
+    : `<span style="font-family:serif;font-size:13px;padding:2px 16px;border-bottom:1px solid #333;">${escapeHtml(log.mentor_name)} (서명)</span>`;
+
+  const programHeader = log.project_name
+    ? `${escapeHtml(log.project_name)} — ${escapeHtml(log.program_name)}`
     : escapeHtml(log.program_name);
+
+  // 사진 행 — 이미지 있을 때만 표시
+  const photoRow = log.image_urls.length > 0
+    ? `<tr>
+         <th rowspan="1">멘토링<br/>사진첨부</th>
+         <td colspan="4">
+           <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 0;">${imagesHtml}</div>
+         </td>
+       </tr>`
+    : '';
 
   return `
 <!DOCTYPE html>
@@ -70,45 +112,53 @@ export function buildMentoringLogHtml(log: MentoringLogForPdf): string {
   }
   h1 {
     text-align: center;
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 800;
-    letter-spacing: 6px;
-    margin-bottom: 6px;
-  }
-  .program-title {
-    text-align: center;
-    font-size: 13px;
-    margin-bottom: 18px;
-    color: #444;
+    letter-spacing: 8px;
+    margin-bottom: 20px;
   }
   table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 24px;
+    table-layout: fixed;
   }
   th, td {
-    border: 1px solid #888;
-    padding: 9px 12px;
-    vertical-align: top;
+    border: 1px solid #555;
+    padding: 8px 10px;
+    vertical-align: middle;
+    word-break: keep-all;
   }
   th {
-    background: #f5f5f5;
+    background: #f4f4f4;
     font-weight: 700;
-    width: 90px;
     text-align: center;
     white-space: nowrap;
   }
-  .content-cell {
-    min-height: 180px;
-    line-height: 1.8;
-    white-space: pre-wrap;
+  th.label {
+    width: 80px;
   }
-  .image-cell {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    min-height: 90px;
-    align-items: center;
+  th.sub-label {
+    width: 90px;
+  }
+  th.value-label {
+    width: 80px;
+  }
+  td.program-header {
+    background: #fafafa;
+    text-align: center;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 10px;
+  }
+  td.content-cell {
+    vertical-align: top;
+    line-height: 1.85;
+    white-space: pre-wrap;
+    min-height: 200px;
+  }
+  td.value-cell {
+    text-align: left;
+    line-height: 1.7;
   }
   .submit-section {
     text-align: center;
@@ -119,49 +169,79 @@ export function buildMentoringLogHtml(log: MentoringLogForPdf): string {
   .recipient-line {
     text-align: left;
     margin-top: 22px;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
   }
 </style>
 </head>
 <body>
-<h1>멘 토 링 상 담 일 지</h1>
-<div class="program-title">${programLine}</div>
+
+<h1>멘 토 링 (컨설팅) 상 담 일 지</h1>
+
 <table>
+  <!-- 헤더 — 프로그램명 -->
   <tr>
-    <th>멘 토</th>
-    <td>소속: ${escapeHtml(log.mentor_org) || '—'} &nbsp;/&nbsp; 직위: ${escapeHtml(log.mentor_position) || '전문가'} &nbsp;/&nbsp; 성명: ${escapeHtml(log.mentor_name)}</td>
+    <td class="program-header" colspan="5">${programHeader}</td>
+  </tr>
+
+  <!-- 멘토 — 4 컬럼 (소속/직위 · 값 · 성명 · 값) -->
+  <tr>
+    <th class="label" rowspan="1">멘 토</th>
+    <th class="sub-label">소속/직위</th>
+    <td class="value-cell">${escapeHtml(orgPosition)}</td>
+    <th class="value-label">성 명</th>
+    <td class="value-cell">${escapeHtml(log.mentor_name)}</td>
+  </tr>
+
+  <!-- 멘티 — rowspan 2 (참여팀명 + 참여자) -->
+  <tr>
+    <th class="label" rowspan="2">멘 티</th>
+    <th class="sub-label">참여팀명</th>
+    <td class="value-cell" colspan="3">${escapeHtml(teamStr)}</td>
   </tr>
   <tr>
-    <th>멘토링 일시</th>
-    <td>${formattedDate}${log.duration_min ? ` &nbsp;(${log.duration_min}분)` : ''}</td>
+    <th class="sub-label">참 여 자</th>
+    <td class="value-cell" colspan="3">${escapeHtml(menteeStr)}</td>
   </tr>
+
+  <!-- 멘토링 일시 -->
   <tr>
-    <th>대상 멘티</th>
-    <td>${escapeHtml(menteeStr)}</td>
+    <th class="label">멘토링 일시</th>
+    <td class="value-cell" colspan="4">
+      ${escapeHtml(datetimeStr)}${log.duration_min ? ` &nbsp;<span style="color:#666;">(${log.duration_min}분)</span>` : ''}
+    </td>
   </tr>
+
+  <!-- 멘토링 내용 헤더 (한 칸 강조) -->
   <tr>
-    <th>주 제</th>
-    <td>${escapeHtml(log.subject) || '—'}</td>
+    <td class="program-header" colspan="5" style="background:#eef;">멘토링 내용</td>
   </tr>
+
+  <!-- 주제 -->
   <tr>
-    <th>멘토링 내용</th>
-    <td class="content-cell">${escapeHtml(log.content)}</td>
+    <th class="label">주 제</th>
+    <td class="value-cell" colspan="4">${escapeHtml(log.subject) || '—'}</td>
   </tr>
-  ${log.image_urls.length > 0 ? `
+
+  <!-- 멘토링 내용 본문 -->
   <tr>
-    <th>사 진 첨 부</th>
-    <td><div class="image-cell">${imagesHtml}</div></td>
-  </tr>` : ''}
+    <th class="label">멘토링 내용</th>
+    <td class="content-cell" colspan="4">${escapeHtml(log.content)}</td>
+  </tr>
+
+  ${photoRow}
 </table>
+
 <div class="submit-section">
-  위와 같이 [${escapeHtml(log.program_name)}] 멘토링 상담일지를 제출합니다.<br/>
+  위와 같이 멘토링 상담일지를 제출합니다.<br/>
   ${formattedDate}<br/><br/>
-  성명 &nbsp;&nbsp; ${signatureHtml}
+  성명 &nbsp;&nbsp; ${escapeHtml(log.mentor_name)} &nbsp;&nbsp; ${signatureHtml}
 </div>
+
 <div class="recipient-line">
   ${escapeHtml(log.recipient) || '담당자'} 귀하
 </div>
+
 </body>
 </html>
 `.trim();
@@ -180,7 +260,7 @@ export async function downloadMentoringLogPdf(log: MentoringLogForPdf): Promise<
   container.innerHTML = html;
   document.body.appendChild(container);
 
-  const fileNameParts = ['멘토링일지', log.mentor_name, log.log_date ?? ''].filter(Boolean);
+  const fileNameParts = ['멘토링상담일지', log.mentor_name, log.log_date ?? ''].filter(Boolean);
   const fileName = fileNameParts.join('_') + '.pdf';
 
   try {

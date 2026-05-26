@@ -91,6 +91,8 @@ export interface MentoringLog {
   subject: string | null;            // 주제
   duration_min: number | null;       // 진행시간(분)
   recipient: string | null;          // 제출처
+  /** 박경수님 2026-05-26 양식 보강 — 참여팀명 (예: "1조 / 우리둥네수호대") */
+  team_name: string | null;
   status: MentoringLogStatus;
   submitted_at: string | null;
   approved_at: string | null;

@@ -17,12 +17,29 @@ interface AssignmentRow {
 }
 interface MenteeLite { id: string; name: string; organization: string | null }
 
+/** 박경수님 2026-05-26 — 수정 모드용 초기값. UPDATE 대상 일지의 핵심 필드. */
+export interface MentoringLogInitial {
+  id: string;
+  subject: string | null;
+  log_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  content: string;
+  next_plan: string | null;
+  recipient: string | null;
+  team_name: string | null;
+  mentee_ids: string[] | null;
+}
+
 interface Props {
   assignment: AssignmentRow;
   mentees: MenteeLite[];
   programName: string;
   mentorName: string;
   userId: string | null;
+  /** 박경수님 2026-05-26 — 신규 작성이면 undefined, 수정이면 기존 일지 데이터 */
+  initialLog?: MentoringLogInitial | null;
   onSaved: () => void;
   onCancel: () => void;
 }
@@ -36,6 +53,7 @@ interface FormState {
   content: string;
   next_plan: string;
   recipient: string;     // STEP-MENTORING-P1 — 제출처
+  team_name: string;     // 박경수님 2026-05-26 — 참여팀명
 }
 
 const INPUT_CLASS =
@@ -63,21 +81,23 @@ function todayIso(): string {
 }
 
 export default function MentoringLogForm({
-  assignment, mentees, programName, mentorName, userId, onSaved, onCancel,
+  assignment, mentees, programName, mentorName, userId, initialLog, onSaved, onCancel,
 }: Props) {
   const toast = useToast();
+  const isEdit = !!initialLog;
   const [form, setForm] = useState<FormState>({
-    subject: '',
-    log_date: todayIso(),
-    start_time: '09:00',
-    end_time: '11:00',
-    location: '',
-    content: '',
-    next_plan: '',
-    recipient: '',
+    subject: initialLog?.subject ?? '',
+    log_date: initialLog?.log_date ?? todayIso(),
+    start_time: initialLog?.start_time ?? '09:00',
+    end_time: initialLog?.end_time ?? '11:00',
+    location: initialLog?.location ?? '',
+    content: initialLog?.content ?? '',
+    next_plan: initialLog?.next_plan ?? '',
+    recipient: initialLog?.recipient ?? '',
+    team_name: initialLog?.team_name ?? '',
   });
-  // STEP-MENTORING-LOG-UX — 멘티 기본 체크 해제 (빈 배열)
-  const [selectedMentees, setSelectedMentees] = useState<string[]>([]);
+  // STEP-MENTORING-LOG-UX — 멘티 기본 체크 해제 (빈 배열). 수정 모드면 기존 mentee_ids prefill.
+  const [selectedMentees, setSelectedMentees] = useState<string[]>(initialLog?.mentee_ids ?? []);
   // STEP-MENTORING-LOG-UX — 첨부 파일 (일지 저장 후 일괄 INSERT)
   const [pendingFiles, setPendingFiles] = useState<UploadedFile[]>([]);
   const [saving, setSaving] = useState(false);
@@ -134,7 +154,7 @@ export default function MentoringLogForm({
     }
     setSaving(true);
     const durationMin = calcDurationMin(form.start_time, form.end_time);
-    const { data: savedLog, error } = await supabase.from('mentoring_logs').insert({
+    const payload = {
       assignment_id: assignment.id,
       program_id: assignment.program?.id ?? null,
       log_date: form.log_date,
@@ -147,42 +167,81 @@ export default function MentoringLogForm({
       content: form.content.trim(),
       next_plan: form.next_plan.trim() || null,
       recipient: form.recipient.trim() || null,
+      team_name: form.team_name.trim() || null,
       status: mode,
       submitted_at: mode === 'submitted' ? new Date().toISOString() : null,
-    }).select('id').single();
-    if (error || !savedLog) {
-      setSaving(false);
-      console.error('[mentoring-log-form] 일지 저장 실패:', error?.message);
-      toast.error('일지 저장에 실패했어요.');
-      return;
-    }
-    if (pendingFiles.length > 0) {
-      const fileRows = pendingFiles.map((f) => ({
-        log_id: (savedLog as { id: string }).id,
-        created_by: userId,
-        file_name: f.file_name,
-        file_url: f.file_url,
-        file_type: f.file_type,
-        file_size: f.file_size ?? null,
-      }));
-      const { error: fileErr } = await supabase.from('mentoring_log_files').insert(fileRows);
-      if (fileErr) {
-        const m = (fileErr.message ?? '').toLowerCase();
-        if (m.includes('does not exist') || m.includes('pgrst205')) {
-          toast.error('일지는 저장됐지만 파일 기능이 활성화되지 않았어요.');
+    };
+
+    // 박경수님 2026-05-26 — 수정 모드는 UPDATE, 신규는 INSERT.
+    let savedLogId: string | null = null;
+    if (isEdit && initialLog) {
+      const { error } = await supabase.from('mentoring_logs')
+        .update(payload).eq('id', initialLog.id);
+      if (error) {
+        setSaving(false);
+        console.error('[mentoring-log-form] 일지 수정 실패:', error.message);
+        const lower = (error.message ?? '').toLowerCase();
+        if (lower.includes('row-level security') || lower.includes('permission denied')) {
+          toast.error('이 일지는 더 이상 수정할 수 없어요. (이미 승인됐을 수 있어요)');
         } else {
-          console.error('[mentoring-log-form] 파일 저장 실패:', fileErr.message);
-          toast.error('일지는 저장됐지만 파일 저장 중 오류가 발생했어요.');
+          toast.error('일지 수정에 실패했어요.');
+        }
+        return;
+      }
+      savedLogId = initialLog.id;
+    } else {
+      const { data: savedLog, error } = await supabase.from('mentoring_logs')
+        .insert(payload).select('id').single();
+      if (error || !savedLog) {
+        setSaving(false);
+        console.error('[mentoring-log-form] 일지 저장 실패:', error?.message);
+        toast.error('일지 저장에 실패했어요.');
+        return;
+      }
+      savedLogId = (savedLog as { id: string }).id;
+    }
+
+    if (pendingFiles.length > 0 && savedLogId) {
+      // 수정 모드에서는 이미 INSERT된 파일(id 있음)은 건너뜀
+      const newFiles = pendingFiles.filter((f) => !f.id);
+      if (newFiles.length > 0) {
+        const fileRows = newFiles.map((f) => ({
+          log_id: savedLogId,
+          created_by: userId,
+          file_name: f.file_name,
+          file_url: f.file_url,
+          file_type: f.file_type,
+          file_size: f.file_size ?? null,
+        }));
+        const { error: fileErr } = await supabase.from('mentoring_log_files').insert(fileRows);
+        if (fileErr) {
+          const m = (fileErr.message ?? '').toLowerCase();
+          if (m.includes('does not exist') || m.includes('pgrst205')) {
+            toast.error('일지는 저장됐지만 파일 기능이 활성화되지 않았어요.');
+          } else {
+            console.error('[mentoring-log-form] 파일 저장 실패:', fileErr.message);
+            toast.error('일지는 저장됐지만 파일 저장 중 오류가 발생했어요.');
+          }
         }
       }
     }
     setSaving(false);
-    toast.success(mode === 'submitted' ? '멘토링 일지를 제출했어요. PM 승인 대기 중.' : '임시저장됐어요.');
+    const msg = isEdit
+      ? (mode === 'submitted' ? '멘토링 일지를 다시 제출했어요. PM 승인 대기 중.' : '수정사항을 임시저장했어요.')
+      : (mode === 'submitted' ? '멘토링 일지를 제출했어요. PM 승인 대기 중.' : '임시저장됐어요.');
+    toast.success(msg);
     onSaved();
   }
 
   return (
     <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 space-y-4">
+      {/* 박경수님 2026-05-26 — 수정 모드 표시 배너 */}
+      {isEdit && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 font-semibold">
+          ✏️ 수정 모드 — 기존 일지를 수정 중입니다.
+        </div>
+      )}
+
       <div>
         <label className="text-xs font-semibold text-slate-700 block mb-1">사업명</label>
         <div className={READONLY_CLASS + ' flex items-center truncate'}>{programName}</div>
@@ -214,10 +273,20 @@ export default function MentoringLogForm({
           className={INPUT_CLASS} />
       </div>
 
+      {/* 박경수님 2026-05-26 — 참여팀명 (양식 [멘티] 첫 줄) */}
+      <div>
+        <label className="text-xs font-semibold text-slate-700 block mb-1">참여팀명</label>
+        <input type="text" value={form.team_name} disabled={saving}
+          onChange={(e) => setForm({ ...form, team_name: e.target.value })}
+          placeholder="예) 1조 / 우리둥네수호대"
+          className={INPUT_CLASS} />
+        <p className="text-[11px] text-slate-400 mt-1">팀 이름·조 번호 등을 입력해 주세요. (없으면 비워두세요)</p>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-            멘티 ({selectedMentees.length}/{mentees.length})
+            참여자 ({selectedMentees.length}/{mentees.length})
           </label>
           {mentees.length === 0 ? (
             <div className={READONLY_CLASS + ' italic flex items-center text-slate-400'}>배정된 멘티가 없어요.</div>
@@ -295,7 +364,7 @@ export default function MentoringLogForm({
         </p>
       </div>
 
-      {/* STEP-MENTORING-P1 — 임시저장 / 제출 분리 */}
+      {/* STEP-MENTORING-P1 — 임시저장 / 제출 분리. 박경수님 2026-05-26 — 수정 모드 라벨 분기. */}
       <div className="flex items-center justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} disabled={saving} className={BTN_GHOST}>
           <X size={14} /> 취소
@@ -305,7 +374,8 @@ export default function MentoringLogForm({
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 임시저장
         </button>
         <button type="button" onClick={() => void handleSave('submitted')} disabled={saving} className={BTN_PRIMARY}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} 제출하기
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+          {isEdit ? ' 다시 제출하기' : ' 제출하기'}
         </button>
       </div>
     </div>
