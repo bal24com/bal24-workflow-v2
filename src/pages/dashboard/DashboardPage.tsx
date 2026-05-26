@@ -25,6 +25,8 @@ import ProjectStagePanel from './components/ProjectStagePanel';
 import TaskAlertPanel from './components/TaskAlertPanel';
 import QuickActionsCard from './components/QuickActionsCard';
 import DashboardUrgentWidget from './components/DashboardUrgentWidget';
+// 박경수님 2026-05-27 STEP-HOME-CALENDAR-FIX — 최상단 미션·비전
+import MissionVisionSection from './components/MissionVisionSection';
 import PageHelpBanner from '../../components/PageHelpBanner';
 // 박경수님 + SkyClaw 2026-05-26 — 홈 하단 전체 재무 대시보드
 import FinancialDashboard from './FinancialDashboard';
@@ -132,6 +134,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 max-w-[1400px]">
+      {/* 박경수님 2026-05-27 STEP-HOME-CALENDAR-FIX — 기업 미션·비전 최상단 */}
+      <MissionVisionSection />
+
       <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
         <span aria-hidden="true">🏠</span>
         홈

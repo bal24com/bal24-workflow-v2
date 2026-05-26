@@ -3,18 +3,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Plus, Loader2, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '../../components/ui';
-import { supabase } from '../../lib/supabase';
-import type { ScheduleEvent } from '../../types/database';
-import { useUserProfile } from '../../hooks/useUserProfile';
-import { fetchDbHolidays, buildHolidayMap } from '../../utils/holidays';
+import { buildHolidayMap } from '../../utils/holidays';
 import {
   fetchMonthEvents,
   weekRange,
   SOURCE_EMOJI,
   SOURCE_LABEL,
-  isMissingTableError,
   type EventSource,
   type UnifiedEvent,
 } from './scheduleUtils';
@@ -22,27 +18,14 @@ import MonthCalendar from './MonthCalendar';
 import WeekCalendar from './WeekCalendar';
 import ScheduleEventCard from './ScheduleEventCard';
 import ScheduleEventList from './ScheduleEventList';
-import ScheduleEventModal from './ScheduleEventModal';
-import HolidayManageModal from './HolidayManageModal';
 
 type ViewMode = 'month' | 'week' | 'list';
 
-const ALL_SOURCES: EventSource[] = ['project', 'program', 'task', 'attendance', 'custom'];
-
-interface ProjectOption {
-  id: string;
-  name: string;
-}
-
-interface ProgramOption {
-  id: string;
-  name: string;
-  project_id: string | null;
-}
+// 박경수님 2026-05-27 STEP-HOME-CALENDAR-FIX — programs · tasks 2종만 노출
+const ALL_SOURCES: EventSource[] = ['program', 'task'];
 
 export default function SchedulePage() {
   const navigate = useNavigate();
-  const { isPM } = useUserProfile();
   const today = useMemo(() => new Date(), []);
 
   const [view, setView] = useState<ViewMode>('month');
@@ -54,44 +37,8 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [enabledSources, setEnabledSources] = useState<Set<EventSource>>(new Set(ALL_SOURCES));
 
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [programs, setPrograms] = useState<ProgramOption[]>([]);
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalDefaultDate, setModalDefaultDate] = useState<string | undefined>(undefined);
-  const [modalEditTarget, setModalEditTarget] = useState<ScheduleEvent | null>(null);
-
-  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
-  const [holidayMap, setHolidayMap] = useState<Map<string, string>>(() => buildHolidayMap([]));
-
-  const reloadHolidays = useCallback(async () => {
-    const db = await fetchDbHolidays();
-    setHolidayMap(buildHolidayMap(db));
-  }, []);
-
-  useEffect(() => {
-    void reloadHolidays();
-  }, [reloadHolidays]);
-
-  // 프로젝트·프로그램 옵션 한 번만 로드
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      // STEP-TRASH-FILTER-AUDIT — 휴지통 옵션 노출 차단
-      const [pRes, gRes] = await Promise.all([
-        supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
-        supabase.from('programs').select('id, name, project_id').is('deleted_at', null).order('created_at', { ascending: false }),
-      ]);
-      if (cancelled) return;
-      if (pRes.error) console.error('[schedule] projects 옵션 조회 실패:', pRes.error.message);
-      if (gRes.error) console.error('[schedule] programs 옵션 조회 실패:', gRes.error.message);
-      setProjects(pRes.data ?? []);
-      setPrograms((gRes.data ?? []) as ProgramOption[]);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // 박경수님 2026-05-27 STEP-HOME-CALENDAR-FIX — 공휴일 표시 제거 (빈 Map 고정)
+  const holidayMap = useMemo<Map<string, string>>(() => buildHolidayMap([]), []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -164,37 +111,9 @@ export default function SchedulePage() {
     setWeekBase(now);
   };
 
-  const openCreate = (date?: string) => {
-    setModalEditTarget(null);
-    setModalDefaultDate(date);
-    setModalOpen(true);
-  };
-
-  const openEditCustom = async (event: UnifiedEvent) => {
-    if (event.source !== 'custom' || !event.relatedId) return;
-    const { data, error } = await supabase
-      .from('schedule_events')
-      .select('*')
-      .eq('id', event.relatedId)
-      .maybeSingle();
-    if (error || !data) {
-      // schedule_events 테이블 미적용 환경 → 조용히 skip (편집 불가 상태)
-      if (error && !isMissingTableError(error.message)) {
-        console.error('[schedule] 일정 조회 실패:', error.message);
-      }
-      return;
-    }
-    setModalEditTarget(data as ScheduleEvent);
-    setModalDefaultDate(undefined);
-    setModalOpen(true);
-  };
-
+  // 박경수님 2026-05-27 STEP-HOME-CALENDAR-FIX — program · task 2종만 처리
   const handleEventClick = (event: UnifiedEvent) => {
     switch (event.source) {
-      case 'project':
-        // STEP-UX-FIXES — 프로젝트 바 클릭 → 해당 프로젝트 상세
-        if (event.relatedId) navigate(`/projects/${event.relatedId}`);
-        break;
       case 'task':
         // task의 relatedId 는 project_id 로 매핑됨 (없으면 task id)
         if (event.relatedId) navigate(`/projects/${event.relatedId}`);
@@ -202,12 +121,6 @@ export default function SchedulePage() {
       case 'program':
         if (event.relatedId) navigate(`/programs/${event.relatedId}`);
         else navigate('/programs');
-        break;
-      case 'attendance':
-        if (event.relatedId) navigate(`/attendance/${event.relatedId}`);
-        break;
-      case 'custom':
-        void openEditCustom(event);
         break;
       default:
         break;
@@ -249,16 +162,7 @@ export default function SchedulePage() {
             ))}
           </div>
 
-          {isPM && (
-            <Button variant="outline" onClick={() => setHolidayModalOpen(true)}>
-              <CalendarDays size={16} className="mr-1.5" aria-hidden="true" />
-              휴일 관리
-            </Button>
-          )}
-          <Button variant="primary" onClick={() => openCreate()}>
-            <Plus size={16} className="mr-1.5" aria-hidden="true" />
-            일정 추가
-          </Button>
+          {/* 박경수님 2026-05-27 STEP-HOME-CALENDAR-FIX — 휴일 관리·일정 추가 제거 (프로그램·태스크만 표시) */}
         </div>
       </header>
 
@@ -323,7 +227,6 @@ export default function SchedulePage() {
             month={month}
             events={filteredEvents}
             holidayMap={holidayMap}
-            onCellClick={(date) => openCreate(date)}
             onEventClick={handleEventClick}
           />
           {/* STEP-UX-FIXES — 달력 하단 텍스트 일정 리스트 */}
@@ -340,7 +243,6 @@ export default function SchedulePage() {
           events={filteredEvents}
           holidayMap={holidayMap}
           onEventClick={handleEventClick}
-          onCellClick={(date) => openCreate(date)}
         />
       ) : (
         <div className="space-y-2">
@@ -355,24 +257,6 @@ export default function SchedulePage() {
           )}
         </div>
       )}
-
-      <ScheduleEventModal
-        open={modalOpen}
-        defaultDate={modalDefaultDate}
-        editTarget={modalEditTarget}
-        projects={projects}
-        programs={programs}
-        onClose={() => setModalOpen(false)}
-        onSaved={() => {
-          void reload();
-        }}
-      />
-
-      <HolidayManageModal
-        open={holidayModalOpen}
-        onClose={() => setHolidayModalOpen(false)}
-        onChanged={() => void reloadHolidays()}
-      />
     </div>
   );
 }

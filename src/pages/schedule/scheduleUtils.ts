@@ -1,6 +1,6 @@
 // bal24 v2 — 일정·캘린더 이벤트 통합 유틸 (STEP 17)
-// projects · tasks · programs · attendance_sessions · schedule_events 5종을
-// 하나의 UnifiedEvent[] 로 병합해서 SchedulePage 에 전달
+// 박경수님 2026-05-27 STEP-HOME-CALENDAR-FIX — programs · tasks 2종만 fetch.
+// project · attendance · custom 은 화면 단순화를 위해 fetch 자체를 제거 (비용 절감).
 
 import { supabase } from '../../lib/supabase';
 
@@ -113,24 +113,13 @@ function dDayBadge(dueIso: string): string {
   return `D-${diff}`;
 }
 
-/** 해당 월의 전체 이벤트를 통합하여 반환 */
+/** 해당 월의 전체 이벤트를 통합하여 반환 (programs + tasks 2종만) */
 export async function fetchMonthEvents(year: number, month: number): Promise<UnifiedEvent[]> {
   const { startDate, endDate } = monthRange(year, month);
 
-  const [projects, tasks, programs, sessions, customs] = await Promise.all([
-    // 0) 프로젝트 기간 (STEP-UX-FIXES — 배경 바로 표시)
-    // STEP-SCHEDULE-DELETED-FIX — 휴지통 (deleted_at IS NOT NULL) 제외
-    supabase
-      .from('projects')
-      .select('id, name, start_date, end_date')
-      .is('deleted_at', null)
-      .not('start_date', 'is', null)
-      .not('end_date', 'is', null)
-      .lte('start_date', endDate)
-      .gte('end_date', startDate),
-    // 1) 태스크 마감일 (완료 제외)
-    // STEP-TRASH-FILTER-AUDIT — projects!inner 가 컨소시엄 전용 태스크(project_id NULL)를 제외하던 회귀 수정.
-    // left join 으로 가져온 뒤 클라이언트에서 부모 휴지통 필터.
+  // 박경수님 2026-05-27 STEP-HOME-CALENDAR-FIX — programs · tasks 2종만 fetch.
+  const [tasks, programs] = await Promise.all([
+    // 1) 태스크 마감일 (완료 제외) — 부모 프로젝트 휴지통 클라이언트 필터
     supabase
       .from('tasks')
       .select('id, project_id, title, due_date, status, projects(deleted_at)')
@@ -147,46 +136,12 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       .not('end_date', 'is', null)
       .lte('start_date', endDate)
       .gte('end_date', startDate),
-    // 3) 출석 세션 (부모 프로그램 휴지통 제외)
-    supabase
-      .from('attendance_sessions')
-      .select('id, title, session_date, start_time, end_time, program_id, programs!inner(deleted_at)')
-      .is('programs.deleted_at', null)
-      .gte('session_date', startDate)
-      .lte('session_date', endDate),
-    // 4) 수동 등록 일정
-    supabase
-      .from('schedule_events')
-      .select('*')
-      .gte('event_date', startDate)
-      .lte('event_date', endDate),
   ]);
 
-  if (projects.error) console.error('[schedule] projects 조회 실패:', projects.error.message);
   if (tasks.error) console.error('[schedule] tasks 조회 실패:', tasks.error.message);
   if (programs.error) console.error('[schedule] programs 조회 실패:', programs.error.message);
-  if (sessions.error) console.error('[schedule] attendance_sessions 조회 실패:', sessions.error.message);
-  // schedule_events 가 아직 마이그레이션 안 된 환경 → 빈 결과로 안전 fallback
-  if (customs.error && !isMissingTableError(customs.error.message)) {
-    console.error('[schedule] schedule_events 조회 실패:', customs.error.message);
-  }
 
   const events: UnifiedEvent[] = [];
-
-  for (const p of projects.data ?? []) {
-    if (!p.start_date || !p.end_date) continue;
-    events.push({
-      id: `project-${p.id}`,
-      title: p.name,
-      date: p.start_date,
-      endDate: p.end_date,
-      allDay: true,
-      source: 'project',
-      color: SOURCE_COLOR.project,
-      relatedId: p.id,
-      relatedType: 'project',
-    });
-  }
 
   for (const t of tasks.data ?? []) {
     if (!t.due_date) continue;
@@ -220,39 +175,6 @@ export async function fetchMonthEvents(year: number, month: number): Promise<Uni
       color: SOURCE_COLOR.program,
       relatedId: p.id,
       relatedType: 'program',
-    });
-  }
-
-  for (const s of sessions.data ?? []) {
-    events.push({
-      id: `session-${s.id}`,
-      title: s.title,
-      date: s.session_date,
-      startTime: s.start_time?.slice(0, 5) ?? undefined,
-      endTime: s.end_time?.slice(0, 5) ?? undefined,
-      allDay: !s.start_time,
-      source: 'attendance',
-      color: SOURCE_COLOR.attendance,
-      relatedId: s.id,
-      relatedType: 'session',
-    });
-  }
-
-  for (const e of customs.data ?? []) {
-    events.push({
-      id: `custom-${e.id}`,
-      title: e.title,
-      date: e.event_date,
-      startTime: e.start_time?.slice(0, 5) ?? undefined,
-      endTime: e.end_time?.slice(0, 5) ?? undefined,
-      allDay: e.all_day,
-      source: 'custom',
-      color: e.color ?? SOURCE_COLOR.custom,
-      relatedId: e.id,
-      relatedType: 'custom',
-      projectId: e.project_id ?? null,
-      programId: e.program_id ?? null,
-      description: e.description ?? null,
     });
   }
 
