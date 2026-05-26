@@ -33,6 +33,8 @@ export interface ProjectFinance {
   vatPayable: number;             // 납부 부가세 = max(0, salesVat - vatAmount)
   remaining: number;
   settledPct: number;
+  // 박경수님 + SkyClaw STEP-TABLE-COMPACT PART D (2026-05-28) — 견적 단계에서 사업비 표시용
+  contractIsProposal: boolean;    // contractTotal 가 견적(estimate_final_amount) 폴백 기준인지
 }
 
 export interface ProjectMembersPreview {
@@ -66,7 +68,8 @@ export function activityLogTypeLabel(t: ActivityLogType): string {
 /** 재무 요약 — 구 income/expenses + 신 income_contracts/payroll_expenses + estimates 합산 */
 export async function fetchProjectFinance(projectId: string): Promise<ProjectFinance> {
   const [projRes, incomeRes, expenseRes, contractRes, payrollRes, estimateRes] = await Promise.all([
-    supabase.from('projects').select('budget').eq('id', projectId).maybeSingle(),
+    // 박경수님 + SkyClaw STEP-TABLE-COMPACT PART D (2026-05-28) — estimate_final_amount 폴백용 fetch
+    supabase.from('projects').select('budget, estimate_final_amount, estimate_includes_vat').eq('id', projectId).maybeSingle(),
     supabase.from('income').select('amount, status').eq('project_id', projectId).is('deleted_at', null),
     supabase.from('expenses').select('gross_amount, status').eq('project_id', projectId).is('deleted_at', null),
     // 박경수님 + SkyClaw STEP-FINANCE-LABEL-VAT — vat_type 추가 fetch (매출세액 계산용)
@@ -133,7 +136,11 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
   // 박경수님 보고 fix (STEP-FINANCE-SUMMARY-FIX 2026-05-27) — 순지출 = 지출 - 부가세 - 원천세
   //   기존: netExpense = expenseTotal - vatAmount (원천세 누락 → 인건비 환경에서 netExpense==expenseTotal 버그)
   //   변경: 부가세 + 원천세 둘 다 차감. 박경수님 환경 운영비 0건일 때도 인건비 원천세 정상 반영
-  const contractTotal = contractRows.reduce((s, r) => s + Number(r.contract_amount ?? 0), 0);
+  const contractSum = contractRows.reduce((s, r) => s + Number(r.contract_amount ?? 0), 0);
+  // 박경수님 + SkyClaw STEP-TABLE-COMPACT PART D (2026-05-28) — 견적 단계 (계약 전) 에서도 estimate_final_amount 폴백
+  const estimateFinal = Number((projRes.data as { estimate_final_amount?: number | null } | null)?.estimate_final_amount ?? 0);
+  const contractTotal = contractSum > 0 ? contractSum : estimateFinal;
+  const contractIsProposal = contractSum === 0 && estimateFinal > 0;
   const netExpense = expenseTotal - vatAmount - withholdingTax;
   // 박경수님 + SkyClaw STEP-FINANCE-LABEL-VAT — 매출세액 (vat_type='과세' 인 행만, 포함가 역산)
   const salesVat = contractRows
@@ -143,7 +150,7 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
   const remaining = budget - expenseTotal;
   const settledPct = budget > 0 ? Math.min(100, Math.round((incomeTotal / budget) * 100)) : 0;
 
-  return { budget, contractTotal, incomeTotal, expectedIncomeTotal, expenseTotal, pendingExpenseTotal, paidExpenseTotal, payrollTotal, proposalTotal, outsourceTotal, operationTotal, vatAmount, withholdingTax, netExpense, salesVat, vatPayable, remaining, settledPct };
+  return { budget, contractTotal, contractIsProposal, incomeTotal, expectedIncomeTotal, expenseTotal, pendingExpenseTotal, paidExpenseTotal, payrollTotal, proposalTotal, outsourceTotal, operationTotal, vatAmount, withholdingTax, netExpense, salesVat, vatPayable, remaining, settledPct };
 }
 
 /** 참여자 미리보기 — project_members 카운트 + 최근 등록 N명 이름 */

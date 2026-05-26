@@ -272,11 +272,13 @@ function PayrollPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {visible.map((r) => {
+              {visible.map((r, idx) => {
                 const hasReceipt = (r.receipt_urls?.length ?? 0) > 0;
                 const needReceipt = !hasReceipt && r.expense_type !== '운영인건비';
+                // STEP-TABLE-COMPACT PART B (2026-05-28) — 짝수 행 옅은 배경 (밀착 디자인)
+                const bgClass = selectedIds.has(r.id) ? 'bg-violet-50/40' : (idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60');
                 return (
-                  <tr key={r.id} className={`group hover:bg-violet-50/40 cursor-pointer ${selectedIds.has(r.id) ? 'bg-violet-50/30' : ''}`}
+                  <tr key={r.id} className={`group hover:bg-violet-50/40 cursor-pointer transition-colors ${bgClass}`}
                     onClick={() => setDetailId(r.id)}>
                     {/* 박경수님 + SkyClaw — 개별 선택 (hover 시 노출, 평소 투명) */}
                     <td className="w-8 px-3 py-2" onClick={(e) => e.stopPropagation()}>

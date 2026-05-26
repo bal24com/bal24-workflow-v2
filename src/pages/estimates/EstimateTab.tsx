@@ -309,13 +309,14 @@ export default function EstimateTab({ projectId, projectName }: Props) {
               <tr><td colSpan={10} className="px-3 py-6 text-center text-xs text-slate-400 italic">
                 {items.length === 0 ? '견적 항목이 아직 없어요. [항목 추가] 로 시작해 보세요.' : '필터/검색 결과가 없어요.'}
               </td></tr>
-            ) : visibleItems.map((it) => {
+            ) : visibleItems.map((it, viewIdx) => {
               const idx = it._idx;
               const sub = (Number(it.unit_price) || 0) * (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1);
               const { netAmount } = calcTax(sub, it.tax_rate_type);
               const locked = !!it._converted;
+              // STEP-TABLE-COMPACT PART A — 짝수 행 옅은 배경
               return (
-                <tr key={idx} className={locked ? 'bg-emerald-50/30' : 'hover:bg-violet-50/30'}>
+                <tr key={idx} className={`${locked ? 'bg-emerald-50/30' : (viewIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60')} hover:bg-violet-50/30 border-b border-slate-100 transition-colors`}>
                   {/* 박경수님 요청 — 프로그램 컬럼 제거. addItem 시 자동 prefill. 프로그램별 메인 탭으로 분류 가능 */}
                   <td className="px-2 py-1">
                     <Input list="estimate-categories" value={it.category} onChange={(e) => updateItem(idx, { category: e.target.value })} disabled={locked} />

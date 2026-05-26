@@ -2,7 +2,7 @@
 // 강사 통합 포털 · 개요 탭 — 담당 프로그램 카드 + D-7 일정 + 교육 개요·전체 커리큘럼 (PART B 2026-05-28)
 
 import { useEffect, useState } from 'react';
-import { Loader2, Calendar, BookOpen, AlertCircle, CheckCircle2, Info, ListChecks, User } from 'lucide-react';
+import { Loader2, BookOpen, CheckCircle2, Info, ListChecks, User } from 'lucide-react';
 import { formatDateKo } from '../../../lib/utils';
 import EmptyState from '../../../components/EmptyState';
 import { BADGE_BASE } from '../../../utils/statusStyles';
@@ -45,8 +45,9 @@ const CARD_CLASS =
 export default function StaffOverviewTab({
   staff, programs, programsLoading, selectedProgramId, onSelectProgram,
 }: Props) {
-  const [upcoming, setUpcoming] = useState<StaffUpcomingSession[]>([]);
-  const [upcomingLoading, setUpcomingLoading] = useState(true);
+  // STEP-TABLE-COMPACT PART C (2026-05-28) — D-7 위젯 UI 제거. 데이터 fetch 도 비활성.
+  const [, setUpcoming] = useState<StaffUpcomingSession[]>([]);
+  const [, setUpcomingLoading] = useState(false);
   // STEP-STAFF-PORTAL-REDESIGN PART B (2026-05-28) — 선택 프로그램의 교육 개요 + 전체 커리큘럼
   const [programDetail, setProgramDetail] = useState<ProgramDetail | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumRow[]>([]);
@@ -94,9 +95,7 @@ export default function StaffOverviewTab({
     return x?.name ?? '미정';
   };
 
-  const filteredUpcoming = selectedProgramId
-    ? upcoming.filter((u) => u.program_id === selectedProgramId)
-    : upcoming;
+  // STEP-TABLE-COMPACT PART C — filteredUpcoming 비사용 (D-7 위젯 제거)
 
   return (
     <div className="space-y-4">
@@ -158,32 +157,8 @@ export default function StaffOverviewTab({
         )}
       </section>
 
-      {/* D-7 다가오는 일정 — 선택된 프로그램 기준 필터링 */}
-      <section className={CARD_CLASS}>
-        <h2 className="text-base font-bold text-[#1E1B4B] mb-3 flex items-center gap-2">
-          <Calendar size={16} className="text-violet-500" aria-hidden="true" />
-          다가오는 일정 (7일 이내)
-        </h2>
-        {upcomingLoading ? (
-          <div className="flex justify-center py-6">
-            <Loader2 size={20} className="animate-spin text-violet-400" aria-hidden="true" />
-          </div>
-        ) : filteredUpcoming.length === 0 ? (
-          <EmptyState emoji="📅"
-            title={selectedProgramId ? '선택한 프로그램의 예정된 일정이 없어요.' : '앞으로 예정된 일정이 없어요.'} />
-        ) : (
-          <ul className="space-y-2">
-            {filteredUpcoming.map((s) => (
-              <li key={s.id} className="rounded-xl border border-violet-100 bg-violet-50/30 p-3 flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-[#1E1B4B] truncate">{s.title}</p>
-                <p className="text-xs text-slate-500 tabular-nums shrink-0">
-                  {formatDateKo(s.session_date)}{s.start_time ? ` · ${s.start_time.slice(0, 5)}` : ''}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* STEP-TABLE-COMPACT PART C (2026-05-28) — D-7 다가오는 일정 위젯 제거 (일정 탭으로 통합)
+          기존 fetchUpcomingSchedule 호출은 유지하되 UI 만 미노출 → 다른 활용처(useEffect) 영향 X */}
 
       {/* PART B — 교육 개요 (선택 프로그램) */}
       {selectedProgramId && programDetail && (
@@ -236,16 +211,13 @@ export default function StaffOverviewTab({
         </section>
       )}
 
-      {/* 미작성 일지 알림 placeholder */}
-      <section className={CARD_CLASS}>
-        <h2 className="text-base font-bold text-[#1E1B4B] mb-3 flex items-center gap-2">
-          <AlertCircle size={16} className="text-orange-500" aria-hidden="true" />
-          미작성 일지
-        </h2>
-        <p className="text-sm text-slate-400 italic text-center py-4">
-          일지 탭에서 정확한 카운트가 표시될 예정이에요.
-        </p>
-      </section>
+      {/* STEP-TABLE-COMPACT PART C (2026-05-28) — 프로젝트 설명 카드 (description 있을 때만) */}
+      {selectedProgramId && programDetail?.description && (
+        <section className={CARD_CLASS}>
+          <h3 className="text-sm font-bold text-violet-700 mb-2">📝 프로젝트 설명</h3>
+          <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{programDetail.description}</p>
+        </section>
+      )}
     </div>
   );
 }

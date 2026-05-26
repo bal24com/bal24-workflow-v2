@@ -57,10 +57,12 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
             : 0;
           return (
         <div className="flex flex-col gap-2.5">
-          {/* 전체 사업비 (계약금액 합) — 상단 강조 */}
+          {/* 전체 사업비 — 박경수님 + SkyClaw STEP-TABLE-COMPACT PART D (2026-05-28): 계약 전이면 제안금액 기준 표시 */}
           <div className="rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 -mx-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-violet-700">전체 사업비 (계약금액)</span>
+              <span className="text-xs font-bold text-violet-700">
+                전체 사업비 {data.contractIsProposal ? <span className="text-[10px] font-normal text-violet-500">(제안금액 기준)</span> : <span className="text-[10px] font-normal text-violet-500">(계약금액 기준)</span>}
+              </span>
               <span className="text-sm font-bold text-violet-700 tabular-nums">{formatMoney(contractTotal)}</span>
             </div>
             <div className="flex items-center justify-between mt-0.5">
