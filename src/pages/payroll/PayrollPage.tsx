@@ -11,7 +11,7 @@ import { supabase } from '../../lib/supabase';
 import type { PayrollPaymentStatus } from '../../types/database';
 import {
   fetchPayroll, softDeletePayroll, bulkSoftDeletePayroll, calcPayrollSummary, maskIdNo,
-  isOutsourceType, isOperationType,
+  isPersonCategory,
   PAYROLL_STATUS_VALUES, PAYROLL_STATUS_STYLE,
   type PayrollRow,
 } from './payrollUtils';
@@ -277,7 +277,7 @@ export default function PayrollPage() {
                     className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                 </th>
                 <SortableTh k="project"        sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">프로젝트</SortableTh>
-                <SortableTh k="expense_type"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">항목</SortableTh>
+                <SortableTh k="expense_type"   sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">항목</SortableTh>
                 <SortableTh k="payee_name"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left">성명/내용</SortableTh>
                 <SortableTh k="subtotal"       sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">단가×회수</SortableTh>
                 <SortableTh k="tax_amount"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right">세액 (원천/부가)</SortableTh>
@@ -303,12 +303,9 @@ export default function PayrollPage() {
                         className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                     </td>
                     <td className="px-3 py-2 text-xs text-muted">{r.project?.name ?? '-'}</td>
-                    <td className="px-3 py-2 text-right text-xs whitespace-nowrap">
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border mr-1 ${
-                        isOutsourceType(r.expense_type) ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
-                        : isOperationType(r.expense_type) ? 'bg-orange-50 text-orange-700 border-orange-200'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                      }`}>{isOutsourceType(r.expense_type) ? '인건비' : isOperationType(r.expense_type) ? '운영비' : '기타'}</span>
+                    {/* 박경수님 fix (2026-05-26) — isPersonCategory 통일 + 좌측 정렬 + '기타' 버킷 제거 */}
+                    <td className="px-3 py-2 text-left text-xs whitespace-nowrap">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border mr-1 ${isPersonCategory(r.expense_type) ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>{isPersonCategory(r.expense_type) ? '인건비' : '운영비'}</span>
                       {r.expense_type}
                     </td>
                     <td className="px-3 py-2">

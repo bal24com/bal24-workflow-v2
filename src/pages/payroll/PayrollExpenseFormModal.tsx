@@ -18,42 +18,19 @@ import {
 } from './payrollUtils';
 // 박경수님 보고 fix (2026-05-26) — 외주/급여 등록 모달도 견적 카테고리를 datalist 에 노출
 import { useEstimateCategories } from '../../hooks/useEstimateCategories';
+// 박경수님 보고 fix (2026-05-26) — 수정 모드 증빙 업로드 (receipt_urls 활용)
+import PayrollReceiptUpload from './PayrollReceiptUpload';
 
 interface RefOption { id: string; name: string }
 interface ProgramOption { id: string; name: string; project_id: string | null }
 // STEP-ACCOUNTING-FOLLOWUP7 — 계약 옵션 (선택 시 project/program/consortium/client 자동 prefill)
-interface ContractOption {
-  id: string;
-  contract_name: string;
-  project_id: string | null;
-  program_id: string | null;
-  consortium_id: string | null;
-  client_id: string | null;
-}
+interface ContractOption { id: string; contract_name: string; project_id: string | null; program_id: string | null; consortium_id: string | null; client_id: string | null }
+interface Props { open: boolean; target: PayrollRow | null; defaultType: PayrollExpenseType; defaultContractId?: string; onClose: () => void; onSaved: () => void }
 
-interface Props {
-  open: boolean;
-  target: PayrollRow | null;
-  defaultType: PayrollExpenseType;
-  /** 계약 상세에서 [+ 외주/급여 추가] 로 열 때 — contract_id 자동 prefill */
-  defaultContractId?: string;
-  onClose: () => void;
-  onSaved: () => void;
-}
-
-const BANK_OPTIONS = [
-  '국민은행', '신한은행', '우리은행', '하나은행', '농협은행',
-  '기업은행', '카카오뱅크', '토스뱅크', '새마을금고', '우체국', '기타',
-];
+const BANK_OPTIONS = ['국민은행', '신한은행', '우리은행', '하나은행', '농협은행', '기업은행', '카카오뱅크', '토스뱅크', '새마을금고', '우체국', '기타'];
 
 function emptyForm(t: PayrollExpenseType) {
-  return {
-    expense_type: t, description: '', payee_name: '', payee_id_no: '',
-    bank_name: '', bank_account: '', unit_price: '', quantity: '1',
-    tax_rate_type: '3.3' as PayrollTaxRateType,
-    payment_status: '대기' as PayrollPaymentStatus,
-    paid_at: '', project_id: '', program_id: '', contract_id: '', memo: '',
-  };
+  return { expense_type: t, description: '', payee_name: '', payee_id_no: '', bank_name: '', bank_account: '', unit_price: '', quantity: '1', tax_rate_type: '3.3' as PayrollTaxRateType, payment_status: '대기' as PayrollPaymentStatus, paid_at: '', project_id: '', program_id: '', contract_id: '', memo: '' };
 }
 
 export default function PayrollExpenseFormModal({
@@ -66,6 +43,8 @@ export default function PayrollExpenseFormModal({
   const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [projectSearch, setProjectSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  // 박경수님 보고 fix (2026-05-26) — 수정 모드 증빙 (target.receipt_urls 초기값, 즉시 DB 반영)
+  const [receiptUrls, setReceiptUrls] = useState<string[]>(target?.receipt_urls ?? []);
   // 박경수님 fix — 견적 카테고리 동적 로드 + PAYROLL_BASE_TYPES merge (중복 제거, 견적 우선)
   const { categories: estimateCats } = useEstimateCategories(form.program_id || null, form.project_id || null);
   const typeOptions = useMemo(() => Array.from(new Set([...estimateCats, ...PAYROLL_BASE_TYPES])), [estimateCats]);
@@ -116,6 +95,7 @@ export default function PayrollExpenseFormModal({
       });
       const projName = (target as PayrollRow).project?.name;
       setProjectSearch(projName ?? '');
+      setReceiptUrls(target.receipt_urls ?? []);
     } else {
       const empty = emptyForm(defaultType);
       // STEP-ACCOUNTING-FOLLOWUP7 — 계약 상세에서 [+ 추가] 로 열린 경우, 그 계약의 정보 자동 prefill
@@ -129,6 +109,7 @@ export default function PayrollExpenseFormModal({
       }
       setForm(empty);
       setProjectSearch('');
+      setReceiptUrls([]);
     }
   }, [open, target, defaultType, defaultContractId, contracts]);
 
@@ -281,11 +262,22 @@ export default function PayrollExpenseFormModal({
         </div>
 
         {/* 프로그램 선택 — 프로젝트 선택 시에만 노출, 해당 프로젝트의 프로그램만 */}
+        {/* 박경수님 보고 fix (2026-05-26) — 프로그램 선택 시 해당 program_id 의 contract 자동 연결 (1건 한정) */}
         {form.project_id && programMatches.length > 0 && (
           <Field label="연결 프로그램 (선택)">
             <select
               value={form.program_id}
-              onChange={(e) => setForm({ ...form, program_id: e.target.value })}
+              onChange={(e) => {
+                const newProgramId = e.target.value;
+                const matchedContract = newProgramId
+                  ? contracts.find((c) => c.program_id === newProgramId)
+                  : null;
+                setForm({
+                  ...form,
+                  program_id: newProgramId,
+                  contract_id: matchedContract?.id ?? form.contract_id,
+                });
+              }}
               className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm"
             >
               <option value="">선택 안함</option>
@@ -382,6 +374,14 @@ export default function PayrollExpenseFormModal({
           <textarea value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} rows={2}
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="추가 메모" />
         </Field>
+
+        {/* 박경수님 보고 fix (2026-05-26) — 수정 모드에서만 증빙 업로드 (id 필요). 신규 등록은 저장 후 다시 열어서 업로드 */}
+        {target?.id && (
+          <PayrollReceiptUpload payrollId={target.id} receiptUrls={receiptUrls} onChange={setReceiptUrls} disabled={saving} />
+        )}
+        {!target?.id && (
+          <p className="text-[10px] text-slate-400">💡 증빙은 저장 후 다시 [수정] 으로 열어 업로드할 수 있어요.</p>
+        )}
       </div>
     </Modal>
   );
