@@ -100,7 +100,7 @@ export default function PayrollImportModal({ open, onClose, onImported }: Props)
           tax_rate_type: r.tax_rate_type ?? '3.3',
           tax_amount: taxAmount,
           net_amount: netAmount,
-          payment_status: '대기' as const,
+          payment_status: 'submitted' as const, // STEP-PAYROLL-STATUS-FLOW — 임포트 = 재무 영역 입력
         };
       });
       const { error } = await supabase.from('payroll_expenses').insert(payloads);

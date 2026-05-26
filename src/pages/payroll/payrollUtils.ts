@@ -44,15 +44,28 @@ export function isCompanyCategory(type: string): boolean {
   return !isPersonCategory(type);
 }
 
+// 박경수님 + SkyClaw STEP-PAYROLL-STATUS-FLOW (2026-05-28) — 영문 6단계
+// UI 표시는 PAYROLL_STATUS_LABEL 매핑으로 한글 유지
 export const PAYROLL_STATUS_VALUES: PayrollPaymentStatus[] = [
-  '대기', '완료', '후순위', '취소',
+  'draft', 'submitted', 'received', 'processing', 'paid', 'cancelled',
 ];
 
+export const PAYROLL_STATUS_LABEL: Record<PayrollPaymentStatus, string> = {
+  draft:      '작성중',
+  submitted:  '전송됨',
+  received:   '수신확인',
+  processing: '처리중',
+  paid:       '완료',
+  cancelled:  '취소',
+};
+
 export const PAYROLL_STATUS_STYLE: Record<PayrollPaymentStatus, string> = {
-  대기:   'bg-amber-50 text-amber-700 border-amber-200',
-  완료:   'bg-emerald-50 text-emerald-700 border-emerald-200',
-  후순위: 'bg-slate-50 text-slate-600 border-slate-200',
-  취소:   'bg-rose-50 text-rose-700 border-rose-200',
+  draft:      'bg-slate-50 text-slate-600 border-slate-200',
+  submitted:  'bg-violet-50 text-violet-700 border-violet-200',
+  received:   'bg-blue-50 text-blue-700 border-blue-200',
+  processing: 'bg-amber-50 text-amber-700 border-amber-200',
+  paid:       'bg-emerald-50 text-emerald-700 border-emerald-200',
+  cancelled:  'bg-rose-50 text-rose-700 border-rose-200',
 };
 
 export interface PayrollFilter {

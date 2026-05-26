@@ -12,7 +12,7 @@ import SubToggle from './SubToggle';
 import PaymentRequestFormModal, { type PaymentTarget } from './PaymentRequestFormModal';
 import PaymentSummaryCards from './PaymentSummaryCards';
 import EstimateImportModal from './EstimateImportModal';
-import { isPersonCategory, bulkSoftDeletePayroll, submitPaymentRequests } from '../../payroll/payrollUtils';
+import { isPersonCategory, bulkSoftDeletePayroll, submitPaymentRequests, PAYROLL_STATUS_STYLE, PAYROLL_STATUS_LABEL } from '../../payroll/payrollUtils';
 // STEP-PAYROLL-DETAIL-COMMENT — 행 클릭 상세 팝업 / STEP-RBAC-SETUP PART D — PM 확정 행 수정/삭제 차단
 import PayrollDetailModal from '../../payroll/PayrollDetailModal';
 import { useUserProfile } from '../../../hooks/useUserProfile';
@@ -46,12 +46,7 @@ interface Row {
   submitted_at?: string | null;
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  대기:   'bg-amber-50 text-amber-700 border-amber-200',
-  완료:   'bg-emerald-50 text-emerald-700 border-emerald-200',
-  후순위: 'bg-slate-50 text-slate-600 border-slate-200',
-  취소:   'bg-rose-50 text-rose-700 border-rose-200',
-};
+// STEP-PAYROLL-STATUS-FLOW — payrollUtils 의 PAYROLL_STATUS_STYLE/LABEL 재사용으로 단일화
 
 interface Props { programId: string; projectId: string | null }
 
@@ -351,7 +346,7 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                   </td>
                   <td className="px-3 py-2 text-center text-xs text-muted whitespace-nowrap">{r.paid_at ? formatDateKo(r.paid_at) : '-'}</td>
                   <td className="px-3 py-2 text-center">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${STATUS_STYLE[r.payment_status] ?? STATUS_STYLE['대기']}`}>{r.payment_status}</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${PAYROLL_STATUS_STYLE[r.payment_status as keyof typeof PAYROLL_STATUS_STYLE] ?? PAYROLL_STATUS_STYLE.submitted}`}>{PAYROLL_STATUS_LABEL[r.payment_status as keyof typeof PAYROLL_STATUS_LABEL] ?? r.payment_status}</span>
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     <span className="inline-flex items-center gap-1">

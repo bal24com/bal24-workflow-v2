@@ -198,7 +198,7 @@ export default function PaymentRequestFormModal({ open, programId, projectId, gr
 
       const res = isEdit
         ? await supabase.from('payroll_expenses').update(payload).eq('id', target!.id)
-        : await supabase.from('payroll_expenses').insert({ ...payload, payment_status: '대기' });
+        : await supabase.from('payroll_expenses').insert({ ...payload, payment_status: 'draft' }); // STEP-PAYROLL-STATUS-FLOW — PM 신규 작성 = draft
       if (res.error) {
         const raw = res.error.message.toLowerCase();
         console.error('[PaymentRequest] 저장 실패:', res.error.message);

@@ -78,7 +78,8 @@ export default function ProjectFinanceDetail({ projectId, startDate, endDate }: 
       const prgAgg = programs.map((p) => {
         const rows = exps.filter((r) => r.program_id === p.id);
         const totalExpense = rows.reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
-        const unpaid = rows.filter((r) => r.payment_status === '대기').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+        // STEP-PAYROLL-STATUS-FLOW — 미지급 = paid/cancelled 외 (영문 6단계)
+        const unpaid = rows.filter((r) => r.payment_status !== 'paid' && r.payment_status !== 'cancelled').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
         const budget = cons.filter((c) => c.program_id === p.id).reduce((s, c) => s + Number(c.contract_amount ?? 0), 0);
         return { id: p.id, name: p.name, budget, totalExpense, unpaid };
       });

@@ -194,7 +194,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
       .eq('project_id', projectId).is('deleted_at', null)
       .then(({ data }) => {
         const live = ((data ?? []) as Array<{ subtotal: number | string | null; expense_type: string; payment_status: string }>)
-          .filter((r) => r.payment_status !== '취소');
+          .filter((r) => r.payment_status !== 'cancelled');
         const sum = (rs: typeof live) => rs.reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
         const o = live.filter((r) => /^(강사료|촬영|기타외주)/.test(r.expense_type));
         const p = live.filter((r) => /^(운영비|운영인건비)/.test(r.expense_type));

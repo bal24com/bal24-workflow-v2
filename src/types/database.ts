@@ -1407,7 +1407,8 @@ export type PayrollExpenseType = string;
 export const PAYROLL_BASE_TYPES = ['강사료', '촬영', '운영비', '운영인건비', '기타외주'] as const;
 // STEP-ACCOUNTING-FOLLOWUP2 — '10' 부가세 10% (포함) 옵션 추가
 export type PayrollTaxRateType = '3.3' | '8.8' | '10' | '면세' | '없음';
-export type PayrollPaymentStatus = '대기' | '완료' | '후순위' | '취소';
+// 박경수님 + SkyClaw STEP-PAYROLL-STATUS-FLOW (2026-05-28) — 영문 6단계로 확장
+export type PayrollPaymentStatus = 'draft' | 'submitted' | 'received' | 'processing' | 'paid' | 'cancelled';
 
 export interface PayrollExpense {
   id: string;

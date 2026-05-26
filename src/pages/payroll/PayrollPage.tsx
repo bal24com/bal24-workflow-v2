@@ -12,7 +12,7 @@ import type { PayrollPaymentStatus } from '../../types/database';
 import {
   fetchPayroll, softDeletePayroll, bulkSoftDeletePayroll, calcPayrollSummary, maskIdNo,
   isPersonCategory,
-  PAYROLL_STATUS_VALUES, PAYROLL_STATUS_STYLE,
+  PAYROLL_STATUS_VALUES, PAYROLL_STATUS_STYLE, PAYROLL_STATUS_LABEL,
   type PayrollRow,
 } from './payrollUtils';
 import PayrollSummaryBar from './PayrollSummaryBar';
@@ -195,7 +195,7 @@ function PayrollPage() {
             <FilterRow label="상태">
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as PayrollPaymentStatus | 'all')} className="w-full h-8 rounded-md border border-slate-200 px-2 text-xs">
                 <option value="all">전체</option>
-                {PAYROLL_STATUS_VALUES.map((s) => <option key={s} value={s}>{s}</option>)}
+                {PAYROLL_STATUS_VALUES.map((s) => <option key={s} value={s}>{PAYROLL_STATUS_LABEL[s]}</option>)}
               </select>
             </FilterRow>
             <FilterRow label="지급월">
@@ -329,7 +329,7 @@ function PayrollPage() {
                     <td className="px-3 py-2 text-right font-bold text-violet-700 tabular-nums whitespace-nowrap">{formatMoney(r.net_amount && r.net_amount > 0 ? r.net_amount : r.subtotal)}</td>
                     <td className="px-3 py-2 text-xs text-muted whitespace-nowrap">{r.paid_at ? formatDateKo(r.paid_at) : '-'}</td>
                     <td className="px-3 py-2 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${PAYROLL_STATUS_STYLE[r.payment_status]}`}>{r.payment_status}</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold ${PAYROLL_STATUS_STYLE[r.payment_status]}`}>{PAYROLL_STATUS_LABEL[r.payment_status]}</span>
                     </td>
                     <td className="px-3 py-2 text-center text-[11px]">
                       {hasReceipt

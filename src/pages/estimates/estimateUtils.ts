@@ -118,7 +118,7 @@ export async function convertEstimateToPayroll(
       tax_rate_type: it.tax_rate_type,
       tax_amount: taxAmount,
       net_amount: netAmount,
-      payment_status: '대기',
+      payment_status: 'draft', // STEP-PAYROLL-STATUS-FLOW — 견적 변환 = PM 초안
       project_id: parent.project_id ?? null,
       program_id: parent.program_id ?? null,
       contract_id: parent.contract_id ?? null,

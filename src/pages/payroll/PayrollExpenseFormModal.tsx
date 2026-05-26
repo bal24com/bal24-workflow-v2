@@ -30,7 +30,8 @@ interface Props { open: boolean; target: PayrollRow | null; defaultType: Payroll
 const BANK_OPTIONS = ['국민은행', '신한은행', '우리은행', '하나은행', '농협은행', '기업은행', '카카오뱅크', '토스뱅크', '새마을금고', '우체국', '기타'];
 
 function emptyForm(t: PayrollExpenseType) {
-  return { expense_type: t, description: '', payee_name: '', payee_id_no: '', biz_reg_no: '', bank_name: '', bank_account: '', unit_price: '', quantity: '1', tax_rate_type: '3.3' as PayrollTaxRateType, payment_status: '대기' as PayrollPaymentStatus, paid_at: '', project_id: '', program_id: '', contract_id: '', memo: '' };
+  // STEP-PAYROLL-STATUS-FLOW — 외주/급여 페이지 직접 등록 = submitted (재무가 직접 입력하는 항목)
+  return { expense_type: t, description: '', payee_name: '', payee_id_no: '', biz_reg_no: '', bank_name: '', bank_account: '', unit_price: '', quantity: '1', tax_rate_type: '3.3' as PayrollTaxRateType, payment_status: 'submitted' as PayrollPaymentStatus, paid_at: '', project_id: '', program_id: '', contract_id: '', memo: '' };
 }
 
 export default function PayrollExpenseFormModal({

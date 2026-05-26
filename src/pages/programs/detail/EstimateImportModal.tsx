@@ -98,7 +98,7 @@ export default function EstimateImportModal({ open, programId, projectId, group,
         description: it.description ?? it.category, payee_name: it.payee_name ?? '미정',
         unit_price: it._unitPrice, quantity: it._quantity,
         tax_rate_type: defaultTax, tax_amount: taxAmount, net_amount: netAmount,
-        payment_status: '대기',
+        payment_status: 'draft', // STEP-PAYROLL-STATUS-FLOW — 견적 import = PM 초안
       };
     });
     const { data: inserted, error } = await supabase.from('payroll_expenses').insert(payloads).select('id');

@@ -317,7 +317,7 @@ export async function convertStaffFeesToPayroll(
     tax_rate_type: mapTaxRate(f.tax_type),
     tax_amount: f.tax_amount,
     net_amount: f.net_amount,
-    payment_status: '대기',
+    payment_status: 'draft', // STEP-PAYROLL-STATUS-FLOW — staff fee → payroll 변환 = PM 초안
     paid_at: f.paid_at,
     program_id: programId,
     project_id: projectId,

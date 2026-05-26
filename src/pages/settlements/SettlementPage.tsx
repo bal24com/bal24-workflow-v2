@@ -91,7 +91,7 @@ export default function SettlementPage() {
         const f = m.get(r.project_id); if (f) f.proposal += Number(r.total_amount ?? 0);
       }
       for (const r of ((payRes.data ?? []) as Array<{ project_id: string; subtotal: number | string | null; expense_type: string; payment_status: string }>)) {
-        if (r.payment_status === '취소') continue;
+        if (r.payment_status === 'cancelled') continue;
         const f = m.get(r.project_id); if (!f) continue;
         const amt = Number(r.subtotal ?? 0);
         f.exec += amt;

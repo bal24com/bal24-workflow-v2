@@ -104,11 +104,13 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
   const legacyExpense = legacyExpenseRows.reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
   const legacyPending = legacyExpenseRows.filter((r) => r.status === '대기').reduce((s, r) => s + Number(r.gross_amount ?? 0), 0);
   const payrollRows = (payrollRes.data ?? []) as Array<{ subtotal: number | string | null; tax_amount: number | string | null; tax_rate_type: string | null; payment_status: string; expense_type: string }>;
-  const livePayroll = payrollRows.filter((r) => r.payment_status !== '취소');
+  // 박경수님 + SkyClaw STEP-PAYROLL-STATUS-FLOW (2026-05-28) — 영문 6단계 (draft/submitted/received/processing/paid/cancelled)
+  const livePayroll = payrollRows.filter((r) => r.payment_status !== 'cancelled');
   const payrollTotal = livePayroll.reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
-  const payrollPending = payrollRows.filter((r) => r.payment_status === '대기').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
-  // 박경수님 + SkyClaw 2026-05-28 — 집행 완료(payment_status='완료')만 집계 (예정 제외)
-  const paidExpenseTotal = payrollRows.filter((r) => r.payment_status === '완료').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+  // 미지급 = paid·cancelled 외 활성 (draft·submitted·received·processing)
+  const payrollPending = payrollRows.filter((r) => r.payment_status !== 'paid' && r.payment_status !== 'cancelled').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+  // 집행 완료 (paid) 만
+  const paidExpenseTotal = payrollRows.filter((r) => r.payment_status === 'paid').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
   // 박경수님 요청 — 인건비/운영비 분리 (prefix 매칭)
   const outsourceTotal = livePayroll.filter((r) => isOutsourceType(r.expense_type)).reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
   const operationTotal = livePayroll.filter((r) => isOperationType(r.expense_type)).reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
