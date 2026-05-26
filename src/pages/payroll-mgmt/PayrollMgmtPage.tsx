@@ -7,6 +7,8 @@ import EmployeeTab from './EmployeeTab';
 import PayrollRegisterTab from './PayrollRegisterTab';
 import PayrollSlipTab from './PayrollSlipTab';
 import ExpenseClaimTab from './ExpenseClaimTab';
+// 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — 재무 권한 가드 (admin/finance 만)
+import { useFinanceGuard, FinanceGuardLoader } from '../../hooks/useFinanceGuard';
 
 type TabKey = 'employee' | 'register' | 'slip' | 'claim';
 
@@ -19,6 +21,10 @@ const TABS: Array<{ key: TabKey; label: string; Icon: typeof Users }> = [
 
 export default function PayrollMgmtPage() {
   const [tab, setTab] = useState<TabKey>('employee');
+  // 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — 재무·관리자만 진입 허용
+  const { loading, allowed } = useFinanceGuard();
+  if (loading) return <FinanceGuardLoader />;
+  if (!allowed) return null;
 
   return (
     <div className="space-y-5 max-w-[1400px]">

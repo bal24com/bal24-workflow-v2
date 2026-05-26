@@ -17,7 +17,7 @@ import {
 } from './payrollUtils';
 import PayrollSummaryBar from './PayrollSummaryBar';
 import PayrollExpenseFormModal from './PayrollExpenseFormModal'; import PayrollImportModal from './PayrollImportModal'; import PayrollStatsPanel from './PayrollStatsPanel'; import PayrollDetailModal from './PayrollDetailModal';
-import { downloadPayrollExcel, downloadPayrollPdf } from './payrollDownload';
+import { downloadPayrollExcel, downloadPayrollPdf } from './payrollDownload'; import { withFinanceGuard } from '../../hooks/useFinanceGuard'; // STEP-RBAC-SETUP
 
 // 박경수님 요청 — 외주/운영 메인 탭 제거, [통계][지출] 2탭으로 재구성
 type MainTab = 'stats' | 'list';
@@ -26,7 +26,7 @@ type SortDir = 'asc' | 'desc';
 
 interface ProjectOption { id: string; name: string }
 
-export default function PayrollPage() {
+function PayrollPage() {
   const toast = useToast();
   const [tab, setTab] = useState<MainTab>('stats');
   const [items, setItems] = useState<PayrollRow[]>([]);
@@ -396,3 +396,5 @@ function SortableTh({ k, sortKey, sortDir, onClick, align, children }: {
     </th>
   );
 }
+
+export default withFinanceGuard(PayrollPage); // STEP-RBAC-SETUP

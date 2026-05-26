@@ -13,8 +13,12 @@ import {
   type ReviewRow,
 } from './accountingReviewUtils';
 import AccountingReviewFormModal from './AccountingReviewFormModal';
+// 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — 재무 권한 가드
+import { useFinanceGuard, FinanceGuardLoader } from '../../hooks/useFinanceGuard';
 
 export default function AccountingReviewPage() {
+  // 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — admin/finance 만 진입 허용
+  const { loading: guardLoading, allowed: guardAllowed } = useFinanceGuard();
   const toast = useToast();
   const [items, setItems] = useState<ReviewRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +51,10 @@ export default function AccountingReviewPage() {
       toast.error('클립보드 복사에 실패했어요.');
     }
   }
+
+  // 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — 가드 통과 전엔 콘텐츠 숨김
+  if (guardLoading) return <FinanceGuardLoader />;
+  if (!guardAllowed) return null;
 
   return (
     <div className="space-y-5 max-w-[1400px]">

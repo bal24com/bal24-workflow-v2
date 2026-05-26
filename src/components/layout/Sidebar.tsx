@@ -228,7 +228,12 @@ export default function Sidebar() {
                      : isFinance ? FINANCE_SECTIONS
                      : SECTIONS;
   // STEP-EXPERT-CRUD-FULL — admin 만 [관리] 그룹 추가 노출
-  const sections = isAdmin ? [...baseSections, ADMIN_EXTRA] : baseSections;
+  // 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — [급여 관리] 메뉴는 admin/finance 만 노출 (pm/staff 숨김)
+  const canSeePayrollMgmt = isAdmin || isFinance;
+  const filteredBase = canSeePayrollMgmt
+    ? baseSections
+    : baseSections.map((s) => ({ ...s, items: s.items.filter((it) => it.to !== '/payroll-mgmt') }));
+  const sections = isAdmin ? [...filteredBase, ADMIN_EXTRA] : filteredBase;
 
   return (
     <aside

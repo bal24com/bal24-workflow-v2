@@ -2,7 +2,7 @@
 // 3열 카드 그리드 + 역할 필터 탭 + 이름·부서·직책 검색
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Search, UserPlus, Link2, Trash2 } from 'lucide-react';
+import { Loader2, Search, UserPlus, Link2, Trash2, ShieldCheck } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { copyToClipboard } from '../../lib/clipboard';
@@ -16,6 +16,8 @@ import MemberInviteModal from './MemberInviteModal';
 import InviteListSection from './InviteListSection';
 import MemberRequestsTab from './MemberRequestsTab';
 import { cleanupOrphans } from './memberCleanupUtils';
+// 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — admin 전용 역할 변경 모달
+import MemberRoleModal from '../../components/admin/MemberRoleModal';
 import {
   ROLE_LABELS, ROLE_BADGE_TONE,
   getRoleBadgeTone, getRoleLabel, normalizeRole, hasRole,
@@ -58,6 +60,8 @@ export default function MembersPage() {
   // STEP-MEMBER-INVITE — 이메일 초대 모달
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteReloadKey, setInviteReloadKey] = useState(0);
+  // 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — admin 전용 역할 변경 모달 대상
+  const [roleEditTarget, setRoleEditTarget] = useState<Profile | null>(null);
   // STEP-MEMBER-ORPHAN-CLEANUP — 고아 계정 정리
   const [cleaning, setCleaning] = useState(false);
 
@@ -333,6 +337,14 @@ export default function MembersPage() {
                   <Button variant="outline" onClick={() => setDetailId(m.id)} className="!flex-1">
                     상세 보기
                   </Button>
+                  {/* STEP-RBAC-SETUP — admin 전용 역할 변경 (본인 제외) */}
+                  {isAdmin && m.id !== user?.id && (
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setRoleEditTarget(m); }}
+                      aria-label={`${m.name} 역할 변경`} title="역할 변경"
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-md text-emerald-600 border border-emerald-200 bg-white hover:bg-emerald-50 transition-colors shrink-0">
+                      <ShieldCheck size={14} aria-hidden="true" />
+                    </button>
+                  )}
                   <button type="button"
                     onClick={(e) => { e.stopPropagation(); void handleCopyPortalLink(m); }}
                     aria-label="팀원 포털 링크 복사" title="팀원 포털 링크 복사"
@@ -367,13 +379,14 @@ export default function MembersPage() {
       />
 
       {detailId && (
-        <MemberDetailPanel
-          memberId={detailId}
-          isAdmin={isAdmin}
-          onClose={() => setDetailId(null)}
-          onEdit={(member) => openEdit(member)}
-        />
+        <MemberDetailPanel memberId={detailId} isAdmin={isAdmin}
+          onClose={() => setDetailId(null)} onEdit={(member) => openEdit(member)} />
       )}
+
+      {/* 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — admin 전용 역할 변경 모달 */}
+      <MemberRoleModal open={roleEditTarget !== null} memberId={roleEditTarget?.id ?? null}
+        memberName={roleEditTarget?.name ?? ''} currentRole={roleEditTarget?.role ?? null}
+        onClose={() => setRoleEditTarget(null)} onSaved={() => { void reload(); }} />
     </div>
   );
 }

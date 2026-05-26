@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Loader2, Search, FileText } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
+// 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — 재무 권한 가드
+import { useFinanceGuard, FinanceGuardLoader } from '../../hooks/useFinanceGuard';
 import { formatDateKo, formatMoney } from '../../lib/utils';
 import EmptyState from '../../components/EmptyState';
 import type { ContractStatus } from '../../types/database';
@@ -27,6 +29,8 @@ type Filter = 'all' | ContractStatus;
 type LifeFilter = 'all' | 'proposal' | 'contract' | 'operation' | 'closing';
 
 export default function ContractsPage() {
+  // 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — admin/finance 만 진입 허용
+  const { loading: guardLoading, allowed: guardAllowed } = useFinanceGuard();
   const toast = useToast();
   const navigate = useNavigate();
   const [items, setItems] = useState<ContractRow[]>([]);
@@ -98,6 +102,10 @@ export default function ContractsPage() {
   function handleRowClick(row: ContractRow) {
     setDetailTarget(row);
   }
+
+  // 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — 가드 통과 전엔 콘텐츠 숨김
+  if (guardLoading) return <FinanceGuardLoader />;
+  if (!guardAllowed) return null;
 
   return (
     <div className="space-y-5 max-w-[1400px]">
