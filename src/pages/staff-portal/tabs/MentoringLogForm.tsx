@@ -3,13 +3,14 @@
 // P1 추가: subject·recipient 필드, duration_min 저장, draft/submitted 모드 분리.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Clock, Loader2, Save, Send, X } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { calcDurationMin, formatDuration } from '../../../types/mentoring';
 import TimeSelect from './TimeSelect';
 import MentoringFileUpload, { type UploadedFile } from './MentoringFileUpload';
 import PortalPhotoUpload, { type PortalPhoto } from '../../../components/portal/PortalPhotoUpload';
+import MentoringLogFormFooter from './MentoringLogFormFooter';
 
 interface AssignmentRow {
   id: string;
@@ -72,14 +73,6 @@ const TEXTAREA_CLASS =
 
 const READONLY_CLASS =
   'w-full h-[42px] border border-gray-200 rounded-[10px] px-3 text-sm bg-slate-50 text-slate-600';
-
-const BTN_PRIMARY =
-  'inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-violet-600 ' +
-  'rounded-[10px] hover:bg-violet-700 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100';
-
-const BTN_GHOST =
-  'inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-600 ' +
-  'hover:bg-slate-100 rounded-[10px] transition-all duration-200';
 
 function todayIso(): string {
   const d = new Date();
@@ -389,20 +382,10 @@ export default function MentoringLogForm({
         </p>
       </div>
 
-      {/* STEP-MENTORING-P1 — 임시저장 / 제출 분리. 박경수님 2026-05-26 — 수정 모드 라벨 분기. */}
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} disabled={saving} className={BTN_GHOST}>
-          <X size={14} /> 취소
-        </button>
-        <button type="button" onClick={() => void handleSave('draft')} disabled={saving}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-300 rounded-[10px] hover:bg-slate-50 transition-all duration-200 disabled:opacity-50">
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 임시저장
-        </button>
-        <button type="button" onClick={() => void handleSave('submitted')} disabled={saving} className={BTN_PRIMARY}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-          {isEdit ? ' 다시 제출하기' : ' 제출하기'}
-        </button>
-      </div>
+      <MentoringLogFormFooter saving={saving} isEdit={isEdit}
+        onCancel={onCancel}
+        onDraft={() => void handleSave('draft')}
+        onSubmit={() => void handleSave('submitted')} />
     </div>
   );
 }
