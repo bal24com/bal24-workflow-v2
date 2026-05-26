@@ -124,9 +124,12 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
 
   const expenseTotal = legacyExpense + payrollTotal;
   const pendingExpenseTotal = legacyPending + payrollPending;
-  // 박경수님 + SkyClaw 2026-05-26 — 전체 사업비 = 모든 계약금액 합. 순지출 = 지출 - 부가세
+  // 박경수님 + SkyClaw 2026-05-26 — 전체 사업비 = 모든 계약금액 합.
+  // 박경수님 보고 fix (STEP-FINANCE-SUMMARY-FIX 2026-05-27) — 순지출 = 지출 - 부가세 - 원천세
+  //   기존: netExpense = expenseTotal - vatAmount (원천세 누락 → 인건비 환경에서 netExpense==expenseTotal 버그)
+  //   변경: 부가세 + 원천세 둘 다 차감. 박경수님 환경 운영비 0건일 때도 인건비 원천세 정상 반영
   const contractTotal = contractRows.reduce((s, r) => s + Number(r.contract_amount ?? 0), 0);
-  const netExpense = expenseTotal - vatAmount;
+  const netExpense = expenseTotal - vatAmount - withholdingTax;
   // 박경수님 + SkyClaw STEP-FINANCE-LABEL-VAT — 매출세액 (vat_type='과세' 인 행만, 포함가 역산)
   const salesVat = contractRows
     .filter((r) => r.vat_type === '과세')
