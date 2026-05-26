@@ -81,6 +81,8 @@ const MentoringStudentPage  = lazy(() => import('./pages/mentoring/MentoringStud
 const MentorPortalPage      = lazy(() => import('./pages/mentor-portal/MentorPortalPage'));
 // STEP-STAFF-PORTAL-P2 — 강사 통합 포털 (멘토+강의+일지+일정+자료)
 const StaffPortalPage       = lazy(() => import('./pages/staff-portal/StaffPortalPage'));
+// 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — 고정 URL /portal (이름+PIN 게이트)
+const StaffPortalLoginPage  = lazy(() => import('./pages/portal/StaffPortalLoginPage'));
 const MyPage                = lazy(() => import('./pages/mypage/MyPage'));
 const MemberInvitePage      = lazy(() => import('./pages/invite/MemberInvitePage'));
 const EvaluatePage          = lazy(() => import('./pages/evaluate/EvaluatePage'));
@@ -149,6 +151,8 @@ export default function App() {
             <Route path="/mentor-invite/:token" element={<MentorPortalPage />} />
             {/* STEP-STAFF-PORTAL-P2 — 강사 통합 포털 (영구 staff_portal_token, 비로그인 공개) */}
             <Route path="/staff-portal/:token" element={<StaffPortalPage />} />
+            {/* 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — 고정 URL /portal (이름+PIN 게이트) */}
+            <Route path="/portal" element={<StaffPortalLoginPage />} />
             <Route path="/my/:token" element={<MyPage />} />
             <Route path="/invite/member/:token" element={<MemberInvitePage />} />
             <Route path="/evaluate/:token" element={<EvaluatePage />} />

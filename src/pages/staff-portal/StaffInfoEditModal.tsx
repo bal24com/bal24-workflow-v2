@@ -3,11 +3,12 @@
 // WorkFlow 디자인 시스템 통일 (brand 모달 560px + rounded-[20px] + 입력 42px).
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Save, X } from 'lucide-react';
+import { Loader2, Save, X, KeyRound } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { type StaffPortalIdentity } from './staffPortalUtils';
 import SignatureUploadSection from './SignatureUploadSection';
+import PinInputBlock from '../../components/portal/PinInputBlock';
 
 interface Props {
   open: boolean;
@@ -174,7 +175,10 @@ export default function StaffInfoEditModal({ open, staff, onClose, onSaved }: Pr
             <div className="mt-7 pt-6 border-t border-slate-100">
               <SignatureUploadSection staffId={staff.id} showBorder={false} />
             </div>
-            {/* STEP-STAFF-TOKEN-SIMPLIFY — PIN 게이트 제거. 비밀번호 변경 섹션 삭제됨. */}
+            {/* 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — PIN 변경 섹션 */}
+            <div className="mt-7 pt-6 border-t border-slate-100">
+              <PinChangeSection portalToken={staff.portalToken} />
+            </div>
           </>
         )}
       </div>
@@ -191,6 +195,95 @@ function Field({ label, required, hint, children }: { label: string; required?: 
       </label>
       {children}
     </div>
+  );
+}
+
+// ─── PIN 변경 섹션 (STAFF-PORTAL-PIN-GATEWAY) ───────────────
+function PinChangeSection({ portalToken }: { portalToken: string }) {
+  const toast = useToast();
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  async function handleChange() {
+    setErrorMsg('');
+    if (currentPin.length !== 6 || newPin.length !== 6 || confirmPin.length !== 6) {
+      setErrorMsg('현재 PIN, 새 PIN, 새 PIN 확인 모두 6자리를 입력해 주세요.');
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setErrorMsg('새 PIN 확인이 일치하지 않아요.');
+      return;
+    }
+    if (newPin === currentPin) {
+      setErrorMsg('현재 PIN 과 다른 번호를 입력해 주세요.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/change-staff-pin`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          portal_token: portalToken,
+          current_pin: currentPin,
+          new_pin: newPin,
+        }),
+      });
+      const data = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok || !data.success) {
+        setErrorMsg(data.error ?? 'PIN 변경에 실패했어요.');
+        return;
+      }
+      toast.success('PIN 이 변경됐어요. 다음 입장부터 새 PIN 을 사용하세요. ✅');
+      setCurrentPin(''); setNewPin(''); setConfirmPin('');
+    } catch (err) {
+      console.error('[PinChangeSection] 오류:', err);
+      setErrorMsg('네트워크 오류가 발생했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section>
+      <h3 className="text-base font-bold text-[#1E1B4B] mb-3 flex items-center gap-2">
+        <KeyRound size={16} className="text-violet-500" aria-hidden="true" /> PIN 변경
+      </h3>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-semibold text-slate-700 block mb-1.5">현재 PIN</label>
+          <PinInputBlock value={currentPin} onChange={setCurrentPin} mask disabled={saving} ariaLabel="현재 PIN" />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-700 block mb-1.5">새 PIN (6자리)</label>
+          <PinInputBlock value={newPin} onChange={setNewPin} mask disabled={saving} ariaLabel="새 PIN" />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-700 block mb-1.5">새 PIN 확인</label>
+          <PinInputBlock value={confirmPin} onChange={setConfirmPin} mask disabled={saving} ariaLabel="새 PIN 확인" />
+        </div>
+        {errorMsg && (
+          <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+            {errorMsg}
+          </p>
+        )}
+        <div className="flex justify-end">
+          <button type="button" onClick={() => void handleChange()} disabled={saving}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-violet-600 border border-violet-600 rounded-[10px] hover:bg-violet-50 transition-all duration-200 disabled:opacity-50">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+            PIN 변경하기
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -31,6 +31,8 @@ type MenuItem = {
   Icon: LucideIcon;
   /** STEP-SIDEBAR-PROGRAM-RESTORE — 상위 항목의 하위 메뉴로 들여쓰기 표시 */
   nested?: boolean;
+  /** 박경수님 2026-05-26 — 외부 새 탭으로 열기 (강사 포털 등) */
+  external?: boolean;
 };
 
 type MenuSection = {
@@ -83,6 +85,8 @@ const SECTIONS: MenuSection[] = [
       { to: '/ai',   label: 'AI',   Icon: Sparkles },
       // 박경수님 + SkyClaw STEP-PAYROLL-MYPAGE (2026-05-28) — 본인 급여명세서
       { to: '/my-payroll', label: '내 급여명세서', Icon: FileText },
+      // 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — 강사 포털 고정 URL (외부 새 탭)
+      { to: '/portal', label: '강사 포털', Icon: ExternalLink, external: true },
     ],
   },
 ];
@@ -120,6 +124,8 @@ const PARTNER_SECTIONS: MenuSection[] = [
       { to: '/ai',   label: 'AI',   Icon: Sparkles },
       // 박경수님 + SkyClaw STEP-PAYROLL-MYPAGE (2026-05-28) — 본인 급여명세서
       { to: '/my-payroll', label: '내 급여명세서', Icon: FileText },
+      // 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — 강사 포털 고정 URL (외부 새 탭)
+      { to: '/portal', label: '강사 포털', Icon: ExternalLink, external: true },
     ],
   },
 ];
@@ -165,7 +171,22 @@ const FINANCE_SECTIONS: MenuSection[] = [
   },
 ];
 
-function MenuLink({ to, label, Icon, nested }: MenuItem) {
+function MenuLink({ to, label, Icon, nested, external }: MenuItem) {
+  // 박경수님 2026-05-26 — external 메뉴는 새 탭. NavLink active 표시 불필요.
+  if (external) {
+    return (
+      <a
+        href={to}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 py-2 px-3 rounded-lg text-sm transition-colors text-slate-300 hover:bg-white/5 hover:text-white"
+      >
+        <Icon size={16} aria-hidden="true" />
+        <span>{label}</span>
+        <span className="ml-auto text-[10px] text-slate-500">↗</span>
+      </a>
+    );
+  }
   return (
     <NavLink
       to={to}

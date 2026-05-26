@@ -21,6 +21,7 @@ import TagFilterTabs from '../../components/TagFilterTabs';
 import { useTagFilter } from '../../hooks/useTagFilter';
 import ExpertFormModal from './ExpertFormModal';
 import ExpertActivityDrawer from './ExpertActivityDrawer';
+import ExpertListRow from './ExpertListRow';
 
 type ViewMode = 'card' | 'list';
 type FieldFilter = '전체' | '교육' | '컨설팅' | '행사' | '기타';
@@ -38,7 +39,7 @@ function expertMatchesField(s: StaffPool, filter: FieldFilter): boolean {
   return tags.includes(filter);
 }
 
-function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void; onShowActivity: () => void }) {
+function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity, onResetPin }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void; onShowActivity: () => void; onResetPin: () => void }) {
   return (
     // STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일한 min-h
     <Card className="group hover:border-primary/30 hover:shadow-md transition min-h-[260px] flex flex-col">
@@ -105,6 +106,11 @@ function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity }: {
           className="inline-flex items-center justify-center w-8 h-8 rounded-md text-cyan-600 border border-cyan-200 bg-white hover:bg-cyan-50 transition-colors">
           <Activity size={13} aria-hidden="true" />
         </button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onResetPin(); }}
+          aria-label="PIN 초기화" title="PIN 을 전화번호 끝 6자리로 초기화"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-amber-700 border border-amber-200 bg-white hover:bg-amber-50 transition-colors">
+          🔑
+        </button>
         <button type="button" onClick={(e) => { e.stopPropagation(); onCopyPortal(); }}
           aria-label="강사 포털 링크 복사" title="강사 포털 링크 복사"
           className="inline-flex items-center justify-center w-8 h-8 rounded-md text-violet-600 border border-violet-200 bg-white hover:bg-violet-50 transition-colors">
@@ -120,71 +126,7 @@ function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity }: {
   );
 }
 
-function ExpertListRow({ s, onEdit, onDelete, onCopyPortal, onShowActivity }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void; onShowActivity: () => void }) {
-  return (
-    <li className="group flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition relative">
-      {s.profile_image_url ? (
-        <img src={s.profile_image_url} alt={`${s.name} 프로필`} className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-200" />
-      ) : (
-        <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary shrink-0">
-          <UserStar size={18} />
-        </span>
-      )}
-      <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-bold text-text truncate flex items-center gap-1.5">
-            {s.name}
-            {s.staff_type && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 border border-violet-200">
-                {s.staff_type}
-              </span>
-            )}
-          </div>
-          <div className="text-xs text-muted truncate">
-            {[s.organization, s.position].filter(Boolean).join(' · ') || '소속·직책 미지정'}
-          </div>
-        </div>
-        <div className="min-w-0 text-xs text-muted">
-          {s.specialty?.length ? (
-            <div className="flex flex-wrap gap-1">
-              {s.specialty.map((t) => (
-                <span key={t} className="bg-violet-50 text-violet-600 border border-violet-200 px-2 py-0.5 rounded-full text-[11px] font-semibold">{t}</span>
-              ))}
-            </div>
-          ) : (
-            <span className="text-slate-400">분야 미지정</span>
-          )}
-        </div>
-        <div className="min-w-0 text-xs text-muted truncate">
-          {s.phone_mobile && <>{s.phone_mobile}</>}
-          {s.phone_mobile && s.email && ' · '}
-          {s.email && <>{s.email}</>}
-          {!s.phone_mobile && !s.email && <span className="text-slate-400">연락처 미지정</span>}
-        </div>
-      </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
-        <button type="button" onClick={onEdit} aria-label="수정"
-          className="p-1.5 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600">
-          <Pencil size={12} />
-        </button>
-        {/* STEP-STAFF-PORTAL-P4 — 활동 이력 드로어 */}
-        <button type="button" onClick={onShowActivity} aria-label="활동 이력" title="활동 이력"
-          className="p-1.5 rounded-md text-slate-400 hover:bg-cyan-50 hover:text-cyan-600">
-          <Activity size={12} />
-        </button>
-        {/* STEP-STAFF-PORTAL-P2 — 강사 포털 링크 복사 */}
-        <button type="button" onClick={onCopyPortal} aria-label="강사 포털 링크 복사" title="강사 포털 링크 복사"
-          className="p-1.5 rounded-md text-slate-400 hover:bg-violet-50 hover:text-violet-600">
-          <Link2 size={12} />
-        </button>
-        <button type="button" onClick={onDelete} aria-label="삭제"
-          className="p-1.5 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500">
-          <Trash2 size={12} />
-        </button>
-      </div>
-    </li>
-  );
-}
+// ExpertListRow 는 ./ExpertListRow 로 분리 (V-1, 박경수님 2026-05-26).
 
 export default function ExpertsPage() {
   const toast = useToast();
@@ -242,6 +184,22 @@ export default function ExpertsPage() {
     const ok = await copyToClipboard(link);
     if (ok) toast.success(`${s.name}님 포털 링크가 복사됐어요.`);
     else toast.error('링크 복사에 실패했어요.');
+  };
+
+  // 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — PIN 초기화 (전화번호 끝 6자리)
+  const handleResetPin = async (s: StaffPool) => {
+    const { resetStaffPinFromPhone } = await import('./expertPinUtils');
+    const digits = ((s.phone ?? s.phone_mobile ?? '') as string).replace(/[^0-9]/g, '');
+    const previewPin = digits.length >= 6 ? digits.slice(-6) : '000000';
+    const note = digits.length >= 6 ? '' : ' (전화번호 없음 → 임시 000000)';
+    if (!window.confirm(`${s.name}님 PIN 을 "${previewPin}"${note} 으로 초기화할까요?`)) return;
+    const r = await resetStaffPinFromPhone(s.id, s.phone ?? null, s.phone_mobile ?? null);
+    if (!r.ok) {
+      toast.error(r.error ?? 'PIN 초기화에 실패했어요.');
+      return;
+    }
+    toast.success(`${s.name}님 PIN 이 "${r.pin}" 으로 초기화됐어요.`);
+    void fetchExperts();
   };
 
   // STEP-EXPERT-CRUD-FULL — soft-delete (휴지통 30일 보관)
@@ -364,7 +322,8 @@ export default function ExpertsPage() {
               onEdit={() => { setEditTarget(s); setModalOpen(true); }}
               onDelete={() => void handleDelete(s)}
               onCopyPortal={() => void handleCopyPortalLink(s)}
-              onShowActivity={() => setActivityTarget(s)} />
+              onShowActivity={() => setActivityTarget(s)}
+              onResetPin={() => void handleResetPin(s)} />
           ))}
         </div>
       ) : (
@@ -374,7 +333,8 @@ export default function ExpertsPage() {
               onEdit={() => { setEditTarget(s); setModalOpen(true); }}
               onDelete={() => void handleDelete(s)}
               onCopyPortal={() => void handleCopyPortalLink(s)}
-              onShowActivity={() => setActivityTarget(s)} />
+              onShowActivity={() => setActivityTarget(s)}
+              onResetPin={() => void handleResetPin(s)} />
           ))}
         </ul>
       )}
