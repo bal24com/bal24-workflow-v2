@@ -14,9 +14,11 @@ import type { Program } from '../../../types/database';
 
 interface Props {
   projectId: string;
+  // 박경수님 + SkyClaw STEP-ESTIMATE-UPGRADE-FULL PART E (2026-05-28) — 프로그램 신규 등록 시 프로젝트명 자동 prefill
+  projectName?: string;
 }
 
-export default function ProjectProgramsTab({ projectId }: Props) {
+export default function ProjectProgramsTab({ projectId, projectName }: Props) {
   const toast = useToast();
   const [items, setItems] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +118,7 @@ export default function ProjectProgramsTab({ projectId }: Props) {
         onClose={() => setModalOpen(false)}
         onCreated={() => void reload()}
         defaultProjectId={projectId}
+        defaultProjectName={projectName}
       />
     </div>
   );

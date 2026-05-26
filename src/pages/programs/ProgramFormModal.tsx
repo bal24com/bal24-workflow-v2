@@ -33,9 +33,10 @@ function toLegacyType(pt: ExtendedProgramType): ProgramType {
 type ProjectOption = Pick<Project, 'id' | 'name'>;
 type ConsortiumOption = { id: string; name: string };
 
-type Props = { open: boolean; onClose: () => void; onCreated: () => void; defaultProjectId?: string };
+// 박경수님 + SkyClaw STEP-ESTIMATE-UPGRADE-FULL PART E (2026-05-28) — 프로젝트명 자동 prefill
+type Props = { open: boolean; onClose: () => void; onCreated: () => void; defaultProjectId?: string; defaultProjectName?: string };
 
-export default function ProgramFormModal({ open, onClose, onCreated, defaultProjectId }: Props) {
+export default function ProgramFormModal({ open, onClose, onCreated, defaultProjectId, defaultProjectName }: Props) {
   const toast = useToast();
   const { user } = useAuth();
   const [name, setName] = useState('');
@@ -102,6 +103,10 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
       cancelled = true;
     };
   }, [open]);
+
+  // STEP-ESTIMATE-UPGRADE-FULL PART E — 모달 열릴 때 프로젝트명 자동 prefill (빈 이름일 때만)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open && defaultProjectName && !name) setName(defaultProjectName); }, [open, defaultProjectName]);
 
   useEffect(() => {
     if (open) return;

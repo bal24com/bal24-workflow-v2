@@ -296,7 +296,7 @@ export default function ProjectDetailPage() {
         {tab === 'members' && <MembersTab projectId={projectId} />}
         {tab === 'grant' && <GrantLedgerTab projectId={projectId} />}
         {tab === 'portal' && <PortalTab projectId={projectId} clientId={project.client_id ?? null} />}
-        {tab === 'programs' && <ProjectProgramsTab projectId={projectId} />}
+        {tab === 'programs' && <ProjectProgramsTab projectId={projectId} projectName={project.name ?? undefined} />}
         {tab === 'docs'     && <ProjectDocsTab    projectId={projectId} />}
         {tab === 'estimate' && <EstimateTab projectId={projectId} projectName={project.name ?? '프로젝트'} />}
       </div>
