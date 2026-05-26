@@ -67,9 +67,13 @@ export interface ConsortiumMember {
   // STEP-CONSORTIUM-UPGRADE-FULL — 박경수님 환경의 실제 DB 컬럼명
   org_name?: string;            // 박경수님 환경 DB 컬럼 (참여사 기관명, NOT NULL)
   is_self?: boolean;            // true = 밸런스닷 자사 (clients 미등록)
-  role?: 'lead' | 'partner';    // lead = 주관사(컨소시엄 총괄), partner = 참여사
+  // 박경수님 2026-05-27 STEP-CONSORTIUM-REDESIGN A안 — role 명칭 통일 ('총괄'|'참여'), legacy('lead'|'partner') 호환.
+  role?: 'lead' | 'partner' | '총괄' | '참여' | null;
   budget_ratio?: number | null; // 박경수님 환경 DB 컬럼 (지분율 %, task_share_pct 대응)
   budget_amount?: number | null;// 박경수님 환경 DB 컬럼 (배분 예산, allocated_budget 대응)
+  // 박경수님 2026-05-27 STEP-CONSORTIUM-REDESIGN A안 — 신 필드(공유 폼/탭 모두에서 사용).
+  share_rate?: number | null;
+  settlement_direction?: 'outbound' | 'inbound' | 'none' | null;
   // (Legacy — 박경수님 환경엔 없는 컬럼. 호환용 optional)
   task_share_pct?: number;
   allocated_budget?: number;
@@ -81,7 +85,7 @@ export interface ConsortiumMember {
   contact_phone: string | null;
   responsibilities: string | null;
   created_at: string;
-  clients?: { id: string; name: string; business_name: string | null } | null;
+  clients?: { id: string; name: string; business_name?: string | null; is_own_company?: boolean | null } | null;
 }
 
 // STEP-CONSORTIUM-UPGRADE-FULL — Consortium 헤더에 lead_is_self 추가

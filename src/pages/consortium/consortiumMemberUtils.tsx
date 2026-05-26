@@ -1,7 +1,7 @@
 // bal24 v2 — STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27)
 // 참여사 표시 헬퍼 — 정산 방향 배지·역할 배지·지분율 합계 등.
 
-import type { ConsortiumMember, ConsortiumSettlementDirection } from '../../types/database';
+import type { ConsortiumSettlementDirection } from '../../types/database';
 
 export function getDirectionBadge(direction: ConsortiumSettlementDirection | string | null | undefined) {
   switch (direction) {
@@ -27,13 +27,17 @@ export function getRoleBadge(role: string | null | undefined, isSelf: boolean | 
   );
 }
 
+// 박경수님 2026-05-27 STEP-CONSORTIUM-REDESIGN A안 — 두 ConsortiumMember(database / consortiumTypes) 모두 받도록 좁힘.
+type ShareRateLike = { share_rate?: number | null };
+type SelfLike = { is_self?: boolean | null };
+
 /** 지분율 합계 (0~100). null 은 0 으로 합산. */
-export function calcTotalShareRate(members: ConsortiumMember[]): number {
+export function calcTotalShareRate<T extends ShareRateLike>(members: T[]): number {
   return members.reduce((sum, m) => sum + (Number(m.share_rate) || 0), 0);
 }
 
 /** 자사 멤버 1명만 허용 — 추가 등록 시 검증. */
-export function findSelfMember(members: ConsortiumMember[]): ConsortiumMember | null {
+export function findSelfMember<T extends SelfLike>(members: T[]): T | null {
   return members.find((m) => m.is_self === true) ?? null;
 }
 

@@ -21,6 +21,8 @@
     "html2pdf.js": "^0.14.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.14.0",
+    "mammoth": "^1.12.0",
+    "pdfjs-dist": "^5.7.284",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.5",
