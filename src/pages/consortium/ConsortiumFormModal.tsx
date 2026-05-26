@@ -6,21 +6,20 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Modal, Button, Input } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
-import {
-  CONSORTIUM_STATUS_VALUES,
-  CONSORTIUM_ROLE_VALUES,
-} from './consortiumStatus';
+import { CONSORTIUM_STATUS_VALUES } from './consortiumStatus';
 import ConsortiumMembersField, {
   makeMember,
   type MemberDraft,
 } from './ConsortiumMembersField';
+import ConsortiumOperatorField from './ConsortiumOperatorField';
+import ConsortiumLeadOrgField from './ConsortiumLeadOrgField';
 import {
   fetchMemberDrafts, replaceMembers, createConsortiumWithMembers, translateConsortiumError,
+  fetchOperatorDraft, makeEmptyOperator, type OperatorDraft,
 } from './consortiumMembersUtils';
 import { useToast } from '../../contexts/ToastContext';
 import type {
   Client,
-  ConsortiumRole,
   ConsortiumStatus,
   Project,
 } from '../../types/database';
@@ -28,10 +27,12 @@ import type {
 import ConsortiumAutoFillSection from './components/ConsortiumAutoFillSection';
 import { useConsortiumAutoFill } from './hooks/useConsortiumAutoFill';
 import {
-  buildFormPatch, buildMemberDrafts, countFilledFields, isOnlyEmptyDefault,
+  buildFormPatch, buildMemberDrafts, buildOperatorDraft,
+  countFilledFields, isOnlyEmptyDefault,
 } from './consortiumAutoFillUtils';
 
-type ClientOption = Pick<Client, 'id' | 'name'>;
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 자사 ⭐ 표시 위해 is_own_company 포함.
+type ClientOption = Pick<Client, 'id' | 'name'> & { is_own_company?: boolean };
 type ProjectOption = Pick<Project, 'id' | 'name'>;
 
 // 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-AI-AUTOFILL — 타입·초기값·fromInitial 분리.
@@ -54,6 +55,8 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
   const isEditMode = !!initialData?.id;
   const [form, setForm] = useState<ConsortiumForm>(initialData ? fromInitial(initialData) : EMPTY);
   const [members, setMembers] = useState<MemberDraft[]>([makeMember()]);
+  // 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 운영사(밸런스닷·총괄) 상태 분리
+  const [operator, setOperator] = useState<OperatorDraft>(makeEmptyOperator());
   const [membersLoading, setMembersLoading] = useState(false);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -71,13 +74,19 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
     let cancelled = false;
     setLoadingRefs(true);
     // STEP-TRASH-FILTER-AUDIT — 휴지통 옵션 노출 차단
+    // 박경수님 2026-05-27 — is_own_company 도 가져와서 자사 ⭐ 정렬
     Promise.all([
-      supabase.from('clients').select('id, name').is('deleted_at', null).order('name', { ascending: true }),
+      supabase
+        .from('clients')
+        .select('id, name, is_own_company')
+        .is('deleted_at', null)
+        .order('is_own_company', { ascending: false })
+        .order('name', { ascending: true }),
       supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
     ]).then(([cRes, pRes]) => {
       if (cancelled) return;
       if (cRes.error) console.error('[consortium] 고객사 조회 실패:', cRes.error.message);
-      else setClients(cRes.data ?? []);
+      else setClients((cRes.data ?? []) as ClientOption[]);
       if (pRes.error) console.error('[consortium] 프로젝트 조회 실패:', pRes.error.message);
       else setProjects(pRes.data ?? []);
       setLoadingRefs(false);
@@ -90,29 +99,35 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
     if (!open) {
       setForm(EMPTY);
       setMembers([makeMember()]);
+      setOperator(makeEmptyOperator());
       setNameError(null);
       setErrorMsg(null);
       return;
     }
     setForm(initialData ? fromInitial(initialData) : EMPTY);
     setMembers([makeMember()]);
+    setOperator(makeEmptyOperator());
     setNameError(null);
     setErrorMsg(null);
   }, [open, initialData]);
 
-  // 수정 모드에서 기존 참여사 fetch
+  // 수정 모드에서 기존 운영사 + 참여사 fetch
   useEffect(() => {
     if (!open || !isEditMode || !initialData?.id) return;
     let cancelled = false;
     setMembersLoading(true);
     void (async () => {
-      const { drafts, error } = await fetchMemberDrafts(initialData.id);
+      const [op, mem] = await Promise.all([
+        fetchOperatorDraft(initialData.id),
+        fetchMemberDrafts(initialData.id),
+      ]);
       if (cancelled) return;
-      if (error) {
+      if (mem.error) {
         toast.error('참여사 정보를 불러오지 못했어요.');
       } else {
-        setMembers(drafts);
+        setMembers(mem.drafts);
       }
+      setOperator(op);
       setMembersLoading(false);
     })();
     return () => { cancelled = true; };
@@ -129,6 +144,11 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
     const result = await analyze(file);
     if (!result) return;
     setForm((prev) => ({ ...prev, ...buildFormPatch(prev, result, clients) }));
+    // 운영사 — 비어 있을 때만 AI 결과로 채움
+    if (!operator.clientId) {
+      const opDraft = buildOperatorDraft(result, clients);
+      if (opDraft.clientId || opDraft.contactName) setOperator(opDraft);
+    }
     if (isOnlyEmptyDefault(members)) {
       const drafts = buildMemberDrafts(result, clients);
       if (drafts.length > 0) setMembers(drafts);
@@ -188,6 +208,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
         const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
         const replaceRes = await replaceMembers({
           consortiumId: initialData.id,
+          operator,
           drafts: members,
           clientNameById,
         });
@@ -217,7 +238,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
           end_date: form.endDate || null,
           total_budget: totalBudgetNum,
         },
-        leadRole: form.leadRole,
+        operator,
         drafts: members,
         clientNameById,
       });
@@ -244,7 +265,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
       open={open}
       onClose={onClose}
       title={isEditMode ? '컨소시엄 수정' : '컨소시엄 신규 등록'}
-      description={isEditMode ? '기본 정보·주관사·참여사를 수정해요.' : '컨소시엄명만 필수예요. 참여사는 여러 곳 추가할 수 있어요.'}
+      description={isEditMode ? '기본 정보·의뢰기관·운영사·참여사를 수정해요.' : '컨소시엄명만 필수예요. 의뢰기관·운영사(밸런스닷)·참여사를 단계별로 입력하세요.'}
       size="lg"
       closeOnBackdrop={!submitting}
       footer={
@@ -322,40 +343,25 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
           </div>
         </section>
 
-        <section className="space-y-3">
-          {/* 박경수님 2026-05-27 A안 — 의뢰기관(주관기관) 명칭 통일 */}
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">의뢰기관 (주관기관)</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">의뢰기관 (clients 선택)</label>
-              <select
-                value={form.leadClientId}
-                onChange={(e) => update('leadClientId', e.target.value)}
-                disabled={submitting || loadingRefs}
-                className={SELECT_CLASS}
-              >
-                <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음'}</option>
-                {clients.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-              </select>
-            </div>
-            {!isEditMode && (
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">역할</label>
-                <select
-                  value={form.leadRole}
-                  onChange={(e) => update('leadRole', e.target.value as ConsortiumRole)}
-                  disabled={submitting || !form.leadClientId}
-                  className={SELECT_CLASS}
-                >
-                  {CONSORTIUM_ROLE_VALUES.map((r) => (<option key={r} value={r}>{r}</option>))}
-                </select>
-              </div>
-            )}
-          </div>
-          {!isEditMode && (
-            <p className="text-xs text-muted">선택한 의뢰기관은 참여사 목록에도 자동 추가돼요.</p>
-          )}
-        </section>
+        {/* 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 의뢰기관(발주처) — 역할은 감수·검수만 */}
+        <ConsortiumLeadOrgField
+          leadClientId={form.leadClientId}
+          leadRole={form.leadRole}
+          onClientChange={(id) => update('leadClientId', id)}
+          onRoleChange={(role) => update('leadRole', role)}
+          clients={clients}
+          loadingRefs={loadingRefs}
+          submitting={submitting}
+        />
+
+        {/* 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 운영사(밸런스닷·총괄) 섹션 */}
+        <ConsortiumOperatorField
+          value={operator}
+          onChange={setOperator}
+          clients={clients}
+          loadingRefs={loadingRefs}
+          submitting={submitting}
+        />
 
         {membersLoading ? (
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">

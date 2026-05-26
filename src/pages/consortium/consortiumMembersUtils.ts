@@ -5,7 +5,7 @@
 
 import { supabase } from '../../lib/supabase';
 import { makeMember, type MemberDraft } from './ConsortiumMembersField';
-import type { ConsortiumRole, ConsortiumStatus } from '../../types/database';
+import type { ConsortiumStatus } from '../../types/database';
 
 export type ErrorContext = 'insert' | 'update' | 'member';
 
@@ -28,16 +28,20 @@ interface MemberRow {
   role: string | null;
   budget_ratio: number | null;
   responsibilities: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  is_self: boolean | null;
 }
 
-/** 기존 참여사 행을 MemberDraft 형식으로 fetch */
+/** 기존 참여사 행을 MemberDraft 형식으로 fetch — 박경수님 2026-05-27: 운영사(is_self=true) 제외, contact 필드 포함 */
 export async function fetchMemberDrafts(consortiumId: string): Promise<{
   drafts: MemberDraft[];
   error?: string;
 }> {
   const { data, error } = await supabase
     .from('consortium_members')
-    .select('client_id, org_name, role, budget_ratio, responsibilities')
+    .select('client_id, org_name, role, budget_ratio, responsibilities, contact_name, contact_phone, contact_email, is_self')
     .eq('consortium_id', consortiumId)
     .order('created_at', { ascending: true });
 
@@ -46,27 +50,103 @@ export async function fetchMemberDrafts(consortiumId: string): Promise<{
     return { drafts: [], error: error.message };
   }
 
-  const rows = (data as MemberRow[] | null) ?? [];
+  // 박경수님 2026-05-27 — 운영사(is_self=true) 행은 별도 섹션에서 관리하므로 참여사 목록에선 제외
+  const rows = ((data as MemberRow[] | null) ?? []).filter((r) => !r.is_self);
   const drafts: MemberDraft[] = rows.map((r) => ({
     ...makeMember(),
     clientId: r.client_id ?? '',
     role: (r.role as MemberDraft['role']) ?? '',
     shareRatio: r.budget_ratio != null ? String(r.budget_ratio) : '',
     responsibilities: r.responsibilities ?? '',
+    contactName: r.contact_name ?? '',
+    contactPhone: r.contact_phone ?? '',
+    contactEmail: r.contact_email ?? '',
   }));
   // fetch 결과가 0건이면 빈 행 1개로 시작
   return { drafts: drafts.length > 0 ? drafts : [makeMember()] };
 }
 
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 운영사(밸런스닷·총괄) 정보.
+export interface OperatorDraft {
+  clientId: string;            // clients.id (자사 또는 직접 선택)
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+}
+
+export function makeEmptyOperator(): OperatorDraft {
+  return { clientId: '', contactName: '', contactPhone: '', contactEmail: '' };
+}
+
+/** 운영사 행 (is_self=true·role='총괄') 1건을 별도 fetch */
+export async function fetchOperatorDraft(consortiumId: string): Promise<OperatorDraft> {
+  const { data, error } = await supabase
+    .from('consortium_members')
+    .select('client_id, contact_name, contact_phone, contact_email')
+    .eq('consortium_id', consortiumId)
+    .eq('is_self', true)
+    .maybeSingle();
+  if (error) {
+    console.error('[consortium-members] operator fetch 실패:', error.message);
+    return makeEmptyOperator();
+  }
+  if (!data) return makeEmptyOperator();
+  return {
+    clientId: data.client_id ?? '',
+    contactName: data.contact_name ?? '',
+    contactPhone: data.contact_phone ?? '',
+    contactEmail: data.contact_email ?? '',
+  };
+}
+
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 운영사 행 빌더 (is_self=true·role='총괄').
+function buildOperatorRow(
+  consortiumId: string,
+  operator: OperatorDraft,
+  clientNameById: Map<string, string>,
+): Record<string, unknown> | null {
+  if (!operator.clientId) return null;
+  return {
+    consortium_id: consortiumId,
+    client_id: operator.clientId,
+    org_name: clientNameById.get(operator.clientId) ?? '밸런스닷',
+    role: '총괄',
+    is_self: true,
+    contact_name: operator.contactName.trim() || null,
+    contact_phone: operator.contactPhone.trim() || null,
+    contact_email: operator.contactEmail.trim() || null,
+  };
+}
+
+function buildMemberRow(
+  consortiumId: string,
+  m: MemberDraft,
+  clientNameById: Map<string, string>,
+): Record<string, unknown> {
+  return {
+    consortium_id: consortiumId,
+    client_id: m.clientId,
+    org_name: clientNameById.get(m.clientId) ?? '참여사',
+    role: m.role || null,
+    budget_ratio: m.shareRatio.trim() ? Number(m.shareRatio) : null,
+    responsibilities: m.responsibilities.trim() || null,
+    contact_name: m.contactName.trim() || null,
+    contact_phone: m.contactPhone.trim() || null,
+    contact_email: m.contactEmail.trim() || null,
+    is_self: false,
+  };
+}
+
 interface ReplaceArgs {
   consortiumId: string;
+  operator: OperatorDraft;
   drafts: MemberDraft[];
   clientNameById: Map<string, string>;
 }
 
-/** 기존 행 일괄 DELETE → 빈 행 제외 INSERT (Q4=A 결정) */
+/** 기존 행 일괄 DELETE → 운영사 + 참여사 INSERT (의뢰기관 자동 추가 제거) */
 export async function replaceMembers({
-  consortiumId, drafts, clientNameById,
+  consortiumId, operator, drafts, clientNameById,
 }: ReplaceArgs): Promise<{ error?: string; stage?: 'delete' | 'insert' }> {
   const { error: dErr } = await supabase
     .from('consortium_members')
@@ -77,17 +157,14 @@ export async function replaceMembers({
     return { error: dErr.message, stage: 'delete' };
   }
 
-  const valid = drafts.filter((m) => m.clientId);
-  if (valid.length === 0) return {};
-
-  const rows = valid.map((m) => ({
-    consortium_id: consortiumId,
-    client_id: m.clientId,
-    org_name: clientNameById.get(m.clientId) ?? '참여사',
-    role: m.role || null,
-    budget_ratio: m.shareRatio.trim() ? Number(m.shareRatio) : null,
-    responsibilities: m.responsibilities.trim() || null,
-  }));
+  const rows: Array<Record<string, unknown>> = [];
+  const op = buildOperatorRow(consortiumId, operator, clientNameById);
+  if (op) rows.push(op);
+  for (const m of drafts) {
+    if (!m.clientId) continue;
+    rows.push(buildMemberRow(consortiumId, m, clientNameById));
+  }
+  if (rows.length === 0) return {};
 
   const { error: iErr } = await supabase.from('consortium_members').insert(rows);
   if (iErr) {
@@ -108,14 +185,14 @@ interface CreateArgs {
     end_date: string | null;
     total_budget: number | null;
   };
-  leadRole: ConsortiumRole;
+  operator: OperatorDraft;
   drafts: MemberDraft[];
   clientNameById: Map<string, string>;
 }
 
-/** 신규 등록 — consortiums INSERT + 주관사 자동 추가 + 참여사 INSERT */
+/** 신규 등록 — consortiums INSERT + 운영사·참여사 INSERT (의뢰기관 자동 추가 제거) */
 export async function createConsortiumWithMembers({
-  payload, leadRole, drafts, clientNameById,
+  payload, operator, drafts, clientNameById,
 }: CreateArgs): Promise<{ id?: string; error?: string; ctx?: ErrorContext }> {
   const { data, error: cErr } = await supabase
     .from('consortiums')
@@ -128,24 +205,11 @@ export async function createConsortiumWithMembers({
   }
 
   const memberRows: Array<Record<string, unknown>> = [];
-  if (payload.lead_client_id) {
-    memberRows.push({
-      consortium_id: data.id,
-      client_id: payload.lead_client_id,
-      org_name: clientNameById.get(payload.lead_client_id) ?? '주관사',
-      role: leadRole,
-    });
-  }
+  const op = buildOperatorRow(data.id, operator, clientNameById);
+  if (op) memberRows.push(op);
   for (const m of drafts) {
     if (!m.clientId) continue;
-    memberRows.push({
-      consortium_id: data.id,
-      client_id: m.clientId,
-      org_name: clientNameById.get(m.clientId) ?? '참여사',
-      role: m.role || null,
-      budget_ratio: m.shareRatio.trim() ? Number(m.shareRatio) : null,
-      responsibilities: m.responsibilities.trim() || null,
-    });
+    memberRows.push(buildMemberRow(data.id, m, clientNameById));
   }
 
   if (memberRows.length === 0) return { id: data.id };

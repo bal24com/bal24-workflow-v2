@@ -8,19 +8,26 @@ import type { Client, ConsortiumRole } from '../../types/database';
 
 type ClientOption = Pick<Client, 'id' | 'name'>;
 
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 담당자 3필드 추가 (이름·연락처·이메일).
 export interface MemberDraft {
   uid: string;
   clientId: string;
   role: ConsortiumRole | '';
   shareRatio: string;
   responsibilities: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
 }
 
 export function makeMember(): MemberDraft {
   const uid = typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}_${Math.random()}`;
-  return { uid, clientId: '', role: '', shareRatio: '', responsibilities: '' };
+  return {
+    uid, clientId: '', role: '', shareRatio: '', responsibilities: '',
+    contactName: '', contactPhone: '', contactEmail: '',
+  };
 }
 
 interface Props {
@@ -84,7 +91,7 @@ export default function ConsortiumMembersField({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-sm font-semibold text-slate-700">고객사</label>
+                <label className="text-sm font-semibold text-slate-700">참여사</label>
                 <select
                   value={m.clientId}
                   onChange={(e) => handleUpdate(m.uid, { clientId: e.target.value })}
@@ -132,11 +139,38 @@ export default function ConsortiumMembersField({
                 placeholder="예) 콘텐츠 기획 / 운영"
               />
             </div>
+
+            {/* 박경수님 2026-05-27 — 참여사 담당자 정보 */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Input
+                label="담당자 이름"
+                value={m.contactName}
+                onChange={(e) => handleUpdate(m.uid, { contactName: e.target.value })}
+                disabled={submitting}
+                placeholder="예) 홍길동"
+              />
+              <Input
+                label="담당자 연락처"
+                inputMode="tel"
+                value={m.contactPhone}
+                onChange={(e) => handleUpdate(m.uid, { contactPhone: e.target.value })}
+                disabled={submitting}
+                placeholder="예) 010-1234-5678"
+              />
+              <Input
+                label="담당자 이메일"
+                type="email"
+                value={m.contactEmail}
+                onChange={(e) => handleUpdate(m.uid, { contactEmail: e.target.value })}
+                disabled={submitting}
+                placeholder="예) hong@example.com"
+              />
+            </div>
           </div>
         ))}
       </div>
 
-      <p className="text-xs text-muted">고객사를 선택하지 않은 행은 저장되지 않아요.</p>
+      <p className="text-xs text-muted">참여사를 선택하지 않은 행은 저장되지 않아요.</p>
     </section>
   );
 }

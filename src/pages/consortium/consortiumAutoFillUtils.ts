@@ -3,6 +3,7 @@
 
 import type { Client, ConsortiumRole } from '../../types/database';
 import { makeMember, type MemberDraft } from './ConsortiumMembersField';
+import { makeEmptyOperator, type OperatorDraft } from './consortiumMembersUtils';
 import type { AutoFillResult } from './hooks/useConsortiumAutoFill';
 
 type ClientOption = Pick<Client, 'id' | 'name'>;
@@ -52,19 +53,45 @@ export function buildFormPatch(
   };
 }
 
-/** AI 결과의 members 배열을 MemberDraft[] 로 변환 */
+/** AI 결과의 members 배열을 MemberDraft[] 로 변환 — operator 는 제외 */
 export function buildMemberDrafts(
   result: AutoFillResult,
   clients: ClientOption[],
 ): MemberDraft[] {
   if (!result.members || result.members.length === 0) return [];
-  return result.members.map((m) => ({
-    ...makeMember(),
-    clientId: matchClientId(clients, m.org_name),
-    role: matchRole(m.role),
-    shareRatio: m.share_rate != null ? String(m.share_rate) : '',
-    responsibilities: m.responsibilities ?? '',
-  }));
+  return result.members
+    // 박경수님 2026-05-27 — operator 와 동일한 회사면 참여사에 중복 추가 안 함
+    .filter((m) => !result.operator_name || !m.org_name?.includes(result.operator_name))
+    .map((m) => ({
+      ...makeMember(),
+      clientId: matchClientId(clients, m.org_name),
+      role: matchRole(m.role),
+      shareRatio: m.share_rate != null ? String(m.share_rate) : '',
+      responsibilities: m.responsibilities ?? '',
+      contactName: m.contact_name ?? '',
+      contactPhone: m.contact_phone ?? '',
+      contactEmail: m.contact_email ?? '',
+    }));
+}
+
+/** AI 결과에서 운영사 정보(OperatorDraft) 추출 — operator_name + members 의 총괄 항목에서 contact 매칭 */
+export function buildOperatorDraft(
+  result: AutoFillResult,
+  clients: ClientOption[],
+): OperatorDraft {
+  const op = makeEmptyOperator();
+  if (!result.operator_name) return op;
+  op.clientId = matchClientId(clients, result.operator_name);
+  // members 배열에 같은 회사가 있으면 contact 정보 복사
+  const matched = (result.members ?? []).find(
+    (m) => m.org_name?.includes(result.operator_name ?? '__') || result.operator_name?.includes(m.org_name ?? '__'),
+  );
+  if (matched) {
+    op.contactName = matched.contact_name ?? '';
+    op.contactPhone = matched.contact_phone ?? '';
+    op.contactEmail = matched.contact_email ?? '';
+  }
+  return op;
 }
 
 /** AI 결과로 채워진 항목 개수 계산 (토스트용) */

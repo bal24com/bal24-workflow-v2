@@ -1,7 +1,8 @@
 // bal24 v2 — 컨소시엄 등록·수정 폼 타입·초기값 (ConsortiumFormModal V-1 분리)
 // 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-AI-AUTOFILL — V-1 (400줄) 충족 위해 분리.
 
-import type { ConsortiumRole, ConsortiumStatus } from '../../types/database';
+import type { ConsortiumStatus } from '../../types/database';
+import type { ConsortiumLeadRole } from './consortiumStatus';
 
 export interface ConsortiumInitialData {
   id: string;
@@ -15,12 +16,13 @@ export interface ConsortiumInitialData {
   total_budget: number | null;     // 박경수님 요청 — 사업비 입력 칸
 }
 
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — leadRole 을 의뢰기관 검수/감수로 변경.
 export interface ConsortiumForm {
   name: string;
   projectId: string;
   status: ConsortiumStatus;
   leadClientId: string;
-  leadRole: ConsortiumRole;
+  leadRole: ConsortiumLeadRole | '';
   description: string;
   startDate: string;
   endDate: string;
@@ -29,7 +31,7 @@ export interface ConsortiumForm {
 
 export const EMPTY_CONSORTIUM_FORM: ConsortiumForm = {
   name: '', projectId: '', status: '구성중',
-  leadClientId: '', leadRole: '총괄',
+  leadClientId: '', leadRole: '',
   description: '',
   startDate: '', endDate: '', totalBudget: '',
 };
@@ -40,7 +42,7 @@ export function fromInitialConsortium(d: ConsortiumInitialData): ConsortiumForm 
     projectId: d.project_id ?? '',
     status: d.status,
     leadClientId: d.lead_client_id ?? '',
-    leadRole: '총괄',
+    leadRole: '',
     description: d.description,
     startDate: d.start_date,
     endDate: d.end_date,
