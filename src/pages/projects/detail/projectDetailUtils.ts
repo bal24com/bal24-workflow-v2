@@ -18,6 +18,7 @@ export interface ProjectFinance {
   expectedIncomeTotal: number;    // 진행중·draft·보류 계약 총액 (신 income_contracts)
   expenseTotal: number;           // 지출 합계 (구 expenses + 신 payroll_expenses)
   pendingExpenseTotal: number;    // 대기 지출 합계
+  paidExpenseTotal: number;       // 박경수님 + SkyClaw 2026-05-28 — 집행 완료 (payment_status='완료') 만 집계
   payrollTotal: number;           // 외주/급여 합계 (신 payroll_expenses, 취소 제외)
   // 박경수님 요청 — 견적 + 인건비/운영비 분리
   proposalTotal: number;          // 제안 견적 합계 (project_estimates.total_amount)
@@ -106,6 +107,8 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
   const livePayroll = payrollRows.filter((r) => r.payment_status !== '취소');
   const payrollTotal = livePayroll.reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
   const payrollPending = payrollRows.filter((r) => r.payment_status === '대기').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+  // 박경수님 + SkyClaw 2026-05-28 — 집행 완료(payment_status='완료')만 집계 (예정 제외)
+  const paidExpenseTotal = payrollRows.filter((r) => r.payment_status === '완료').reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
   // 박경수님 요청 — 인건비/운영비 분리 (prefix 매칭)
   const outsourceTotal = livePayroll.filter((r) => isOutsourceType(r.expense_type)).reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
   const operationTotal = livePayroll.filter((r) => isOperationType(r.expense_type)).reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
@@ -138,7 +141,7 @@ export async function fetchProjectFinance(projectId: string): Promise<ProjectFin
   const remaining = budget - expenseTotal;
   const settledPct = budget > 0 ? Math.min(100, Math.round((incomeTotal / budget) * 100)) : 0;
 
-  return { budget, contractTotal, incomeTotal, expectedIncomeTotal, expenseTotal, pendingExpenseTotal, payrollTotal, proposalTotal, outsourceTotal, operationTotal, vatAmount, withholdingTax, netExpense, salesVat, vatPayable, remaining, settledPct };
+  return { budget, contractTotal, incomeTotal, expectedIncomeTotal, expenseTotal, pendingExpenseTotal, paidExpenseTotal, payrollTotal, proposalTotal, outsourceTotal, operationTotal, vatAmount, withholdingTax, netExpense, salesVat, vatPayable, remaining, settledPct };
 }
 
 /** 참여자 미리보기 — project_members 카운트 + 최근 등록 N명 이름 */

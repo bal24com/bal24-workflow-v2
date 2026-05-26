@@ -71,12 +71,12 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
 
           <Divider />
 
-          {/* 지출계 (세액 포함) + 운영비·인건비 분리 */}
+          {/* 지출계 (세액 포함) + 운영비·인건비 분리 + 박경수님 + SkyClaw 2026-05-28: [집행 완료] 행 */}
           <div>
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-xs font-bold text-orange-700">지출계</span>
-                <span className="text-[10px] text-slate-400">운영비·인건비 등 세액 포함 전체</span>
+                <span className="text-xs font-bold text-orange-700">지출계 (예정 포함)</span>
+                <span className="text-[10px] text-slate-400">취소 제외 — 대기·완료·후순위 모두 포함</span>
               </div>
               <span className="text-sm font-bold text-orange-700 tabular-nums">{formatMoney(data.expenseTotal)}</span>
             </div>
@@ -86,6 +86,10 @@ export default function FinanceSummaryCard({ projectId }: { projectId: string })
             {data.outsourceTotal > 0 && (
               <Row label="└ 인건비" value={formatMoney(data.outsourceTotal)} accent="orange" small />
             )}
+            <div className="flex items-center justify-between mt-1 pt-1 border-t border-orange-100">
+              <span className="text-[11px] text-emerald-700">✓ 집행 완료 (지급 완료만)</span>
+              <span className="text-xs text-emerald-700 tabular-nums font-semibold">{formatMoney(data.paidExpenseTotal)}</span>
+            </div>
           </div>
 
           {/* 세액 박스 (원천세 + 외주부가세 + 사업부가세) */}
