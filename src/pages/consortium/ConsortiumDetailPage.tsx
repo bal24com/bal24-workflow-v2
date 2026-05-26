@@ -30,6 +30,7 @@ import {
   getStatusBadgeClass,
 } from './consortiumUtils';
 import ConOverviewTab from './detail/ConOverviewTab';
+import ConMembersTab from './detail/ConMembersTab';
 import ConProgramsTab from './detail/ConProgramsTab';
 import ConEstimateTab from './detail/ConEstimateTab'; // STEP-CONSORTIUM-UPGRADE-FULL PART B (2026-05-28)
 import ConTasksTab from './detail/ConTasksTab';
@@ -54,11 +55,12 @@ interface ConsortiumDetail {
   project: { id: string; name: string } | null;
 }
 
-type TabKey = 'overview' | 'programs' | 'tasks' | 'estimate' | 'finance' | 'staff' | 'links' | 'portal' | 'files';
+type TabKey = 'overview' | 'members' | 'programs' | 'tasks' | 'estimate' | 'finance' | 'staff' | 'links' | 'portal' | 'files';
 
-// STEP-CONSORTIUM-UPGRADE-FULL PART B (2026-05-28) — 견적 탭 추가 (재무 앞)
+// STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27) — [참여사] 탭 신규 (개요 다음).
 const TAB_LIST: Array<{ key: TabKey; label: string; Icon: typeof Briefcase }> = [
   { key: 'overview', label: '개요', Icon: Building2 },
+  { key: 'members', label: '참여사', Icon: Users },
   { key: 'programs', label: '프로그램', Icon: GraduationCap },
   { key: 'tasks', label: '태스크', Icon: ListChecks },
   { key: 'estimate', label: '견적', Icon: Receipt },
@@ -168,6 +170,7 @@ export default function ConsortiumDetailPage() {
 
   const TabContent: Record<TabKey, ReactNode> = {
     overview: <ConOverviewTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} description={consortium.description} />,
+    members:  <ConMembersTab  consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} />,
     programs: <ConProgramsTab consortiumId={id} members={members} />,
     // STEP-CONSORTIUM-UPGRADE-FULL PART B (2026-05-28) — 견적 탭
     estimate: <ConEstimateTab consortiumId={id} projectId={consortium.project_id ?? null} totalBudget={Number(consortium.total_budget ?? 0)} members={members} />,

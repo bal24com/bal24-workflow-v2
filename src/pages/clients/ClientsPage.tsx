@@ -21,6 +21,7 @@ import TagFilterTabs from '../../components/TagFilterTabs';
 import { useTagFilter } from '../../hooks/useTagFilter';
 import ClientFormModal from './ClientFormModal';
 import ClientDetailModal from './ClientDetailModal';
+import ClientListRowImported from './ClientListRow';
 
 type ViewMode = 'card' | 'list';
 
@@ -70,6 +71,10 @@ function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & Card
             {/* STEP-CLIENT-EXPERT-CARD — 상호명 + 부서명 병기 */}
             <div className="text-base font-bold text-[#1E1B4B] truncate">
               {c.name}
+              {/* STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27) — 자사 뱃지 */}
+              {c.is_own_company && (
+                <span className="ml-1.5 text-xs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded font-bold">자사</span>
+              )}
               {c.department && <span className="ml-1 text-sm font-semibold text-slate-500">· {c.department}</span>}
             </div>
             {c.business_name && (
@@ -132,12 +137,15 @@ function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & Card
       <div className="flex items-center gap-2 px-5 pb-4">
         <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={() => onView(c)} className="!flex-1">내용보기</Button>
         <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={() => onEdit(c)} className="!flex-1">수정</Button>
-        <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(c); }}
-          aria-label="삭제"
-          className="inline-flex items-center justify-center gap-1 h-8 px-2.5 rounded-md text-xs font-semibold text-rose-500 border border-rose-200 bg-white hover:bg-rose-50 transition-colors">
-          <Trash2 size={13} aria-hidden="true" />
-          삭제
-        </button>
+        {/* STEP-CONSORTIUM-REDESIGN — 자사는 삭제 차단 */}
+        {!c.is_own_company && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(c); }}
+            aria-label="삭제"
+            className="inline-flex items-center justify-center gap-1 h-8 px-2.5 rounded-md text-xs font-semibold text-rose-500 border border-rose-200 bg-white hover:bg-rose-50 transition-colors">
+            <Trash2 size={13} aria-hidden="true" />
+            삭제
+          </button>
+        )}
       </div>
     </Card>
   );
@@ -152,61 +160,7 @@ function Line({ icon, children }: { icon: React.ReactNode; children: React.React
   );
 }
 
-function ClientListRow({ c, onView, onEdit, onDelete }: { c: ClientRow } & CardActions) {
-  const ceo = c.ceo_name ?? c.representative;
-  const firstTag = c.tags?.[0];
-  return (
-    <li className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-violet-200 hover:shadow-sm transition">
-      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-violet-100 text-violet-600 shrink-0">
-        <Building2 size={18} aria-hidden="true" />
-      </span>
-      <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            {firstTag && (
-              <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-violet-50 text-violet-700 border border-violet-200">{firstTag}</span>
-            )}
-            <span className="text-sm font-bold text-text truncate">{c.name}</span>
-          </div>
-          <div className="text-xs text-muted truncate">
-            {ceo ?? '대표자 미지정'}
-            {c.business_number && ` · ${formatBusinessNumber(c.business_number)}`}
-          </div>
-        </div>
-        <div className="min-w-0 text-xs text-muted">
-          {[c.business_type, c.business_item].filter(Boolean).join(' · ') || (
-            <span className="text-slate-400">업종 미지정</span>
-          )}
-        </div>
-        <div className="min-w-0 text-xs text-muted truncate">
-          {c.phone || c.email ? (
-            <>
-              {c.phone && <span>{c.phone}</span>}
-              {c.phone && c.email && ' · '}
-              {c.email}
-            </>
-          ) : c.contacts[0] ? (
-            <>
-              <span className="font-semibold text-slate-700">담당</span>{' '}
-              {c.contacts[0].name}
-              {c.contacts[0].phone_mobile && ` · ${c.contacts[0].phone_mobile}`}
-            </>
-          ) : (
-            <span className="text-slate-400">연락처 미등록</span>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5 shrink-0">
-        <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={() => onView(c)}>내용</Button>
-        <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={() => onEdit(c)}>수정</Button>
-        <button type="button" onClick={() => onDelete(c)} aria-label="삭제"
-          className="p-1.5 rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-500 border border-rose-300">
-          <Trash2 size={12} />
-        </button>
-      </div>
-    </li>
-  );
-}
+// ClientListRow 는 ./ClientListRow 로 분리 (V-1, STEP-CONSORTIUM-REDESIGN).
 
 export default function ClientsPage() {
   const toast = useToast();
@@ -269,6 +223,11 @@ export default function ClientsPage() {
 
   // STEP-DELETE-RESUME-FULL — 카드/리스트 hover 삭제
   const handleDelete = async (c: ClientRow) => {
+    // STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27) — 자사는 삭제 차단
+    if (c.is_own_company) {
+      toast.error('자사 고객사는 삭제할 수 없어요.');
+      return;
+    }
     if (!window.confirm(`"${c.name}"을(를) 삭제할까요? 30일 후 자동으로 완전 삭제됩니다. (관리자 휴지통에서 복원 가능)`)) return;
     const err = await softDelete('clients', c.id);
     if (err) { toast.error(err); return; }
@@ -354,7 +313,7 @@ export default function ClientsPage() {
       ) : (
         <ul className="space-y-2">
           {visible.map((c) => (
-            <ClientListRow key={c.id} c={c} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
+            <ClientListRowImported key={c.id} c={c} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
           ))}
         </ul>
       )}

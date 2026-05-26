@@ -96,6 +96,8 @@ export interface Client {
   updated_at: string;
   /** STEP-EXPERT-CRUD-FULL — soft-delete 휴지통 (30일 후 영구 삭제) */
   deleted_at?: string | null;
+  /** STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27) — 자사 여부. UI 라벨 '자사' 매핑. 1개만 등록. */
+  is_own_company?: boolean | null;
 }
 
 export interface ClientContact {
@@ -173,6 +175,9 @@ export interface Consortium {
   deleted_at?: string | null;
 }
 
+/** STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27) — 정산 방향 */
+export type ConsortiumSettlementDirection = 'outbound' | 'inbound' | 'none';
+
 export interface ConsortiumMember {
   id: string;
   consortium_id: string;
@@ -180,13 +185,21 @@ export interface ConsortiumMember {
   client_id?: string | null;
   role?: ConsortiumRole | null;
   responsibilities?: string | null;
-  budget_ratio?: number | null;     // 지분율 (%)
+  budget_ratio?: number | null;     // 기존 예산 비율 필드
   budget_amount?: number | null;
   contact_name?: string | null;
   contact_phone?: string | null;
   contact_email?: string | null;
   access_token: string;
   created_at: string;
+  /** STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27) — 지분율 (0~100). UI 표시·합계 검증용. */
+  share_rate?: number | null;
+  /** 정산 방향 — outbound: 밸런스닷 → 참여사 지급, inbound: 참여사 → 밸런스닷 수령, none: 해당없음. */
+  settlement_direction?: ConsortiumSettlementDirection | null;
+  /** 자사(밸런스닷) 여부 — clients.is_own_company 와 연동되어 자동 set. */
+  is_self?: boolean | null;
+  /** STEP-CONSORTIUM-REDESIGN — clients join 정보 (드롭다운 표시·자사 ⭐ 우선) */
+  clients?: { id: string; name: string; is_own_company: boolean } | null;
 }
 
 // ─── 프로젝트 ─────────────────────────────────────────
