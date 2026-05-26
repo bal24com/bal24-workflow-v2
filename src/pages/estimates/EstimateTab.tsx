@@ -169,8 +169,8 @@ export default function EstimateTab({ projectId, projectName }: Props) {
   const addonConfig: EstimateAddonConfig = parseAddonConfig(estimate as Record<string, unknown> | null);
   async function handleAddonSave(cfg: EstimateAddonConfig) { const est = await ensureEstimate(); if (!est) return; const { error } = await supabase.from('project_estimates').update(buildAddonPayload(cfg)).eq('id', est.id); if (error) { console.error('[EstimateTab] addon 저장 오류:', error.message); toast.error('견적 추가 요금 저장 중 오류가 발생했어요.'); return; } toast.success('견적 추가 요금을 저장했어요.'); void reload(); }
   async function handleExcelDownload() {
-    // 박경수님 + SkyClaw STEP-ESTIMATE-EXCEL-UX — xItems + clientName fetch + 엑셀 양식 호출
-    const xItems = items.map((it) => { const qty = (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1); const up = Number(it.unit_price) || 0; return { category: it.category, name: it.description ?? '', unitPrice: up, quantity: qty, amount: up * qty, note: it.memo ?? '' }; });
+    // 박경수님 + SkyClaw STEP-ESTIMATE-EXCEL-FIX — 7열 구조 (단가·시간·인원·소계 분리)
+    const xItems = items.map((it) => { const up = Number(it.unit_price) || 0; const hrs = Number(it.quantity) || 0; const hc = Number(it.headcount ?? 1) || 1; return { category: it.category, name: it.description ?? '', unitPrice: up, hours: hrs, headcount: hc, amount: up * hrs * hc, note: it.memo ?? '' }; });
     const { data: prj } = await supabase.from('projects').select('client:clients(name)').eq('id', projectId).maybeSingle();
     downloadEstimateExcel({ title: estimate?.title ?? projectName, clientName: (prj as { client?: { name?: string } | null } | null)?.client?.name ?? '', items: xItems, cfg: addonConfig, result: calcEstimateAddon(total, addonConfig) });
   }

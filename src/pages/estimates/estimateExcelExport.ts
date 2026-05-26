@@ -4,23 +4,23 @@
 import * as XLSX from 'xlsx';
 import type { EstimateAddonConfig, EstimateAddonResult } from './estimateAddonUtils';
 
-// 공급자 정보 — (주)밸런스닷
+// 공급자 정보 — (주)밸런스닷 (박경수님 가이드 STEP-ESTIMATE-EXCEL-FIX 2026-05-28 수정)
 const COMPANY_INFO = {
   name: '주식회사 밸런스닷',
-  bizNo: '883-87-03232',
-  address: '전북특별자치도 전주시 덕진구 오공로 43-13, 1동 5층 501호',
+  bizNo: '883-87-03214',
+  address: '전남 목포시 옥암동 1195-1 멘토법조빌딩 2층 201호',
   tel: '070-7773-2341',
-  email: 'park8451@gmail.com',
+  email: 'ks@bal24.com',
   ceo: '박경수',
 } as const;
 
 interface EstimateItem {
-  category: string;
-  name: string;
-  unit?: string;
-  unitPrice: number;
-  quantity: number;
-  amount: number;
+  category: string;       // 항목
+  name: string;           // 세세항목 (기존 세항목 → 가이드 변경)
+  unitPrice: number;      // 단가
+  hours: number;          // 시간·횟수 (quantity)
+  headcount: number;      // 수량·인원 (headcount, 기본 1)
+  amount: number;         // 소계 (unitPrice × hours × headcount)
   note?: string;
 }
 
@@ -64,23 +64,23 @@ export function downloadEstimateExcel(params: ExportParams): void {
   aoa.push(['이메일', COMPANY_INFO.email, '', '', '', '']);
   aoa.push([]);
 
-  // [4] 항목 테이블 헤더
-  const headerRow = aoa.push(['항목', '세부내용', '수량', '단가', '금액', '비고']);
+  // [4] 항목 테이블 헤더 — 박경수님 가이드 STEP-ESTIMATE-EXCEL-FIX (7열 구조)
+  const headerRow = aoa.push(['항목', '세세항목', '단가(원)', '시간·횟수', '수량·인원', '소계(원)', '비고']);
 
-  // [5] 항목 데이터
+  // [5] 항목 데이터 (7열)
   for (const it of items) {
-    aoa.push([it.category, it.name, it.quantity, it.unitPrice, it.amount, it.note ?? '']);
+    aoa.push([it.category, it.name, it.unitPrice, it.hours, it.headcount, it.amount, it.note ?? '']);
   }
   aoa.push([]);
 
-  // [6] 합계 요약
-  aoa.push(['', '', '', '직접비 소계', result.directTotal, '']);
-  if (cfg.useOverhead) aoa.push(['', '', '', `${cfg.overheadLabel} (${cfg.overheadRate}%)`, result.overheadAmount, '']);
-  if (cfg.useTechFee)  aoa.push(['', '', '', `${cfg.techFeeLabel} (${cfg.techFeeRate}%)`, result.techFeeAmount, '']);
-  aoa.push(['', '', '', '공급가액', result.supplyTotal, '']);
-  aoa.push(['', '', '', `부 가 세 (${cfg.useVat ? cfg.vatRate + '%' : '미적용'})`, cfg.useVat ? result.vatAmount : '-', '']);
-  aoa.push(['', '', '', '견적금액 (부가세 포함)', result.grandTotal, '']);
-  aoa.push(['', '', '', '최종 제안금액 (만단위 절사)', finalAmount, '']);
+  // [6] 합계 요약 (7열: 라벨은 E=4번 컬럼, 금액은 F=5번 컬럼)
+  aoa.push(['', '', '', '', '직접비 소계', result.directTotal, '']);
+  if (cfg.useOverhead) aoa.push(['', '', '', '', `${cfg.overheadLabel} (${cfg.overheadRate}%)`, result.overheadAmount, '']);
+  if (cfg.useTechFee)  aoa.push(['', '', '', '', `${cfg.techFeeLabel} (${cfg.techFeeRate}%)`, result.techFeeAmount, '']);
+  aoa.push(['', '', '', '', '공급가액', result.supplyTotal, '']);
+  aoa.push(['', '', '', '', `부 가 세 (${cfg.useVat ? cfg.vatRate + '%' : '미적용'})`, cfg.useVat ? result.vatAmount : '-', '']);
+  aoa.push(['', '', '', '', '견적금액 (부가세 포함)', result.grandTotal, '']);
+  aoa.push(['', '', '', '', '최종 제안금액 (만단위 절사)', finalAmount, '']);
   aoa.push([]);
 
   // [7] 특이사항
@@ -90,41 +90,36 @@ export function downloadEstimateExcel(params: ExportParams): void {
   // ── 워크시트 생성 ────────────────────────────────
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  // 컬럼 너비
-  ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 8 }, { wch: 15 }, { wch: 15 }, { wch: 12 }];
+  // 컬럼 너비 (7열)
+  ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
 
-  // 머지 셀
+  // 머지 셀 (7열 기준 c: 0~6)
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },  // 타이틀
-    { s: { r: 2, c: 1 }, e: { r: 2, c: 5 } },  // 수신
-    { s: { r: 3, c: 1 }, e: { r: 3, c: 5 } },  // 제목
-    { s: { r: 4, c: 1 }, e: { r: 4, c: 5 } },  // 견적금액
-    { s: { r: 5, c: 1 }, e: { r: 5, c: 5 } },  // 견적일자
-    { s: { r: 7, c: 0 }, e: { r: 7, c: 5 } },  // [공급자 정보]
-    { s: { r: 9, c: 1 }, e: { r: 9, c: 2 } },  // 사업자번호 영역
-    { s: { r: 10, c: 1 }, e: { r: 10, c: 5 } }, // 소재지
-    { s: { r: 11, c: 1 }, e: { r: 11, c: 5 } }, // 이메일
-    // 특이사항 영역은 동적 row 번호라 마지막에 추가 (headerRow + 항목 + 합계 등)
-    { s: { r: aoa.length - 2, c: 0 }, e: { r: aoa.length - 2, c: 5 } },
-    { s: { r: aoa.length - 1, c: 1 }, e: { r: aoa.length - 1, c: 5 } },
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },  // 타이틀
+    { s: { r: 2, c: 1 }, e: { r: 2, c: 6 } },  // 수신
+    { s: { r: 3, c: 1 }, e: { r: 3, c: 6 } },  // 제목
+    { s: { r: 4, c: 1 }, e: { r: 4, c: 6 } },  // 견적금액
+    { s: { r: 5, c: 1 }, e: { r: 5, c: 6 } },  // 견적일자
+    { s: { r: 7, c: 0 }, e: { r: 7, c: 6 } },  // [공급자 정보]
+    { s: { r: 9, c: 1 }, e: { r: 9, c: 2 } },  // 사업자번호
+    { s: { r: 10, c: 1 }, e: { r: 10, c: 6 } }, // 소재지
+    { s: { r: 11, c: 1 }, e: { r: 11, c: 6 } }, // 이메일
+    { s: { r: aoa.length - 2, c: 0 }, e: { r: aoa.length - 2, c: 6 } },
+    { s: { r: aoa.length - 1, c: 1 }, e: { r: aoa.length - 1, c: 6 } },
   ];
 
-  // 숫자 셀 포맷 (#,##0) — 항목 단가/금액 + 합계 영역
-  const headerRowIdx = headerRow - 1; // 0-based
+  // 숫자 포맷 (#,##0) — 항목 단가(C)·시간(D)·인원(E)·소계(F) + 합계 영역 F열
+  const headerRowIdx = headerRow - 1;
   const itemStart = headerRowIdx + 1;
   const itemEnd = itemStart + items.length - 1;
   for (let r = itemStart; r <= itemEnd; r += 1) {
-    const cellD = XLSX.utils.encode_cell({ r, c: 3 });
-    const cellE = XLSX.utils.encode_cell({ r, c: 4 });
-    if (ws[cellD]) ws[cellD].z = '#,##0';
-    if (ws[cellE]) ws[cellE].z = '#,##0';
+    [2, 3, 4, 5].forEach((c) => { const cell = XLSX.utils.encode_cell({ r, c }); if (ws[cell]) ws[cell].z = '#,##0'; });
   }
-  // 합계 영역도 숫자 포맷
   const sumStart = itemEnd + 2;
   const sumEnd = aoa.length - 3;
   for (let r = sumStart; r <= sumEnd; r += 1) {
-    const cellE = XLSX.utils.encode_cell({ r, c: 4 });
-    if (ws[cellE] && typeof ws[cellE].v === 'number') ws[cellE].z = '#,##0';
+    const cellF = XLSX.utils.encode_cell({ r, c: 5 });
+    if (ws[cellF] && typeof ws[cellF].v === 'number') ws[cellF].z = '#,##0';
   }
 
   // 워크북 생성 + 다운로드
