@@ -99,7 +99,8 @@ export default function StaffMaterialsTab({ staff, selectedProgramId }: Props) {
       .select('*').in('curriculum_id', filteredCurIds).order('created_at', { ascending: false });
     if (matErr) {
       const m = (matErr.message ?? '').toLowerCase();
-      if (m.includes('does not exist') || m.includes('pgrst205')) {
+      // 박경수님 2026-05-28 — 'Could not find the table' / 'schema cache' 도 미존재로 인식
+      if (m.includes('does not exist') || m.includes('pgrst205') || m.includes('could not find') || m.includes('schema cache')) {
         setTableMissing(true); setMaterials([]);
       } else {
         console.warn('[staff-portal/materials] 조회 경고:', matErr.message);
