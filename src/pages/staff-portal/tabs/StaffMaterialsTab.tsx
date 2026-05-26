@@ -1,5 +1,6 @@
 // bal24 v2 — STEP-STAFF-PORTAL-P5 / STEP-STAFF-PORTAL-UI-UNIFY
 // 강사 포털 · 자료 탭 — curriculum_materials 실제 업로드/다운로드/삭제.
+// 박경수님 + SkyClaw STEP-STAFF-PORTAL-REDESIGN PART F (2026-05-28) — [교안][프로필] 서브탭 분리
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, FileText, Download, Trash2, Upload, Info } from 'lucide-react';
@@ -7,6 +8,9 @@ import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import EmptyState from '../../../components/EmptyState';
 import type { StaffPortalIdentity } from '../staffPortalUtils';
+import ProfileFileSection from './ProfileFileSection';
+
+type MaterialSubTab = 'curriculum' | 'profile';
 
 interface Props {
   staff: StaffPortalIdentity;
@@ -26,13 +30,42 @@ const STORAGE_BUCKET = 'staff-files';
 const CARD_CLASS =
   'bg-white rounded-2xl border border-violet-100 shadow-[0_4px_16px_rgba(124,58,237,0.08)] p-5';
 
+// STEP-STAFF-PORTAL-REDESIGN PART F (2026-05-28) — 서브탭 헤더 (공용)
+function SubTabHeader({ active, onChange }: { active: MaterialSubTab; onChange: (k: MaterialSubTab) => void }) {
+  const items: Array<{ key: MaterialSubTab; label: string; desc: string }> = [
+    { key: 'curriculum', label: '교안', desc: '강사가 차시별 업로드' },
+    { key: 'profile',    label: '프로필', desc: 'PM 업로드 (다운로드만)' },
+  ];
+  return (
+    <div className="flex items-center gap-1 border-b border-violet-100 mb-3 -mx-1 px-1">
+      {items.map((it) => (
+        <button key={it.key} type="button" onClick={() => onChange(it.key)}
+          className={`px-3 py-2 text-xs font-bold border-b-2 -mb-px transition-colors ${active === it.key ? 'text-violet-700 border-violet-600' : 'text-slate-500 border-transparent hover:text-violet-600'}`}>
+          {it.label} <span className="text-[10px] text-slate-400 ml-1">{it.desc}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function StaffMaterialsTab({ staff, selectedProgramId }: Props) {
   const toast = useToast();
+  const [subTab, setSubTab] = useState<MaterialSubTab>('curriculum');
   const [curriculums, setCurriculums] = useState<CurriculumRow[]>([]);
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  // 프로필 서브탭은 별도 컴포넌트에서 처리 — 여기서 early return
+  if (subTab === 'profile') {
+    return (
+      <div className="space-y-3">
+        <SubTabHeader active={subTab} onChange={setSubTab} />
+        <ProfileFileSection staff={staff} selectedProgramId={selectedProgramId} />
+      </div>
+    );
+  }
 
   const fetchData = useCallback(async () => {
     if (!selectedProgramId) { setCurriculums([]); setMaterials([]); setLoading(false); return; }
@@ -165,6 +198,8 @@ export default function StaffMaterialsTab({ staff, selectedProgramId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* PART F — 서브탭 헤더 */}
+      <SubTabHeader active={subTab} onChange={setSubTab} />
       <div className="rounded-2xl border border-cyan-200 bg-cyan-50/60 px-4 py-3 text-xs text-cyan-800 flex items-start gap-2">
         <Info size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
         <p>본인이 올린 자료는 삭제할 수 있어요. PM이 올린 자료는 다운로드만 가능합니다.</p>
