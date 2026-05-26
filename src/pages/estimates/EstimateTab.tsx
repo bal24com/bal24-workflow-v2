@@ -9,21 +9,18 @@ import { supabase } from '../../lib/supabase';
 import { formatMoney } from '../../lib/utils';
 import { calcTax, TAX_RATE_LABEL, TAX_RATE_VALUES } from '../../utils/taxUtils';
 import type { PayrollTaxRateType } from '../../types/database';
-import {
-  applyFilterSort, emptyDraft, EstSortTh, KpiBox,
-  type DraftItem, type SortKey, type SortDir,
-} from './estimateTableHelpers';
-import {
-  fetchEstimateByProject, createEstimate, saveEstimateItems,
-  fetchEstimatePaymentMap, estimateItemStatusLabel,
-  ESTIMATE_CATEGORY_SUGGESTIONS, type EstimateRow,
-} from './estimateUtils';
+import { applyFilterSort, emptyDraft, EstSortTh, KpiBox, type DraftItem, type SortKey, type SortDir } from './estimateTableHelpers';
+import { fetchEstimateByProject, createEstimate, saveEstimateItems, fetchEstimatePaymentMap, estimateItemStatusLabel, ESTIMATE_CATEGORY_SUGGESTIONS, type EstimateRow } from './estimateUtils';
 // STEP-ACCOUNTING-FOLLOWUP7-Phase3 — AI 견적서 추출
 import { extractEstimateFromDocument, type ExtractedEstimateItem } from './estimateExtract';
 import EstimateAiSection from './EstimateAiSection';
 import EstimateHeaderEditModal from './EstimateHeaderEditModal';
 // 박경수님 요청 — 견적 항목 템플릿 저장/불러오기
 import { SaveEstimateTemplateModal, LoadEstimateTemplateModal, type TemplateItem } from './EstimateTemplateModals';
+// 박경수님 + SkyClaw STEP-ESTIMATE-ADDON-FULL (2026-05-27) — 제경비·기술료·부가세·최종금액 + 엑셀
+import EstimateAddonSection from './EstimateAddonSection';
+import { buildAddonPayload, calcEstimateAddon, parseAddonConfig, type EstimateAddonConfig } from './estimateAddonUtils';
+import { downloadEstimateExcel } from './estimateExcelExport';
 
 interface Props { projectId: string; projectName: string }
 
@@ -51,15 +48,7 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         // 박경수님 요청 — 매핑된 payroll 의 지급상태 일괄 조회
         const payrollIds = data.items.map((it) => it.payroll_expense_id).filter(Boolean) as string[];
         const payMap = await fetchEstimatePaymentMap(payrollIds);
-        setItems(data.items.map((it) => ({
-          category: it.category, description: it.description ?? '', payee_name: it.payee_name ?? '',
-          unit_price: it.unit_price, quantity: it.quantity, headcount: Number(it.headcount ?? 1),
-          tax_rate_type: it.tax_rate_type as PayrollTaxRateType,
-          memo: it.memo ?? '', order_index: it.order_index, program_id: it.program_id ?? null,
-          _existingId: it.id, _converted: !!it.payroll_expense_id,
-          _payrollId: it.payroll_expense_id ?? null,
-          _paymentStatus: it.payroll_expense_id ? payMap.get(it.payroll_expense_id) ?? null : null,
-        })));
+        setItems(data.items.map((it) => ({ category: it.category, description: it.description ?? '', payee_name: it.payee_name ?? '', unit_price: it.unit_price, quantity: it.quantity, headcount: Number(it.headcount ?? 1), tax_rate_type: it.tax_rate_type as PayrollTaxRateType, memo: it.memo ?? '', order_index: it.order_index, program_id: it.program_id ?? null, _existingId: it.id, _converted: !!it.payroll_expense_id, _payrollId: it.payroll_expense_id ?? null, _paymentStatus: it.payroll_expense_id ? payMap.get(it.payroll_expense_id) ?? null : null })));
       } else { setItems([]); }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
@@ -175,6 +164,19 @@ export default function EstimateTab({ projectId, projectName }: Props) {
 
   // 박경수님 요청 — 단가 × 회수 × 수량(인원) 3중 곱
   const total = items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1), 0);
+
+  // 박경수님 + SkyClaw STEP-ESTIMATE-ADDON-FULL — 제경비·기술료·부가세·최종금액 + 엑셀
+  const addonConfig: EstimateAddonConfig = parseAddonConfig(estimate as Record<string, unknown> | null);
+  async function handleAddonSave(cfg: EstimateAddonConfig) {
+    const est = await ensureEstimate(); if (!est) return;
+    const { error } = await supabase.from('project_estimates').update(buildAddonPayload(cfg)).eq('id', est.id);
+    if (error) { console.error('[EstimateTab] addon 저장 오류:', error.message); toast.error('견적 추가 요금 저장 중 오류가 발생했어요.'); return; }
+    toast.success('견적 추가 요금을 저장했어요.'); void reload();
+  }
+  function handleExcelDownload() {
+    const xItems = items.map((it) => { const qty = (Number(it.quantity) || 0) * (Number(it.headcount ?? 1) || 1); const up = Number(it.unit_price) || 0; return { category: it.category, name: it.description ?? '', unitPrice: up, quantity: qty, amount: up * qty, note: it.memo ?? '' }; });
+    downloadEstimateExcel(projectName, xItems, addonConfig, calcEstimateAddon(total, addonConfig));
+  }
 
   // 박경수님 요청 — 필터/검색/정렬 + 프로그램 연동
   const [catFilter, setCatFilter] = useState(''); const [search, setSearch] = useState('');
@@ -360,6 +362,12 @@ export default function EstimateTab({ projectId, projectName }: Props) {
         <datalist id="estimate-categories">
           {ESTIMATE_CATEGORY_SUGGESTIONS.map((c) => <option key={c} value={c} />)}
         </datalist>
+      </div>
+
+      {/* 박경수님 + SkyClaw STEP-ESTIMATE-ADDON-FULL — 제경비·기술료·부가세·최종금액 + 엑셀 */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4">
+        <div className="flex items-center justify-between mb-2"><h3 className="text-sm font-semibold text-slate-800">견적 합계 (제경비·기술료·부가세·최종 제안금액)</h3><Button variant="outline" size="sm" leftIcon={<Download size={13} />} onClick={handleExcelDownload}>엑셀 다운로드</Button></div>
+        <EstimateAddonSection directTotal={total} addonConfig={addonConfig} onSave={handleAddonSave} />
       </div>
 
       {/* 박경수님 요청 — 견적 항목 템플릿 저장/불러오기 */}
