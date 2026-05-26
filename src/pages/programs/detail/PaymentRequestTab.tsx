@@ -13,8 +13,9 @@ import PaymentRequestFormModal, { type PaymentTarget } from './PaymentRequestFor
 import PaymentSummaryCards from './PaymentSummaryCards';
 import EstimateImportModal from './EstimateImportModal';
 import { isPersonCategory, bulkSoftDeletePayroll, submitPaymentRequests } from '../../payroll/payrollUtils';
-// 박경수님 + SkyClaw STEP-PAYROLL-DETAIL-COMMENT (2026-05-28) — 행 클릭 상세 팝업
+// STEP-PAYROLL-DETAIL-COMMENT — 행 클릭 상세 팝업 / STEP-RBAC-SETUP PART D — PM 확정 행 수정/삭제 차단
 import PayrollDetailModal from '../../payroll/PayrollDetailModal';
+import { useUserProfile } from '../../../hooks/useUserProfile';
 
 type Group = 'outsource' | 'operation';
 
@@ -56,6 +57,9 @@ interface Props { programId: string; projectId: string | null }
 
 export default function PaymentRequestTab({ programId, projectId }: Props) {
   const toast = useToast();
+  // STEP-RBAC-SETUP PART D — finance/admin 은 전체, PM 은 초안만 수정·삭제 가능
+  const { isFinance, isPM } = useUserProfile();
+  const canEditRow = (row: { submitted_at?: string | null }) => isFinance || (isPM && !row.submitted_at);
   const [group, setGroup] = useState<Group>('outsource');
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,12 +174,19 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
   }
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`선택한 ${selectedIds.size}건을 휴지통으로 보낼까요?`)) return;
+    // STEP-RBAC-SETUP PART D — PM 이 확정 행 일괄삭제 시도 시 차단
+    const deletable = visible.filter((r) => selectedIds.has(r.id) && canEditRow(r));
+    const blocked = selectedIds.size - deletable.length;
+    if (deletable.length === 0) { toast.error('삭제 권한이 있는 항목이 없어요. (확정된 행은 재무만 삭제 가능)'); return; }
+    const msg = blocked > 0
+      ? `선택한 ${selectedIds.size}건 중 ${blocked}건은 확정되어 권한이 없어요. ${deletable.length}건만 삭제할까요?`
+      : `선택한 ${selectedIds.size}건을 휴지통으로 보낼까요?`;
+    if (!window.confirm(msg)) return;
     setBulkDeleting(true);
-    const err = await bulkSoftDeletePayroll(Array.from(selectedIds));
+    const err = await bulkSoftDeletePayroll(deletable.map((r) => r.id));
     setBulkDeleting(false);
     if (err) { toast.error(err); return; }
-    toast.success(`${selectedIds.size}건 삭제했어요.`);
+    toast.success(`${deletable.length}건 삭제했어요.`);
     setSelectedIds(new Set());
     void reload();
   }
@@ -346,8 +357,14 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
                     <span className="inline-flex items-center gap-1">
                       <button type="button" onClick={() => void swap(idx, 'up')} disabled={idx === 0} aria-label="위로" title="위로" className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30"><ArrowUp size={11} aria-hidden="true" /></button>
                       <button type="button" onClick={() => void swap(idx, 'down')} disabled={idx === visible.length - 1} aria-label="아래로" title="아래로" className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30"><ArrowDown size={11} aria-hidden="true" /></button>
-                      <button type="button" onClick={() => setEditTarget(r as PaymentTarget)} className="inline-flex items-center gap-0.5 text-xs text-violet-600 hover:underline ml-1"><Pencil size={11} aria-hidden="true" />수정</button>
-                      <button type="button" onClick={() => void handleDelete(r)} disabled={acting === r.id} className="inline-flex items-center gap-0.5 text-xs text-rose-600 hover:underline disabled:opacity-40 ml-1"><Trash2 size={11} aria-hidden="true" />삭제</button>
+                      {canEditRow(r) ? (
+                        <>
+                          <button type="button" onClick={() => setEditTarget(r as PaymentTarget)} className="inline-flex items-center gap-0.5 text-xs text-violet-600 hover:underline ml-1"><Pencil size={11} aria-hidden="true" />수정</button>
+                          <button type="button" onClick={() => void handleDelete(r)} disabled={acting === r.id} className="inline-flex items-center gap-0.5 text-xs text-rose-600 hover:underline disabled:opacity-40 ml-1"><Trash2 size={11} aria-hidden="true" />삭제</button>
+                        </>
+                      ) : (
+                        <span title={isPM ? '확정된 항목은 재무만 수정 가능해요' : '수정 권한이 없어요'} className="text-[11px] text-slate-300 ml-1">잠김</span>
+                      )}
                     </span>
                   </td>
                 </tr>
