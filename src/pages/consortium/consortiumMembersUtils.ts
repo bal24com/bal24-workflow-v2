@@ -99,54 +99,144 @@ export async function fetchOperatorDraft(consortiumId: string): Promise<Operator
   };
 }
 
-// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 운영사 행 빌더 (is_self=true·role='총괄').
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — clients 자사 판정 helper.
+// is_self 는 client_id 의 is_own_company 값으로 자동 결정 (운영사·참여사 모두).
+export type ClientLookup = {
+  nameById: Map<string, string>;
+  isOwnById: Map<string, boolean>;
+};
+
+export function buildClientLookup(
+  clients: Array<{ id: string; name: string; is_own_company?: boolean | null }>,
+): ClientLookup {
+  return {
+    nameById: new Map(clients.map((c) => [c.id, c.name])),
+    isOwnById: new Map(clients.map((c) => [c.id, !!c.is_own_company])),
+  };
+}
+
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 정산 방향 자동 추론.
+// 자사가 운영사 → 자사 outbound, 참여사 inbound 기본.
+// 자사가 참여사 → 자사 inbound, 운영사 outbound 기본.
+// 자사 미포함 → 모두 none.
+type Direction = 'outbound' | 'inbound' | 'none';
+
+interface DirectionInput {
+  isSelfOperator: boolean;
+  isSelfMember: boolean;   // 어느 행 자체가 자사인지
+  hasSelfAnywhere: boolean; // 컨소시엄 내 자사 행 존재 여부
+  role: 'operator' | 'member';
+}
+
+function inferDirection({ isSelfOperator, isSelfMember, hasSelfAnywhere, role }: DirectionInput): Direction {
+  if (!hasSelfAnywhere) return 'none';
+  if (role === 'operator') {
+    if (isSelfMember) return 'outbound';                 // 자사가 운영사 → 지급
+    return isSelfOperator ? 'outbound' : 'outbound';     // 운영사 → (외부 운영사이지만 자사가 어딘가 참여사로 받음)
+  }
+  // role === 'member'
+  if (isSelfMember) return 'inbound';                    // 자사가 참여사 → 수령
+  return isSelfOperator ? 'inbound' : 'none';            // 자사가 운영사면 참여사는 inbound(자사가 지급 → 참여사 수령)
+}
+
 function buildOperatorRow(
   consortiumId: string,
   operator: OperatorDraft,
-  clientNameById: Map<string, string>,
+  lookup: ClientLookup,
+  hasSelfMember: boolean,
 ): Record<string, unknown> | null {
   if (!operator.clientId) return null;
+  const isSelf = lookup.isOwnById.get(operator.clientId) ?? false;
+  const hasSelfAnywhere = isSelf || hasSelfMember;
   return {
     consortium_id: consortiumId,
     client_id: operator.clientId,
-    org_name: clientNameById.get(operator.clientId) ?? '밸런스닷',
+    org_name: lookup.nameById.get(operator.clientId) ?? '운영사',
     role: '총괄',
-    is_self: true,
+    is_self: isSelf,
     contact_name: operator.contactName.trim() || null,
     contact_phone: operator.contactPhone.trim() || null,
     contact_email: operator.contactEmail.trim() || null,
+    settlement_direction: inferDirection({
+      isSelfOperator: isSelf, isSelfMember: isSelf, hasSelfAnywhere, role: 'operator',
+    }),
   };
 }
 
 function buildMemberRow(
   consortiumId: string,
   m: MemberDraft,
-  clientNameById: Map<string, string>,
+  lookup: ClientLookup,
+  isSelfOperator: boolean,
+  hasSelfMember: boolean,
 ): Record<string, unknown> {
+  const isSelf = lookup.isOwnById.get(m.clientId) ?? false;
+  const hasSelfAnywhere = isSelfOperator || hasSelfMember;
   return {
     consortium_id: consortiumId,
     client_id: m.clientId,
-    org_name: clientNameById.get(m.clientId) ?? '참여사',
-    role: m.role || null,
+    org_name: lookup.nameById.get(m.clientId) ?? '참여사',
+    role: m.role || '참여',
     budget_ratio: m.shareRatio.trim() ? Number(m.shareRatio) : null,
     responsibilities: m.responsibilities.trim() || null,
     contact_name: m.contactName.trim() || null,
     contact_phone: m.contactPhone.trim() || null,
     contact_email: m.contactEmail.trim() || null,
-    is_self: false,
+    is_self: isSelf,
+    settlement_direction: inferDirection({
+      isSelfOperator, isSelfMember: isSelf, hasSelfAnywhere, role: 'member',
+    }),
   };
+}
+
+/** 자사(밸런스닷) 행이 운영사+참여사에 동시 등록되는지 검증. */
+export function validateOnlyOneSelf(
+  operatorClientId: string,
+  drafts: MemberDraft[],
+  lookup: ClientLookup,
+): string | null {
+  const opIsSelf = !!operatorClientId && (lookup.isOwnById.get(operatorClientId) ?? false);
+  const memberSelfCount = drafts.filter(
+    (m) => m.clientId && (lookup.isOwnById.get(m.clientId) ?? false),
+  ).length;
+  if (opIsSelf && memberSelfCount > 0) {
+    return '자사(밸런스닷)는 운영사 또는 참여사 중 한 곳에만 등록할 수 있어요.';
+  }
+  if (memberSelfCount > 1) {
+    return '자사(밸런스닷)가 참여사 목록에 중복 등록됐어요. 1개만 남겨주세요.';
+  }
+  return null;
+}
+
+function buildAllMemberRows(
+  consortiumId: string,
+  operator: OperatorDraft,
+  drafts: MemberDraft[],
+  lookup: ClientLookup,
+): Array<Record<string, unknown>> {
+  const validDrafts = drafts.filter((m) => m.clientId);
+  const hasSelfMember = validDrafts.some((m) => lookup.isOwnById.get(m.clientId) ?? false);
+  const isSelfOperator = !!operator.clientId && (lookup.isOwnById.get(operator.clientId) ?? false);
+
+  const rows: Array<Record<string, unknown>> = [];
+  const op = buildOperatorRow(consortiumId, operator, lookup, hasSelfMember);
+  if (op) rows.push(op);
+  for (const m of validDrafts) {
+    rows.push(buildMemberRow(consortiumId, m, lookup, isSelfOperator, hasSelfMember));
+  }
+  return rows;
 }
 
 interface ReplaceArgs {
   consortiumId: string;
   operator: OperatorDraft;
   drafts: MemberDraft[];
-  clientNameById: Map<string, string>;
+  lookup: ClientLookup;
 }
 
 /** 기존 행 일괄 DELETE → 운영사 + 참여사 INSERT (의뢰기관 자동 추가 제거) */
 export async function replaceMembers({
-  consortiumId, operator, drafts, clientNameById,
+  consortiumId, operator, drafts, lookup,
 }: ReplaceArgs): Promise<{ error?: string; stage?: 'delete' | 'insert' }> {
   const { error: dErr } = await supabase
     .from('consortium_members')
@@ -157,13 +247,7 @@ export async function replaceMembers({
     return { error: dErr.message, stage: 'delete' };
   }
 
-  const rows: Array<Record<string, unknown>> = [];
-  const op = buildOperatorRow(consortiumId, operator, clientNameById);
-  if (op) rows.push(op);
-  for (const m of drafts) {
-    if (!m.clientId) continue;
-    rows.push(buildMemberRow(consortiumId, m, clientNameById));
-  }
+  const rows = buildAllMemberRows(consortiumId, operator, drafts, lookup);
   if (rows.length === 0) return {};
 
   const { error: iErr } = await supabase.from('consortium_members').insert(rows);
@@ -187,12 +271,12 @@ interface CreateArgs {
   };
   operator: OperatorDraft;
   drafts: MemberDraft[];
-  clientNameById: Map<string, string>;
+  lookup: ClientLookup;
 }
 
 /** 신규 등록 — consortiums INSERT + 운영사·참여사 INSERT (의뢰기관 자동 추가 제거) */
 export async function createConsortiumWithMembers({
-  payload, operator, drafts, clientNameById,
+  payload, operator, drafts, lookup,
 }: CreateArgs): Promise<{ id?: string; error?: string; ctx?: ErrorContext }> {
   const { data, error: cErr } = await supabase
     .from('consortiums')
@@ -204,14 +288,7 @@ export async function createConsortiumWithMembers({
     return { error: cErr?.message ?? '등록 실패', ctx: 'insert' };
   }
 
-  const memberRows: Array<Record<string, unknown>> = [];
-  const op = buildOperatorRow(data.id, operator, clientNameById);
-  if (op) memberRows.push(op);
-  for (const m of drafts) {
-    if (!m.clientId) continue;
-    memberRows.push(buildMemberRow(data.id, m, clientNameById));
-  }
-
+  const memberRows = buildAllMemberRows(data.id, operator, drafts, lookup);
   if (memberRows.length === 0) return { id: data.id };
 
   const { error: mErr } = await supabase.from('consortium_members').insert(memberRows);

@@ -15,7 +15,8 @@ import ConsortiumOperatorField from './ConsortiumOperatorField';
 import ConsortiumLeadOrgField from './ConsortiumLeadOrgField';
 import {
   fetchMemberDrafts, replaceMembers, createConsortiumWithMembers, translateConsortiumError,
-  fetchOperatorDraft, makeEmptyOperator, type OperatorDraft,
+  fetchOperatorDraft, makeEmptyOperator, buildClientLookup, validateOnlyOneSelf,
+  type OperatorDraft,
 } from './consortiumMembersUtils';
 import { useToast } from '../../contexts/ToastContext';
 import type {
@@ -172,6 +173,13 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
         }
       }
     }
+    // 박경수님 2026-05-27 — 자사 행은 운영사 또는 참여사 중 한 곳에만 1개
+    const lookup = buildClientLookup(clients);
+    const selfErr = validateOnlyOneSelf(operator.clientId, members, lookup);
+    if (selfErr) {
+      setErrorMsg(selfErr);
+      return false;
+    }
     return true;
   };
 
@@ -205,12 +213,12 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
           return;
         }
 
-        const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
+        const lookup = buildClientLookup(clients);
         const replaceRes = await replaceMembers({
           consortiumId: initialData.id,
           operator,
           drafts: members,
-          clientNameById,
+          lookup,
         });
         if (replaceRes.error) {
           const msg = replaceRes.stage === 'delete'
@@ -226,7 +234,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
       }
 
       // 신규 등록 — utils 위임
-      const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
+      const lookup = buildClientLookup(clients);
       const res = await createConsortiumWithMembers({
         payload: {
           name: form.name.trim(),
@@ -240,7 +248,7 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
         },
         operator,
         drafts: members,
-        clientNameById,
+        lookup,
       });
       if (res.error) {
         setErrorMsg(translateConsortiumError(res.error, res.ctx ?? 'insert'));

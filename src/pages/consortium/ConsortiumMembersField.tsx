@@ -6,7 +6,8 @@ import { Button, Input } from '../../components/ui';
 import { CONSORTIUM_ROLE_VALUES } from './consortiumStatus';
 import type { Client, ConsortiumRole } from '../../types/database';
 
-type ClientOption = Pick<Client, 'id' | 'name'>;
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 자사도 참여사로 선택 가능.
+type ClientOption = Pick<Client, 'id' | 'name'> & { is_own_company?: boolean };
 
 // 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 담당자 3필드 추가 (이름·연락처·이메일).
 export interface MemberDraft {
@@ -91,7 +92,15 @@ export default function ConsortiumMembersField({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-sm font-semibold text-slate-700">참여사</label>
+                <label className="text-sm font-semibold text-slate-700 inline-flex items-center gap-1.5">
+                  참여사
+                  {(() => {
+                    const sel = clients.find((c) => c.id === m.clientId);
+                    return sel?.is_own_company ? (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded">자사</span>
+                    ) : null;
+                  })()}
+                </label>
                 <select
                   value={m.clientId}
                   onChange={(e) => handleUpdate(m.uid, { clientId: e.target.value })}
@@ -100,7 +109,9 @@ export default function ConsortiumMembersField({
                 >
                   <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음'}</option>
                   {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.is_own_company ? `${c.name} [자사]` : c.name}
+                    </option>
                   ))}
                 </select>
               </div>

@@ -1,5 +1,6 @@
-// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 운영사(밸런스닷·총괄) 섹션.
+// 박경수님 2026-05-27 STEP-CONSORTIUM-FORM-V2 — 총괄(운영사) 섹션.
 // 의뢰기관(발주처) 다음, 참여사 위에 위치. clients 드롭다운에서 직접 선택 + 담당자 3필드.
+// 운영사는 자사(밸런스닷) 또는 외부 회사 모두 가능. is_self 는 client_id 의 is_own_company 로 자동 판정.
 
 import { Input } from '../../components/ui';
 import type { Client } from '../../types/database';
@@ -22,14 +23,23 @@ export default function ConsortiumOperatorField({
   value, onChange, clients, loadingRefs, submitting,
 }: Props) {
   const patch = (next: Partial<OperatorDraft>) => onChange({ ...value, ...next });
+  const selectedClient = clients.find((c) => c.id === value.clientId);
+  const isSelfSelected = !!selectedClient?.is_own_company;
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-          ⭐ 운영사 (총괄)
+          총괄 (운영사)
         </h3>
-        <span className="text-[10px] text-slate-400">컨소시엄 총괄 운영 주체 — 보통 밸런스닷(자사)</span>
+        <span className="text-[10px] text-slate-400">
+          컨소시엄 PM 역할 회사 — 밸런스닷 또는 외부 회사
+        </span>
+        {isSelfSelected && (
+          <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded">
+            자사
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -41,14 +51,14 @@ export default function ConsortiumOperatorField({
             disabled={submitting || loadingRefs}
             className={SELECT_CLASS}
           >
-            <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음'}</option>
+            <option value="">{loadingRefs ? '불러오는 중…' : '선택 없음 (운영사 미정)'}</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.is_own_company ? `⭐ ${c.name} (자사)` : c.name}
+                {c.is_own_company ? `${c.name} [자사]` : c.name}
               </option>
             ))}
           </select>
-          <p className="text-[11px] text-slate-400">자사(밸런스닷)는 ⭐ 표시로 최상단에 노출돼요.</p>
+          <p className="text-[11px] text-slate-400">자사(밸런스닷)에는 [자사] 배지가 함께 표시돼요.</p>
         </div>
       </div>
 
