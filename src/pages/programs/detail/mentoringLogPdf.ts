@@ -263,57 +263,99 @@ function waitForImages(root: HTMLElement, timeoutMs = 8000): Promise<void> {
   return Promise.race([Promise.all(waits).then(() => undefined), timeout]);
 }
 
-/** 박경수님 2026-05-26 — PDF 백지 fix.
- *  · 화면 밖 fixed 대신 화면 안 fixed (opacity 0 + pointer-events none) 로 두어 html2canvas 가 정상 캡쳐.
- *  · html/head/body 전체가 아닌 본문 div 만 container 에 주입 + style 태그 별도.
- *  · 이미지 모두 로드된 후 캡쳐.
- *
- *  동적 import 로 html2pdf.js 로드 후 PDF 다운로드. */
+/** 박경수님 2026-05-28 — PDF 백지 근본 fix (v3).
+ *  html2pdf.js wrapper 우회하고 html2canvas + jsPDF 직접 호출.
+ *  원인:
+ *   ① <style> 태그가 <div> 안에 들어가면 모던 Chrome 일부 빌드가 무시 → CSS 적용 안 된 헐벗은 캡쳐.
+ *   ② 화면 밖 absolute 요소를 html2canvas 가 캡쳐할 때 windowWidth 안 주면 viewport=0 → 빈 캔버스.
+ *  처방:
+ *   1) <style> 을 <head> 에 임시 삽입 (캡쳐 종료 후 제거).
+ *   2) container 는 transform 으로 화면 밖 (paint 는 정상 수행).
+ *   3) html2canvas 호출에 width/height/windowWidth/windowHeight 모두 명시.
+ *   4) 캡쳐 직전 더블 requestAnimationFrame 으로 layout/paint flush 보장.
+ *   5) 페이지 분할 — 일지가 길면 여러 페이지로 자동 분할. */
 export async function downloadMentoringLogPdf(log: MentoringLogForPdf): Promise<void> {
   const fullHtml = buildMentoringLogHtml(log);
-
-  // body 안쪽 HTML + style 태그 분리 추출 (html2canvas 는 fragment 더 안정적)
   const styleMatch = fullHtml.match(/<style[\s\S]*?<\/style>/);
   const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/);
   const styleHtml = styleMatch?.[0] ?? '';
   const bodyInner = bodyMatch?.[1] ?? fullHtml;
 
-  const mod = await import('html2pdf.js');
-  const html2pdf = mod.default;
+  // ① <style> 을 <head> 에 임시 삽입.
+  const styleWrap = document.createElement('div');
+  styleWrap.innerHTML = styleHtml;
+  const styleEl = styleWrap.firstElementChild as HTMLStyleElement | null;
+  if (styleEl) document.head.appendChild(styleEl);
 
+  // ② container 는 transform 으로 화면 밖 (visibility hidden 아니라 paint 보장).
   const container = document.createElement('div');
   container.setAttribute('id', 'pdf-render-container');
-  // 박경수님 2026-05-28 — PDF 백지 재발 fix.
-  // 모던 Chrome 은 position:fixed + opacity:0 + zIndex:-1 조합을 paint skip 처리해서
-  // html2canvas 가 빈 캔버스를 받음. 화면 밖 absolute (-99999px) 로 두면 layout/paint
-  // 모두 정상 수행되어 캡쳐 보장.
   container.style.position = 'absolute';
   container.style.top = '0';
-  container.style.left = '-99999px';
+  container.style.left = '0';
   container.style.width = '794px';
+  container.style.transform = 'translateX(-99999px)';
   container.style.background = '#fff';
-  container.style.pointerEvents = 'none';
-  container.innerHTML = styleHtml + bodyInner;
+  container.innerHTML = bodyInner;
   document.body.appendChild(container);
 
   const fileNameParts = ['멘토링상담일지', log.mentor_name, log.log_date ?? ''].filter(Boolean);
   const fileName = fileNameParts.join('_') + '.pdf';
 
   try {
-    // 이미지 로드 완료 대기 (서명·첨부 사진)
+    // 이미지 로드 + 더블 raf 로 paint flush 보장.
     await waitForImages(container);
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
 
-    await html2pdf()
-      .set({
-        margin: [10, 10, 10, 10],
-        filename: fileName,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      })
-      .from(container)
-      .save();
+    const [h2cMod, jspdfMod] = await Promise.all([
+      import('html2canvas'),
+      import('jspdf'),
+    ]);
+    const html2canvas = h2cMod.default;
+    const jsPDFCtor = jspdfMod.default;
+
+    const captureWidth = 794;
+    const captureHeight = container.scrollHeight;
+
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: captureWidth,
+      height: captureHeight,
+      windowWidth: captureWidth,
+      windowHeight: captureHeight,
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const margin = 10; // mm
+    const pdfW = pdf.internal.pageSize.getWidth() - margin * 2;
+    const pdfH = pdf.internal.pageSize.getHeight() - margin * 2;
+    const imgHmm = (canvas.height * pdfW) / canvas.width;
+
+    if (imgHmm <= pdfH) {
+      pdf.addImage(imgData, 'JPEG', margin, margin, pdfW, imgHmm);
+    } else {
+      // 페이지 분할 — 같은 이미지의 top offset 만 이동시켜 여러 페이지로.
+      let remaining = imgHmm;
+      let position = margin;
+      pdf.addImage(imgData, 'JPEG', margin, position, pdfW, imgHmm);
+      remaining -= pdfH;
+      while (remaining > 0) {
+        pdf.addPage();
+        position = margin - (imgHmm - remaining);
+        pdf.addImage(imgData, 'JPEG', margin, position, pdfW, imgHmm);
+        remaining -= pdfH;
+      }
+    }
+    pdf.save(fileName);
   } finally {
     if (container.parentElement) document.body.removeChild(container);
+    if (styleEl && styleEl.parentElement) styleEl.parentElement.removeChild(styleEl);
   }
 }
