@@ -1,6 +1,8 @@
-// bal24 v2 — 좌측 사이드바 (STEP-MENU-RESTRUCTURE)
-// 다크 슬레이트(#0F172A) 배경. 5그룹 구조로 재편 — 홈/사업/주관기관·인력/재무/도구.
-// PARTNER 는 3그룹(홈/사업/도구), MEMBER 는 1그룹(내 사업).
+// bal24 v2 — 좌측 사이드바 (STEP-SIDEBAR-SIMPLIFY 박경수님 2026-05-28)
+// 다크 슬레이트(#0F172A) 배경. 5그룹 구조 — 홈/사업/거래처·인력/재무/도구.
+// 매뉴얼 기준 단순화 — 부가 메뉴(회계검토·급여관리·일지·내급여 등)는 사이드바에서 제거하고
+// 라우트는 유지(직접 URL 접근 가능). 도구 그룹에 팀원 관리(ADMIN·FINANCE) 이동.
+// PARTNER 는 3그룹, MEMBER 는 1그룹, FINANCE 는 별도 3그룹.
 
 import { NavLink, Link } from 'react-router-dom';
 import {
@@ -40,53 +42,46 @@ type MenuSection = {
   items: MenuItem[];
 };
 
-// SECTIONS — admin / pm / staff / finance 공용 (5그룹)
+// SECTIONS — 박경수님 2026-05-28 STEP-SIDEBAR-SIMPLIFY 매뉴얼 기준 5그룹.
+// 부가 기능(회계검토·급여관리·일지·내급여명세서)은 사이드바에서 제거, 라우트는 유지.
 const SECTIONS: MenuSection[] = [
   {
     heading: '홈',
     items: [
       { to: '/home',     label: '대시보드', Icon: LayoutDashboard },
-      { to: '/schedule', label: '일정',     Icon: CalendarDays },
+      { to: '/schedule', label: '달력',     Icon: CalendarDays },
     ],
   },
   {
     heading: '사업',
     items: [
       { to: '/projects',   label: '프로젝트', Icon: FolderKanban },
-      // STEP-MENU-INTEGRATION-1A — 프로그램 메뉴 제거. 프로젝트 상세 안의 "프로그램" 탭으로 통합 진입.
-      // 기존 /programs URL 은 라우트 보존 (북마크 호환).
+      { to: '/programs',   label: '프로그램', Icon: BookOpen },
       { to: '/consortium', label: '컨소시엄', Icon: Building2 },
     ],
   },
   {
-    heading: '주관기관·인력',
+    heading: '거래처·인력',
     items: [
-      { to: '/clients', label: '고객사', Icon: Briefcase },
+      { to: '/clients', label: '거래처', Icon: Briefcase },
       { to: '/experts', label: '전문가', Icon: Users },
-      { to: '/members', label: '팀원',   Icon: UserCog },
     ],
   },
   {
     heading: '재무',
     items: [
-      // STEP-ACCOUNTING-ALL — 수입→수입/계약, 지출→외주/급여, 증빙 제거, 회계 검토 신규
-      { to: '/contracts',          label: '수입/계약', Icon: FileText },
-      { to: '/payroll',            label: '외주/급여', Icon: Users },
-      // 박경수님 + SkyClaw STEP-PAYROLL-SYSTEM (2026-05-28) — 직원 급여 + 지출결의서
-      { to: '/payroll-mgmt',       label: '급여 관리', Icon: Users },
-      { to: '/accounting-reviews', label: '회계 검토', Icon: ClipboardCheck },
-      { to: '/reports',            label: '리포트',    Icon: BarChart3 },
+      { to: '/payroll',   label: '외주·급여',     Icon: Users },
+      { to: '/contracts', label: '수입·계약',     Icon: FileText },
+      { to: '/reports',   label: '재무 대시보드', Icon: BarChart3 },
     ],
   },
   {
     heading: '도구',
     items: [
-      { to: '/logs', label: '일지', Icon: BookOpen },
-      { to: '/ai',   label: 'AI',   Icon: Sparkles },
-      // 박경수님 + SkyClaw STEP-PAYROLL-MYPAGE (2026-05-28) — 본인 급여명세서
-      { to: '/my-payroll', label: '내 급여명세서', Icon: FileText },
+      { to: '/ai',      label: 'AI 초안',   Icon: Sparkles },
+      { to: '/members', label: '팀원 관리', Icon: UserCog },
       // 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — 강사 포털 고정 URL (외부 새 탭)
-      { to: '/portal', label: '강사 포털', Icon: ExternalLink, external: true },
+      { to: '/portal',  label: '강사 포털', Icon: ExternalLink, external: true },
     ],
   },
 ];
@@ -249,11 +244,11 @@ export default function Sidebar() {
                      : isFinance ? FINANCE_SECTIONS
                      : SECTIONS;
   // STEP-EXPERT-CRUD-FULL — admin 만 [관리] 그룹 추가 노출
-  // 박경수님 + SkyClaw STEP-RBAC-SETUP (2026-05-28) — [급여 관리] 메뉴는 admin/finance 만 노출 (pm/staff 숨김)
-  const canSeePayrollMgmt = isAdmin || isFinance;
-  const filteredBase = canSeePayrollMgmt
+  // 박경수님 2026-05-28 STEP-SIDEBAR-SIMPLIFY — [팀원 관리] 메뉴는 admin/finance 만 노출
+  const canSeeMembers = isAdmin || isFinance;
+  const filteredBase = canSeeMembers
     ? baseSections
-    : baseSections.map((s) => ({ ...s, items: s.items.filter((it) => it.to !== '/payroll-mgmt') }));
+    : baseSections.map((s) => ({ ...s, items: s.items.filter((it) => it.to !== '/members') }));
   const sections = isAdmin ? [...filteredBase, ADMIN_EXTRA] : filteredBase;
 
   return (
