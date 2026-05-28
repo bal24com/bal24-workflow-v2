@@ -11,18 +11,23 @@ import GrantManageTab from './GrantManageTab';
 import CompletionThresholdPanel from './CompletionThresholdPanel';
 // 박경수님 + SkyClaw STEP-STAFF-PORTAL-REDESIGN PART E PM (2026-05-28) — 일정 4단계 등록 UI
 import ScheduleItemsManager from './ScheduleItemsManager';
+// 박경수님 2026-05-28 STEP-PM-PORTAL-ADMIN — 포털 발급·개요·설문 관리
+import PortalIntroEditor from '../../../components/portal-admin/PortalIntroEditor';
+import PortalIssueSection from '../../../components/portal-admin/PortalIssueSection';
+import ProgramSurveyManagerTab from '../../portal/survey/ProgramSurveyManagerTab';
 
 interface Props {
   programId: string;
+  projectId?: string | null;
   isPM: boolean;
   consortiumId: string | null;
   applicationType?: 'open' | 'evaluation' | null;
   hasConsortium: boolean;
 }
 
-type SubKey = 'share' | 'files' | 'activity' | 'schedule' | 'grant' | 'completion';
+type SubKey = 'share' | 'files' | 'activity' | 'schedule' | 'grant' | 'completion' | 'portal';
 
-export default function SettingsShareTab({ programId, isPM, consortiumId, applicationType, hasConsortium }: Props) {
+export default function SettingsShareTab({ programId, projectId, isPM, consortiumId, applicationType, hasConsortium }: Props) {
   const items: { key: SubKey; label: string }[] = [
     { key: 'share',      label: '외부 공유' },
     { key: 'files',      label: '파일' },
@@ -31,6 +36,8 @@ export default function SettingsShareTab({ programId, isPM, consortiumId, applic
     ...(isPM ? [{ key: 'schedule' as const, label: '일정 단계' }] : []),
     ...(isPM ? [{ key: 'grant' as const, label: '지원금' }] : []),
     { key: 'completion', label: '수료 기준' },
+    // 박경수님 2026-05-28 STEP-PM-PORTAL-ADMIN — PM 만 포털·설문 관리
+    ...(isPM ? [{ key: 'portal' as const, label: '포털·설문' }] : []),
   ];
   const [sub, setSub] = useState<SubKey>('share');
   return (
@@ -50,6 +57,13 @@ export default function SettingsShareTab({ programId, isPM, consortiumId, applic
         />
       )}
       {sub === 'completion' && <CompletionThresholdPanel programId={programId} />}
+      {sub === 'portal' && isPM && (
+        <div className="space-y-4">
+          <PortalIntroEditor programId={programId} editable={true} />
+          <PortalIssueSection programId={programId} projectId={projectId ?? null} />
+          <ProgramSurveyManagerTab programId={programId} projectId={projectId ?? null} />
+        </div>
+      )}
     </div>
   );
 }

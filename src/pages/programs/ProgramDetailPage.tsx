@@ -300,6 +300,7 @@ export default function ProgramDetailPage() {
         {tab === 'settings'     && (
           <SettingsShareTab
             programId={programId}
+            projectId={program.project_id ?? null}
             isPM={isPM}
             consortiumId={program.consortium_id ?? null}
             applicationType={program.application_type}

@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { Users, GraduationCap, Calendar, Loader2 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import type { SchoolPortalContext } from '../../../types/schoolPortal';
+// 박경수님 2026-05-28 STEP-PM-PORTAL-ADMIN — 외부 포털 개요에 사업 개요 조회 모드 추가
+import PortalIntroEditor from '../../../components/portal-admin/PortalIntroEditor';
 
 interface Props { context: SchoolPortalContext }
 
@@ -121,6 +123,9 @@ export default function SchoolOverviewTab({ context }: Props) {
         <KpiCard Icon={Calendar} label="다음 일정"
           value={stats.nextSessionDate ?? '예정 없음'} tone={stats.nextSessionDate ? 'emerald' : 'slate'} />
       </div>
+
+      {/* 박경수님 2026-05-28 STEP-PM-PORTAL-ADMIN — 사업 개요 (조회 전용) */}
+      <PortalIntroEditor programId={context.programId} editable={false} />
 
       {/* 강사 배정 현황 */}
       <section className="bg-white rounded-2xl shadow-sm p-5">
