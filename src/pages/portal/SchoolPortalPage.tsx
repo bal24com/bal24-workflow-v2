@@ -59,13 +59,20 @@ export default function SchoolPortalPage() {
   // scope=school → 탭 UI
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* 헤더 */}
+      {/* 헤더 — 박경수님 2026-05-28: team_label 있으면 동아리 단위 포털 */}
       <header className="bg-gradient-to-r from-violet-600 to-violet-800 text-white px-6 py-6">
         <div className="max-w-[1100px] mx-auto">
-          <div className="text-xs font-semibold text-violet-200 mb-1">학교 담당자 포털</div>
-          <h1 className="text-2xl font-extrabold leading-snug">{context.programTitle}</h1>
+          <div className="text-xs font-semibold text-violet-200 mb-1">
+            {context.portal.team_label ? '동아리 담당 포털' : '학교 담당자 포털'}
+          </div>
+          <h1 className="text-2xl font-extrabold leading-snug">
+            {context.portal.team_label
+              ? <>{context.portal.team_label} <span className="text-violet-200 text-base font-bold">동아리</span></>
+              : context.programTitle}
+          </h1>
           <div className="mt-1.5 text-sm text-violet-100">
             {context.schoolName && <span>🏫 {context.schoolName}</span>}
+            {context.portal.team_label && <span className="ml-2">📚 {context.programTitle}</span>}
             {context.programStartDate && (
               <span className="ml-2">📅 {context.programStartDate} ~ {context.programEndDate ?? ''}</span>
             )}

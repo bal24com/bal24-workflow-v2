@@ -28,20 +28,23 @@ export default function SchoolParticipantsTab({ context }: Props) {
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    // 박경수님 2026-05-28: team_label 있으면 자기 동아리 학생만 필터
+    let query = supabase
+      .from('program_participants')
+      .select('id, name, status, team_name, phone')
+      .eq('program_id', context.programId);
+    if (context.portal.team_label) {
+      query = query.eq('team_name', context.portal.team_label);
+    }
     const [pRes, tRes] = await Promise.all([
-      supabase
-        .from('program_participants')
-        .select('id, name, status, team_name, phone')
-        .eq('program_id', context.programId)
-        .order('team_name', { ascending: true })
-        .order('name', { ascending: true }),
+      query.order('team_name', { ascending: true }).order('name', { ascending: true }),
       listTeamPortals(context.programId),
     ]);
     if (pRes.error) console.error('[SchoolParticipantsTab] 교육생 조회:', pRes.error.message);
     setParticipants((pRes.data ?? []) as Participant[]);
     setTeamPortals(tRes);
     setLoading(false);
-  }, [context.programId]);
+  }, [context.programId, context.portal.team_label]);
 
   useEffect(() => { void fetchAll(); }, [fetchAll]);
 
