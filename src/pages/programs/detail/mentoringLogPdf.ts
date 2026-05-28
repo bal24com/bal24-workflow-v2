@@ -73,13 +73,17 @@ export function buildMentoringLogHtml(log: MentoringLogForPdf): string {
   const teamStr = log.team_name && log.team_name.trim() ? log.team_name : '—';
   const orgPosition = [log.mentor_org, log.mentor_position].filter(Boolean).join(' / ') || '—';
 
+  // 박경수님 2026-05-28 — PDF 백지 진짜 원인 fix.
+  // <img> 태그에 crossorigin="anonymous" 없으면 html2canvas 의 useCORS:true 가 효력
+  // 발생하지 않고, 외부 이미지로 인해 canvas 가 tainted 됨 → toDataURL 시 SecurityError
+  // → PDF 백지. crossorigin 속성 명시해야 Supabase Storage CORS 헤더 정상 협상.
   const imagesHtml = log.image_urls.slice(0, 6)
     .map((url) =>
-      `<img src="${escapeHtml(url)}" style="width:180px;height:135px;object-fit:cover;border:1px solid #ccc;border-radius:3px;" />`,
+      `<img src="${escapeHtml(url)}" crossorigin="anonymous" style="width:180px;height:135px;object-fit:cover;border:1px solid #ccc;border-radius:3px;" />`,
     ).join('');
 
   const signatureHtml = log.mentor_signature_url
-    ? `<img src="${escapeHtml(log.mentor_signature_url)}" style="height:38px;vertical-align:middle;" />`
+    ? `<img src="${escapeHtml(log.mentor_signature_url)}" crossorigin="anonymous" style="height:38px;vertical-align:middle;" />`
     : `<span style="font-family:serif;font-size:13px;padding:2px 16px;border-bottom:1px solid #333;">${escapeHtml(log.mentor_name)} (서명)</span>`;
 
   const programHeader = log.project_name
@@ -263,99 +267,59 @@ function waitForImages(root: HTMLElement, timeoutMs = 8000): Promise<void> {
   return Promise.race([Promise.all(waits).then(() => undefined), timeout]);
 }
 
-/** 박경수님 2026-05-28 — PDF 백지 근본 fix (v3).
- *  html2pdf.js wrapper 우회하고 html2canvas + jsPDF 직접 호출.
- *  원인:
- *   ① <style> 태그가 <div> 안에 들어가면 모던 Chrome 일부 빌드가 무시 → CSS 적용 안 된 헐벗은 캡쳐.
- *   ② 화면 밖 absolute 요소를 html2canvas 가 캡쳐할 때 windowWidth 안 주면 viewport=0 → 빈 캔버스.
- *  처방:
- *   1) <style> 을 <head> 에 임시 삽입 (캡쳐 종료 후 제거).
- *   2) container 는 transform 으로 화면 밖 (paint 는 정상 수행).
- *   3) html2canvas 호출에 width/height/windowWidth/windowHeight 모두 명시.
- *   4) 캡쳐 직전 더블 requestAnimationFrame 으로 layout/paint flush 보장.
- *   5) 페이지 분할 — 일지가 길면 여러 페이지로 자동 분할. */
+/** 박경수님 2026-05-28 — PDF 백지 근본 fix (v4).
+ *  검증된 feeFormPDF.ts 패턴 100% 동일 채용 (그쪽은 박경수님 환경에서 정상 동작).
+ *  진짜 원인은 container 위치가 아니라 <img> 의 crossorigin 속성 누락이었음 —
+ *  buildMentoringLogHtml 에서 fix 완료.
+ *
+ *  진단 로그 — PDF 백지 재발 시 F12 → Console 에 [PDF] 로 시작하는 단계별 출력 확인 가능. */
 export async function downloadMentoringLogPdf(log: MentoringLogForPdf): Promise<void> {
+  console.log('[PDF] 시작 — 일지 ID:', log.id, '/ 사진:', log.image_urls.length, '장');
   const fullHtml = buildMentoringLogHtml(log);
+  console.log('[PDF] HTML 빌드 완료 — 길이:', fullHtml.length);
+
   const styleMatch = fullHtml.match(/<style[\s\S]*?<\/style>/);
   const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/);
   const styleHtml = styleMatch?.[0] ?? '';
   const bodyInner = bodyMatch?.[1] ?? fullHtml;
 
-  // ① <style> 을 <head> 에 임시 삽입.
-  const styleWrap = document.createElement('div');
-  styleWrap.innerHTML = styleHtml;
-  const styleEl = styleWrap.firstElementChild as HTMLStyleElement | null;
-  if (styleEl) document.head.appendChild(styleEl);
+  const mod = await import('html2pdf.js');
+  const html2pdf = mod.default;
 
-  // ② container 는 transform 으로 화면 밖 (visibility hidden 아니라 paint 보장).
   const container = document.createElement('div');
-  container.setAttribute('id', 'pdf-render-container');
-  container.style.position = 'absolute';
+  container.style.position = 'fixed';
   container.style.top = '0';
   container.style.left = '0';
   container.style.width = '794px';
-  container.style.transform = 'translateX(-99999px)';
+  container.style.opacity = '0';
+  container.style.pointerEvents = 'none';
+  container.style.zIndex = '-1';
   container.style.background = '#fff';
-  container.innerHTML = bodyInner;
+  container.innerHTML = styleHtml + bodyInner;
   document.body.appendChild(container);
+  console.log('[PDF] container 부착 — scrollHeight:', container.scrollHeight);
 
   const fileNameParts = ['멘토링상담일지', log.mentor_name, log.log_date ?? ''].filter(Boolean);
   const fileName = fileNameParts.join('_') + '.pdf';
 
   try {
-    // 이미지 로드 + 더블 raf 로 paint flush 보장.
     await waitForImages(container);
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
-
-    const [h2cMod, jspdfMod] = await Promise.all([
-      import('html2canvas'),
-      import('jspdf'),
-    ]);
-    const html2canvas = h2cMod.default;
-    const jsPDFCtor = jspdfMod.default;
-
-    const captureWidth = 794;
-    const captureHeight = container.scrollHeight;
-
-    const canvas = await html2canvas(container, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      width: captureWidth,
-      height: captureHeight,
-      windowWidth: captureWidth,
-      windowHeight: captureHeight,
-    });
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const pdf = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    const margin = 10; // mm
-    const pdfW = pdf.internal.pageSize.getWidth() - margin * 2;
-    const pdfH = pdf.internal.pageSize.getHeight() - margin * 2;
-    const imgHmm = (canvas.height * pdfW) / canvas.width;
-
-    if (imgHmm <= pdfH) {
-      pdf.addImage(imgData, 'JPEG', margin, margin, pdfW, imgHmm);
-    } else {
-      // 페이지 분할 — 같은 이미지의 top offset 만 이동시켜 여러 페이지로.
-      let remaining = imgHmm;
-      let position = margin;
-      pdf.addImage(imgData, 'JPEG', margin, position, pdfW, imgHmm);
-      remaining -= pdfH;
-      while (remaining > 0) {
-        pdf.addPage();
-        position = margin - (imgHmm - remaining);
-        pdf.addImage(imgData, 'JPEG', margin, position, pdfW, imgHmm);
-        remaining -= pdfH;
-      }
-    }
-    pdf.save(fileName);
+    console.log('[PDF] 이미지 로드 완료, html2pdf 실행 중...');
+    await html2pdf()
+      .set({
+        margin: [10, 10, 10, 10],
+        filename: fileName,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      })
+      .from(container)
+      .save();
+    console.log('[PDF] 저장 완료:', fileName);
+  } catch (err) {
+    console.error('[PDF] 오류:', err);
+    throw err;
   } finally {
     if (container.parentElement) document.body.removeChild(container);
-    if (styleEl && styleEl.parentElement) styleEl.parentElement.removeChild(styleEl);
   }
 }
