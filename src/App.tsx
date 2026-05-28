@@ -53,6 +53,8 @@ const MyReportPage          = lazy(() => import('./pages/my-report/MyReportPage'
 const AccountingReviewPortal = lazy(() => import('./pages/public/AccountingReviewPortal'));
 // 박경수님 2026-05-28 STEP-PROGRAM-SURVEY — 사전 수요조사 외부 폼
 const YeosuMarineStartupSurveyPage = lazy(() => import('./pages/public/YeosuMarineStartupSurveyPage'));
+// 박경수님 2026-05-28 STEP-SCHOOL-PORTAL — 학교/팀/지원청 포털
+const SchoolPortalPage = lazy(() => import('./pages/portal/SchoolPortalPage'));
 
 // ── PrivateRoute 안쪽이지만 vendor-docs(docx/jspdf/html2canvas/xlsx) 를 끌어오는
 //    무거운 페이지들도 lazy 처리 (STEP-BUNDLE-SPLIT-2)
@@ -135,6 +137,8 @@ export default function App() {
             <Route path="/form/:token" element={<PublicFormPage />} />
             {/* 박경수님 2026-05-28 STEP-PROGRAM-SURVEY — 외부 사전 수요조사 (token 기반) */}
             <Route path="/survey/:token" element={<YeosuMarineStartupSurveyPage />} />
+            {/* 박경수님 2026-05-28 STEP-SCHOOL-PORTAL — 학교 담당자/팀 포털 */}
+            <Route path="/program-portal/:token" element={<SchoolPortalPage />} />
             <Route path="/portal/:token" element={<ClientPortalPage />} />
             {/* STEP-ACCOUNTING-ALL P4 — 회계사무소 외부 검토 포털 */}
             <Route path="/accounting-review/:token" element={<AccountingReviewPortal />} />
