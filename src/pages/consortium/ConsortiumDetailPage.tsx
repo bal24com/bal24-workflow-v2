@@ -29,6 +29,8 @@ import {
   getStageIndex,
   getStatusBadgeClass,
 } from './consortiumUtils';
+// 박경수님 2026-05-29 STEP-CONSORTIUM-OWN-MEMBER — 역방향 컨소시엄 판별 (자사가 참여사 위치)
+import { isReverseConsortium } from './consortiumMembersUtils';
 import ConOverviewTab from './detail/ConOverviewTab';
 import ConMembersTab from './detail/ConMembersTab';
 import ConProgramsTab from './detail/ConProgramsTab';
@@ -207,6 +209,14 @@ export default function ConsortiumDetailPage() {
               <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-md border ${getStatusBadgeClass(consortium.status)}`}>
                 {consortium.status}
               </span>
+              {/* 박경수님 2026-05-29 STEP-CONSORTIUM-OWN-MEMBER — 역방향 컨소시엄 배지
+                  자사(밸런스닷)가 참여사 위치 = 외부 운영사로부터 수령 구조 */}
+              {isReverseConsortium(members.map((m) => ({ is_self: m.is_self, role: m.role }))) && (
+                <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 border border-orange-200"
+                  title="자사(밸런스닷)가 참여사 위치인 컨소시엄 — 외부 운영사로부터 지분율 만큼 수령">
+                  ⇄ 역방향
+                </span>
+              )}
             </div>
             {/* 박경수님 2026-05-27 A안 — 의뢰기관(주관기관) 라벨 강조 */}
             {consortium.lead_client && (
@@ -285,6 +295,18 @@ export default function ConsortiumDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 박경수님 2026-05-29 STEP-CONSORTIUM-OWN-MEMBER — 역방향 재무 안내 박스 */}
+      {isReverseConsortium(members.map((m) => ({ is_self: m.is_self, role: m.role }))) && (
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800 leading-relaxed">
+          <p className="font-bold mb-1">💡 역방향 컨소시엄 안내</p>
+          <p>
+            밸런스닷(자사)이 <strong>참여사</strong> 위치인 구조예요.
+            수입은 외부 운영사로부터 받는 지분율 만큼만 <Link to="/contracts" className="underline font-semibold">수입·계약</Link> 에 등록하시고,
+            하위 지급 (외주·강사료) 은 없거나 본인 담당 영역 한정이에요.
+          </p>
+        </div>
+      )}
 
       {/* 2단 레이아웃 */}
       <div className="flex flex-col lg:flex-row gap-5">

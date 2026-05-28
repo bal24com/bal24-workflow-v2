@@ -189,6 +189,17 @@ function buildMemberRow(
   };
 }
 
+/** 박경수님 2026-05-29 STEP-CONSORTIUM-OWN-MEMBER — 역방향 컨소시엄 판별.
+ *  자사가 운영사 아니고 참여사 위치인 경우 = 외부 운영사 → 자사 수령.
+ *  members 배열 (저장된 행) 받아서 판정. */
+export function isReverseConsortium(
+  members: Array<{ is_self?: boolean | null; role?: string | null }>,
+): boolean {
+  const selfRow = members.find((m) => m.is_self);
+  if (!selfRow) return false;            // 자사 없음 — 역방향 아님
+  return selfRow.role !== '총괄';        // 자사가 총괄 아니면 역방향
+}
+
 /** 자사(밸런스닷) 행이 운영사+참여사에 동시 등록되는지 검증. */
 export function validateOnlyOneSelf(
   operatorClientId: string,

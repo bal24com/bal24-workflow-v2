@@ -42,8 +42,9 @@ type MenuSection = {
   items: MenuItem[];
 };
 
-// SECTIONS — 박경수님 2026-05-28 STEP-SIDEBAR-SIMPLIFY 매뉴얼 기준 5그룹.
-// 부가 기능(회계검토·급여관리·일지·내급여명세서)은 사이드바에서 제거, 라우트는 유지.
+// SECTIONS — 박경수님 2026-05-29 STEP-SIDEBAR-WORKFLOW 업무 프로세스 기준 5단계 + 시스템.
+// 그룹 헤더가 실제 사업 진행 순서 (수주 → 준비 → 운영 → 정산 → 시스템) 와 매칭되어
+// 사이드바 위→아래 = 사업 진행 흐름.
 const SECTIONS: MenuSection[] = [
   {
     heading: '홈',
@@ -53,35 +54,40 @@ const SECTIONS: MenuSection[] = [
     ],
   },
   {
-    heading: '사업',
+    heading: '① 수주·기획',
     items: [
-      { to: '/projects',   label: '프로젝트', Icon: FolderKanban },
-      { to: '/programs',   label: '프로그램', Icon: BookOpen },
-      { to: '/consortium', label: '컨소시엄', Icon: Building2 },
+      { to: '/projects',   label: '프로젝트',     Icon: FolderKanban },
+      { to: '/consortium', label: '컨소시엄',     Icon: Building2 },
+      { to: '/contracts',  label: '수입·계약',    Icon: FileText },
+      { to: '/clients',    label: '거래처',       Icon: Briefcase },
     ],
   },
   {
-    heading: '거래처·인력',
+    heading: '② 사업 준비',
     items: [
-      { to: '/clients', label: '거래처', Icon: Briefcase },
-      { to: '/experts', label: '전문가', Icon: Users },
+      { to: '/programs', label: '프로그램', Icon: BookOpen },
+      { to: '/experts',  label: '전문가',   Icon: Users },
     ],
   },
   {
-    heading: '재무',
+    heading: '③ 사업 운영',
     items: [
-      { to: '/payroll',   label: '외주·급여',     Icon: Users },
-      { to: '/contracts', label: '수입·계약',     Icon: FileText },
-      { to: '/reports',   label: '재무 대시보드', Icon: BarChart3 },
-    ],
-  },
-  {
-    heading: '도구',
-    items: [
-      { to: '/ai',      label: 'AI 초안',   Icon: Sparkles },
-      { to: '/members', label: '팀원 관리', Icon: UserCog },
       // 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — 강사 포털 고정 URL (외부 새 탭)
-      { to: '/portal',  label: '강사 포털', Icon: ExternalLink, external: true },
+      { to: '/portal', label: '강사 포털', Icon: ExternalLink, external: true },
+      { to: '/ai',     label: 'AI 초안',   Icon: Sparkles },
+    ],
+  },
+  {
+    heading: '④ 정산·보고',
+    items: [
+      { to: '/payroll', label: '외주·급여',     Icon: Users },
+      { to: '/reports', label: '재무 대시보드', Icon: BarChart3 },
+    ],
+  },
+  {
+    heading: '⚙️ 시스템',
+    items: [
+      { to: '/members', label: '팀원 관리', Icon: UserCog },
     ],
   },
 ];
