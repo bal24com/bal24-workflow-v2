@@ -22,6 +22,8 @@ import { useTagFilter } from '../../hooks/useTagFilter';
 import ClientFormModal from './ClientFormModal';
 import ClientDetailModal from './ClientDetailModal';
 import ClientListRowImported from './ClientListRow';
+// 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 기관 유형 필터·배지
+import { CLIENT_TYPES, getClientTypeBadge } from './clientTypeUtils';
 
 type ViewMode = 'card' | 'list';
 
@@ -71,6 +73,11 @@ function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & Card
             {/* STEP-CLIENT-EXPERT-CARD — 상호명 + 부서명 병기 */}
             <div className="text-base font-bold text-[#1E1B4B] truncate">
               {c.name}
+              {/* 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 기관 유형 배지 */}
+              {(() => {
+                const b = getClientTypeBadge(c.client_type);
+                return <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded font-bold ${b.className}`}>{b.label}</span>;
+              })()}
               {/* STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27) — 자사 뱃지 */}
               {c.is_own_company && (
                 <span className="ml-1.5 text-xs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded font-bold">자사</span>
@@ -168,6 +175,8 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ViewMode>('card');
   const [search, setSearch] = useState('');
+  // 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 기관 유형 필터
+  const [typeFilter, setTypeFilter] = useState<string>('전체');
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Client | null>(null);
@@ -206,6 +215,8 @@ export default function ClientsPage() {
     const q = search.trim().toLowerCase();
     return clients.filter((c) => {
       if (!tagFilter.matches(c)) return false; // STEP-TAGS-2B
+      // 박경수님 2026-05-28 — 기관 유형 필터
+      if (typeFilter !== '전체' && (c.client_type ?? '거래처') !== typeFilter) return false;
       if (!q) return true;
       if (c.name?.toLowerCase().includes(q)) return true;
       if (c.business_name?.toLowerCase().includes(q)) return true;
@@ -213,7 +224,7 @@ export default function ClientsPage() {
       if (c.ceo_name?.toLowerCase().includes(q)) return true;
       return c.contacts.some((ct) => ct.name?.toLowerCase().includes(q));
     });
-  }, [clients, search, tagFilter]);
+  }, [clients, search, tagFilter, typeFilter]);
 
   const handleView = (c: ClientRow) => setDetailTarget(c);
   const handleEdit = (c: ClientRow) => {
@@ -245,15 +256,23 @@ export default function ClientsPage() {
       <TagFilterTabs categories={tagFilter.categories} active={tagFilter.active} counts={tagFilter.counts} onChange={tagFilter.setActive} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="상호명 또는 담당자명으로 검색"
-            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20"
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:max-w-sm">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="상호명 또는 담당자명으로 검색"
+              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          {/* 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 기관 유형 필터 */}
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+            <option value="전체">전체 유형</option>
+            {CLIENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
 
         <div className="flex items-center gap-2">

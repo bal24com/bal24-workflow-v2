@@ -6,9 +6,10 @@ import { type ContactDraft } from './ContactRow';
 
 export const STORAGE_BUCKET = 'client-files';
 
-// 박경수님 + SkyClaw 요청 — clientType 제거 (tags 가 역할 대체)
+// 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — clientType 한글 4종 부활.
 export type ClientForm = {
   name: string;
+  clientType: string;        // '주관기관' | '수혜기관' | '참여사' | '거래처'
   businessName: string;
   ceoName: string;
   representative: string;
@@ -27,7 +28,8 @@ export type ClientForm = {
 };
 
 export const EMPTY_CLIENT: ClientForm = {
-  name: '', businessName: '', ceoName: '',
+  name: '', clientType: '거래처',
+  businessName: '', ceoName: '',
   representative: '', businessNumber: '', businessType: '', businessItem: '',
   department: '',
   bankName: '', bankAccount: '', bankHolder: '',
@@ -36,7 +38,9 @@ export const EMPTY_CLIENT: ClientForm = {
 
 export function clientToForm(c: Client): ClientForm {
   return {
-    name: c.name ?? '', businessName: c.business_name ?? '', ceoName: c.ceo_name ?? '',
+    name: c.name ?? '',
+    clientType: c.client_type ?? '거래처',
+    businessName: c.business_name ?? '', ceoName: c.ceo_name ?? '',
     representative: c.representative ?? '', businessNumber: c.business_number ?? '',
     businessType: c.business_type ?? '', businessItem: c.business_item ?? '',
     department: c.department ?? '',

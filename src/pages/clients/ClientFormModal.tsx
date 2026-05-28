@@ -21,6 +21,8 @@ import ClientContactsSection from './ClientContactsSection';
 import ClientCardScanSection from './ClientCardScanSection';
 import TagsSelector from '../../components/TagsSelector';
 import type { ClientCardExtracted } from '../../lib/clientCardAutoFill';
+// 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 기관 유형 한글 4종
+import { CLIENT_TYPES } from './clientTypeUtils';
 
 type Props = {
   open: boolean;
@@ -183,9 +185,10 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
     setSubmitting(true);
     try {
       const businessNumberDigits = form.businessNumber.replace(/\D/g, '');
-      // 박경수님 + SkyClaw 요청 — client_type 제거 (tags 대체) + bank_copy_url 추가 (null 명시)
+      // 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — client_type 한글 4종 부활
       const payload = {
         name: form.name.trim(),
+        client_type: form.clientType || '거래처',
         business_name: form.businessName.trim() || null,
         ceo_name: form.ceoName.trim() || null,
         representative: form.representative.trim() || null,
@@ -291,6 +294,17 @@ export default function ClientFormModal({ open, client, onClose, onSaved }: Prop
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="상호명 (통칭)" required value={form.name} onChange={(e) => update('name', e.target.value)} disabled={submitting} error={errors.name} placeholder="예) 밸런스닷" />
             <Input label="부서명" value={form.department} onChange={(e) => update('department', e.target.value)} disabled={submitting} placeholder="부서명 (선택)" helperText="해당 고객사 내 부서·팀명" />
+          </div>
+          {/* 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 기관 유형 4종 드롭다운 */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-700">기관 유형</label>
+            <select value={form.clientType}
+              onChange={(e) => update('clientType', e.target.value)}
+              disabled={submitting}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200">
+              {CLIENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <p className="text-xs text-slate-400">발주처는 주관기관, 학교·동아리 등은 수혜기관, 컨소시엄 외주는 참여사로 분류.</p>
           </div>
           {/* 2. 법인명 */}
           <Input label="법인명 (사업자등록증 상)" value={form.businessName} onChange={(e) => update('businessName', e.target.value)} disabled={submitting} placeholder="예) 주식회사 밸런스닷" />

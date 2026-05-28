@@ -40,7 +40,8 @@ export type CertificateRecipientType = 'student' | 'instructor';
 export type ReportType = 'interim' | 'final';
 export type ReportStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
 export type SettlementStep = 1 | 2 | 3 | 4 | 5;
-export type ClientType = 'client' | 'vendor' | 'both';
+// 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 한글 4종 통일 (영문 enum 폐기)
+export type ClientType = '주관기관' | '수혜기관' | '참여사' | '거래처';
 export type PortalItemType = 'file_download' | 'file_upload' | 'feedback' | 'approval' | 'auto_data' | 'tax_invoice';
 export type PortalAutoDataKey = 'applications' | 'attendance' | 'curriculum' | 'report';
 export type PortalStageTag = 'proposal' | 'contract' | 'operation' | 'closing';

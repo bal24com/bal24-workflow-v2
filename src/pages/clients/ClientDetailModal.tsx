@@ -30,10 +30,12 @@ interface Props {
   onDeleted?: () => void;
 }
 
+// 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 한글 4종으로 통일
 const TYPE_BADGE: Record<string, { bg: string; text: string; label: string }> = {
-  client: { bg: 'bg-violet-100', text: 'text-violet-700', label: '고객사' },
-  vendor: { bg: 'bg-orange-100', text: 'text-orange-700', label: '주관기관' },
-  both: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: '고객·주관기관' },
+  주관기관: { bg: 'bg-violet-100', text: 'text-violet-700', label: '주관기관' },
+  수혜기관: { bg: 'bg-blue-100',   text: 'text-blue-700',   label: '수혜기관' },
+  참여사:   { bg: 'bg-orange-100', text: 'text-orange-700', label: '참여사'   },
+  거래처:   { bg: 'bg-slate-100',  text: 'text-slate-600',  label: '거래처'   },
 };
 
 function formatBusinessNumber(raw?: string | null): string {
@@ -114,8 +116,9 @@ export default function ClientDetailModal({ open, client, onClose, onDeleted }: 
   }, [open, client, tab]);
 
   if (!client) return null;
-  const typeKey = (client.client_type ?? 'client') as string;
-  const typeMeta = TYPE_BADGE[typeKey] ?? TYPE_BADGE.client;
+  // 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 한글 4종 기본값 '거래처'
+  const typeKey = (client.client_type ?? '거래처') as string;
+  const typeMeta = TYPE_BADGE[typeKey] ?? TYPE_BADGE['거래처'];
 
   return (
     <Modal
