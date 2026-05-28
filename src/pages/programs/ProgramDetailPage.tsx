@@ -283,7 +283,12 @@ export default function ProgramDetailPage() {
           // STEP-OVERVIEW-CARD-FIX — 단계 시작일+KPI 상단으로 + 강사 요약 카드 제거 + OverviewTab 슬림화
           <div className="space-y-4">
             <ProgramOverviewCard program={program} />
-            <OverviewTab programId={programId} programEndDate={program.end_date ?? null} />
+            <OverviewTab
+              programId={programId}
+              programEndDate={program.end_date ?? null}
+              programStartDate={program.start_date ?? null}
+              programStatus={program.status ?? null}
+            />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ProgramCurriculumSummaryCard programId={programId} />
               <ProgramParticipantSummaryCard programId={programId} />

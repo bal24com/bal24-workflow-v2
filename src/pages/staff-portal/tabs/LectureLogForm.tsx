@@ -7,6 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { formatDateKo } from '../../../lib/utils';
 import { useToast } from '../../../contexts/ToastContext';
 import PortalPhotoUpload, { type PortalPhoto } from '../../../components/portal/PortalPhotoUpload';
+import AiDraftButton from '../../../components/portal/AiDraftButton';
 
 export type LectureLogPhoto = PortalPhoto;
 
@@ -167,13 +168,27 @@ export default function LectureLogForm({
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
               <label className="text-xs font-semibold text-slate-700">
                 일지 내용 <span className="text-[11px] text-slate-400 font-normal">(선택)</span>
               </label>
-              {saveStatus === 'saving' && <span className="text-[10px] text-slate-400 inline-flex items-center gap-1"><Loader2 size={10} className="animate-spin" />저장 중…</span>}
-              {saveStatus === 'saved' && <span className="text-[10px] text-emerald-600">✓ 저장됨</span>}
-              {saveStatus === 'error' && <span className="text-[10px] text-rose-600">⚠ 저장 실패</span>}
+              <div className="inline-flex items-center gap-2">
+                {/* STEP-V9-QUICKWIN QW-4 — AI 초안 버튼 */}
+                <AiDraftButton
+                  edgeFunctionName="curriculum-log-ai"
+                  payload={{
+                    session_title: curriculum.title,
+                    session_no: curriculum.session_no,
+                    session_date: curriculum.session_date,
+                    photo_count: photos.length,
+                  }}
+                  onDraftGenerated={(draft) => setContent((prev) => (prev.trim() ? `${prev}\n\n${draft}` : draft))}
+                  disabled={submitting}
+                />
+                {saveStatus === 'saving' && <span className="text-[10px] text-slate-400 inline-flex items-center gap-1"><Loader2 size={10} className="animate-spin" />저장 중…</span>}
+                {saveStatus === 'saved' && <span className="text-[10px] text-emerald-600">✓ 저장됨</span>}
+                {saveStatus === 'error' && <span className="text-[10px] text-rose-600">⚠ 저장 실패</span>}
+              </div>
             </div>
             <textarea value={content} onChange={(e) => setContent(e.target.value)}
               placeholder="강의 진행 내용·특이사항·다음 차시 준비 등 (사진이 충분하면 비워둬도 OK)"
