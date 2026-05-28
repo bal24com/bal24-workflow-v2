@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Loader2, Search, Users, Upload, ArrowUp, ArrowDown, ArrowUpDown, Filter, Download, FileText } from 'lucide-react';
 import { Button } from '../../components/ui';
 import { useToast } from '../../contexts/ToastContext';
-import { formatDateKo, formatMoney } from '../../lib/utils';
+import { formatMoney } from '../../lib/utils';
 import EmptyState from '../../components/EmptyState';
 import { supabase } from '../../lib/supabase';
 import type { PayrollPaymentStatus } from '../../types/database';
@@ -18,6 +18,17 @@ import {
 import PayrollSummaryBar from './PayrollSummaryBar';
 import PayrollExpenseFormModal from './PayrollExpenseFormModal'; import PayrollImportModal from './PayrollImportModal'; import PayrollStatsPanel from './PayrollStatsPanel'; import PayrollDetailModal from './PayrollDetailModal';
 import { downloadPayrollExcel, downloadPayrollPdf } from './payrollDownload'; import { withFinanceGuard } from '../../hooks/useFinanceGuard'; import PayrollRowStatusActions from './PayrollRowStatusActions'; import PayrollBulkActions from './PayrollBulkActions'; // STEP-RBAC-SETUP + STEP-PAYROLL-STATUS-FLOW + STEP-PAYROLL-LIST-REDESIGN
+
+// STEP-PAYROLL-UI-FIX (박경수님 2026-05-28) — 지급일 YY/MM/DD 형식 통일
+function fmtPayrollDate(d: string | null | undefined): string {
+  if (!d) return '-';
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return '-';
+  const y = String(dt.getFullYear()).slice(2);
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}/${m}/${day}`;
+}
 
 // 박경수님 요청 — 외주/운영 메인 탭 제거, [통계][지출] 2탭으로 재구성
 type MainTab = 'stats' | 'list';
@@ -313,7 +324,8 @@ function PayrollPage() {
                       ) : <span className="text-slate-400">없음</span>}
                     </td>
                     <td className="px-3 py-2 text-right font-bold text-violet-700 tabular-nums whitespace-nowrap">{formatMoney(r.net_amount && r.net_amount > 0 ? r.net_amount : r.subtotal)}</td>
-                    <td className="px-3 py-2 text-xs text-muted whitespace-nowrap">{r.paid_at ? formatDateKo(r.paid_at) : '-'}</td>
+                    {/* STEP-PAYROLL-UI-FIX (박경수님 2026-05-28) — YY/MM/DD 형식 통일 */}
+                    <td className="px-3 py-2 text-xs text-muted whitespace-nowrap tabular-nums">{fmtPayrollDate(r.paid_at)}</td>
                     {/* STEP-PAYROLL-UI-FIX (2026-05-28) — 상태 td 제거 (일괄처리 바로 대체) */}
                     <td className="px-3 py-2 text-center text-sm">
                       {/* STEP-PAYROLL-LIST-REDESIGN PART A — O/X 단순 표시. 운영인건비는 증빙 불필요 */}
