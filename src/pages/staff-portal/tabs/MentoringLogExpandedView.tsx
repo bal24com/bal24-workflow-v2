@@ -3,7 +3,6 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { supabase } from '../../../lib/supabase';
 import { fetchLogForPdf } from '../../programs/detail/mentoringLogPdfFetch';
 import type { MentoringLogForPdf } from '../../programs/detail/mentoringLogPdf';
 import MentoringLogDetailTable from './MentoringLogDetailTable';
@@ -32,32 +31,20 @@ interface Props {
 export default function MentoringLogExpandedView({ logId, fallback, cached, onLoaded }: Props) {
   const [detail, setDetail] = useState<MentoringLogForPdf | null>(cached ?? null);
   const [loading, setLoading] = useState(!cached);
-  // 박경수님 2026-05-26 PART A — 멘토링 일지 photo_urls 추가 fetch (mentoring_log_files 와 별개)
-  const [extraPhotoUrls, setExtraPhotoUrls] = useState<string[]>([]);
 
   useEffect(() => {
-    if (cached) { setDetail(cached); setLoading(false); }
+    if (cached) { setDetail(cached); setLoading(false); return; }
     let cancelled = false;
-    if (!cached) setLoading(true);
+    setLoading(true);
     void (async () => {
-      // 1) PDF용 풀 데이터 (mentor info + image_urls from mentoring_log_files)
-      if (!cached) {
-        const d = await fetchLogForPdf(logId);
-        if (!cancelled) {
-          setDetail(d);
-          setLoading(false);
-          if (d && onLoaded) onLoaded(d);
-        }
-      }
-      // 2) photo_urls JSONB 추가 fetch (PART A — 신규 사진 시스템)
-      const { data: row } = await supabase.from('mentoring_logs')
-        .select('photo_urls').eq('id', logId).maybeSingle();
+      // PDF용 풀 데이터 (mentor info + image_urls from mentoring_log_files + photo_urls JSONB).
+      // 박경수님 2026-05-28 — fetchLogForPdf 내부에서 mentoring_log_files (legacy) 와
+      // mentoring_logs.photo_urls (신규 PortalPhotoUpload) 를 합쳐서 반환하도록 통합.
+      const d = await fetchLogForPdf(logId);
       if (cancelled) return;
-      const arr = (row?.photo_urls ?? []) as Array<{ url?: string } | string>;
-      const urls = arr
-        .map((p) => (typeof p === 'string' ? p : p?.url ?? ''))
-        .filter((u): u is string => !!u);
-      setExtraPhotoUrls(urls);
+      setDetail(d);
+      setLoading(false);
+      if (d && onLoaded) onLoaded(d);
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,7 +74,7 @@ export default function MentoringLogExpandedView({ logId, fallback, cached, onLo
       durationMin={fallback.durationMin}
       subject={fallback.subject}
       content={fallback.content}
-      imageUrls={[...(detail?.image_urls ?? []), ...extraPhotoUrls]}
+      imageUrls={detail?.image_urls ?? []}
       recipient={fallback.recipient}
     />
   );

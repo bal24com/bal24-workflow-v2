@@ -8,12 +8,13 @@ import type { MentoringLogForPdf } from './mentoringLogPdf';
 export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf | null> {
   // 1) mentoring_logs 기본 (mentee_ids는 mentoring_logs 자체 컬럼).
   //    박경수님 2026-05-26 — team_name (참여팀명) + start_time/end_time 도 fetch (양식 일시 표기용).
+  //    박경수님 2026-05-28 — photo_urls JSONB 추가 fetch (PortalPhotoUpload 신규 사진 시스템).
   const { data: log, error } = await supabase
     .from('mentoring_logs')
     .select(`
       id, subject, content, log_date, duration_min, recipient,
       mentor_signature_url, status, assignment_id, program_id, mentee_ids,
-      team_name, start_time, end_time
+      team_name, start_time, end_time, photo_urls
     `)
     .eq('id', logId)
     .maybeSingle();
@@ -28,6 +29,7 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
     assignment_id: string | null; program_id: string | null;
     mentee_ids: string[] | null;
     team_name: string | null; start_time: string | null; end_time: string | null;
+    photo_urls: Array<{ url?: string } | string> | null;
   };
   const l = log as LogRow;
 
@@ -93,7 +95,9 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
     menteeNames = menteeIds.map((id) => idToName.get(id)).filter((n): n is string => !!n);
   }
 
-  // 5) 첨부 이미지 (mentoring_log_files, file_type='image' 만)
+  // 5) 첨부 이미지 — legacy mentoring_log_files + 신규 photo_urls JSONB 통합.
+  //    박경수님 2026-05-28 — PortalPhotoUpload 로 업로드한 사진이 일지 조회·PDF 에서 안 보이던 버그 fix.
+  //    legacy 파일은 file_type='image' 만, 신규 photo_urls 는 {url, path, ...} 객체 배열.
   let imageUrls: string[] = [];
   const { data: files, error: fErr } = await supabase.from('mentoring_log_files')
     .select('file_url, file_type').eq('log_id', logId)
@@ -106,8 +110,14 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
   } else {
     imageUrls = ((files ?? []) as Array<{ file_url: string; file_type: string }>)
       .filter((f) => f.file_type === 'image')
-      .map((f) => f.file_url).filter(Boolean).slice(0, 3);
+      .map((f) => f.file_url).filter(Boolean);
   }
+  // 신규 photo_urls JSONB 사진 합치기 (작성 폼 PortalPhotoUpload 저장본).
+  const photoArr = (l.photo_urls ?? []) as Array<{ url?: string } | string>;
+  const photoUrlsFromJsonb = photoArr
+    .map((p) => (typeof p === 'string' ? p : p?.url ?? ''))
+    .filter((u): u is string => !!u);
+  imageUrls = [...imageUrls, ...photoUrlsFromJsonb];
 
   return {
     id: l.id,
