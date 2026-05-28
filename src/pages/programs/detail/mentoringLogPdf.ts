@@ -1,5 +1,7 @@
-// bal24 v2 — STEP-MENTORING-P2-PDF · 박경수님 2026-05-26 양식 보강
+// bal24 v2 — STEP-MENTORING-P2-PDF · 박경수님 2026-05-26 양식 보강 + 2026-05-28 v5 CORS 우회
 // 멘토링 (컨설팅) 상담일지 PDF 양식 HTML 빌더 + 동적 import 다운로드.
+
+import { supabase } from '../../../lib/supabase';
 // 양식 구조 (박경수님 PDF 기준).
 //   제목: 멘 토 링 (컨설팅) 상 담 일 지
 //   표 1행 헤더: [프로그램명] colspan 5
@@ -33,6 +35,10 @@ export interface MentoringLogForPdf {
   project_name: string;
   // 첨부 이미지 URL (최대 3개)
   image_urls: string[];
+  /** 박경수님 2026-05-28 PDF v5 — image_urls 와 같은 인덱스의 Storage path.
+   *  PDF 다운로드 시 supabase.storage.download() 로 Blob → base64 변환하여 CORS 우회.
+   *  legacy mentoring_log_files 항목은 null (URL 만 보유). */
+  image_paths?: (string | null)[];
   // 박경수님 2026-05-26 양식 보강
   team_name: string | null;
   start_time: string | null;        // HH:MM
@@ -267,7 +273,42 @@ function waitForImages(root: HTMLElement, timeoutMs = 8000): Promise<void> {
   return Promise.race([Promise.all(waits).then(() => undefined), timeout]);
 }
 
-/** 박경수님 2026-05-28 — PDF 백지 근본 fix (v4).
+/** 박경수님 2026-05-28 PDF v5 — Storage Blob → base64 변환 (CORS 진짜 우회).
+ *  v4 의 crossorigin 속성만으론 Supabase Storage 가 헤더 협상 안 되면 무효.
+ *  SDK 의 download() 는 SDK 내부 인증 헤더로 Blob 을 받아오므로 CORS 무관. */
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('FileReader 실패'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** 사진 URL → data:base64 변환. 1순위 Storage SDK, 2순위 fetch, 3순위 원본 URL. */
+async function resolveImageToDataUrl(url: string, path: string | null): Promise<string> {
+  // 1) Storage path 가 있으면 SDK download (CORS 무관, 가장 안정적).
+  if (path) {
+    try {
+      const { data, error } = await supabase.storage.from('mentoring-files').download(path);
+      if (!error && data) return await blobToDataUrl(data);
+      if (error) console.warn('[PDF] storage.download 실패, fetch 폴백:', error.message);
+    } catch (err) {
+      console.warn('[PDF] storage.download 예외:', err);
+    }
+  }
+  // 2) fetch 시도 (CORS 허용된 URL 일 때만 성공).
+  try {
+    const res = await fetch(url);
+    if (res.ok) return await blobToDataUrl(await res.blob());
+  } catch (err) {
+    console.warn('[PDF] fetch 실패, 원본 URL 사용:', err);
+  }
+  // 3) 최종 — 원본 URL (crossorigin 협상 의존, 실패 가능).
+  return url;
+}
+
+/** 박경수님 2026-05-28 — PDF 백지 근본 fix (v4 → v5).
  *  검증된 feeFormPDF.ts 패턴 100% 동일 채용 (그쪽은 박경수님 환경에서 정상 동작).
  *  진짜 원인은 container 위치가 아니라 <img> 의 crossorigin 속성 누락이었음 —
  *  buildMentoringLogHtml 에서 fix 완료.
@@ -275,7 +316,27 @@ function waitForImages(root: HTMLElement, timeoutMs = 8000): Promise<void> {
  *  진단 로그 — PDF 백지 재발 시 F12 → Console 에 [PDF] 로 시작하는 단계별 출력 확인 가능. */
 export async function downloadMentoringLogPdf(log: MentoringLogForPdf): Promise<void> {
   console.log('[PDF] 시작 — 일지 ID:', log.id, '/ 사진:', log.image_urls.length, '장');
-  const fullHtml = buildMentoringLogHtml(log);
+
+  // ★ v5 핵심 — 사진을 base64 data URL 로 사전 변환 (CORS 우회).
+  let workingLog = log;
+  if (log.image_urls.length > 0) {
+    console.log('[PDF] 사진 base64 변환 시작...');
+    const paths = log.image_paths ?? log.image_urls.map(() => null);
+    const dataUrls = await Promise.all(
+      log.image_urls.map((url, i) => resolveImageToDataUrl(url, paths[i] ?? null)),
+    );
+    const dataCount = dataUrls.filter((u) => u.startsWith('data:')).length;
+    console.log(`[PDF] 사진 변환 완료 — data URL ${dataCount}/${dataUrls.length}`);
+    workingLog = { ...log, image_urls: dataUrls };
+  }
+
+  // 서명도 동일하게 변환 시도 (signature_url 은 path 정보 없으므로 fetch 만).
+  if (workingLog.mentor_signature_url) {
+    const sigData = await resolveImageToDataUrl(workingLog.mentor_signature_url, null);
+    workingLog = { ...workingLog, mentor_signature_url: sigData };
+  }
+
+  const fullHtml = buildMentoringLogHtml(workingLog);
   console.log('[PDF] HTML 빌드 완료 — 길이:', fullHtml.length);
 
   const styleMatch = fullHtml.match(/<style[\s\S]*?<\/style>/);

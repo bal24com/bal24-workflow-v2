@@ -113,11 +113,23 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
       .map((f) => f.file_url).filter(Boolean);
   }
   // 신규 photo_urls JSONB 사진 합치기 (작성 폼 PortalPhotoUpload 저장본).
-  const photoArr = (l.photo_urls ?? []) as Array<{ url?: string } | string>;
-  const photoUrlsFromJsonb = photoArr
-    .map((p) => (typeof p === 'string' ? p : p?.url ?? ''))
-    .filter((u): u is string => !!u);
+  // 박경수님 2026-05-28 PDF v5 — path 도 같이 추출하여 image_paths 로 반환.
+  //   PDF 다운로드 시 supabase.storage.download() 로 CORS 우회 base64 변환에 사용.
+  const photoArr = (l.photo_urls ?? []) as Array<{ url?: string; path?: string } | string>;
+  const photoUrlsFromJsonb: string[] = [];
+  const photoPathsFromJsonb: (string | null)[] = [];
+  photoArr.forEach((p) => {
+    if (typeof p === 'string') {
+      if (p) { photoUrlsFromJsonb.push(p); photoPathsFromJsonb.push(null); }
+    } else if (p?.url) {
+      photoUrlsFromJsonb.push(p.url);
+      photoPathsFromJsonb.push(p.path ?? null);
+    }
+  });
+  // legacy 항목 수만큼 null path 채우기 (인덱스 매칭).
+  const legacyPathPlaceholders: (string | null)[] = imageUrls.map(() => null);
   imageUrls = [...imageUrls, ...photoUrlsFromJsonb];
+  const imagePaths: (string | null)[] = [...legacyPathPlaceholders, ...photoPathsFromJsonb];
 
   return {
     id: l.id,
@@ -136,6 +148,7 @@ export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf 
     program_name: programName,
     project_name: projectName,
     image_urls: imageUrls,
+    image_paths: imagePaths,
     // 박경수님 2026-05-26 양식 보강
     team_name: l.team_name,
     start_time: l.start_time,
