@@ -14,6 +14,8 @@
 | | 거래처 | `/clients` | 주관기관·수혜기관·참여사·거래처 (한글 4종) |
 | **② 사업 준비** | 프로그램 | `/programs` | 교육·캠프·행사·세미나·멘토링 (14종 유형) |
 | | 전문가 | `/experts` | 외부 강사·컨설턴트·멘토 (인력풀) |
+| | 신청 관리 | `/applications` | 교육생 신청자 검토·승인 (운영 전 사전 세팅) |
+| | 모집 공고 | `/recruit-manage` | 강사·TA 모집 폼 |
 | **③ 사업 운영** | 강사 포털 | `/portal` ↗ | 강사 본인 로그인 (외부 새 탭) |
 | | AI 초안 | `/ai` | AI 어시스턴트 (Claude API) |
 | **④ 정산·보고** | 외주·급여 | `/payroll` | 강사료·외주비 (`payroll_expenses`) |
@@ -39,8 +41,6 @@
 | 수료증 | `/certificates` | 수료증 발급 |
 | 일지 | `/activity-logs` | 통합 일지 |
 | 폼 관리 | `/forms` | 외부 공개 폼 |
-| 신청 관리 | `/applications` | 교육생 신청 검토 |
-| 모집 공고 | `/recruit-manage` | 강사·TA 모집 |
 | 포털 관리 | `/portals` | 고객 문서 포털 발급 |
 | 직원 급여 | `/payroll-mgmt` | 내부 직원 급여명세서 |
 | 회계 검토 | `/accounting-portal` | 회계사무소 외부 |

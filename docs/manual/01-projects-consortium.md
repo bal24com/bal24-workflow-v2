@@ -103,6 +103,18 @@
 
 ⚠️ **밸런스닷(자사) 위치 자유화 (2026-05-27)** — 운영사로 들어가도 되고 참여사 중 하나로 들어가도 됨. `clients.is_own_company=true` 행만 있으면 됨.
 
+### 자사 판별 기준 명세 (2026-05-29)
+
+| 판별 | 조건식 (consortium_members 기준) | 결과 |
+|---|---|---|
+| **운영사 자사 여부** | `is_self = true AND role = '총괄'` 행이 1건 존재 | 자사가 운영사 (정방향) |
+| **역방향 컨소시엄** | `is_self = true AND role = '참여'` 행이 1건 존재 | 자사가 참여사. 외부 운영사로부터 지분율 만큼 `inbound` 수령 |
+| **자사 미포함** | `is_self = true` 행이 0건 | 자사가 위탁자 외부. 정산 방향 모두 `none` |
+
+`isReverseConsortium()` 함수 (`consortiumMembersUtils.ts`) 가 위 조건을 1줄로 평가하여 헤더 배지·재무 안내 박스 표시 분기.
+
+별도 컬럼 `consortiums.operator_is_own_company` 는 도입하지 않음. 같은 사실을 두 곳에서 관리 시 동기화 부담 + 단일 진실 원천 (single source of truth) 원칙 위배.
+
 ### 자주 하는 일
 
 | 상황 | 어디서 |

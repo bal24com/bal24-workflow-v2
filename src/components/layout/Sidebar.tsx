@@ -21,6 +21,8 @@ import {
   Trash2,
   FileText,
   ClipboardCheck,
+  UserPlus,
+  Megaphone,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -65,8 +67,11 @@ const SECTIONS: MenuSection[] = [
   {
     heading: '② 사업 준비',
     items: [
-      { to: '/programs', label: '프로그램', Icon: BookOpen },
-      { to: '/experts',  label: '전문가',   Icon: Users },
+      { to: '/programs',        label: '프로그램',   Icon: BookOpen },
+      { to: '/experts',         label: '전문가',     Icon: Users },
+      // 박경수님 2026-05-29 — 사전 세팅 메뉴 보강. 신청 접수·강사 모집은 운영 전 가장 먼저 만지는 영역.
+      { to: '/applications',    label: '신청 관리',  Icon: UserPlus },
+      { to: '/recruit-manage',  label: '모집 공고',  Icon: Megaphone },
     ],
   },
   {
