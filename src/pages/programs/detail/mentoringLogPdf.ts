@@ -283,15 +283,16 @@ export async function downloadMentoringLogPdf(log: MentoringLogForPdf): Promise<
 
   const container = document.createElement('div');
   container.setAttribute('id', 'pdf-render-container');
-  // 화면 안에 두되 보이지 않게 (off-screen 은 일부 환경에서 캡쳐 실패)
-  container.style.position = 'fixed';
+  // 박경수님 2026-05-28 — PDF 백지 재발 fix.
+  // 모던 Chrome 은 position:fixed + opacity:0 + zIndex:-1 조합을 paint skip 처리해서
+  // html2canvas 가 빈 캔버스를 받음. 화면 밖 absolute (-99999px) 로 두면 layout/paint
+  // 모두 정상 수행되어 캡쳐 보장.
+  container.style.position = 'absolute';
   container.style.top = '0';
-  container.style.left = '0';
+  container.style.left = '-99999px';
   container.style.width = '794px';
-  container.style.opacity = '0';
-  container.style.pointerEvents = 'none';
-  container.style.zIndex = '-1';
   container.style.background = '#fff';
+  container.style.pointerEvents = 'none';
   container.innerHTML = styleHtml + bodyInner;
   document.body.appendChild(container);
 
