@@ -107,6 +107,16 @@ export default function LectureLogForm({
     toast.success('일지를 제출했어요. 🎉');
     if (data) {
       const row = data as LectureLogRow;
+      // 박경수님 2026-05-29 STEP-PHOTO-SAVE-GUARD — 제출 시점 silent-fail 검증.
+      //   PostgREST 가 모르는 컬럼을 silent drop 하는 위험에 대비. 보낸 개수 vs DB 저장 개수 비교.
+      if (photos.length > 0) {
+        const savedPhotos = (row.photos ?? []) as unknown[];
+        const savedCount = Array.isArray(savedPhotos) ? savedPhotos.length : 0;
+        if (savedCount !== photos.length) {
+          console.error('[photo-save-guard] 강의 일지 사진 누락 — 보낸:', photos.length, '저장된:', savedCount);
+          toast.error(`사진 ${photos.length}장 중 ${savedCount}장만 저장됐어요. PM 에게 컬럼 마이그레이션 확인 요청 부탁드려요.`);
+        }
+      }
       onSaved({ ...row, photos: (row.photos ?? []) as LectureLogPhoto[] });
     }
   }

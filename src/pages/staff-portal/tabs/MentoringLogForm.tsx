@@ -204,6 +204,21 @@ export default function MentoringLogForm({
       savedLogId = (savedLog as { id: string }).id;
     }
 
+    // 박경수님 2026-05-29 STEP-PHOTO-SAVE-GUARD — silent-fail 방어.
+    //   PostgREST 는 모르는 컬럼을 silent 하게 drop. 컬럼 마이그레이션 누락 시
+    //   토스트는 성공이지만 실제 photo_urls 가 빈 채로 저장될 위험. 보낸 개수 vs
+    //   DB 에 들어간 개수 비교하여 불일치 시 사용자에게 즉시 알림.
+    if (savedLogId && photoUrls.length > 0) {
+      const { data: verify } = await supabase.from('mentoring_logs')
+        .select('photo_urls').eq('id', savedLogId).maybeSingle();
+      const savedPhotos = (verify?.photo_urls ?? []) as unknown[];
+      const savedCount = Array.isArray(savedPhotos) ? savedPhotos.length : 0;
+      if (savedCount !== photoUrls.length) {
+        console.error('[photo-save-guard] 사진 저장 누락 — 보낸:', photoUrls.length, '저장된:', savedCount);
+        toast.error(`사진 ${photoUrls.length}장 중 ${savedCount}장만 저장됐어요. PM 에게 컬럼 마이그레이션 확인 요청 부탁드려요.`);
+      }
+    }
+
     if (pendingFiles.length > 0 && savedLogId) {
       // 수정 모드에서는 이미 INSERT된 파일(id 있음)은 건너뜀
       const newFiles = pendingFiles.filter((f) => !f.id);
