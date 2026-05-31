@@ -84,10 +84,25 @@ export default function ConsortiumFormModal({ open, onClose, onCreated, initialD
         .order('is_own_company', { ascending: false })
         .order('name', { ascending: true }),
       supabase.from('projects').select('id, name').is('deleted_at', null).order('created_at', { ascending: false }),
-    ]).then(([cRes, pRes]) => {
+    ]).then(async ([cRes, pRes]) => {
       if (cancelled) return;
       if (cRes.error) console.error('[consortium] 고객사 조회 실패:', cRes.error.message);
-      else setClients((cRes.data ?? []) as ClientOption[]);
+      let clientsArr = (cRes.data ?? []) as ClientOption[];
+      // 박경수님 2026-05-29 STEP-CONSORTIUM-MEMBER-FIX — 자사(밸런스닷) 행이 clients 에
+      //   등록 안 되어 있으면 자동 생성. 참여사·운영사 드롭다운에 즉시 노출되도록 보장.
+      if (!clientsArr.some((c) => c.is_own_company)) {
+        const { data: created, error: insErr } = await supabase
+          .from('clients')
+          .insert({ name: '밸런스닷', is_own_company: true })
+          .select('id, name, is_own_company')
+          .single();
+        if (insErr) {
+          console.error('[consortium] 자사(밸런스닷) 자동 등록 실패:', insErr.message);
+        } else if (created) {
+          clientsArr = [created as ClientOption, ...clientsArr];
+        }
+      }
+      setClients(clientsArr);
       if (pRes.error) console.error('[consortium] 프로젝트 조회 실패:', pRes.error.message);
       else setProjects(pRes.data ?? []);
       setLoadingRefs(false);

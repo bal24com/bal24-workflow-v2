@@ -62,7 +62,23 @@ export default function ConsortiumMemberModal({
       console.error('[ConsortiumMemberModal] clients fetch:', error.message);
       return;
     }
-    setClients((data ?? []) as Client[]);
+    let arr = (data ?? []) as Client[];
+    // 박경수님 2026-05-29 STEP-CONSORTIUM-MEMBER-FIX — 자사 행 자동 생성 보강.
+    //   clients 에 is_own_company=true 행이 없으면 즉시 INSERT 후 옵션에 prepend.
+    //   참여사 드롭다운에 [자사] 옵션이 항상 보장됨.
+    if (!arr.some((c) => c.is_own_company)) {
+      const { data: created, error: insErr } = await supabase
+        .from('clients')
+        .insert({ name: '밸런스닷', is_own_company: true })
+        .select('id, name, is_own_company')
+        .single();
+      if (insErr) {
+        console.error('[ConsortiumMemberModal] 자사(밸런스닷) 자동 등록 실패:', insErr.message);
+      } else if (created) {
+        arr = [created as Client, ...arr];
+      }
+    }
+    setClients(arr);
   }, []);
 
   useEffect(() => {
