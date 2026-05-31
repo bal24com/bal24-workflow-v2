@@ -5,6 +5,37 @@
 import { supabase } from '../../../lib/supabase';
 import type { MentoringLogForPdf } from './mentoringLogPdf';
 
+/** 박경수님 2026-05-29 — 한 멘토 (assignment) 의 모든 일지 fetch (PDF 일괄 다운로드용). */
+export async function fetchAllLogsForPdfByAssignment(assignmentId: string): Promise<MentoringLogForPdf[]> {
+  const { data, error } = await supabase
+    .from('mentoring_logs')
+    .select('id')
+    .eq('assignment_id', assignmentId)
+    .order('log_date', { ascending: true });
+  if (error) {
+    console.error('[mentoring-log-pdf-fetch] assignment 일지 목록 조회 실패:', error.message);
+    return [];
+  }
+  const logs = await Promise.all((data ?? []).map((r) => fetchLogForPdf((r as { id: string }).id)));
+  return logs.filter((l): l is MentoringLogForPdf => !!l);
+}
+
+/** 박경수님 2026-05-29 — 여러 assignment 의 모든 일지 fetch (전체 일괄 다운로드용). */
+export async function fetchAllLogsForPdfByAssignments(assignmentIds: string[]): Promise<MentoringLogForPdf[]> {
+  if (assignmentIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('mentoring_logs')
+    .select('id')
+    .in('assignment_id', assignmentIds)
+    .order('log_date', { ascending: true });
+  if (error) {
+    console.error('[mentoring-log-pdf-fetch] 다중 assignment 일지 목록 조회 실패:', error.message);
+    return [];
+  }
+  const logs = await Promise.all((data ?? []).map((r) => fetchLogForPdf((r as { id: string }).id)));
+  return logs.filter((l): l is MentoringLogForPdf => !!l);
+}
+
 export async function fetchLogForPdf(logId: string): Promise<MentoringLogForPdf | null> {
   // 1) mentoring_logs 기본 (mentee_ids는 mentoring_logs 자체 컬럼).
   //    박경수님 2026-05-26 — team_name (참여팀명) + start_time/end_time 도 fetch (양식 일시 표기용).

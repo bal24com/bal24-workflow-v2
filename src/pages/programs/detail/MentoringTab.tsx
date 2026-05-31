@@ -2,8 +2,8 @@
 // 현황 카드 4개 + 보고서 목록 테이블 (멘토 필터 + 보고서/배정 추가).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, FileDown, Loader2, Plus, Users2, UserCheck, UserX, MessageSquare, ChevronDown, ChevronUp, Download } from 'lucide-react';
-import MentoringLogCard from './MentoringLogCard';
+import { FileDown, Loader2, Plus, Users2, UserCheck, UserX, MessageSquare, Download } from 'lucide-react';
+import MentorAssignmentCard from './MentorAssignmentCard';
 import { Button, Card, CardContent } from '../../../components/ui';
 import EmptyState from '../../../components/EmptyState';
 import { supabase } from '../../../lib/supabase';
@@ -11,10 +11,12 @@ import { useToast } from '../../../contexts/ToastContext';
 import { copyToClipboard } from '../../../lib/clipboard';
 import { formatDateKo } from '../../../lib/utils';
 import {
-  fetchMentoringAssignments, downloadSessionAsWord, countCompletedSessions,
+  fetchMentoringAssignments, downloadSessionAsWord,
 } from './mentoringUtils';
 import { fetchStaffFees } from './staffFeeUtils';
-import { formatDuration, getMentorName, isUnregisteredMentor } from '../../../types/mentoring';
+// 박경수님 2026-05-29 — 일지 일괄·개인 PDF 인쇄 (새 창 패턴, V-1 hook 분리)
+import { useMentoringLogBatch } from './useMentoringLogBatch';
+import { formatDuration, getMentorName } from '../../../types/mentoring';
 import type {
   MentoringAssignment, MentoringSession,
 } from '../../../types/mentoring';
@@ -120,6 +122,10 @@ export default function MentoringTab({ programId }: Props) {
     await downloadOne(a.id, () => buildFeeFormFromStaffFee(fee, programId));
   }
 
+  // 박경수님 2026-05-29 — 일지 일괄·개인 PDF (hook 으로 분리)
+  const { loading: logBatchLoading, downloadMentor: handleDownloadMentorLogs, downloadAll: handleDownloadAllLogsRaw } = useMentoringLogBatch(toast);
+  const handleDownloadAllLogs = () => void handleDownloadAllLogsRaw(assignments);
+
   async function handleDownloadAllMentorFees() {
     if (assignments.length === 0) { toast.error('멘토가 없어요.'); return; }
     if (!window.confirm(`멘토 ${assignments.length}명의 강사료 확인서를 순차 다운로드할까요?`)) return;
@@ -167,15 +173,26 @@ export default function MentoringTab({ programId }: Props) {
               <option key={a.id} value={a.id}>{getMentorName(a)}</option>
             ))}
           </select>
+          {/* 박경수님 2026-05-29 — 일지 일괄 인쇄 (전체 멘토) */}
+          {assignments.length > 0 && (
+            <Button variant="outline" size="sm"
+              leftIcon={logBatchLoading === 'all' ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+              disabled={!!logBatchLoading}
+              title="전체 멘토의 모든 일지를 한 번에 인쇄 (PDF 로 저장 가능)"
+              onClick={() => void handleDownloadAllLogs()}>
+              {logBatchLoading === 'all' ? '준비 중…' : `일지 일괄 (${assignments.length}명)`}
+            </Button>
+          )}
           {/* 박경수님 2026-05-26 — 강사료 확인서 일괄 다운로드 */}
           {assignments.length > 0 && (
             <Button variant="outline" size="sm"
               leftIcon={feeBatchProgress ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
               disabled={!!feeBatchProgress}
+              title={`멘토 ${assignments.length}명의 강사료 확인서 PDF 를 1.5초 간격으로 순차 다운로드해요. [확인] 누른 후 다운로드 폴더 확인`}
               onClick={() => void handleDownloadAllMentorFees()}>
               {feeBatchProgress
                 ? `다운로드 중 (${feeBatchProgress.current}/${feeBatchProgress.total})`
-                : `강사료 일괄 다운로드 (${assignments.length}명)`}
+                : `강사료 일괄 (${assignments.length}명)`}
             </Button>
           )}
           <Button variant="primary" size="sm" leftIcon={<Plus size={14} />} onClick={() => setAssignOpen(true)}>
@@ -275,91 +292,18 @@ export default function MentoringTab({ programId }: Props) {
           <CardContent className="p-3 space-y-2">
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">배정된 멘토 ({assignments.length})</p>
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {assignments.map((a) => {
-                const completed = countCompletedSessions(a.sessions);
-                const planned = a.session_count ?? 0;
-                const menteeCount = a.mentee_ids?.length ?? 0;
-                const unregistered = isUnregisteredMentor(a);
-                return (
-                  <li key={a.id} className="rounded-xl border border-violet-100 bg-violet-50/30 p-3 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-[#1E1B4B] truncate inline-flex items-center gap-1">
-                        {getMentorName(a)}
-                        {/* STEP-MENTORING-FULL — 미등록 멘토 표시 */}
-                        {unregistered && (
-                          <span className="text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded px-1 py-0.5">미등록</span>
-                        )}
-                      </span>
-                      <span className="text-[10px] text-slate-500 shrink-0">{a.meet_type ?? '-'} · {a.pay_type ?? '-'}</span>
-                    </div>
-                    {/* STEP-MENTORING-FULL — 담당 멘티 수 + 미등록 멘토 초대 링크 */}
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-slate-500">
-                        담당 멘티 <strong className="text-slate-700 tabular-nums">{menteeCount}</strong>명
-                        {menteeCount === 0 && <span className="ml-1 text-slate-400 italic">(미지정)</span>}
-                      </span>
-                      {unregistered && a.mentor_invite_token && (
-                        <button type="button"
-                          onClick={() => void copyToClipboard(`${window.location.origin}/mentor-invite/${a.mentor_invite_token}`)
-                            .then((ok) => toast.success(ok ? '초대 링크 복사됨' : '복사 실패'))}
-                          className="text-violet-600 hover:underline font-semibold">
-                          초대 링크 복사
-                        </button>
-                      )}
-                      {/* STEP-MENTOR-MENTEE-MATCHING — 멘티 배정 버튼 */}
-                      <button type="button" onClick={() => setMenteeTarget(a)}
-                        className="text-violet-600 hover:underline font-semibold">
-                        멘티 배정
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>완료 {completed}/{planned}회 · 원천 {a.tax_type}</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => void handleCopyMentorLink(a.mentor_access_token, getMentorName(a))}
-                          title="멘토 링크 복사"
-                          className="inline-flex items-center justify-center w-6 h-6 rounded text-slate-500 hover:bg-violet-100 hover:text-violet-700"
-                        >
-                          <Copy size={11} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSessionTarget({ assignmentId: a.id, mentorName: getMentorName(a), session: null })}
-                          className="text-[10px] font-semibold text-violet-700 hover:underline"
-                        >
-                          보고서 추가
-                        </button>
-                        {/* 박경수님 2026-05-26 — 강사료 확인서 PDF */}
-                        <button
-                          type="button"
-                          onClick={() => void handleDownloadMentorFee(a)}
-                          disabled={feeDownloadingId === a.id || !!feeBatchProgress}
-                          title="강사료 확인서 PDF 다운로드"
-                          className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-700 hover:underline disabled:opacity-50"
-                        >
-                          {feeDownloadingId === a.id
-                            ? <Loader2 size={10} className="animate-spin" />
-                            : <FileDown size={10} aria-hidden="true" />}
-                          강사료 PDF
-                        </button>
-                        {/* STEP-MENTOR-PORTAL-FULL — 펼침 토글 */}
-                        <button type="button"
-                          onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}
-                          aria-label={expandedId === a.id ? '접기' : '펼치기'}
-                          className="inline-flex items-center justify-center w-6 h-6 rounded text-slate-500 hover:bg-violet-100 hover:text-violet-700">
-                          {expandedId === a.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                        </button>
-                      </div>
-                    </div>
-                    {/* STEP-MENTOR-PORTAL-FULL — 펼친 영역 (멘티 + 최근 일지 3건 + 연관 일지) */}
-                    {expandedId === a.id && (
-                      <MentoringLogCard assignmentId={a.id} menteeIds={a.mentee_ids ?? []}
-                        allAssignments={assignments} />
-                    )}
-                  </li>
-                );
-              })}
+              {assignments.map((a) => (
+                <MentorAssignmentCard
+                  key={a.id} a={a} allAssignments={assignments}
+                  expanded={expandedId === a.id} setExpanded={setExpandedId}
+                  setSessionTarget={setSessionTarget} setMenteeTarget={setMenteeTarget}
+                  handleCopyMentorLink={handleCopyMentorLink}
+                  handleDownloadMentorFee={handleDownloadMentorFee}
+                  handleDownloadMentorLogs={handleDownloadMentorLogs}
+                  feeDownloadingId={feeDownloadingId} feeBatchProgress={feeBatchProgress}
+                  logBatchLoading={logBatchLoading} toast={toast}
+                />
+              ))}
             </ul>
           </CardContent>
         </Card>
