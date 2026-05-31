@@ -10,7 +10,7 @@ import { formatDateKo } from '../../../lib/utils';
 import { getMentorName, MENTORING_LOG_STATUS_LABEL, MENTORING_LOG_STATUS_STYLE } from '../../../types/mentoring';
 import type { MentoringAssignment, MentoringLog } from '../../../types/mentoring';
 import { fetchLogForPdf } from './mentoringLogPdfFetch';
-import { downloadMentoringLogPdf } from './mentoringLogPdf';
+import { downloadMentoringLogPdf, printMentoringLogViaNewWindow } from './mentoringLogPdf';
 import { approveMentoringLog, rejectMentoringLog } from './mentoringLogApproval';
 import MentoringRejectModal from './MentoringRejectModal';
 import { hasRole } from '../../../constants/roles';
@@ -90,12 +90,22 @@ export default function MentoringLogCard({ assignmentId, menteeIds, allAssignmen
     try {
       const data = await fetchLogForPdf(logId);
       if (!data) { toast.error('일지 정보를 불러오지 못했어요.'); return; }
-      await downloadMentoringLogPdf(data);
-      toast.success('PDF 다운로드가 시작됐어요.');
+      // 박경수님 2026-05-29 — html2canvas v1~v5 모두 박경수님 환경에서 백지.
+      // 새 창 + 브라우저 인쇄 fallback 으로 교체. 사용자가 "PDF 로 저장" 선택.
+      try {
+        printMentoringLogViaNewWindow(data);
+        toast.success('인쇄창에서 "PDF 로 저장" 을 선택해 주세요.');
+      } catch (printErr) {
+        const raw = printErr instanceof Error ? printErr.message : '';
+        console.error('[mentoring-log-card] 인쇄창 호출 실패:', raw);
+        // 팝업 차단 시 기존 html2pdf 시도 (v5)
+        await downloadMentoringLogPdf(data);
+        toast.success('PDF 다운로드가 시작됐어요.');
+      }
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[mentoring-log-card] PDF 생성 실패:', raw);
-      toast.error('PDF 생성 중 오류가 발생했어요.');
+      toast.error(raw || 'PDF 생성 중 오류가 발생했어요.');
     } finally {
       setDownloadingId(null);
     }

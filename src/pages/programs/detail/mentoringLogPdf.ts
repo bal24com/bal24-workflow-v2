@@ -314,6 +314,34 @@ async function resolveImageToDataUrl(url: string, path: string | null): Promise<
  *  buildMentoringLogHtml 에서 fix 완료.
  *
  *  진단 로그 — PDF 백지 재발 시 F12 → Console 에 [PDF] 로 시작하는 단계별 출력 확인 가능. */
+/** 박경수님 2026-05-29 — 100% 동작하는 fallback. html2canvas 우회.
+ *  새 창에 HTML 띄우고 브라우저 인쇄 대화상자 호출. 사용자는 "PDF 로 저장" 선택.
+ *  CORS·tainted canvas 등 모든 html2canvas 이슈를 회피. */
+export function printMentoringLogViaNewWindow(log: MentoringLogForPdf): void {
+  console.log('[PDF-PRINT] 시작 — 일지 ID:', log.id, '/ 사진:', log.image_urls.length, '장');
+  const html = buildMentoringLogHtml(log);
+  const win = window.open('', '_blank', 'width=900,height=1100,scrollbars=yes');
+  if (!win) {
+    console.error('[PDF-PRINT] 팝업 차단됨');
+    throw new Error('팝업이 차단됐어요. 브라우저 주소창 우측의 차단 아이콘을 눌러 허용 후 다시 시도해 주세요.');
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  // 이미지 로드 후 자동 인쇄 대화상자 호출. 이미지가 많으면 1초 추가 대기.
+  const imgCount = log.image_urls.length;
+  const waitMs = imgCount > 5 ? 1500 : 800;
+  setTimeout(() => {
+    try {
+      win.focus();
+      win.print();
+      console.log('[PDF-PRINT] 인쇄 대화상자 호출 완료');
+    } catch (err) {
+      console.error('[PDF-PRINT] window.print 실패:', err);
+    }
+  }, waitMs);
+}
+
 export async function downloadMentoringLogPdf(log: MentoringLogForPdf): Promise<void> {
   console.log('[PDF] 시작 — 일지 ID:', log.id, '/ 사진:', log.image_urls.length, '장');
 

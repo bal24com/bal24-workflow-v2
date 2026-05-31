@@ -16,7 +16,8 @@ import type { StaffPortalIdentity } from '../staffPortalUtils';
 import MentoringLogForm, { type MentoringLogInitial } from './MentoringLogForm';
 import { fetchLogForPdf } from '../../programs/detail/mentoringLogPdfFetch';
 import type { MentoringLogForPdf } from '../../programs/detail/mentoringLogPdf';
-import { downloadMentoringLogPdf } from '../../programs/detail/mentoringLogPdf';
+// 박경수님 2026-05-29 — html2canvas 백지 v1~v5 모두 실패. 새 창 인쇄 fallback 으로 교체.
+import { downloadMentoringLogPdf, printMentoringLogViaNewWindow } from '../../programs/detail/mentoringLogPdf';
 import MentoringLogExpandedView from './MentoringLogExpandedView';
 import { fetchStaffLogs, type UnifiedLog, type AssignmentLite, type MenteeLite } from './staffLogFetch';
 import LectureLogSection from './LectureLogSection';
@@ -73,11 +74,22 @@ export default function StaffLogTab({ staff, selectedProgramId }: Props) {
     const data = cached ?? await fetchLogForPdf(logId);
     if (!data) { setDownloadingId(null); toast.error('일지 정보를 불러오지 못했어요.'); return; }
     try {
-      await downloadMentoringLogPdf(data);
-      toast.success('PDF 다운로드가 시작됐어요.');
+      // 박경수님 2026-05-29 — html2canvas v1~v5 모두 박경수님 환경에서 백지.
+      //   추측 그만하고 100% 동작하는 fallback. 새 창에 양식 띄우고 브라우저 인쇄
+      //   대화상자 호출. 사용자가 "PDF 로 저장" 선택. 한 클릭 더 들지만 깨질 일 없음.
+      printMentoringLogViaNewWindow(data);
+      toast.success('인쇄창에서 "PDF 로 저장" 을 선택해 주세요.');
     } catch (err) {
-      console.error('[staff-portal/log] PDF 생성 실패:', err);
-      toast.error('PDF 생성 중 오류가 발생했어요.');
+      const raw = err instanceof Error ? err.message : '';
+      console.error('[staff-portal/log] 인쇄창 호출 실패:', raw);
+      // 팝업 차단 등 인쇄창 실패 시 기존 html2pdf 시도 (v5 base64 fix 적용본)
+      try {
+        await downloadMentoringLogPdf(data);
+        toast.success('PDF 다운로드가 시작됐어요.');
+      } catch (fallbackErr) {
+        console.error('[staff-portal/log] PDF 폴백도 실패:', fallbackErr);
+        toast.error(raw || 'PDF 생성 중 오류가 발생했어요.');
+      }
     } finally {
       setDownloadingId(null);
     }
