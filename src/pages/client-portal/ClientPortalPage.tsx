@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { isProjectExpired } from '../../lib/portalExpiry';
 import type { PortalItem, ProjectPortal } from '../../types/database';
 import ClientPortalItem from './ClientPortalItem';
 import { usePMViewer } from '../../hooks/usePMViewer';
@@ -38,6 +39,8 @@ export default function ClientPortalPage() {
       setItems((p.items ?? []).sort((a, b) => a.sort_order - b.sort_order));
       if (!p.is_active) { setScreen('closed'); return; }
       if (p.expires_at && new Date(p.expires_at).getTime() < Date.now()) { setScreen('expired'); return; }
+      // 박경수님 2026-05-29 STEP-PORTAL-EXPIRY — 프로젝트 종료 시 포털 자동 만료.
+      if (await isProjectExpired(p.project_id)) { setScreen('expired'); return; }
       setScreen('ready');
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';

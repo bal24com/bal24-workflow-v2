@@ -156,6 +156,9 @@ export interface StaffPool {
   staff_portal_token?: string | null;
   /** STEP-MENTORING-P3-APPROVE — 도장/사인 이미지 URL (signatures 버킷) */
   signature_url?: string | null;
+  /** STEP-PORTAL-EXPIRY — PIN 잠금 해제 시각 (5회 실패 시 60초). 박경수님 2026-05-29 */
+  pin_locked_until?: string | null;
+  pin_fail_count?: number | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;

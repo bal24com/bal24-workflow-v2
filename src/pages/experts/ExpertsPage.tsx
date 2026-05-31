@@ -66,6 +66,13 @@ function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity, onR
                   {s.staff_type}
                 </span>
               )}
+              {/* 박경수님 2026-05-29 STEP-PORTAL-EXPIRY — PIN 잠금 배지 (현재 시각 < pin_locked_until). */}
+              {s.pin_locked_until && new Date(s.pin_locked_until).getTime() > Date.now() && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 border border-rose-200"
+                  title="PIN 5회 실패 잠금 상태 — [PIN 초기화] 클릭 시 해제">
+                  🔒 PIN 잠김
+                </span>
+              )}
             </CardTitle>
             <CardDescription>
               {[s.organization, s.position].filter(Boolean).join(' · ') || '소속·직책 미지정'}
@@ -245,12 +252,26 @@ export default function ExpertsPage() {
     });
   }, [experts, role, search]);
 
+  // 박경수님 2026-05-29 STEP-PORTAL-EXPIRY — PIN 잠금 강사 카운트.
+  //   잠금 시각 (pin_locked_until) 이 현재 시각보다 미래면 잠긴 상태.
+  const lockedCount = experts.filter((s) =>
+    s.pin_locked_until && new Date(s.pin_locked_until).getTime() > Date.now(),
+  ).length;
+
   return (
     <div className="space-y-5 max-w-[1400px]">
-      <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
-        <span aria-hidden="true">👥</span>
-        전문가
-      </h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-2xl font-bold text-[#1E1B4B] flex items-center gap-2">
+          <span aria-hidden="true">👥</span>
+          전문가
+        </h1>
+        {lockedCount > 0 && (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200"
+            title="PIN 5회 실패로 잠긴 강사 — 카드 [PIN 초기화] 버튼으로 즉시 해제 가능">
+            🔒 잠긴 강사 {lockedCount}명 — [PIN 초기화] 한 번이면 해제돼요.
+          </span>
+        )}
+      </div>
 
       {/* 박경수님 2026-05-26 STEP-EXPERTS-UI-REFINE — TagFilterTabs·FIELD_FILTERS 제거. 역할(staff_type) 1행만. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
