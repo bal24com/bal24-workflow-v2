@@ -63,7 +63,7 @@ type TabKey = 'overview' | 'members' | 'programs' | 'assign' | 'tasks' | 'estima
 
 // STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27) — [참여사] 탭 신규 (개요 다음).
 const TAB_LIST: Array<{ key: TabKey; label: string; Icon: typeof Briefcase }> = [
-  { key: 'overview', label: '개요', Icon: Building2 },
+  { key: 'overview', label: '기본 정보', Icon: Building2 },
   { key: 'members', label: '참여사', Icon: Users },
   { key: 'programs', label: '프로그램', Icon: GraduationCap },
   // 박경수님 2026-05-28 — 참여사 ↔ 프로그램 배정

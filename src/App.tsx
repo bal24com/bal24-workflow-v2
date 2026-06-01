@@ -242,8 +242,11 @@ export default function App() {
               <Route path="/forms" element={<FormManagePage />} />
 
               {/* 교육생 신청·모집 공고 (STEP 11 옵션 B) */}
+              {/* 박경수님 2026-05-29 STEP-MENU-REFACTOR Phase 4 — 모집·신청 통합 라우트.
+                  사이드바 메뉴 1개 (/applications) → 페이지 내부에서 신청·모집 모두 처리. */}
               <Route path="/applications" element={<ApplicationPage />} />
               <Route path="/recruit-manage" element={<RecruitPage />} />
+              <Route path="/recruitment"    element={<Navigate to="/applications" replace />} />
 
               {/* 고객 문서 포털 (STEP 15) */}
               <Route path="/portals" element={<PortalManagePage />} />

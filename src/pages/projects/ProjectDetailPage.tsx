@@ -31,16 +31,17 @@ type DetailProject = Project & {
 
 type TabKey = 'overview' | 'programs' | 'tasks' | 'estimate' | 'grant' | 'docs' | 'members' | 'portal';
 
+// 박경수님 2026-05-29 STEP-MENU-REFACTOR Phase 2 — 탭 레이블 일관화 (첫 탭 = 기본 정보).
 const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
-  { key: 'overview', label: '개요',     Icon: Info },
-  { key: 'programs', label: '프로그램', Icon: BookOpen },
-  { key: 'tasks',    label: '태스크',   Icon: ClipboardList },
+  { key: 'overview', label: '기본 정보', Icon: Info },
+  { key: 'programs', label: '프로그램',  Icon: BookOpen },
+  { key: 'tasks',    label: '할 일',     Icon: ClipboardList },
   // STEP-ACCOUNTING-FOLLOWUP7-Phase2 — 견적 탭
-  { key: 'estimate', label: '견적',     Icon: FileText },
-  { key: 'grant',    label: '지원금',   Icon: Wallet },
-  { key: 'docs',     label: '문서',     Icon: FolderArchive },
-  { key: 'members',  label: '참여인력', Icon: Users },
-  { key: 'portal',   label: '포털',     Icon: Link2 },
+  { key: 'estimate', label: '견적',      Icon: FileText },
+  { key: 'grant',    label: '지원금',    Icon: Wallet },
+  { key: 'docs',     label: '파일·문서', Icon: FolderArchive },
+  { key: 'members',  label: '투입 인력', Icon: Users },
+  { key: 'portal',   label: '외부 공유', Icon: Link2 },
 ];
 
 // projects → profiles FK가 두 개(pm_id, created_by) 있어 명시적 별칭 필요 (PGRST201 방지)

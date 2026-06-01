@@ -22,7 +22,8 @@ import {
   FileText,
   ClipboardCheck,
   UserPlus,
-  Megaphone,
+  CreditCard,
+  Share2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -44,55 +45,54 @@ type MenuSection = {
   items: MenuItem[];
 };
 
-// SECTIONS — 박경수님 2026-05-29 STEP-SIDEBAR-WORKFLOW 업무 프로세스 기준 5단계 + 시스템.
-// 그룹 헤더가 실제 사업 진행 순서 (수주 → 준비 → 운영 → 정산 → 시스템) 와 매칭되어
-// 사이드바 위→아래 = 사업 진행 흐름.
+// SECTIONS — 박경수님 2026-05-29 STEP-MENU-REFACTOR — 6그룹 + 메뉴명 명료화.
+// 홈 / 사업 관리 / 운영 / 모집 관리 / 재무 / 설정.
 const SECTIONS: MenuSection[] = [
   {
     heading: '홈',
     items: [
-      { to: '/home',     label: '대시보드', Icon: LayoutDashboard },
-      { to: '/schedule', label: '달력',     Icon: CalendarDays },
+      { to: '/home',     label: '홈',   Icon: LayoutDashboard },
+      { to: '/schedule', label: '일정', Icon: CalendarDays },
     ],
   },
   {
-    heading: '① 수주·기획',
+    heading: '사업 관리',
     items: [
-      { to: '/projects',   label: '프로젝트',     Icon: FolderKanban },
-      { to: '/consortium', label: '컨소시엄',     Icon: Building2 },
-      { to: '/contracts',  label: '수입·계약',    Icon: FileText },
-      { to: '/clients',    label: '거래처',       Icon: Briefcase },
+      { to: '/projects',   label: '사업',     Icon: FolderKanban },
+      { to: '/clients',    label: '기관',     Icon: Briefcase },
+      { to: '/consortium', label: '컨소시엄', Icon: Building2 },
+      { to: '/contracts',  label: '계약',     Icon: FileText },
     ],
   },
   {
-    heading: '② 사업 준비',
+    heading: '운영',
     items: [
-      { to: '/programs',        label: '프로그램',   Icon: BookOpen },
-      { to: '/experts',         label: '전문가',     Icon: Users },
-      // 박경수님 2026-05-29 — 사전 세팅 메뉴 보강. 신청 접수·강사 모집은 운영 전 가장 먼저 만지는 영역.
-      { to: '/applications',    label: '신청 관리',  Icon: UserPlus },
-      { to: '/recruit-manage',  label: '모집 공고',  Icon: Megaphone },
+      { to: '/programs', label: '프로그램',  Icon: BookOpen },
+      { to: '/experts',  label: '강사·멘토', Icon: Users },
+      // 박경수님 2026-05-29 STEP-MENU-REFACTOR Phase 3 — 포털 외부 공유 사이드바 노출.
+      { to: '/portals',  label: '외부 공유', Icon: Share2 },
+      // 강사 포털 (외부 새 탭) — 강사 본인 진입용
+      { to: '/portal',   label: '강사 포털', Icon: ExternalLink, external: true },
     ],
   },
   {
-    heading: '③ 사업 운영',
+    heading: '모집 관리',
     items: [
-      // 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — 강사 포털 고정 URL (외부 새 탭)
-      { to: '/portal', label: '강사 포털', Icon: ExternalLink, external: true },
-      { to: '/ai',     label: 'AI 초안',   Icon: Sparkles },
+      { to: '/applications', label: '모집·신청', Icon: UserPlus },
     ],
   },
   {
-    heading: '④ 정산·보고',
+    heading: '재무',
     items: [
-      { to: '/payroll', label: '외주·급여',     Icon: Users },
-      { to: '/reports', label: '재무 대시보드', Icon: BarChart3 },
+      { to: '/payroll', label: '지급 관리', Icon: CreditCard },
+      { to: '/reports', label: '재무 현황', Icon: BarChart3 },
     ],
   },
   {
-    heading: '⚙️ 시스템',
+    heading: '설정',
     items: [
-      { to: '/members', label: '팀원 관리', Icon: UserCog },
+      { to: '/ai',      label: 'AI 작성',  Icon: Sparkles },
+      { to: '/members', label: '팀원',     Icon: UserCog },
     ],
   },
 ];
@@ -101,7 +101,7 @@ const SECTIONS: MenuSection[] = [
 const ADMIN_EXTRA: MenuSection = {
   heading: '관리',
   items: [
-    { to: '/admin', label: '휴지통·관리', Icon: Trash2 },
+    { to: '/admin', label: '휴지통', Icon: Trash2 },
   ],
 };
 

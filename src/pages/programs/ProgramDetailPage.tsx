@@ -56,21 +56,22 @@ interface TabDef {
   hide?: (c: AuthCtx) => boolean;
 }
 
+// 박경수님 2026-05-29 STEP-MENU-REFACTOR Phase 2 — 탭 레이블 일관화 (첫 탭 = 기본 정보).
 const TABS: TabDef[] = [
-  { key: 'overview',     label: '개요',         Icon: Info },
-  { key: 'curriculum',   label: '커리큘럼',     Icon: BookOpen,        hide: (c) => c.isMember || c.isPartner },
+  { key: 'overview',     label: '기본 정보',    Icon: Info },
+  { key: 'curriculum',   label: '강의 계획',    Icon: BookOpen,        hide: (c) => c.isMember || c.isPartner },
   { key: 'participants', label: '교육생',       Icon: Users2,          hide: (c) => c.isMember || c.isPartner },
   { key: 'instructor',   label: '강사',         Icon: Mic2 },
   // STEP-MENTORING-FULL — 멘토링 메인 탭 (PM/Staff)
   { key: 'mentoring',    label: '멘토링',       Icon: MessageSquare,   hide: (c) => c.isMember || c.isPartner },
   // 박경수님 요청 — 호텔/버스/재료비 지급요청 (운영 지출 → payroll_expenses)
-  { key: 'payment',      label: '지급요청',     Icon: ReceiptText,     hide: (c) => c.isMember || c.isPartner },
+  { key: 'payment',      label: '지급 요청',    Icon: ReceiptText,     hide: (c) => c.isMember || c.isPartner },
   { key: 'report',       label: '만족도·보고',  Icon: FileBarChart,
     hide: (c) => !c.isPM && !c.hasSurveyData && (c.isMember || c.isPartner) },
   // STEP-PROGRAM-REPORT-TAB — 결과보고서 (6섹션 자동집계·편집)
   { key: 'final-report', label: '결과보고서',   Icon: FileText,        hide: (c) => c.isMember || c.isPartner },
   // STEP-TAB-RESTRUCTURE-B — activity-log + grant 흡수. PM만 접근 (활동·지원금·멘토링·파일 등 운영 메뉴)
-  { key: 'settings',     label: '설정·공유',    Icon: Settings,        hide: (c) => !c.isPM },
+  { key: 'settings',     label: '외부 공유',    Icon: Settings,        hide: (c) => !c.isPM },
 ];
 
 const SELECT_COLUMNS = '*, project:projects(id,name,status)';
