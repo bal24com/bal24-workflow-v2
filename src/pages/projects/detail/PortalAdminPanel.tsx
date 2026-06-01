@@ -8,6 +8,10 @@ import { useToast } from '../../../contexts/ToastContext';
 import { copyToClipboard } from '../../../lib/clipboard';
 import { ROLE_LABEL, ITEM_TYPE_LABEL, buildPortalUrl, type PortalRole } from '../../portal/portalUtils';
 import PortalItemFormModal from '../../portal/PortalItemFormModal';
+// 박경수님 2026-05-30 STEP-PORTAL-EXTERNAL-SHARE — 외부 공유 시스템 3섹션
+import PortalIntroSection from './PortalIntroSection';
+import PortalBeneficiarySection from './PortalBeneficiarySection';
+import PortalSurveyConfigSection, { type SurveyConfig } from './PortalSurveyConfigSection';
 
 interface PortalRow {
   id: string;
@@ -17,6 +21,10 @@ interface PortalRow {
   beneficiary_token: string | null;
   participant_token: string | null;
   beneficiary_pin: string | null;
+  // 박경수님 2026-05-30 — 외부 공유 안내·설문
+  intro_title: string | null;
+  intro_content: string | null;
+  survey_config: SurveyConfig | null;
 }
 
 interface TeamRow { id: string; team_code: string; team_name: string }
@@ -59,7 +67,7 @@ export default function PortalAdminPanel({ portalId, onClose }: Props) {
     setLoading(true);
     const [pRes, tRes, iRes] = await Promise.all([
       supabase.from('project_portals')
-        .select('id, title, operator_token, supporter_token, beneficiary_token, participant_token, beneficiary_pin')
+        .select('id, title, operator_token, supporter_token, beneficiary_token, participant_token, beneficiary_pin, intro_title, intro_content, survey_config')
         .eq('id', portalId).maybeSingle(),
       supabase.from('portal_teams').select('id, team_code, team_name')
         .eq('portal_id', portalId).order('team_code'),
@@ -269,6 +277,25 @@ export default function PortalAdminPanel({ portalId, onClose }: Props) {
               ))}
             </div>
           </section>
+
+          {/* 박경수님 2026-05-30 STEP-PORTAL-EXTERNAL-SHARE — 외부 공유 시스템 3섹션 */}
+          <div className="border-t border-slate-100 pt-6 mt-2 space-y-6">
+            <div className="text-[10px] font-bold tracking-widest uppercase text-slate-400">
+              외부 공유 시스템 (수혜기관 신청 흐름)
+            </div>
+            <PortalIntroSection
+              portalId={portalId}
+              introTitle={portal.intro_title ?? ''}
+              introContent={portal.intro_content ?? ''}
+              onSaved={reload}
+            />
+            <PortalBeneficiarySection portalId={portalId} />
+            <PortalSurveyConfigSection
+              portalId={portalId}
+              surveyConfig={portal.survey_config ?? {}}
+              onSaved={reload}
+            />
+          </div>
         </div>
       </div>
 
