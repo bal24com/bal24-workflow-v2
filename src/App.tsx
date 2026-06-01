@@ -71,6 +71,8 @@ const SettlementPage       = lazy(() => import('./pages/settlements/SettlementPa
 const CheckInPage           = lazy(() => import('./pages/attendance-checkin/CheckInPage'));
 const PublicFormPage        = lazy(() => import('./pages/public-form/PublicFormPage'));
 const ClientPortalPage      = lazy(() => import('./pages/client-portal/ClientPortalPage'));
+// 박경수님 2026-05-29 STEP-PORTAL-MULTI-ROLE — 5단계 역할 통합 외부 포털
+const PortalPublicPage      = lazy(() => import('./pages/portal/PortalPublicPage'));
 const InstructorInvitePage  = lazy(() => import('./pages/instructor-portal/InstructorInvitePage'));
 const ParticipantPortalPage = lazy(() => import('./pages/public-participant/ParticipantPortalPage'));
 const CurriculumInvitePage  = lazy(() => import('./pages/curriculum-invite/CurriculumInvitePage'));
@@ -143,7 +145,9 @@ export default function App() {
             <Route path="/program-portal/:token" element={<SchoolPortalPage />} />
             <Route path="/survey-respond/:surveyId" element={<SurveyFormPage />} />
             <Route path="/project-portal/:token" element={<SupervisorPortalPage />} />
-            <Route path="/portal/:token" element={<ClientPortalPage />} />
+            {/* 박경수님 2026-05-29 STEP-PORTAL-MULTI-ROLE — 5단계 역할 통합. 기존 ClientPortalPage 는 /legacy-portal 로 이전. */}
+            <Route path="/portal/:token" element={<PortalPublicPage />} />
+            <Route path="/legacy-portal/:token" element={<ClientPortalPage />} />
             {/* STEP-ACCOUNTING-ALL P4 — 회계사무소 외부 검토 포털 */}
             <Route path="/accounting-review/:token" element={<AccountingReviewPortal />} />
             <Route path="/invitation/:token" element={<InstructorInvitePage />} />
