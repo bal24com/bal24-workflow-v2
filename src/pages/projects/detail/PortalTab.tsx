@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Plus, Loader2, Link2, Copy, Edit3, Power, PowerOff,
+  Plus, Loader2, Link2, Copy, Edit3, Power, PowerOff, Settings,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
@@ -12,6 +12,8 @@ import { getPortalUrl, STAGE_LABELS } from '../../portal/portalConstants';
 import type { ProjectPortal } from '../../../types/database';
 import PortalCreateModal from '../../portal/PortalCreateModal';
 import PortalResponsesPanel from '../../portal/PortalResponsesPanel';
+// 박경수님 2026-05-29 STEP-PORTAL-MULTI-ROLE 2차 — 관리 패널
+import PortalAdminPanel from './PortalAdminPanel';
 
 type Props = {
   projectId: string;
@@ -32,6 +34,8 @@ export default function PortalTab({ projectId, clientId }: Props) {
   const [editing, setEditing] = useState<ProjectPortal | null>(null);
   const [activePortal, setActivePortal] = useState<PortalRow | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  // 박경수님 2026-05-29 STEP-PORTAL-MULTI-ROLE 2차 — 관리 패널 대상
+  const [adminPortalId, setAdminPortalId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -141,6 +145,11 @@ export default function PortalTab({ projectId, clientId }: Props) {
                       className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-500 hover:bg-slate-50">
                       <Edit3 size={11} />수정
                     </button>
+                    {/* 박경수님 2026-05-29 — 5단계 역할 관리 패널 (토큰·PIN·팀·체크리스트) */}
+                    <button type="button" onClick={() => setAdminPortalId(p.id)}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-violet-600 hover:bg-violet-50 font-semibold">
+                      <Settings size={11} />관리
+                    </button>
                     <button type="button" onClick={() => void toggleActive(p)}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-500 hover:bg-slate-50 ml-auto">
                       {p.is_active ? <><PowerOff size={11} />비활성</> : <><Power size={11} />활성</>}
@@ -166,6 +175,10 @@ export default function PortalTab({ projectId, clientId }: Props) {
         portal={activePortal}
         onClose={() => setActivePortal(null)}
       />
+      {/* 박경수님 2026-05-29 — 5단계 역할 관리 패널 */}
+      {adminPortalId && (
+        <PortalAdminPanel portalId={adminPortalId} onClose={() => { setAdminPortalId(null); void fetchData(); }} />
+      )}
     </div>
   );
 }
