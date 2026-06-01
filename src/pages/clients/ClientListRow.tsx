@@ -13,6 +13,8 @@ interface Props {
   onView: (c: ClientRow) => void;
   onEdit: (c: ClientRow) => void;
   onDelete: (c: ClientRow) => void;
+  /** 박경수님 2026-05-29 STEP-CLEANUP — 연관 사업 드로어 (optional, 리스트에서는 미사용 가능) */
+  onShowProjects?: (c: ClientRow) => void;
 }
 
 function formatBusinessNumber(raw?: string | null): string {

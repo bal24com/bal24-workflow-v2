@@ -33,6 +33,7 @@ import {
 import { isReverseConsortium } from './consortiumMembersUtils';
 import ConOverviewTab from './detail/ConOverviewTab';
 import ConMembersTab from './detail/ConMembersTab';
+import ConEquityTab from './detail/ConEquityTab';
 import ConProgramsTab from './detail/ConProgramsTab';
 // 박경수님 2026-05-28 STEP-CONSORTIUM-PROGRAM-ASSIGN — 참여사 ↔ 프로그램 배정
 import ConProgramAssignTab from './detail/ConProgramAssignTab';
@@ -59,12 +60,14 @@ interface ConsortiumDetail {
   project: { id: string; name: string } | null;
 }
 
-type TabKey = 'overview' | 'members' | 'programs' | 'assign' | 'tasks' | 'estimate' | 'finance' | 'staff' | 'links' | 'portal' | 'files';
+type TabKey = 'overview' | 'members' | 'equity' | 'programs' | 'assign' | 'tasks' | 'estimate' | 'finance' | 'staff' | 'links' | 'portal' | 'files';
 
 // STEP-CONSORTIUM-REDESIGN (박경수님 2026-05-27) — [참여사] 탭 신규 (개요 다음).
 const TAB_LIST: Array<{ key: TabKey; label: string; Icon: typeof Briefcase }> = [
   { key: 'overview', label: '기본 정보', Icon: Building2 },
   { key: 'members', label: '참여사', Icon: Users },
+  // 박경수님 2026-05-29 STEP-CLEANUP — 지분·정산 통합 탭
+  { key: 'equity', label: '지분·정산', Icon: Wallet },
   { key: 'programs', label: '프로그램', Icon: GraduationCap },
   // 박경수님 2026-05-28 — 참여사 ↔ 프로그램 배정
   { key: 'assign', label: '프로그램 배정', Icon: Briefcase },
@@ -177,6 +180,7 @@ export default function ConsortiumDetailPage() {
   const TabContent: Record<TabKey, ReactNode> = {
     overview: <ConOverviewTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} description={consortium.description} />,
     members:  <ConMembersTab  consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} />,
+    equity:   <ConEquityTab   consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} />,
     programs: <ConProgramsTab consortiumId={id} members={members} />,
     // 박경수님 2026-05-28 STEP-CONSORTIUM-PROGRAM-ASSIGN — 참여사 ↔ 프로그램 배정
     assign: <ConProgramAssignTab consortiumId={id} projectId={consortium.project_id ?? null} />,

@@ -19,6 +19,8 @@ import { copyToClipboard } from '../../lib/clipboard';
 import type { StaffPool, StaffType } from '../../types/database';
 import ExpertFormModal from './ExpertFormModal';
 import ExpertActivityDrawer from './ExpertActivityDrawer';
+// 박경수님 2026-05-29 STEP-CLEANUP Phase 2 — 강사·멘토 지급 내역 드로어
+import ExpertPaymentDrawer from './ExpertPaymentDrawer';
 import ExpertListRow from './ExpertListRow';
 import ExpertRecentPrograms from './ExpertRecentPrograms';
 import { fetchRecentProgramsForExperts, type ExpertProgramRef } from './expertProgramsFetch';
@@ -41,7 +43,7 @@ function expertMatchesRole(s: StaffPool, filter: RoleFilter): boolean {
   return s.staff_type === filter;
 }
 
-function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity, onResetPin, recentPrograms }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void; onShowActivity: () => void; onResetPin: () => void; recentPrograms?: ExpertProgramRef[] }) {
+function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity, onShowPayment, onResetPin, recentPrograms }: { s: StaffPool; onEdit: () => void; onDelete: () => void; onCopyPortal: () => void; onShowActivity: () => void; onShowPayment: () => void; onResetPin: () => void; recentPrograms?: ExpertProgramRef[] }) {
   return (
     // STEP-CLIENT-EXPERT-CARD — 고객사 카드와 동일한 min-h
     <Card className="group hover:border-primary/30 hover:shadow-md transition min-h-[260px] flex flex-col">
@@ -117,6 +119,12 @@ function ExpertGridCard({ s, onEdit, onDelete, onCopyPortal, onShowActivity, onR
           className="inline-flex items-center justify-center w-8 h-8 rounded-md text-cyan-600 border border-cyan-200 bg-white hover:bg-cyan-50 transition-colors">
           <Activity size={13} aria-hidden="true" />
         </button>
+        {/* 박경수님 2026-05-29 STEP-CLEANUP — 지급 내역 드로어 */}
+        <button type="button" onClick={(e) => { e.stopPropagation(); onShowPayment(); }}
+          aria-label="지급 내역" title="지급 내역"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-emerald-600 border border-emerald-200 bg-white hover:bg-emerald-50 transition-colors">
+          💰
+        </button>
         <button type="button" onClick={(e) => { e.stopPropagation(); onResetPin(); }}
           aria-label="PIN 초기화" title="PIN 을 전화번호 끝 6자리로 초기화"
           className="inline-flex items-center justify-center w-8 h-8 rounded-md text-amber-700 border border-amber-200 bg-white hover:bg-amber-50 transition-colors">
@@ -152,6 +160,8 @@ export default function ExpertsPage() {
   const [editTarget, setEditTarget] = useState<StaffPool | null>(null);
   // STEP-STAFF-PORTAL-P4 — 활동 이력 드로어 대상
   const [activityTarget, setActivityTarget] = useState<StaffPool | null>(null);
+  // 박경수님 2026-05-29 STEP-CLEANUP Phase 2 — 지급 내역 드로어 대상
+  const [paymentTarget, setPaymentTarget] = useState<StaffPool | null>(null);
   // 박경수님 2026-05-26 STEP-EXPERTS-UI-REFINE — 카드별 최근 참여 프로그램 (staff_id → ExpertProgramRef[])
   const [programsByStaff, setProgramsByStaff] = useState<Map<string, ExpertProgramRef[]>>(new Map());
 
@@ -354,6 +364,7 @@ export default function ExpertsPage() {
               onDelete={() => void handleDelete(s)}
               onCopyPortal={() => void handleCopyPortalLink(s)}
               onShowActivity={() => setActivityTarget(s)}
+              onShowPayment={() => setPaymentTarget(s)}
               onResetPin={() => void handleResetPin(s)}
               recentPrograms={programsByStaff.get(s.id)} />
           ))}
@@ -366,6 +377,7 @@ export default function ExpertsPage() {
               onDelete={() => void handleDelete(s)}
               onCopyPortal={() => void handleCopyPortalLink(s)}
               onShowActivity={() => setActivityTarget(s)}
+              onShowPayment={() => setPaymentTarget(s)}
               onResetPin={() => void handleResetPin(s)}
               recentPrograms={programsByStaff.get(s.id)} />
           ))}
@@ -381,6 +393,8 @@ export default function ExpertsPage() {
 
       {/* STEP-STAFF-PORTAL-P4 — 활동 이력 드로어 */}
       <ExpertActivityDrawer expert={activityTarget} onClose={() => setActivityTarget(null)} />
+      {/* 박경수님 2026-05-29 STEP-CLEANUP — 지급 내역 드로어 */}
+      <ExpertPaymentDrawer expert={paymentTarget} onClose={() => setPaymentTarget(null)} />
     </div>
   );
 }

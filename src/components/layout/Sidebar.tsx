@@ -71,8 +71,8 @@ const SECTIONS: MenuSection[] = [
       { to: '/experts',  label: '강사·멘토', Icon: Users },
       // 박경수님 2026-05-29 STEP-MENU-REFACTOR Phase 3 — 포털 외부 공유 사이드바 노출.
       { to: '/portals',  label: '외부 공유', Icon: Share2 },
-      // 강사 포털 (외부 새 탭) — 강사 본인 진입용
-      { to: '/portal',   label: '강사 포털', Icon: ExternalLink, external: true },
+      // 박경수님 2026-05-29 STEP-CLEANUP — 강사 포털 사이드바 항목 제거 완료.
+      // 강사 포털은 /portal 라우트로 유지하되, PM 은 [강사·멘토] 카드의 [링크 복사] 로 강사에게 전달.
     ],
   },
   {
@@ -130,8 +130,7 @@ const PARTNER_SECTIONS: MenuSection[] = [
       { to: '/ai',   label: 'AI',   Icon: Sparkles },
       // 박경수님 + SkyClaw STEP-PAYROLL-MYPAGE (2026-05-28) — 본인 급여명세서
       { to: '/my-payroll', label: '내 급여명세서', Icon: FileText },
-      // 박경수님 2026-05-26 STEP-STAFF-PORTAL-PIN-GATEWAY — 강사 포털 고정 URL (외부 새 탭)
-      { to: '/portal', label: '강사 포털', Icon: ExternalLink, external: true },
+      // 박경수님 2026-05-29 STEP-CLEANUP — 강사 포털 사이드바 항목 제거 (외부 토큰 전용).
     ],
   },
 ];

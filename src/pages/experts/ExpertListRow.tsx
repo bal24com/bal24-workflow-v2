@@ -11,12 +11,14 @@ interface Props {
   onDelete: () => void;
   onCopyPortal: () => void;
   onShowActivity: () => void;
+  /** 박경수님 2026-05-29 STEP-CLEANUP — 지급 내역 드로어 */
+  onShowPayment?: () => void;
   onResetPin: () => void;
   recentPrograms?: ExpertProgramRef[];
 }
 
 export default function ExpertListRow({
-  s, onEdit, onDelete, onCopyPortal, onShowActivity, onResetPin, recentPrograms,
+  s, onEdit, onDelete, onCopyPortal, onShowActivity, onShowPayment, onResetPin, recentPrograms,
 }: Props) {
   return (
     <li className="group flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-primary/30 hover:shadow-sm transition relative">
@@ -66,6 +68,12 @@ export default function ExpertListRow({
           className="p-1.5 rounded-md text-slate-400 hover:bg-cyan-50 hover:text-cyan-600">
           <Activity size={12} />
         </button>
+        {onShowPayment && (
+          <button type="button" onClick={onShowPayment} aria-label="지급 내역" title="지급 내역"
+            className="p-1.5 rounded-md text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 text-sm leading-none">
+            💰
+          </button>
+        )}
         <button type="button" onClick={onResetPin} aria-label="PIN 초기화" title="PIN 을 전화번호 끝 6자리로 초기화"
           className="p-1.5 rounded-md text-slate-400 hover:bg-amber-50 hover:text-amber-600 text-sm leading-none">
           🔑

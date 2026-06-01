@@ -21,6 +21,8 @@ import TagFilterTabs from '../../components/TagFilterTabs';
 import { useTagFilter } from '../../hooks/useTagFilter';
 import ClientFormModal from './ClientFormModal';
 import ClientDetailModal from './ClientDetailModal';
+// 박경수님 2026-05-29 STEP-CLEANUP Phase 2 — 연관 사업 드로어
+import ClientProjectsDrawer from './ClientProjectsDrawer';
 import ClientListRowImported from './ClientListRow';
 // 박경수님 2026-05-28 STEP-CLIENT-TYPE-TAG — 기관 유형 필터·배지
 import { CLIENT_TYPES, getClientTypeBadge } from './clientTypeUtils';
@@ -47,9 +49,11 @@ interface CardActions {
   onEdit: (c: ClientRow) => void;
   /** STEP-DELETE-RESUME-FULL — 카드/리스트 hover 삭제 */
   onDelete: (c: ClientRow) => void;
+  /** 박경수님 2026-05-29 STEP-CLEANUP — 연관 사업 드로어 */
+  onShowProjects?: (c: ClientRow) => void;
 }
 
-function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & CardActions) {
+function ClientGridCard({ c, onView, onEdit, onDelete, onShowProjects }: { c: ClientRow } & CardActions) {
   const ceo = c.ceo_name ?? c.representative;
   const industry = [c.business_type, c.business_item].filter(Boolean).join(' · ');
   const bankLine = [c.bank_name, c.bank_account, c.bank_holder].filter(Boolean).join(' ');
@@ -144,6 +148,14 @@ function ClientGridCard({ c, onView, onEdit, onDelete }: { c: ClientRow } & Card
       <div className="flex items-center gap-2 px-5 pb-4">
         <Button variant="outline" size="sm" leftIcon={<Eye size={14} />} onClick={() => onView(c)} className="!flex-1">내용보기</Button>
         <Button variant="primary" size="sm" leftIcon={<Pencil size={14} />} onClick={() => onEdit(c)} className="!flex-1">수정</Button>
+        {/* 박경수님 2026-05-29 STEP-CLEANUP — 연관 사업 드로어 */}
+        {onShowProjects && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); onShowProjects(c); }}
+            aria-label="연관 사업" title="연관 사업"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-md text-violet-600 border border-violet-200 bg-white hover:bg-violet-50 transition-colors">
+            📁
+          </button>
+        )}
         {/* STEP-CONSORTIUM-REDESIGN — 자사는 삭제 차단 */}
         {!c.is_own_company && (
           <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(c); }}
@@ -181,6 +193,8 @@ export default function ClientsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Client | null>(null);
   const [detailTarget, setDetailTarget] = useState<Client | null>(null);
+  // 박경수님 2026-05-29 STEP-CLEANUP Phase 2 — 연관 사업 드로어 대상
+  const [projectsTarget, setProjectsTarget] = useState<Client | null>(null);
   const tagFilter = useTagFilter('client', clients); // STEP-TAGS-2B
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -326,13 +340,13 @@ export default function ClientsPage() {
       ) : view === 'card' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((c) => (
-            <ClientGridCard key={c.id} c={c} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
+            <ClientGridCard key={c.id} c={c} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onShowProjects={setProjectsTarget} />
           ))}
         </div>
       ) : (
         <ul className="space-y-2">
           {visible.map((c) => (
-            <ClientListRowImported key={c.id} c={c} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
+            <ClientListRowImported key={c.id} c={c} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onShowProjects={setProjectsTarget} />
           ))}
         </ul>
       )}
@@ -365,6 +379,8 @@ export default function ClientsPage() {
         onClose={() => setDetailTarget(null)}
         onDeleted={() => void fetchClients()}
       />
+      {/* 박경수님 2026-05-29 STEP-CLEANUP — 연관 사업 드로어 */}
+      <ClientProjectsDrawer client={projectsTarget} onClose={() => setProjectsTarget(null)} />
     </div>
   );
 }
