@@ -22,6 +22,8 @@ import SurveyResponseItem from './items/SurveyResponseItem';
 import SurveyResultsViewItem from './items/SurveyResultsViewItem';
 // 박경수님 2026-06-02 CLUB-3 — 결과보고서 외부 열람
 import ReportViewItem from './items/ReportViewItem';
+// 박경수님 2026-06-02 CLUB-10 — 동아리 전체 진행률 대시보드
+import ClubDashboardItem from './items/ClubDashboardItem';
 // 박경수님 2026-06-02 — invite_response·activity_log·lecture_certificate 는 본인 식별 필요로 일단 안내문 처리
 import { fetchShareByToken, getPublicMaterials, type ShareContext } from './sharePortalUtils';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
@@ -120,6 +122,25 @@ export default function RoleSharePage({ role }: Props) {
                   return <SurveyResultsViewItem key={item} programId={ctx.program.id} />;
                 case 'report_view':
                   return <ReportViewItem key={item} programId={ctx.program.id} />;
+                // 박경수님 2026-06-02 CLUB-10 — 동아리 전체 진행률
+                case 'club_dashboard':
+                  return <ClubDashboardItem key={item} programId={ctx.program.id} />;
+                // 박경수님 2026-06-02 MERGE-2 — 파일 다운/업로드 (기존 컴포넌트 재사용)
+                case 'file_download':
+                  return <MaterialsItem key={item} files={getPublicMaterials(ctx.program)} />;
+                case 'file_upload':
+                  return <OutcomeUploadItem key={item} programId={ctx.program.id} />;
+                case 'approval':
+                case 'tax_invoice':
+                  // 박경수님 2026-06-02 MERGE-2 — 동의·세금계산서는 PM 안내 + 담당자 연락 흐름 (외부 입력은 추후 STEP)
+                  return (
+                    <section key={item} className="rounded-2xl border border-violet-100 bg-white p-4 text-center">
+                      <p className="text-xs font-semibold text-[#1E1B4B]">
+                        {item === 'approval' ? '동의·확인 요청 항목이에요.' : '세금계산서 요청 항목이에요.'}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">담당자에게 문의해 주세요.</p>
+                    </section>
+                  );
                 case 'invite_response':
                 case 'activity_log':
                 case 'lecture_certificate':

@@ -26,6 +26,13 @@ export const SHARE_ITEM_LABEL: Record<ShareItem, string> = {
   survey_results_view: '설문 응답 결과 조회',
   // 박경수님 2026-06-02 CLUB-3
   report_view: '결과보고서 열람',
+  // 박경수님 2026-06-02 CLUB-10
+  club_dashboard: '동아리 전체 진행률',
+  // 박경수님 2026-06-02 MERGE-2
+  file_download: '파일 다운로드',
+  file_upload: '파일 제출',
+  approval: '동의·확인',
+  tax_invoice: '세금계산서 요청',
 };
 
 // 박경수님 2026-06-02 — 4역할 추가. 기존 3종은 호환 fallback (UI 에서는 숨길 수 있음).
@@ -77,32 +84,33 @@ export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>>
   },
   // 신규 4종 — 박경수님 의도 매핑 (운영사·발주처·교육생·강사 시각)
   // 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 4역할 모두 모든 단계에 survey_response 추가
+  // 박경수님 2026-06-02 CLUB-10/MERGE-2 — club_dashboard·file_download·approval·tax_invoice 추가
   supporter: {
-    before: ['survey_response', 'survey_results_view'],
-    pre:    ['basic_info', 'curriculum', 'survey_response', 'survey_results_view'],
-    ready:  ['basic_info', 'curriculum', 'instructors', 'survey_response', 'survey_results_view'],
-    progress: ['portal_progress', 'survey_response', 'survey_results_view', 'report_view'],
-    result: ['survey_view', 'feedback_comments', 'survey_response', 'survey_results_view', 'report_view'],
+    before: ['survey_response', 'survey_results_view', 'club_dashboard'],
+    pre:    ['basic_info', 'curriculum', 'survey_response', 'survey_results_view', 'club_dashboard', 'file_download'],
+    ready:  ['basic_info', 'curriculum', 'instructors', 'survey_response', 'survey_results_view', 'club_dashboard', 'file_download'],
+    progress: ['portal_progress', 'survey_response', 'survey_results_view', 'report_view', 'club_dashboard'],
+    result: ['survey_view', 'feedback_comments', 'survey_response', 'survey_results_view', 'report_view', 'club_dashboard'],
   },
   beneficiary: {
-    before: ['survey_response'],
-    pre:    ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response'],
-    ready:  ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response'],
-    progress: ['portal_progress', 'feedback_comments', 'survey_response'],
-    result: ['survey_view', 'edit_request', 'survey_response'],
+    before: ['survey_response', 'club_dashboard'],
+    pre:    ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response', 'club_dashboard', 'file_download', 'approval'],
+    ready:  ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response', 'club_dashboard', 'file_download', 'approval'],
+    progress: ['portal_progress', 'feedback_comments', 'survey_response', 'club_dashboard', 'file_upload'],
+    result: ['survey_view', 'edit_request', 'survey_response', 'club_dashboard', 'file_upload', 'tax_invoice'],
   },
   team: {
     before: ['survey_response'],
     pre:    ['survey_response'],
-    ready:  ['basic_info', 'survey_response'],
-    progress: ['checkin', 'mypage', 'survey_response'],
-    result: ['survey_submit', 'outcome_upload', 'survey_response'],
+    ready:  ['basic_info', 'survey_response', 'file_download'],
+    progress: ['checkin', 'mypage', 'survey_response', 'file_upload'],
+    result: ['survey_submit', 'outcome_upload', 'survey_response', 'file_upload'],
   },
   staff: {
     before: ['survey_response'],
     pre:    ['invite_response', 'survey_response'],
-    ready:  ['invite_response', 'curriculum', 'survey_response'],
-    progress: ['activity_log', 'mypage', 'survey_response'],
+    ready:  ['invite_response', 'curriculum', 'survey_response', 'file_download'],
+    progress: ['activity_log', 'mypage', 'survey_response', 'file_upload'],
     result: ['lecture_certificate', 'survey_response'],
   },
 };
@@ -112,11 +120,11 @@ export const ITEMS_BY_AUDIENCE: Record<ShareAudience, ShareItem[]> = {
   client: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments'],
   student: ['checkin', 'mypage', 'survey_submit', 'outcome_upload'],
   expert: ['invite_response', 'activity_log', 'mypage', 'lecture_certificate'],
-  // 박경수님 2026-06-02 — 신규 4종 (+ survey_response 추가)
-  supporter:   ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'survey_view', 'feedback_comments', 'survey_response', 'survey_results_view', 'report_view'],
-  beneficiary: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments', 'survey_response'],
-  team:        ['basic_info', 'checkin', 'mypage', 'survey_submit', 'outcome_upload', 'survey_response'],
-  staff:       ['invite_response', 'curriculum', 'activity_log', 'mypage', 'lecture_certificate', 'survey_response'],
+  // 박경수님 2026-06-02 — 신규 4종 (+ survey_response·club_dashboard·MERGE-2 추가)
+  supporter:   ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'survey_view', 'feedback_comments', 'survey_response', 'survey_results_view', 'report_view', 'club_dashboard', 'file_download'],
+  beneficiary: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments', 'survey_response', 'club_dashboard', 'file_download', 'file_upload', 'approval', 'tax_invoice'],
+  team:        ['basic_info', 'checkin', 'mypage', 'survey_submit', 'outcome_upload', 'survey_response', 'file_download', 'file_upload'],
+  staff:       ['invite_response', 'curriculum', 'activity_log', 'mypage', 'lecture_certificate', 'survey_response', 'file_download', 'file_upload'],
 };
 
 /** 대상×단계 매트릭스 헤더 (UI 안내용) */
