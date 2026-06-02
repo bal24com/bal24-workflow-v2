@@ -437,9 +437,13 @@ export interface CurriculumStaff {
   created_at: string;
 }
 
-// ─── 프로그램 외부공유 4단계×3대상 (Stage 3-B / 2026-05-08 신규) ─
+// ─── 프로그램 외부공유 (Stage 3-B / 2026-05-08 신규) ─
+// 박경수님 2026-06-02 — 4역할(지원기관·수혜기관·참여팀·강사/멘토) 확장.
+//   기존 3종(client·student·expert) 은 호환 fallback 으로 유지 (deprecated).
 
-export type ShareAudience = 'client' | 'student' | 'expert';
+export type ShareAudience =
+  | 'client' | 'student' | 'expert'             // 기존 3종 (호환 fallback)
+  | 'supporter' | 'beneficiary' | 'team' | 'staff'; // 신규 4종
 
 export type ShareStage = 'before' | 'pre' | 'ready' | 'progress' | 'result';
 
@@ -480,6 +484,11 @@ export interface ProgramShare {
   client_token: string;
   student_token: string;
   expert_token: string;
+  // 박경수님 2026-06-02 — 4역할 신규 토큰
+  supporter_token?: string | null;
+  beneficiary_token?: string | null;
+  team_token?: string | null;
+  staff_token?: string | null;
   visibility: ShareVisibility;
   created_at: string;
   updated_at: string;

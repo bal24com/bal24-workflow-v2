@@ -22,10 +22,17 @@ export const SHARE_ITEM_LABEL: Record<ShareItem, string> = {
   mypage: '마이페이지',
 };
 
+// 박경수님 2026-06-02 — 4역할 추가. 기존 3종은 호환 fallback (UI 에서는 숨길 수 있음).
 export const SHARE_AUDIENCE_LABEL: Record<ShareAudience, string> = {
-  client: '고객(담당자)',
+  // 기존 3종 (호환)
+  client:  '고객(담당자)',
   student: '학생(참여자)',
-  expert: '전문가',
+  expert:  '전문가',
+  // 신규 4종 (지원기관·수혜기관·참여팀(개인)·강사/멘토)
+  supporter:   '지원기관',
+  beneficiary: '수혜기관',
+  team:        '참여팀(개인)',
+  staff:       '강사/멘토',
 };
 
 export const SHARE_STAGE_LABEL: Record<ShareStage, string> = {
@@ -38,7 +45,9 @@ export const SHARE_STAGE_LABEL: Record<ShareStage, string> = {
 
 /** 어떤 단계에 어떤 항목이 노출 가능한지 (코드 hardcoded 매트릭스) */
 /** STEP-TAB-RESTRUCTURE-B — progress 단계에 portal_progress / mypage 추가 */
+/** 박경수님 2026-06-02 — 4역할 추가 (supporter·beneficiary·team·staff) */
 export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>> = {
+  // 기존 3종 (호환)
   client: {
     before: [],
     pre:    ['basic_info', 'curriculum', 'instructors', 'materials'],
@@ -60,6 +69,35 @@ export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>>
     progress: ['activity_log', 'mypage'],
     result: ['lecture_certificate'],
   },
+  // 신규 4종 — 박경수님 의도 매핑 (운영사·발주처·교육생·강사 시각)
+  supporter: {
+    before: [],
+    pre:    ['basic_info', 'curriculum'],
+    ready:  ['basic_info', 'curriculum', 'instructors'],
+    progress: ['portal_progress'],
+    result: ['survey_view', 'feedback_comments'],
+  },
+  beneficiary: {
+    before: [],
+    pre:    ['basic_info', 'curriculum', 'instructors', 'materials'],
+    ready:  ['basic_info', 'curriculum', 'instructors', 'materials'],
+    progress: ['portal_progress', 'feedback_comments'],
+    result: ['survey_view', 'edit_request'],
+  },
+  team: {
+    before: [],
+    pre:    [],
+    ready:  ['basic_info'],
+    progress: ['checkin', 'mypage'],
+    result: ['survey_submit', 'outcome_upload'],
+  },
+  staff: {
+    before: [],
+    pre:    ['invite_response'],
+    ready:  ['invite_response', 'curriculum'],
+    progress: ['activity_log', 'mypage'],
+    result: ['lecture_certificate'],
+  },
 };
 
 /** 대상별 전체 항목 목록 (관리자 UI 체크박스용) */
@@ -67,10 +105,16 @@ export const ITEMS_BY_AUDIENCE: Record<ShareAudience, ShareItem[]> = {
   client: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments'],
   student: ['checkin', 'mypage', 'survey_submit', 'outcome_upload'],
   expert: ['invite_response', 'activity_log', 'mypage', 'lecture_certificate'],
+  // 박경수님 2026-06-02 — 신규 4종
+  supporter:   ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'survey_view', 'feedback_comments'],
+  beneficiary: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments'],
+  team:        ['basic_info', 'checkin', 'mypage', 'survey_submit', 'outcome_upload'],
+  staff:       ['invite_response', 'curriculum', 'activity_log', 'mypage', 'lecture_certificate'],
 };
 
 /** 대상×단계 매트릭스 헤더 (UI 안내용) */
 export const STAGE_TIPS: Record<ShareAudience, Record<ShareStage, string>> = {
+  // 기존 3종 (호환)
   client: {
     before: '시작 전엔 노출 안 됨',
     pre: '사전·준비 단계에서 노출',
@@ -90,6 +134,35 @@ export const STAGE_TIPS: Record<ShareAudience, Record<ShareStage, string>> = {
     pre: '사전부터 초대수락/거절 가능',
     ready: '준비 중에도 응답 가능',
     progress: '진행 중 활동일지 작성',
+    result: '결과 단계에서 강의확인서',
+  },
+  // 박경수님 2026-06-02 — 신규 4종
+  supporter: {
+    before: '시작 전엔 노출 안 됨',
+    pre: '사전·준비 단계 안내',
+    ready: '강사 정보 추가 노출',
+    progress: '진행 현황 확인',
+    result: '만족도·의견 확인',
+  },
+  beneficiary: {
+    before: '시작 전엔 노출 안 됨',
+    pre: '사전·준비 단계 안내',
+    ready: '교재·강사 정보 노출',
+    progress: '진행 현황 + 의견 회신',
+    result: '만족도·수정 요청 가능',
+  },
+  team: {
+    before: '시작 전엔 노출 안 됨',
+    pre: '사전엔 노출 없음',
+    ready: '기본 정보 확인',
+    progress: '진행 중 출석·마이페이지',
+    result: '결과 단계에서 응답·업로드',
+  },
+  staff: {
+    before: '시작 전엔 노출 안 됨',
+    pre: '사전부터 초대수락/거절',
+    ready: '커리큘럼 사전 확인',
+    progress: '진행 중 활동일지·마이페이지',
     result: '결과 단계에서 강의확인서',
   },
 };

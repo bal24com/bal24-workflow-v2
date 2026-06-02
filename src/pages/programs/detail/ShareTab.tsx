@@ -25,7 +25,22 @@ import StageDateBar from './share/StageDateBar';
 import AudienceTab from './share/AudienceTab';
 import { SHARE_AUDIENCE_LABEL } from './share/visibilityCatalog';
 
-const AUDIENCE_TABS: ShareAudience[] = ['client', 'student', 'expert'];
+// 박경수님 2026-06-02 — 4역할 (지원기관·수혜기관·참여팀(개인)·강사/멘토) 메인 탭
+const AUDIENCE_TABS: ShareAudience[] = ['supporter', 'beneficiary', 'team', 'staff'];
+
+/** audience 별 토큰 선택 헬퍼 — 신규 4종 우선, 없으면 기존 3종 fallback. */
+function pickAudienceToken(share: ProgramShare, audience: ShareAudience): string {
+  switch (audience) {
+    case 'supporter':   return share.supporter_token   ?? share.client_token;
+    case 'beneficiary': return share.beneficiary_token ?? share.client_token;
+    case 'team':        return share.team_token        ?? share.student_token;
+    case 'staff':       return share.staff_token       ?? share.expert_token;
+    case 'client':      return share.client_token;
+    case 'student':     return share.student_token;
+    case 'expert':      return share.expert_token;
+    default:            return share.client_token;
+  }
+}
 
 function todayIso(): string {
   const d = new Date();
@@ -42,7 +57,7 @@ export default function ShareTab({ programId }: { programId: string }) {
   const toast = useToast();
   const [share, setShare] = useState<ProgramShare | null>(null);
   const [loading, setLoading] = useState(true);
-  const [audienceTab, setAudienceTab] = useState<ShareAudience>('client');
+  const [audienceTab, setAudienceTab] = useState<ShareAudience>('supporter');
   const [draftDates, setDraftDates] = useState<SaveDatesPayload>({
     pre_date: null, ready_date: null, progress_date: null, result_date: null,
     // 박경수님 + SkyClaw 2026-05-28 — 각 단계 종료일
@@ -218,11 +233,7 @@ export default function ShareTab({ programId }: { programId: string }) {
 
       <AudienceTab
         audience={audienceTab}
-        token={
-          audienceTab === 'client' ? share.client_token :
-          audienceTab === 'student' ? share.student_token :
-          share.expert_token
-        }
+        token={pickAudienceToken(share, audienceTab)}
         visibility={share.visibility}
         currentStage={currentStage}
         onToggleItem={(item, next) => handleToggleItem(audienceTab, item, next)}
