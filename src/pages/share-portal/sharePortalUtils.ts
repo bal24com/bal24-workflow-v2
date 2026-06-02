@@ -23,16 +23,24 @@ function todayIso(): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
+// 박경수님 2026-06-02 — audience 별 토큰 컬럼 매핑 (기존 3종 + 신규 4종)
+const TOKEN_COLUMN: Record<ShareAudience, string> = {
+  client:      'client_token',
+  student:     'student_token',
+  expert:      'expert_token',
+  supporter:   'supporter_token',
+  beneficiary: 'beneficiary_token',
+  team:        'team_token',
+  staff:       'staff_token',
+};
+
 /** token 검증 + program join + 단계 자동 판별 */
 export async function fetchShareByToken(
   audience: ShareAudience,
   token: string,
 ): Promise<ShareContext | null> {
   if (!token) return null;
-  const col =
-    audience === 'client' ? 'client_token'
-    : audience === 'student' ? 'student_token'
-    : 'expert_token';
+  const col = TOKEN_COLUMN[audience];
 
   const shareRes = await supabase
     .from('program_share')

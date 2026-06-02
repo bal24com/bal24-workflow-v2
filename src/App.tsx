@@ -84,6 +84,12 @@ const CertViewPage          = lazy(() => import('./pages/public-cert/CertViewPag
 const ClientSharePage       = lazy(() => import('./pages/share-portal/ClientSharePage'));
 const StudentSharePage      = lazy(() => import('./pages/share-portal/StudentSharePage'));
 const ExpertSharePage       = lazy(() => import('./pages/share-portal/ExpertSharePage'));
+// 박경수님 2026-06-02 STEP-B — 4역할(지원기관·수혜기관·참여팀·강사/멘토) 공용 페이지
+// 4개 wrapper 를 named export 로 만들어 lazy 가 default 만 받는 제약 회피
+const ShareSupporterPage    = lazy(() => import('./pages/share-portal/RoleSharePage').then((m) => ({ default: () => <m.default role="supporter" /> })));
+const ShareBeneficiaryPage  = lazy(() => import('./pages/share-portal/RoleSharePage').then((m) => ({ default: () => <m.default role="beneficiary" /> })));
+const ShareTeamPage         = lazy(() => import('./pages/share-portal/RoleSharePage').then((m) => ({ default: () => <m.default role="team" /> })));
+const ShareStaffPage        = lazy(() => import('./pages/share-portal/RoleSharePage').then((m) => ({ default: () => <m.default role="staff" /> })));
 const MentoringMentorPage   = lazy(() => import('./pages/mentoring/MentoringMentorPage'));
 const MentoringStudentPage  = lazy(() => import('./pages/mentoring/MentoringStudentPage'));
 const MentorPortalPage      = lazy(() => import('./pages/mentor-portal/MentorPortalPage'));
@@ -161,6 +167,11 @@ export default function App() {
             <Route path="/share/client/:token" element={<ClientSharePage />} />
             <Route path="/share/student/:token" element={<StudentSharePage />} />
             <Route path="/share/expert/:token" element={<ExpertSharePage />} />
+            {/* 박경수님 2026-06-02 STEP-B — 4역할 신규 라우트 */}
+            <Route path="/share/supporter/:token"   element={<ShareSupporterPage />} />
+            <Route path="/share/beneficiary/:token" element={<ShareBeneficiaryPage />} />
+            <Route path="/share/team/:token"        element={<ShareTeamPage />} />
+            <Route path="/share/staff/:token"       element={<ShareStaffPage />} />
             <Route path="/mentoring-mentor/:token" element={<MentoringMentorPage />} />
             <Route path="/mentoring-student/:token" element={<MentoringStudentPage />} />
             {/* STEP-MENTOR-PORTAL-FULL — 미등록 멘토 초대 토큰 기반 외부 포털 */}
