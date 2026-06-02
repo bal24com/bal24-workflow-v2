@@ -10,6 +10,7 @@ import {
   type ProgramSurveyForm,
 } from '../../../types/database';
 import SurveyFormCreateModal from './SurveyFormCreateModal';
+import SurveyResponsesPanel from './SurveyResponsesPanel';
 
 interface Props {
   programId: string;
@@ -30,6 +31,8 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ProgramSurveyForm | null>(null);
+  // 박경수님 2026-06-02 STEP-SURVEY-RESULTS-A — 응답 상세 패널 대상
+  const [responsesTarget, setResponsesTarget] = useState<ProgramSurveyForm | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -144,7 +147,10 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500 flex-wrap">
                     <span><strong>{f.questions.length}</strong>문항</span>
-                    <span>응답 <strong className="text-violet-700">{count}</strong>건</span>
+                    <button type="button" onClick={() => setResponsesTarget(f)}
+                      className="inline-flex items-center gap-0.5 hover:underline">
+                      응답 <strong className="text-violet-700">{count}</strong>건
+                    </button>
                     <span className="inline-flex items-center gap-1">
                       <Users size={10} aria-hidden="true" />
                       대상 {f.target_audiences.length === 0 ? '미지정' : f.target_audiences.map((t) => TARGET_LABEL[t] ?? t).join('·')}
@@ -182,6 +188,14 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
           form={editing}
           onClose={() => { setModalOpen(false); setEditing(null); }}
           onSaved={() => { setModalOpen(false); setEditing(null); void reload(); }}
+        />
+      )}
+
+      {/* 박경수님 2026-06-02 STEP-SURVEY-RESULTS-A — 응답 상세 패널 */}
+      {responsesTarget && (
+        <SurveyResponsesPanel
+          form={responsesTarget}
+          onClose={() => setResponsesTarget(null)}
         />
       )}
     </section>
