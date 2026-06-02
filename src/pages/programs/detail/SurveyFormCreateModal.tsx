@@ -2,13 +2,14 @@
 // 제목·종류·문항(text/select/number/date/textarea) + 4역할 응답 대상 선택.
 
 import { useEffect, useRef, useState } from 'react';
-import { Plus, Save, X, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Save, X, Trash2, Loader2, Sparkles, Upload } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import {
   SURVEY_FORM_KIND_LABEL,
   type ProgramSurveyForm, type SurveyFormKind, type SurveyFormQuestion, type SurveyFormQuestionType,
 } from '../../../types/database';
+import { importSurveyFromFile } from './surveyAiImport';
 
 interface Props {
   programId: string;
@@ -56,6 +57,29 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
   const [newType, setNewType] = useState<SurveyFormQuestionType>('text');
   const [newOptions, setNewOptions] = useState('');
   const [newRequired, setNewRequired] = useState(false);
+
+  // 박경수님 2026-06-02 STEP-SURVEY-AI-IMPORT — AI 자동 생성
+  const [aiLoading, setAiLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleAiImport(file: File) {
+    setAiLoading(true);
+    try {
+      const parsed = await importSurveyFromFile(file);
+      // 박경수님이 직접 검토할 수 있도록 — 기존 입력값은 비어 있으면 채우고, 문항은 합치기
+      if (!title.trim()) setTitle(parsed.title);
+      setKind(parsed.kind);
+      setQuestions((prev) => [...prev, ...parsed.questions]);
+      toast.success(`${parsed.questions.length}개 문항을 자동 추출했어요. 검토 후 저장해 주세요.`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'AI 분석 중 오류가 발생했어요.';
+      console.error('[SurveyFormCreateModal] AI 자동 생성 실패:', msg);
+      toast.error(msg);
+    } finally {
+      setAiLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
 
   useEffect(() => {
     setTitle(form?.title ?? '');
@@ -133,6 +157,34 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
         </header>
 
         <div className="p-5 space-y-4">
+          {/* 박경수님 2026-06-02 STEP-SURVEY-AI-IMPORT — AI 자동 생성 영역 */}
+          {!form && (
+            <div className="rounded-xl border border-dashed border-violet-300 bg-violet-50/50 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-xs font-bold text-violet-700 inline-flex items-center gap-1">
+                  <Sparkles size={12} aria-hidden="true" /> AI 자동 생성 (PDF·이미지)
+                </p>
+                <button type="button" disabled={aiLoading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1 px-3 h-8 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50">
+                  {aiLoading
+                    ? (<><Loader2 size={12} className="animate-spin" aria-hidden="true" /> 분석 중…</>)
+                    : (<><Upload size={12} aria-hidden="true" /> 파일 첨부</>)}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                기존 설문 양식(PDF·JPG·PNG)을 첨부하면 AI 가 문항을 추출해 자동 입력해요.
+                추출 후 문항을 검토·수정한 뒤 [설문 등록] 을 눌러 주세요.
+              </p>
+              <input ref={fileInputRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleAiImport(f);
+                }} />
+            </div>
+          )}
+
           {/* 제목·종류·활성 */}
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2">
             <div className="space-y-1">
