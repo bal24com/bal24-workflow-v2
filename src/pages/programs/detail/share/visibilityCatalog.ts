@@ -6,7 +6,7 @@ import type { ShareAudience, ShareItem, ShareStage } from '../../../../types/dat
 export const SHARE_ITEM_LABEL: Record<ShareItem, string> = {
   basic_info: '기본정보 (장소·날짜·준비물)',
   curriculum: '커리큘럼',
-  instructors: '강사정보',
+  instructors: '강사·멘토 정보',
   materials: '교재',
   survey_view: '만족도 확인',
   edit_request: '수정요청 버튼',

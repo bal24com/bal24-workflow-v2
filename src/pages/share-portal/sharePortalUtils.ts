@@ -172,6 +172,35 @@ export async function fetchPublicInstructors(programId: string): Promise<PublicI
   }));
 }
 
+// 박경수님 2026-06-02 CLUB-15 — 동아리 멘토 (program_clubs.mentor_name) 공개 조회.
+//   강사진 섹션에 멘토도 함께 노출. 이름·담당 동아리만 (연락처 X).
+export interface PublicMentor {
+  name: string;
+  /** 담당 동아리 목록 */
+  clubs: string[];
+}
+
+export async function fetchPublicMentors(programId: string): Promise<PublicMentor[]> {
+  const { data, error } = await supabase
+    .from('program_clubs')
+    .select('mentor_name, club_name')
+    .eq('program_id', programId)
+    .not('mentor_name', 'is', null);
+  if (error) {
+    console.error('[share-portal] 멘토 조회 실패:', error.message);
+    return [];
+  }
+  const byName = new Map<string, Set<string>>();
+  ((data as Array<{ mentor_name: string | null; club_name: string }> | null) ?? []).forEach((r) => {
+    const name = (r.mentor_name ?? '').trim();
+    if (!name) return;
+    const set = byName.get(name) ?? new Set<string>();
+    if (r.club_name) set.add(r.club_name);
+    byName.set(name, set);
+  });
+  return [...byName.entries()].map(([name, clubs]) => ({ name, clubs: [...clubs] }));
+}
+
 /** 교재 fetch — programs.notice_files (Stage 1에서 추가) */
 export function getPublicMaterials(program: Program): ProgramFile[] {
   return program.notice_files ?? [];
