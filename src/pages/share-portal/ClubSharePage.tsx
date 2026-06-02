@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { ProgramClub, ActivityLog } from '../../types/database';
+import ClubSessionSchedule from '../programs/detail/club/ClubSessionSchedule';
 
 type Screen = 'loading' | 'notfound' | 'ready';
 
@@ -97,6 +98,17 @@ export default function ClubSharePage() {
             {club.student_count != null && <span>학생 {club.student_count}명</span>}
           </div>
         </header>
+
+        {/* 박경수님 2026-06-02 CLUB-7b — 멘토링 일정 (희망 제출 + 확정) */}
+        <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-card space-y-3">
+          <h2 className="text-sm font-bold text-[#1E1B4B] inline-flex items-center gap-1.5">
+            <CalendarDays size={15} className="text-violet-600" aria-hidden="true" /> 멘토링 일정
+          </h2>
+          <p className="text-[11px] text-slate-500">
+            희망 일정(1·2순위)을 입력하면 멘토·담당 선생님과 협의해 확정해요. 확정된 일정은 [이 일정으로 확정] 으로 정할 수 있어요.
+          </p>
+          <ClubSessionSchedule clubId={club.id} canEdit decidedByLabel={club.mentor_name ?? club.teacher_name ?? '담당자'} />
+        </section>
 
         {/* 활동 등록 */}
         <ClubActivityForm clubId={club.id} programId={club.program_id} onSaved={() => void loadLogs(club.id)} />

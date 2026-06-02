@@ -954,6 +954,27 @@ export interface ProgramClub {
   updated_at: string;
 }
 
+// 박경수님 2026-06-02 CLUB-6 — 동아리 차수별 멘토링 일정 (캡쳐 표1)
+export type ClubSessionStatus = 'wish' | 'confirmed' | 'done';
+
+export interface ProgramClubSession {
+  id: string;
+  club_id: string;
+  session_no: number;
+  session_label: string | null;
+  wish_date_1: string | null;
+  wish_time_1: string | null;
+  wish_date_2: string | null;
+  wish_time_2: string | null;
+  confirmed_date: string | null;
+  confirmed_time: string | null;
+  status: ClubSessionStatus;
+  decided_by: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ActivityLog {
   id: string;
   program_id?: string | null;

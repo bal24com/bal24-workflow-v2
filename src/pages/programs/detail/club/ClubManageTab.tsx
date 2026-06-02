@@ -3,13 +3,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Upload, Copy, Trash2, ExternalLink, School, Users,
+  Loader2, Upload, Copy, Trash2, ExternalLink, School, Users, CalendarDays, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
 import { copyToClipboard } from '../../../../lib/clipboard';
 import type { ProgramClub } from '../../../../types/database';
 import ClubBulkModal from './ClubBulkModal';
+import ClubSessionSchedule from './ClubSessionSchedule';
 
 interface Props {
   programId: string;
@@ -29,6 +30,8 @@ export default function ClubManageTab({ programId }: Props) {
   const [clubs, setClubs] = useState<ClubWithActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [bulkOpen, setBulkOpen] = useState(false);
+  // 박경수님 2026-06-02 CLUB-7a — 차수 일정 펼친 동아리 id
+  const [scheduleOpen, setScheduleOpen] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -137,7 +140,8 @@ export default function ClubManageTab({ programId }: Props) {
               </div>
               <ul className="divide-y divide-slate-100">
                 {schoolClubs.map((c) => (
-                  <li key={c.id} className="p-3 flex items-start gap-3 flex-wrap">
+                  <li key={c.id} className="p-3">
+                  <div className="flex items-start gap-3 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-sm font-bold text-[#1E1B4B]">{c.club_name}</span>
@@ -159,6 +163,11 @@ export default function ClubManageTab({ programId }: Props) {
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <button type="button" onClick={() => setScheduleOpen(scheduleOpen === c.id ? null : c.id)}
+                        title="멘토링 일정" className="p-1.5 rounded hover:bg-violet-50 text-violet-700 inline-flex items-center gap-0.5">
+                        <CalendarDays size={13} aria-hidden="true" />
+                        {scheduleOpen === c.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                      </button>
                       <button type="button" onClick={() => void copyClubLink(c)}
                         title="동아리 링크 복사" className="p-1.5 rounded hover:bg-violet-50 text-violet-700">
                         <Copy size={13} aria-hidden="true" />
@@ -172,6 +181,16 @@ export default function ClubManageTab({ programId }: Props) {
                         <Trash2 size={13} aria-hidden="true" />
                       </button>
                     </div>
+                  </div>
+                  {/* 박경수님 2026-06-02 CLUB-7a — 차수 멘토링 일정 펼침 */}
+                  {scheduleOpen === c.id && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <p className="text-[11px] font-bold text-violet-700 mb-2 inline-flex items-center gap-1">
+                        <CalendarDays size={12} aria-hidden="true" /> 멘토링 일정 — {c.mentor_name ?? '멘토 미지정'}
+                      </p>
+                      <ClubSessionSchedule clubId={c.id} canEdit decidedByLabel="관리자" />
+                    </div>
+                  )}
                   </li>
                 ))}
               </ul>
