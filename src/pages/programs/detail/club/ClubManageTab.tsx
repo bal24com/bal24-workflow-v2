@@ -218,7 +218,7 @@ export default function ClubManageTab({ programId }: Props) {
                       <p className="text-[11px] font-bold text-violet-700 mb-2 inline-flex items-center gap-1">
                         <CalendarDays size={12} aria-hidden="true" /> 멘토링 일정 — {c.mentor_name ?? '멘토 미지정'}
                       </p>
-                      <ClubSessionSchedule clubId={c.id} canEdit decidedByLabel="관리자" />
+                      <ClubSessionSchedule clubId={c.id} canEdit canConfirm decidedByLabel="관리자" />
                     </div>
                   )}
                   </li>

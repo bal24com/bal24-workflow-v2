@@ -20,6 +20,8 @@ export default function ClubSharePage() {
   const [club, setClub] = useState<ProgramClub | null>(null);
   const [programName, setProgramName] = useState('');
   const [logs, setLogs] = useState<ActivityLog[]>([]);
+  // 박경수님 2026-06-02 CLUB-12 — 확정 권한은 담당 선생님만. 본인이 선생님임을 선택하면 확정 버튼 노출.
+  const [isTeacher, setIsTeacher] = useState(false);
 
   const loadLogs = useCallback(async (clubId: string) => {
     const { data, error } = await supabase
@@ -106,9 +108,20 @@ export default function ClubSharePage() {
             <CalendarDays size={15} className="text-violet-600" aria-hidden="true" /> 멘토링 일정
           </h2>
           <p className="text-[11px] text-slate-500">
-            담당 선생님·멘토가 차수별 날짜·시간을 입력하고 [이 일정으로 확정] 을 누르면 확정돼요. 누구든 등록·확정할 수 있어요.
+            멘토·팀은 차수별 날짜·시간을 입력해 두고, 담당 선생님이 확인 후 [이 일정으로 확정] 을 눌러 확정해요.
           </p>
-          <ClubSessionSchedule clubId={club.id} canEdit decidedByLabel={club.mentor_name ?? club.teacher_name ?? '담당자'} />
+          {/* 박경수님 2026-06-02 CLUB-12 — 담당 선생님 본인 확인 토글 (확정 권한 부여) */}
+          <button type="button" onClick={() => setIsTeacher((v) => !v)}
+            className={`w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-bold border transition-colors ${
+              isTeacher
+                ? 'bg-violet-600 text-white border-violet-600'
+                : 'bg-white text-violet-700 border-violet-200 hover:bg-violet-50'
+            }`}>
+            <CheckCircle2 size={13} aria-hidden="true" />
+            {isTeacher ? '담당 선생님으로 확정 모드 (해제하려면 클릭)' : '담당 선생님이세요? 확정하려면 클릭'}
+          </button>
+          <ClubSessionSchedule clubId={club.id} canEdit canConfirm={isTeacher}
+            decidedByLabel={isTeacher ? (club.teacher_name ?? '담당 선생님') : (club.mentor_name ?? '담당자')} />
         </section>
 
         {/* 활동 등록 */}

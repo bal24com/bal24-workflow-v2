@@ -1,5 +1,5 @@
 // 박경수님 2026-06-02 CLUB-7 — 동아리 차수별 멘토링 일정 공용 컴포넌트.
-// PM·외부(팀·교사·멘토) 양쪽에서 사용. 희망(1·2순위) 제출 + 확정 처리.
+// PM·외부(팀·교사·멘토) 양쪽에서 사용. 누구나 날짜·시간 수정, 확정은 PM·담당 선생님만 (CLUB-12).
 
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, CalendarDays, CheckCircle2, Trash2 } from 'lucide-react';
@@ -9,9 +9,11 @@ import type { ProgramClubSession, ClubSessionStatus } from '../../../../types/da
 
 interface Props {
   clubId: string;
-  /** PM 화면이면 추가·삭제·확정 모두 / 외부면 희망 제출 + 확정 가능 */
+  /** 날짜·시간 수정·차수 추가·삭제 권한 (PM·선생님·멘토 모두 true) */
   canEdit: boolean;
-  /** 외부 페이지에서 확정 주체 라벨 (예: '멘토 박경수', '담당교사 장나운') */
+  /** 박경수님 2026-06-02 — 확정·확정해제 권한. PM·수혜기관(선생님)만 true. 멘토·팀은 false. */
+  canConfirm?: boolean;
+  /** 확정 주체 라벨 (예: '관리자', '담당 선생님') */
   decidedByLabel?: string;
 }
 
@@ -21,7 +23,7 @@ const STATUS_BADGE: Record<ClubSessionStatus, { label: string; cls: string }> = 
   done:      { label: '완료',   cls: 'bg-emerald-100 text-emerald-700' },
 };
 
-export default function ClubSessionSchedule({ clubId, canEdit, decidedByLabel }: Props) {
+export default function ClubSessionSchedule({ clubId, canEdit, canConfirm = false, decidedByLabel }: Props) {
   const toast = useToast();
   const [sessions, setSessions] = useState<ProgramClubSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,15 +108,17 @@ export default function ClubSessionSchedule({ clubId, canEdit, decidedByLabel }:
               )}
             </div>
 
-            {/* 박경수님 2026-06-02 CLUB-11 — 단순 구조: 날짜·시간 1개 + [확정] (1·2순위 제거) */}
+            {/* 박경수님 2026-06-02 CLUB-12 — 수정은 누구나, 확정·변경은 PM·담당 선생님만 (canConfirm) */}
             {s.status !== 'wish' && s.confirmed_date ? (
               <div className="flex items-center gap-2 text-sm text-violet-800 bg-white rounded-lg px-3 py-2 flex-wrap">
                 <CheckCircle2 size={14} className="text-violet-600" aria-hidden="true" />
                 <span className="font-bold">{s.confirmed_date}</span>
                 {s.confirmed_time && <span>{s.confirmed_time}</span>}
                 {s.decided_by && <span className="text-[11px] text-slate-500 ml-auto">{s.decided_by} 확정</span>}
-                <button type="button" onClick={() => void patch(s.id, { status: 'wish', confirmed_date: null, confirmed_time: null })}
-                  className="text-[11px] text-slate-400 hover:text-violet-600">변경</button>
+                {canConfirm && (
+                  <button type="button" onClick={() => void patch(s.id, { status: 'wish', confirmed_date: null, confirmed_time: null })}
+                    className="text-[11px] text-slate-400 hover:text-violet-600">변경</button>
+                )}
               </div>
             ) : (
               <div className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2">
@@ -133,16 +137,22 @@ export default function ClubSessionSchedule({ clubId, canEdit, decidedByLabel }:
                       className="w-full h-9 rounded border border-slate-200 px-2 text-sm outline-none focus:border-violet-500" />
                   </div>
                 </div>
-                <button type="button" disabled={busy || !s.wish_date_1}
-                  onClick={() => void confirmSession(s)}
-                  className="w-full inline-flex items-center justify-center gap-1 h-9 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50">
-                  <CheckCircle2 size={13} aria-hidden="true" /> 이 일정으로 확정
-                </button>
+                {canConfirm ? (
+                  <button type="button" disabled={busy || !s.wish_date_1}
+                    onClick={() => void confirmSession(s)}
+                    className="w-full inline-flex items-center justify-center gap-1 h-9 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50">
+                    <CheckCircle2 size={13} aria-hidden="true" /> 이 일정으로 확정
+                  </button>
+                ) : (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5 text-center">
+                    날짜·시간을 입력해 두면 담당 선생님이 확인 후 확정해요.
+                  </p>
+                )}
               </div>
             )}
 
-            {/* 완료 처리 (확정된 차수만) */}
-            {s.status === 'confirmed' && (
+            {/* 완료 처리 (확정된 차수만 · PM·담당 선생님) */}
+            {s.status === 'confirmed' && canConfirm && (
               <button type="button" onClick={() => void patch(s.id, { status: 'done' })}
                 className="w-full inline-flex items-center justify-center gap-1 h-8 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100">
                 <CheckCircle2 size={12} aria-hidden="true" /> 이 차수 완료 처리
