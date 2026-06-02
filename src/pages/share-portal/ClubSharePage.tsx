@@ -106,7 +106,7 @@ export default function ClubSharePage() {
             <CalendarDays size={15} className="text-violet-600" aria-hidden="true" /> 멘토링 일정
           </h2>
           <p className="text-[11px] text-slate-500">
-            희망 일정(1·2순위)을 입력하면 멘토·담당 선생님과 협의해 확정해요. 확정된 일정은 [이 일정으로 확정] 으로 정할 수 있어요.
+            담당 선생님·멘토가 차수별 날짜·시간을 입력하고 [이 일정으로 확정] 을 누르면 확정돼요. 누구든 등록·확정할 수 있어요.
           </p>
           <ClubSessionSchedule clubId={club.id} canEdit decidedByLabel={club.mentor_name ?? club.teacher_name ?? '담당자'} />
         </section>

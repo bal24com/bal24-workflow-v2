@@ -16,9 +16,9 @@ interface Props {
 }
 
 const STATUS_BADGE: Record<ClubSessionStatus, { label: string; cls: string }> = {
-  wish:      { label: '희망', cls: 'bg-amber-100 text-amber-700' },
-  confirmed: { label: '확정', cls: 'bg-violet-100 text-violet-700' },
-  done:      { label: '완료', cls: 'bg-emerald-100 text-emerald-700' },
+  wish:      { label: '미확정', cls: 'bg-amber-100 text-amber-700' },
+  confirmed: { label: '확정',   cls: 'bg-violet-100 text-violet-700' },
+  done:      { label: '완료',   cls: 'bg-emerald-100 text-emerald-700' },
 };
 
 export default function ClubSessionSchedule({ clubId, canEdit, decidedByLabel }: Props) {
@@ -64,15 +64,14 @@ export default function ClubSessionSchedule({ clubId, canEdit, decidedByLabel }:
     void reload();
   }
 
-  async function confirmSession(s: ProgramClubSession, which: 1 | 2) {
-    const date = which === 1 ? s.wish_date_1 : s.wish_date_2;
-    const time = which === 1 ? s.wish_time_1 : s.wish_time_2;
-    if (!date) { toast.error(`${which}순위 희망 날짜가 없어요.`); return; }
+  // 박경수님 2026-06-02 CLUB-11 — 단순 확정 (1·2순위 제거). wish_date_1 을 날짜 입력으로 사용.
+  async function confirmSession(s: ProgramClubSession) {
+    if (!s.wish_date_1) { toast.error('날짜를 먼저 입력해 주세요.'); return; }
     await patch(s.id, {
-      confirmed_date: date, confirmed_time: time, status: 'confirmed',
-      decided_by: decidedByLabel ?? '관리자',
+      confirmed_date: s.wish_date_1, confirmed_time: s.wish_time_1, status: 'confirmed',
+      decided_by: decidedByLabel ?? '담당자',
     });
-    toast.success(`${which}순위로 확정했어요.`);
+    toast.success('일정을 확정했어요.');
   }
 
   async function removeSession(id: string) {
@@ -107,46 +106,38 @@ export default function ClubSessionSchedule({ clubId, canEdit, decidedByLabel }:
               )}
             </div>
 
-            {/* 확정됐으면 확정 일정 강조, 아니면 희망 1·2순위 입력 */}
+            {/* 박경수님 2026-06-02 CLUB-11 — 단순 구조: 날짜·시간 1개 + [확정] (1·2순위 제거) */}
             {s.status !== 'wish' && s.confirmed_date ? (
-              <div className="flex items-center gap-2 text-sm text-violet-800 bg-white rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 text-sm text-violet-800 bg-white rounded-lg px-3 py-2 flex-wrap">
                 <CheckCircle2 size={14} className="text-violet-600" aria-hidden="true" />
                 <span className="font-bold">{s.confirmed_date}</span>
                 {s.confirmed_time && <span>{s.confirmed_time}</span>}
                 {s.decided_by && <span className="text-[11px] text-slate-500 ml-auto">{s.decided_by} 확정</span>}
-                {canEdit && (
-                  <button type="button" onClick={() => void patch(s.id, { status: 'wish', confirmed_date: null, confirmed_time: null })}
-                    className="text-[11px] text-slate-400 hover:text-violet-600">변경</button>
-                )}
+                <button type="button" onClick={() => void patch(s.id, { status: 'wish', confirmed_date: null, confirmed_time: null })}
+                  className="text-[11px] text-slate-400 hover:text-violet-600">변경</button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {([1, 2] as const).map((rank) => {
-                  const dateKey = rank === 1 ? 'wish_date_1' : 'wish_date_2';
-                  const timeKey = rank === 1 ? 'wish_time_1' : 'wish_time_2';
-                  const dateVal = (rank === 1 ? s.wish_date_1 : s.wish_date_2) ?? '';
-                  const timeVal = (rank === 1 ? s.wish_time_1 : s.wish_time_2) ?? '';
-                  return (
-                    <div key={rank} className="rounded-lg border border-slate-200 bg-white p-2 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-600">{rank}순위</span>
-                        {dateVal && (
-                          <button type="button" disabled={busy} onClick={() => void confirmSession(s, rank)}
-                            className="text-[10px] font-bold text-violet-600 hover:underline disabled:opacity-50">
-                            이 일정으로 확정
-                          </button>
-                        )}
-                      </div>
-                      <input type="date" defaultValue={dateVal} disabled={busy}
-                        onBlur={(e) => { if (e.target.value !== dateVal) void patch(s.id, { [dateKey]: e.target.value || null }); }}
-                        className="w-full h-8 rounded border border-slate-200 px-2 text-xs outline-none focus:border-violet-500" />
-                      <input type="text" defaultValue={timeVal} disabled={busy}
-                        placeholder="예: 13:00~15:30"
-                        onBlur={(e) => { if (e.target.value !== timeVal) void patch(s.id, { [timeKey]: e.target.value || null }); }}
-                        className="w-full h-8 rounded border border-slate-200 px-2 text-xs outline-none focus:border-violet-500" />
-                    </div>
-                  );
-                })}
+              <div className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-600">날짜</label>
+                    <input type="date" defaultValue={s.wish_date_1 ?? ''} disabled={busy}
+                      onBlur={(e) => { if (e.target.value !== (s.wish_date_1 ?? '')) void patch(s.id, { wish_date_1: e.target.value || null }); }}
+                      className="w-full h-9 rounded border border-slate-200 px-2 text-sm outline-none focus:border-violet-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-600">시간</label>
+                    <input type="text" defaultValue={s.wish_time_1 ?? ''} disabled={busy}
+                      placeholder="예: 13:00~15:30"
+                      onBlur={(e) => { if (e.target.value !== (s.wish_time_1 ?? '')) void patch(s.id, { wish_time_1: e.target.value || null }); }}
+                      className="w-full h-9 rounded border border-slate-200 px-2 text-sm outline-none focus:border-violet-500" />
+                  </div>
+                </div>
+                <button type="button" disabled={busy || !s.wish_date_1}
+                  onClick={() => void confirmSession(s)}
+                  className="w-full inline-flex items-center justify-center gap-1 h-9 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-50">
+                  <CheckCircle2 size={13} aria-hidden="true" /> 이 일정으로 확정
+                </button>
               </div>
             )}
 
