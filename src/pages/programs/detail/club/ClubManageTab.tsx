@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Upload, Copy, Trash2, ExternalLink, School, Users, CalendarDays, ChevronDown, ChevronUp,
+  Loader2, Upload, Copy, Trash2, ExternalLink, School, Users, CalendarDays, ChevronDown, ChevronUp, List, LayoutGrid,
 } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
@@ -11,6 +11,7 @@ import { copyToClipboard } from '../../../../lib/clipboard';
 import type { ProgramClub } from '../../../../types/database';
 import ClubBulkModal from './ClubBulkModal';
 import ClubSessionSchedule from './ClubSessionSchedule';
+import ClubCardGrid from './ClubCardGrid';
 
 interface Props {
   programId: string;
@@ -32,6 +33,8 @@ export default function ClubManageTab({ programId }: Props) {
   const [bulkOpen, setBulkOpen] = useState(false);
   // 박경수님 2026-06-02 CLUB-7a — 차수 일정 펼친 동아리 id
   const [scheduleOpen, setScheduleOpen] = useState<string | null>(null);
+  // 박경수님 2026-06-02 CLUB-8 — 리스트 / 카드 보기 토글
+  const [view, setView] = useState<'list' | 'card'>('list');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -113,10 +116,21 @@ export default function ClubManageTab({ programId }: Props) {
             {bySchool.length}개 학교 · {clubs.length}개 팀 · 학생 {totalStudents}명
           </p>
         </div>
-        <button type="button" onClick={() => setBulkOpen(true)}
-          className="inline-flex items-center gap-1 px-3 h-9 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700">
-          <Upload size={13} aria-hidden="true" /> 엑셀 일괄 등록
-        </button>
+        <div className="flex items-center gap-2">
+          {/* 박경수님 2026-06-02 CLUB-8 — 보기 토글 */}
+          <div className="inline-flex items-center bg-slate-100 rounded-lg p-0.5">
+            <button type="button" onClick={() => setView('list')}
+              className={`p-1.5 rounded-md ${view === 'list' ? 'bg-white shadow-sm text-violet-700' : 'text-slate-400'}`}
+              title="목록 보기"><List size={14} aria-hidden="true" /></button>
+            <button type="button" onClick={() => setView('card')}
+              className={`p-1.5 rounded-md ${view === 'card' ? 'bg-white shadow-sm text-violet-700' : 'text-slate-400'}`}
+              title="카드 보기"><LayoutGrid size={14} aria-hidden="true" /></button>
+          </div>
+          <button type="button" onClick={() => setBulkOpen(true)}
+            className="inline-flex items-center gap-1 px-3 h-9 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700">
+            <Upload size={13} aria-hidden="true" /> 엑셀 일괄 등록
+          </button>
+        </div>
       </header>
 
       {loading ? (
@@ -129,6 +143,13 @@ export default function ClubManageTab({ programId }: Props) {
           <p className="text-sm text-slate-500 mb-1">아직 등록된 동아리가 없어요.</p>
           <p className="text-xs text-slate-400">[엑셀 일괄 등록] 으로 학교별 동아리를 한 번에 등록하세요.</p>
         </div>
+      ) : view === 'card' ? (
+        <ClubCardGrid
+          bySchool={bySchool}
+          onCopyLink={(c) => void copyClubLink(c)}
+          onDelete={(c) => void handleDelete(c)}
+          onSchedule={(id) => { setView('list'); setScheduleOpen(id); }}
+        />
       ) : (
         <div className="space-y-4">
           {bySchool.map(([school, schoolClubs]) => (

@@ -8,8 +8,9 @@ import {
   Loader2, ShieldAlert, Users, Plus, CalendarDays, CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import type { ProgramClub, ActivityLog } from '../../types/database';
+import type { ProgramClub, ActivityLog, ActivityFile } from '../../types/database';
 import ClubSessionSchedule from '../programs/detail/club/ClubSessionSchedule';
+import MultiFileUpload from '../../components/MultiFileUpload';
 
 type Screen = 'loading' | 'notfound' | 'ready';
 
@@ -132,6 +133,20 @@ export default function ClubSharePage() {
                   {log.outcome && (
                     <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1">성과 · {log.outcome}</p>
                   )}
+                  {log.file_urls && log.file_urls.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {log.file_urls.map((f, i) => (
+                        /\.(png|jpe?g|gif|webp)$/i.test(f.name) ? (
+                          <a key={i} href={f.url} target="_blank" rel="noreferrer" className="block">
+                            <img src={f.url} alt={f.name} className="w-16 h-16 object-cover rounded-lg border border-slate-200" />
+                          </a>
+                        ) : (
+                          <a key={i} href={f.url} target="_blank" rel="noreferrer"
+                            className="text-[11px] text-violet-700 hover:underline bg-violet-50 rounded px-2 py-1">📎 {f.name}</a>
+                        )
+                      ))}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -153,6 +168,7 @@ function ClubActivityForm({ clubId, programId, onSaved }: { clubId: string; prog
   const [date, setDate] = useState('');
   const [content, setContent] = useState('');
   const [outcome, setOutcome] = useState('');
+  const [files, setFiles] = useState<ActivityFile[]>([]);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -170,6 +186,7 @@ function ClubActivityForm({ clubId, programId, onSaved }: { clubId: string; prog
       activity_date: date,
       content: content.trim() || null,
       outcome: outcome.trim() || null,
+      file_urls: files,
     });
     setSaving(false);
     if (error) {
@@ -177,7 +194,7 @@ function ClubActivityForm({ clubId, programId, onSaved }: { clubId: string; prog
       setErr('등록에 실패했어요. 잠시 후 다시 시도해 주세요.');
       return;
     }
-    setTitle(''); setDate(''); setContent(''); setOutcome('');
+    setTitle(''); setDate(''); setContent(''); setOutcome(''); setFiles([]);
     setDone(true);
     setTimeout(() => setDone(false), 2000);
     setOpen(false);
@@ -208,6 +225,8 @@ function ClubActivityForm({ clubId, programId, onSaved }: { clubId: string; prog
         <textarea value={outcome} onChange={(e) => setOutcome(e.target.value)} rows={2}
           placeholder="성과·결과물 (선택)"
           className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none outline-none focus:border-violet-500" />
+        {/* 박경수님 2026-06-02 CLUB-8 — 활동 사진·자료 첨부 */}
+        <MultiFileUpload bucket="satisfaction-files" pathPrefix={`club/${clubId}`} files={files} onChange={setFiles} disabled={saving} />
         {err && <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{err}</p>}
         <div className="flex items-center justify-end gap-2">
           <button type="button" onClick={() => setOpen(false)} className="px-4 h-10 rounded-lg text-sm text-slate-600 hover:bg-slate-100">취소</button>

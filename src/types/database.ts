@@ -1401,6 +1401,8 @@ export interface ProgramReportSection {
   content?: string | null;
   sort_order: number;
   updated_at: string;
+  // 박경수님 2026-06-02 CLUB-8 — 보고서 섹션 첨부파일 (사진·증빙)
+  file_urls?: ActivityFile[] | null;
 }
 
 // ─── STEP-INSTRUCTOR-INVITE-A 강사 자기 입력 프로필 ───────

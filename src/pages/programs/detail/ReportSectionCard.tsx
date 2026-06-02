@@ -1,9 +1,11 @@
 // bal24 v2 — STEP-PROGRAM-REPORT-TAB / STEP-PROGRAM-UX-B
 // 결과보고서 섹션 카드 (자동집계 + textarea + 저장 시각 + ↑↓ 순서변경 + 삭제)
 
-import { Loader2, Sparkles, Save, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { Loader2, Sparkles, Save, ChevronUp, ChevronDown, X, Paperclip } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { formatDateKo } from '../../../lib/utils';
+import MultiFileUpload from '../../../components/MultiFileUpload';
+import type { ActivityFile } from '../../../types/database';
 
 interface Props {
   Icon: LucideIcon;
@@ -23,12 +25,17 @@ interface Props {
   onDelete?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
+  // 박경수님 2026-06-02 CLUB-8 — 섹션 첨부파일
+  programId?: string;
+  files?: ActivityFile[];
+  onFilesChange?: (files: ActivityFile[]) => void;
 }
 
 export default function ReportSectionCard({
   Icon, label, canGenerate, content, onContentChange,
   onGenerate, onSave, isGenerating, isSaving, isDirty, updatedAt,
   onMove, onDelete, isFirst, isLast,
+  programId, files, onFilesChange,
 }: Props) {
   return (
     <section className={`rounded-2xl border bg-white shadow-[0_4px_16px_rgba(124,58,237,0.06)] p-5 space-y-3 transition-colors ${
@@ -86,6 +93,21 @@ export default function ReportSectionCard({
         placeholder={canGenerate ? '자동집계 버튼을 누르거나 직접 입력해 주세요.' : '직접 입력해 주세요.'}
         rows={8}
         className="w-full min-h-[140px] px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm leading-relaxed focus:outline-none focus:border-violet-400 resize-y" />
+
+      {/* 박경수님 2026-06-02 CLUB-8 — 섹션 첨부파일 (사진·증빙) */}
+      {programId && onFilesChange && (
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-bold text-slate-500 inline-flex items-center gap-1">
+            <Paperclip size={11} aria-hidden="true" /> 첨부파일 (사진·증빙)
+          </p>
+          <MultiFileUpload
+            bucket="satisfaction-files"
+            pathPrefix={`report/${programId}`}
+            files={files ?? []}
+            onChange={onFilesChange}
+          />
+        </div>
+      )}
 
       <footer className="flex items-center justify-between text-[11px] text-slate-400">
         <span>{content.length.toLocaleString()}자</span>

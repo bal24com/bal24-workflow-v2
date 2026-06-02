@@ -23,11 +23,13 @@ export async function saveReportSection(
   sectionKey: ProgramReportSectionKey,
   content: string,
   sortOrder: number,
+  // 박경수님 2026-06-02 CLUB-8 — 섹션 첨부파일
+  fileUrls?: import('../../../types/database').ActivityFile[],
 ): Promise<void> {
   const { error } = await supabase
     .from('program_report_sections')
     .upsert(
-      { program_id: programId, section_key: sectionKey, content, sort_order: sortOrder, updated_at: new Date().toISOString() },
+      { program_id: programId, section_key: sectionKey, content, sort_order: sortOrder, file_urls: fileUrls ?? [], updated_at: new Date().toISOString() },
       { onConflict: 'program_id,section_key' },
     );
   if (error) {

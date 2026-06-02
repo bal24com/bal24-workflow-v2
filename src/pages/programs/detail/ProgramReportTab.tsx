@@ -15,7 +15,7 @@ import {
   DEFAULT_REPORT_SECTIONS,
 } from './programReportUtils';
 import ReportReviewTab from './ReportReviewTab';
-import type { ProgramReportSectionKey } from '../../../types/database';
+import type { ProgramReportSectionKey, ActivityFile } from '../../../types/database';
 
 interface Props { programId: string }
 
@@ -44,9 +44,11 @@ interface SectionState {
   baseline: string;
   generating: boolean;
   saving: boolean;
+  // 박경수님 2026-06-02 CLUB-8 — 섹션 첨부파일
+  files: ActivityFile[];
 }
 
-const EMPTY_STATE: SectionState = { content: '', updatedAt: null, baseline: '', generating: false, saving: false };
+const EMPTY_STATE: SectionState = { content: '', updatedAt: null, baseline: '', generating: false, saving: false, files: [] };
 
 function buildDefs(keys: Array<{ key: ProgramReportSectionKey; label: string }>): SectionDef[] {
   return keys.map((k) => ({
@@ -94,7 +96,7 @@ export default function ProgramReportTab({ programId }: Props) {
     const next: Record<string, SectionState> = {};
     for (const def of defs) {
       const row = rows.find((r) => r.section_key === def.key);
-      next[def.key] = { ...EMPTY_STATE, content: row?.content ?? '', baseline: row?.content ?? '', updatedAt: row?.updated_at ?? null };
+      next[def.key] = { ...EMPTY_STATE, content: row?.content ?? '', baseline: row?.content ?? '', updatedAt: row?.updated_at ?? null, files: row?.file_urls ?? [] };
     }
     setState(next);
     setLoading(false);
@@ -125,7 +127,7 @@ export default function ProgramReportTab({ programId }: Props) {
     patch(key, { saving: true });
     try {
       const s = state[key];
-      await saveReportSection(programId, key, s.content, sortOrder);
+      await saveReportSection(programId, key, s.content, sortOrder, s.files);
       patch(key, { saving: false, baseline: s.content, updatedAt: new Date().toISOString() });
       toast.success('섹션을 저장했어요.');
     } catch (err) {
@@ -282,6 +284,9 @@ export default function ProgramReportTab({ programId }: Props) {
               onDelete={() => handleDeleteSection(sec.key)}
               isFirst={idx === 0}
               isLast={idx === sections.length - 1}
+              programId={programId}
+              files={s.files}
+              onFilesChange={(f) => patch(sec.key, { files: f })}
             />
           );
         })}
