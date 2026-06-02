@@ -90,6 +90,8 @@ const ShareSupporterPage    = lazy(() => import('./pages/share-portal/RoleShareP
 const ShareBeneficiaryPage  = lazy(() => import('./pages/share-portal/RoleSharePage').then((m) => ({ default: () => <m.default role="beneficiary" /> })));
 const ShareTeamPage         = lazy(() => import('./pages/share-portal/RoleSharePage').then((m) => ({ default: () => <m.default role="team" /> })));
 const ShareStaffPage        = lazy(() => import('./pages/share-portal/RoleSharePage').then((m) => ({ default: () => <m.default role="staff" /> })));
+// 박경수님 2026-06-02 CLUB-4 — 동아리(팀) 활동 외부 페이지
+const ClubSharePage         = lazy(() => import('./pages/share-portal/ClubSharePage'));
 const MentoringMentorPage   = lazy(() => import('./pages/mentoring/MentoringMentorPage'));
 const MentoringStudentPage  = lazy(() => import('./pages/mentoring/MentoringStudentPage'));
 const MentorPortalPage      = lazy(() => import('./pages/mentor-portal/MentorPortalPage'));
@@ -172,6 +174,8 @@ export default function App() {
             <Route path="/share/beneficiary/:token" element={<ShareBeneficiaryPage />} />
             <Route path="/share/team/:token"        element={<ShareTeamPage />} />
             <Route path="/share/staff/:token"       element={<ShareStaffPage />} />
+            {/* 박경수님 2026-06-02 CLUB-4 — 동아리(팀) 활동 페이지 */}
+            <Route path="/share/club/:token"        element={<ClubSharePage />} />
             <Route path="/mentoring-mentor/:token" element={<MentoringMentorPage />} />
             <Route path="/mentoring-student/:token" element={<MentoringStudentPage />} />
             {/* STEP-MENTOR-PORTAL-FULL — 미등록 멘토 초대 토큰 기반 외부 포털 */}
