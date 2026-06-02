@@ -24,6 +24,7 @@ import {
 import StageDateBar from './share/StageDateBar';
 import AudienceTab from './share/AudienceTab';
 import { SHARE_AUDIENCE_LABEL } from './share/visibilityCatalog';
+import ExposureMatrixPanel from './share/ExposureMatrixPanel';
 
 // 박경수님 2026-06-02 — 4역할 (지원기관·수혜기관·참여팀(개인)·강사/멘토) 메인 탭
 const AUDIENCE_TABS: ShareAudience[] = ['supporter', 'beneficiary', 'team', 'staff'];
@@ -204,6 +205,13 @@ export default function ShareTab({ programId }: { programId: string }) {
         dirty={datesDirty}
         saving={savingDates}
         onSave={handleSaveDates}
+      />
+
+      {/* 박경수님 2026-06-02 SHARE-UX-2 — 통합 노출 관리 (4역할 한 표) */}
+      <ExposureMatrixPanel
+        programId={programId}
+        visibility={share.visibility}
+        onChange={(next) => setShare({ ...share, visibility: next })}
       />
 
       {/* 대상별 탭 */}
