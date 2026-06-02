@@ -467,7 +467,9 @@ export type ShareItem =
   // 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 외부 토큰 응답 동적 설문
   | 'survey_response'
   // 박경수님 2026-06-02 STEP-SURVEY-RESULTS-B — 동적 설문 응답 결과 조회 (지원기관 공유)
-  | 'survey_results_view';
+  | 'survey_results_view'
+  // 박경수님 2026-06-02 CLUB-3 — 결과보고서 외부 조회 (착수·중간·결과보고)
+  | 'report_view';
 
 // 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 설문 정의 + 동적 문항 + 4역할 대상
 export type SurveyFormKind = 'pre-demand' | 'mid' | 'satisfaction' | 'custom';

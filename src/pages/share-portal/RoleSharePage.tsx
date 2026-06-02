@@ -20,6 +20,8 @@ import OutcomeUploadItem from './items/OutcomeUploadItem';
 import SurveyResponseItem from './items/SurveyResponseItem';
 // 박경수님 2026-06-02 STEP-SURVEY-RESULTS-B — 동적 설문 결과 조회 (지원기관 공유)
 import SurveyResultsViewItem from './items/SurveyResultsViewItem';
+// 박경수님 2026-06-02 CLUB-3 — 결과보고서 외부 열람
+import ReportViewItem from './items/ReportViewItem';
 // 박경수님 2026-06-02 — invite_response·activity_log·lecture_certificate 는 본인 식별 필요로 일단 안내문 처리
 import { fetchShareByToken, getPublicMaterials, type ShareContext } from './sharePortalUtils';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
@@ -116,6 +118,8 @@ export default function RoleSharePage({ role }: Props) {
                   );
                 case 'survey_results_view':
                   return <SurveyResultsViewItem key={item} programId={ctx.program.id} />;
+                case 'report_view':
+                  return <ReportViewItem key={item} programId={ctx.program.id} />;
                 case 'invite_response':
                 case 'activity_log':
                 case 'lecture_certificate':
