@@ -16,6 +16,10 @@ interface Props {
   program?: Program | null;
   stage?: ShareStage;
   children?: ReactNode;
+  // 박경수님 2026-06-02 SHARE-UX-1 — 단계 탭 (외부인이 모든 과정 골라 보기)
+  currentStage?: ShareStage;
+  viewStage?: ShareStage;
+  onStageChange?: (s: ShareStage) => void;
 }
 
 const STAGE_TONE: Record<ShareStage, string> = {
@@ -26,7 +30,13 @@ const STAGE_TONE: Record<ShareStage, string> = {
   result:   'bg-emerald-100 text-emerald-700',
 };
 
-export default function SharePortalShell({ audience, state, program, stage, children }: Props) {
+// 박경수님 2026-06-02 SHARE-UX-1 — 단계 탭 (before 제외 — 실제 운영 4단계)
+const STAGE_TABS: ShareStage[] = ['pre', 'ready', 'progress', 'result'];
+
+export default function SharePortalShell({
+  audience, state, program, stage, children,
+  currentStage, viewStage, onStageChange,
+}: Props) {
   const audienceLabel = SHARE_AUDIENCE_LABEL[audience];
 
   return (
@@ -74,6 +84,29 @@ export default function SharePortalShell({ audience, state, program, stage, chil
                 {program.capacity != null && <span>· 정원 {program.capacity}명</span>}
               </div>
             </header>
+
+            {/* 박경수님 2026-06-02 SHARE-UX-1 — 단계 탭 (모든 과정 골라 보기) */}
+            {state === 'ok' && onStageChange && viewStage && (
+              <nav role="tablist" aria-label="단계 선택"
+                className="flex items-center gap-1 bg-white rounded-2xl border border-violet-100 p-1 shadow-[0_4px_16px_rgba(124,58,237,0.06)] overflow-x-auto">
+                {STAGE_TABS.map((s) => {
+                  const active = viewStage === s;
+                  const isCurrent = currentStage === s;
+                  return (
+                    <button key={s} type="button" role="tab" aria-selected={active}
+                      onClick={() => onStageChange(s)}
+                      className={`flex-1 min-w-[72px] inline-flex items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
+                        active ? 'bg-violet-600 text-white' : 'text-slate-500 hover:bg-violet-50'
+                      }`}>
+                      {SHARE_STAGE_LABEL[s]}
+                      {isCurrent && (
+                        <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-white' : 'bg-violet-500'}`} aria-hidden="true" />
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            )}
 
             {state === 'before' && (
               <section className="rounded-2xl border border-violet-100 bg-white p-8 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col items-center gap-3 text-center">

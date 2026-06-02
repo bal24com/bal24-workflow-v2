@@ -24,7 +24,7 @@ import SurveyResultsViewItem from './items/SurveyResultsViewItem';
 import { fetchShareByToken, getPublicMaterials, type ShareContext } from './sharePortalUtils';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
 import { STAGE_ITEMS } from '../programs/detail/share/visibilityCatalog';
-import type { ShareAudience } from '../../types/database';
+import type { ShareAudience, ShareStage } from '../../types/database';
 
 interface Props {
   /** 박경수님 2026-06-02 — supporter·beneficiary·team·staff 중 하나 */
@@ -36,6 +36,8 @@ export default function RoleSharePage({ role }: Props) {
   const tokenStr = token ?? '';
   const [ctx, setCtx] = useState<ShareContext | null>(null);
   const [state, setState] = useState<'loading' | 'notfound' | 'before' | 'ok'>('loading');
+  // 박경수님 2026-06-02 SHARE-UX-1 — 외부인이 단계 탭으로 모든 과정 골라 보기
+  const [viewStage, setViewStage] = useState<ShareStage>('pre');
 
   useEffect(() => {
     if (!token) { setState('notfound'); return; }
@@ -46,37 +48,36 @@ export default function RoleSharePage({ role }: Props) {
       if (cancelled) return;
       if (!next) { setState('notfound'); return; }
       setCtx(next);
+      // 단계 탭 기본값 — 현재 단계 (before 면 pre 부터 보여줌)
+      setViewStage(next.stage === 'before' ? 'pre' : next.stage);
       setState(next.stage === 'before' ? 'before' : 'ok');
     })();
     return () => { cancelled = true; };
   }, [token, role]);
 
+  // 박경수님 2026-06-02 — 선택한 단계(viewStage) 기준으로 항목 필터
   const visibleItems = ctx
-    ? STAGE_ITEMS[role][ctx.stage].filter((item) =>
+    ? STAGE_ITEMS[role][viewStage].filter((item) =>
         isItemVisible(ctx.share.visibility, role, item),
       )
     : [];
 
-  // team / staff 는 SharePortalShell 의 audience prop 호환 위해 student / expert 로 매핑
-  const shellAudience: 'client' | 'student' | 'expert' =
-      role === 'supporter'   ? 'client'
-    : role === 'beneficiary' ? 'client'
-    : role === 'team'        ? 'student'
-    :                          'expert'; // staff
-
   return (
     <SharePortalShell
-      audience={shellAudience}
+      audience={role}
       state={state}
       program={ctx?.program ?? null}
       stage={ctx?.stage}
+      currentStage={ctx?.stage}
+      viewStage={viewStage}
+      onStageChange={setViewStage}
     >
       {ctx && state === 'ok' && (
         <div className="flex flex-col gap-4">
           {visibleItems.length === 0 ? (
             <section className="rounded-2xl border border-violet-100 bg-white p-8 text-center">
-              <p className="text-sm text-slate-500">현재 단계에 노출 가능한 항목이 없어요.</p>
-              <p className="mt-1 text-[11px] text-slate-400">담당자에게 문의해 주세요.</p>
+              <p className="text-sm text-slate-500">이 단계에 노출된 항목이 없어요.</p>
+              <p className="mt-1 text-[11px] text-slate-400">다른 단계 탭을 선택하거나 담당자에게 문의해 주세요.</p>
             </section>
           ) : (
             visibleItems.map((item) => {
