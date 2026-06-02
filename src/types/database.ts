@@ -478,7 +478,8 @@ export const SURVEY_FORM_KIND_LABEL: Record<SurveyFormKind, string> = {
 };
 
 // 박경수님 2026-06-02 — 기존 SurveyQuestionType (survey_questions 테이블용) 과 충돌 회피 위해 SurveyForm* prefix
-export type SurveyFormQuestionType = 'text' | 'select' | 'number' | 'date' | 'textarea';
+// 박경수님 2026-06-02 STEP-SURVEY-CHECKBOX — 다중 선택 'checkbox' 추가
+export type SurveyFormQuestionType = 'text' | 'select' | 'checkbox' | 'number' | 'date' | 'textarea';
 
 export interface SurveyFormQuestion {
   id: string;

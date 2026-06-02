@@ -19,11 +19,12 @@ interface Props {
 }
 
 const KIND_VALUES: SurveyFormKind[] = ['pre-demand', 'mid', 'satisfaction', 'custom'];
-const QUESTION_TYPE_VALUES: SurveyFormQuestionType[] = ['text', 'textarea', 'select', 'number', 'date'];
+const QUESTION_TYPE_VALUES: SurveyFormQuestionType[] = ['text', 'textarea', 'select', 'checkbox', 'number', 'date'];
 const QUESTION_TYPE_LABEL: Record<SurveyFormQuestionType, string> = {
   text:     '단답형',
   textarea: '서술형',
-  select:   '선택형',
+  select:   '선택형 (1개)',
+  checkbox: '다중 선택',
   number:   '숫자',
   date:     '날짜',
 };
@@ -71,10 +72,12 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
   function addQuestion() {
     const label = newLabel.trim();
     if (!label) { toast.error('문항 레이블을 입력해 주세요.'); return; }
-    const opts = newType === 'select'
+    // 박경수님 2026-06-02 — select·checkbox 둘 다 옵션 필요
+    const needsOptions = newType === 'select' || newType === 'checkbox';
+    const opts = needsOptions
       ? newOptions.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-    if (newType === 'select' && (!opts || opts.length === 0)) {
-      toast.error('선택형은 선택지를 1개 이상 입력해 주세요. (쉼표 구분)');
+    if (needsOptions && (!opts || opts.length === 0)) {
+      toast.error('선택형·다중 선택은 선택지를 1개 이상 입력해 주세요. (쉼표 구분)');
       return;
     }
     setQuestions((prev) => [...prev, { id: genId(), label, type: newType, options: opts, required: newRequired }]);
@@ -192,7 +195,7 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">필수</span>
                         )}
                       </div>
-                      {q.type === 'select' && q.options && (
+                      {(q.type === 'select' || q.type === 'checkbox') && q.options && (
                         <p className="text-[11px] text-slate-500 mt-0.5 truncate">{q.options.join(' · ')}</p>
                       )}
                     </div>
@@ -218,7 +221,7 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
                   ))}
                 </select>
               </div>
-              {newType === 'select' && (
+              {(newType === 'select' || newType === 'checkbox') && (
                 <input type="text" value={newOptions} onChange={(e) => setNewOptions(e.target.value)}
                   placeholder="선택지 (쉼표 구분) — 예: AI, 데이터분석, 마케팅"
                   className="w-full h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500" />

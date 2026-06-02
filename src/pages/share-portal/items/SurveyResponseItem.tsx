@@ -183,6 +183,17 @@ function SurveyFormResponder({ form, programId, role, respondentToken, alreadySu
 function QuestionField({ q, value, onChange, disabled }: {
   q: SurveyFormQuestion; value: string; onChange: (v: string) => void; disabled: boolean;
 }) {
+  // 박경수님 2026-06-02 STEP-SURVEY-CHECKBOX — 다중 선택은 ", " 로 구분된 문자열로 저장
+  const checkedSet = q.type === 'checkbox'
+    ? new Set(value.split(',').map((s) => s.trim()).filter(Boolean))
+    : new Set<string>();
+
+  function toggleCheckbox(opt: string) {
+    const next = new Set(checkedSet);
+    if (next.has(opt)) next.delete(opt); else next.add(opt);
+    onChange(Array.from(next).join(', '));
+  }
+
   return (
     <div className="space-y-1">
       <label className="text-xs font-semibold text-slate-700">
@@ -195,6 +206,22 @@ function QuestionField({ q, value, onChange, disabled }: {
           <option value="">선택해 주세요</option>
           {(q.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
+      ) : q.type === 'checkbox' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          {(q.options ?? []).map((opt) => {
+            const checked = checkedSet.has(opt);
+            return (
+              <label key={opt} className={`flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer text-sm ${
+                checked ? 'border-violet-300 bg-violet-50 text-violet-800' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}>
+                <input type="checkbox" checked={checked} disabled={disabled}
+                  onChange={() => toggleCheckbox(opt)}
+                  className="rounded text-violet-600" />
+                <span>{opt}</span>
+              </label>
+            );
+          })}
+        </div>
       ) : q.type === 'textarea' ? (
         <textarea value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} required={q.required}
           rows={3} placeholder={`${q.label} 입력`}
