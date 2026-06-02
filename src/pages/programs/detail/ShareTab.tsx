@@ -155,10 +155,11 @@ export default function ShareTab({ programId }: { programId: string }) {
     if (!share) return;
     const updated = await toggleItemVisibility(programId, share.visibility, audience, item, next);
     if (!updated) {
-      toast.error('항목 표시 변경에 실패했어요.');
+      toast.error('노출 항목 저장에 실패했습니다.');
       return;
     }
     setShare({ ...share, visibility: updated });
+    toast.success('노출 항목이 저장되었습니다.');
   }
 
   async function handleRegenerate(audience: ShareAudience) {

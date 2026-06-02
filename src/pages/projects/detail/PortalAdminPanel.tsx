@@ -15,6 +15,8 @@ import PortalBeneficiarySection from './PortalBeneficiarySection';
 import PortalSurveyConfigSection, { type SurveyConfig } from './PortalSurveyConfigSection';
 // 박경수님 2026-05-30 STEP-PORTAL-BULK-REGISTER — 수혜자 팀 섹션 분리
 import PortalTeamSection from './PortalTeamSection';
+// 박경수님 2026-06-02 — 역할별 노출 항목 제어 패널 분리 (V-1 가드용)
+import PortalExposePanel from './PortalExposePanel';
 
 interface PortalRow {
   id: string;
@@ -161,6 +163,9 @@ export default function PortalAdminPanel({ portalId }: Props) {
               })}
             </div>
           </section>
+
+          {/* 박경수님 2026-06-02 — 역할별 노출 항목 제어 패널 */}
+          <PortalExposePanel portalId={portalId} />
 
           {/* 2) PIN */}
           <section className="space-y-2">
