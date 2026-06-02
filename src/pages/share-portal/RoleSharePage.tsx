@@ -24,6 +24,8 @@ import SurveyResultsViewItem from './items/SurveyResultsViewItem';
 import ReportViewItem from './items/ReportViewItem';
 // 박경수님 2026-06-02 CLUB-10 — 동아리 전체 진행률 대시보드
 import ClubDashboardItem from './items/ClubDashboardItem';
+// 박경수님 2026-06-02 CLUB-13 — 진행 중 파일 제출 (과정 산출물·사진)
+import FileUploadItem from './items/FileUploadItem';
 // 박경수님 2026-06-02 — invite_response·activity_log·lecture_certificate 는 본인 식별 필요로 일단 안내문 처리
 import { fetchShareByToken, getPublicMaterials, type ShareContext } from './sharePortalUtils';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
@@ -78,6 +80,10 @@ export default function RoleSharePage({ role }: Props) {
     >
       {ctx && state === 'ok' && (
         <div className="flex flex-col gap-4">
+          {/* 박경수님 2026-06-02 CLUB-13 — 지원·수혜기관은 단계 무관 종합 현황을 상단 고정 (동아리 없으면 자동 숨김) */}
+          {(role === 'supporter' || role === 'beneficiary') && (
+            <ClubDashboardItem programId={ctx.program.id} />
+          )}
           {visibleItems.length === 0 ? (
             <section className="rounded-2xl border border-violet-100 bg-white p-8 text-center">
               <p className="text-sm text-slate-500">이 단계에 노출된 항목이 없어요.</p>
@@ -129,7 +135,8 @@ export default function RoleSharePage({ role }: Props) {
                 case 'file_download':
                   return <MaterialsItem key={item} files={getPublicMaterials(ctx.program)} />;
                 case 'file_upload':
-                  return <OutcomeUploadItem key={item} programId={ctx.program.id} />;
+                  // 박경수님 2026-06-02 CLUB-13 — 실제 파일 업로드 (폼 발행 불필요)
+                  return <FileUploadItem key={item} programId={ctx.program.id} />;
                 case 'approval':
                 case 'tax_invoice':
                   // 박경수님 2026-06-02 MERGE-2 — 동의·세금계산서는 PM 안내 + 담당자 연락 흐름 (외부 입력은 추후 STEP)
