@@ -1,8 +1,36 @@
 // bal24 v2 — STEP-APPLICATION-MGMT 신청자 관리 헬퍼 (PM)
 // fetch / 단건 상태 변경 / 일괄 상태 변경 / MEMBER 초대.
+// 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 추가 질문·응답 집계 헬퍼.
 
 import { supabase } from '../../../lib/supabase';
-import type { ParticipantApplication, ParticipantStatus } from '../../../types/application';
+import type {
+  ParticipantApplication, ParticipantStatus, AppQuestion,
+} from '../../../types/application';
+
+/** 박경수님 2026-06-02 — programs.application_questions 단건 조회. */
+export async function fetchApplicationQuestions(programId: string): Promise<AppQuestion[]> {
+  const { data, error } = await supabase
+    .from('programs').select('application_questions').eq('id', programId).maybeSingle();
+  if (error) {
+    console.error('[applications] 추가 질문 조회 실패:', error.message);
+    return [];
+  }
+  const raw = (data?.application_questions ?? []) as unknown;
+  return Array.isArray(raw) ? (raw as AppQuestion[]) : [];
+}
+
+/** 박경수님 2026-06-02 — 신청자 행들에 대해 select 형 질문 응답 집계. (희망 일정 카운트 등) */
+export function tallySelectAnswers(
+  apps: ParticipantApplication[],
+  question: AppQuestion,
+): Record<string, number> {
+  const tally: Record<string, number> = {};
+  apps.forEach((a) => {
+    const ans = (a.extra_answers ?? {})[question.id]?.trim() || '미응답';
+    tally[ans] = (tally[ans] ?? 0) + 1;
+  });
+  return tally;
+}
 
 // ─── STEP-MEMBER-INVITE-REPORT — 합격자 MEMBER 초대 결과 타입 ───
 export interface InviteAsMemberResult {

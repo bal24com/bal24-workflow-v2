@@ -1,15 +1,18 @@
 // bal24 v2 — 교육생 신청 상세 모달 (STEP 11 옵션 B)
+// 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 추가 질문 응답 섹션 추가.
 
 import { useEffect, useState } from 'react';
-import { Mail, Phone, Building2, MapPin, Calendar, FileText } from 'lucide-react';
+import { Mail, Phone, Building2, MapPin, Calendar, FileText, MessageSquare } from 'lucide-react';
 import { Modal, Button } from '../../components/ui';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
 import { useToast } from '../../contexts/ToastContext';
-import type { ParticipantApplication } from '../../types/application';
+import type { ParticipantApplication, AppQuestion } from '../../types/application';
 
 interface Props {
   application: ParticipantApplication;
+  /** 박경수님 2026-06-02 — 프로그램별 추가 질문 정의 (없으면 빈 배열) */
+  questions?: AppQuestion[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -20,7 +23,7 @@ const GENDER_LABEL: Record<string, string> = {
   other: '기타',
 };
 
-export default function ApplicationDetailModal({ application, onClose, onSaved }: Props) {
+export default function ApplicationDetailModal({ application, questions, onClose, onSaved }: Props) {
   const toast = useToast();
   const [reviewNotes, setReviewNotes] = useState(application.review_notes ?? '');
   const [attendanceRate, setAttendanceRate] = useState<string>(
@@ -154,6 +157,28 @@ export default function ApplicationDetailModal({ application, onClose, onSaved }
           <section>
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">관련 경험</h4>
             <p className="text-sm text-slate-700 whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-3">{application.experience}</p>
+          </section>
+        )}
+
+        {/* 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 추가 질문 응답 */}
+        {questions && questions.length > 0 && (
+          <section>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 inline-flex items-center gap-1">
+              <MessageSquare size={11} aria-hidden="true" /> 추가 질문 응답
+            </h4>
+            <div className="rounded-2xl border border-violet-100 bg-violet-50/30 p-3 space-y-1.5">
+              {questions.map((q) => {
+                const ans = (application.extra_answers ?? {})[q.id]?.trim();
+                return (
+                  <div key={q.id} className="flex items-start gap-2 text-sm">
+                    <span className="text-slate-500 w-32 shrink-0 truncate" title={q.label}>{q.label}</span>
+                    <span className={`flex-1 min-w-0 break-words ${ans ? 'text-slate-700 font-semibold' : 'text-slate-300 italic'}`}>
+                      {ans || '미응답'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         )}
 

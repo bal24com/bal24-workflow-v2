@@ -2,9 +2,7 @@
 // 필터 + 일괄 선택/처리 + 단건 상태 변경 + 상세 모달 + 평가 점수 컬럼(평가형).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Loader2, CheckCircle2, XCircle, Clock, Trophy, Users2, UserPlus, Mail, Search, Trash2,
-} from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Clock, Trophy, Users2, UserPlus, Mail, Search, Trash2 } from 'lucide-react';
 import { Button } from '../../../components/ui';
 import EmptyState from '../../../components/EmptyState';
 import { useBulkSelect } from '../../../hooks/useBulkSelect';
@@ -12,17 +10,12 @@ import { useToast } from '../../../contexts/ToastContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { formatDateKo } from '../../../lib/utils';
 import { supabase } from '../../../lib/supabase';
-import {
-  fetchApplications, updateApplicationStatus, bulkUpdateStatus, fetchAvgScores,
-  inviteAsMember as inviteAsMemberUtil,
-  PARTICIPANT_STATUS_LABELS, PARTICIPANT_STATUS_TONE,
-} from './applicationMgmtUtils';
+import { fetchApplications, updateApplicationStatus, bulkUpdateStatus, fetchAvgScores, fetchApplicationQuestions, inviteAsMember as inviteAsMemberUtil, PARTICIPANT_STATUS_LABELS, PARTICIPANT_STATUS_TONE } from './applicationMgmtUtils';
 import ApplicationDetailModal from '../../applications/ApplicationDetailModal';
 import RejectionReasonModal from './RejectionReasonModal';
+import ExtraAnswerTallyBar from './ExtraAnswerTallyBar';
 import { sendNotification } from '../../../lib/notifyUtils';
-import type {
-  ParticipantApplication, ParticipantStatus,
-} from '../../../types/application';
+import type { ParticipantApplication, ParticipantStatus, AppQuestion } from '../../../types/application';
 
 interface Props {
   programId: string;
@@ -47,6 +40,8 @@ export default function ApplicationTab({ programId }: Props) {
   const [scores, setScores] = useState<Map<string, { avg: number; count: number }>>(new Map());
   const [isEvaluation, setIsEvaluation] = useState(false);
   const [maxApplicants, setMaxApplicants] = useState<number | null>(null);
+  // 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 프로그램별 추가 질문
+  const [questions, setQuestions] = useState<AppQuestion[]>([]);
   // STEP-EMAIL-NOTIFY — 이메일 발송 시 프로그램명 사용
   const [programName, setProgramName] = useState<string>('');
   // STEP-MEMBER-INVITE-REPORT — 합격자 MEMBER 초대 상태 관리
@@ -69,6 +64,8 @@ export default function ApplicationTab({ programId }: Props) {
     setIsEvaluation((prog?.application_type ?? 'open') === 'evaluation');
     setMaxApplicants((prog?.max_applicants as number | null | undefined) ?? null);
     setProgramName((prog?.name as string | null | undefined) ?? '');
+    // 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 추가 질문 정의 로드
+    setQuestions(await fetchApplicationQuestions(programId));
     // 2) 신청자 + (평가형이면) 점수
     const list = await fetchApplications(programId);
     setItems(list);
@@ -249,6 +246,9 @@ export default function ApplicationTab({ programId }: Props) {
         );
       })()}
 
+      {/* 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — select 추가 질문 응답 집계 배지 (분리) */}
+      <ExtraAnswerTallyBar questions={questions} items={items} />
+
       {/* 헤더 — STEP-PARTICIPANT-BULK-DELETE: 검색 input + 일괄 처리 + 일괄 삭제 */}
       <header className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-base font-bold text-[#1E1B4B] flex items-center gap-1.5">
@@ -379,6 +379,7 @@ export default function ApplicationTab({ programId }: Props) {
       {detailTarget && (
         <ApplicationDetailModal
           application={detailTarget}
+          questions={questions}
           onClose={() => setDetailTarget(null)}
           onSaved={() => { void refresh(); setDetailTarget(null); }}
         />

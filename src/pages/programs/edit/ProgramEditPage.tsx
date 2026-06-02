@@ -146,7 +146,7 @@ export default function ProgramEditPage() {
         <ScheduleCard form={form} onChange={update} errorField={error?.field} />
         <NoticeCard form={form} onChange={update} />
         <GoalCard form={form} onChange={update} />
-        <ApplicationCard form={form} onChange={update} errorField={error?.field} />
+        <ApplicationCard form={form} onChange={update} errorField={error?.field} programId={id ?? null} />
         <OutcomeLinkCard programId={id} />
         <SurveyLinkCard />
         <ClassificationCard />

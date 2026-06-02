@@ -282,6 +282,14 @@ export interface Program {
   application_end_date?: string | null;
   /** STEP-PROGRAM-TYPE-TS — 모집 정원 */
   max_applicants?: number | null;
+  /** 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 외부 신청 폼 추가 질문 (AppQuestion[]). database.ts 와 application.ts 의 순환 import 회피 위해 인라인 정의. */
+  application_questions?: Array<{
+    id: string;
+    label: string;
+    type: 'text' | 'select' | 'number' | 'date';
+    options?: string[];
+    required: boolean;
+  }> | null;
   /** STEP-PROGRAM-TYPE — 표시 순서 (오름차순) */
   display_order?: number | null;
   /** STEP-PROGRAM-TYPE — 활성 모듈 ID 배열 (program_templates.modules 복사) */

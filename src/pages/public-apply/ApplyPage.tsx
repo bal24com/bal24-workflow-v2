@@ -11,7 +11,9 @@ import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
 import { useToast } from '../../contexts/ToastContext';
 import type { Program } from '../../types/database';
+import type { AppQuestion } from '../../types/application';
 import PromoSection from './PromoSection';
+import ApplyQuestionsSection from './ApplyQuestionsSection';
 import {
   checkApplicationGate, checkDuplicateApplication, submitApplication,
 } from './applicationUtils';
@@ -57,6 +59,8 @@ export default function ApplyPage() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 추가 질문 응답
+  const [extraAnswers, setExtraAnswers] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!programId) return;
@@ -106,6 +110,15 @@ export default function ApplyPage() {
       return;
     }
 
+    // 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 필수 추가 질문 검증
+    const questions = (program.application_questions ?? []) as AppQuestion[];
+    for (const q of questions) {
+      if (q.required && !(extraAnswers[q.id] ?? '').trim()) {
+        toast.error(`'${q.label}' 항목을 입력해 주세요.`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       // STEP-APPLICATION-CAPACITY — INSERT 직전 RPC 재확인 (race condition 방지)
@@ -134,6 +147,8 @@ export default function ApplyPage() {
         organization: form.organization,
         motivation: form.motivation,
         experience: form.experience,
+        // 박경수님 2026-06-02 — 추가 질문 응답
+        extraAnswers,
       });
       if (!result.success) {
         toast.error(result.error ?? '신청 중 오류가 발생했어요.');
@@ -318,6 +333,14 @@ export default function ApplyPage() {
                 className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
               />
             </div>
+
+            {/* 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — PM 추가 질문 동적 렌더 (분리) */}
+            <ApplyQuestionsSection
+              questions={(program.application_questions ?? []) as AppQuestion[]}
+              answers={extraAnswers}
+              onChange={(id, v) => setExtraAnswers((prev) => ({ ...prev, [id]: v }))}
+              disabled={submitting}
+            />
 
             <label className="flex items-start gap-2 rounded-xl border border-violet-100 bg-violet-50/40 px-3 py-3 text-sm cursor-pointer">
               <input

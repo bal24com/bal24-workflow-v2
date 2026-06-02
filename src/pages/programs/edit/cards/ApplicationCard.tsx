@@ -1,19 +1,23 @@
 // bal24 v2 — STEP-PROGRAM-CREATION-WIZARD 신청·지원금 카드
 // application_type / 신청 기간·정원 / grant_enabled / grant_budget 통합 입력.
+// 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 카드 하단에 추가 질문 에디터 마운트.
 
 import CardShell, { Field, inputClass } from './CardShell';
 import { APPLICATION_TYPE_LABELS } from '../../../../constants/programTypes';
 import type { ProgramEditForm, ApplicationType } from '../programEditUtils';
+import RecruitQuestionEditor from './RecruitQuestionEditor';
 
 interface Props {
   form: ProgramEditForm;
   onChange: <K extends keyof ProgramEditForm>(key: K, value: ProgramEditForm[K]) => void;
   errorField?: keyof ProgramEditForm;
+  /** 박경수님 2026-06-02 — 추가 질문 에디터 마운트용 (신규 작성 단계에서는 null) */
+  programId?: string | null;
 }
 
 const APPLICATION_TYPE_VALUES: ApplicationType[] = ['open', 'evaluation'];
 
-export default function ApplicationCard({ form, onChange, errorField }: Props) {
+export default function ApplicationCard({ form, onChange, errorField, programId }: Props) {
   const isEvaluation = form.application_type === 'evaluation';
   return (
     <CardShell
@@ -96,6 +100,9 @@ export default function ApplicationCard({ form, onChange, errorField }: Props) {
           </Field>
         </div>
       )}
+
+      {/* 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 추가 질문 에디터 */}
+      <RecruitQuestionEditor programId={programId ?? null} />
     </CardShell>
   );
 }

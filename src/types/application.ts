@@ -32,7 +32,27 @@ export interface ParticipantApplication {
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+  // 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 신청 폼 추가 질문 응답
+  extra_answers: Record<string, string> | null;
 }
+
+// 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — PM 이 설정하는 신청 폼 추가 질문 정의
+export type AppQuestionType = 'text' | 'select' | 'number' | 'date';
+
+export interface AppQuestion {
+  id: string;
+  label: string;
+  type: AppQuestionType;
+  options?: string[];
+  required: boolean;
+}
+
+export const APP_QUESTION_TYPE_LABEL: Record<AppQuestionType, string> = {
+  text:   '단답형',
+  select: '선택형',
+  number: '숫자',
+  date:   '날짜',
+};
 
 export type RecruitType = 'instructor' | 'ta' | 'expert' | 'mentor';
 

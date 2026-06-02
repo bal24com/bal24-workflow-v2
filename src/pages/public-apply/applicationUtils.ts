@@ -75,6 +75,8 @@ export interface ApplicationPayload {
   organization: string;
   motivation: string;
   experience: string;
+  // 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 추가 질문 응답
+  extraAnswers?: Record<string, string>;
 }
 
 export interface SubmitResult {
@@ -99,6 +101,8 @@ export async function submitApplication(p: ApplicationPayload): Promise<SubmitRe
     privacy_agreed_at: new Date().toISOString(),
     // V2 실측 CHECK: 'applied' | 'reviewing' | 'accepted' | 'rejected' | 'withdrawn' | 'completed'
     status: 'applied',
+    // 박경수님 2026-06-02 STEP-RECRUIT-CUSTOM-QUESTIONS — 추가 질문 응답
+    extra_answers: p.extraAnswers ?? {},
   });
   if (error) {
     const m = error.message.toLowerCase();
