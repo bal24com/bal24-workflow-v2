@@ -2,10 +2,11 @@
 // portal_beneficiary_orgs 행별 token + 4자리 PIN. 5단계 토큰과 별개 레벨.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, Copy, Trash2, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Copy, Trash2, RefreshCw, Upload } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { copyToClipboard } from '../../../lib/clipboard';
+import PortalBeneficiaryBulkModal from './PortalBeneficiaryBulkModal';
 
 interface OrgRow {
   id: string;
@@ -40,6 +41,7 @@ export default function PortalBeneficiarySection({ portalId }: Props) {
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newPin, setNewPin] = useState(genPin());
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -104,7 +106,13 @@ export default function PortalBeneficiarySection({ portalId }: Props) {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-bold text-[#1E1B4B]">🏢 수혜기관 등록 ({rows.length})</h3>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h3 className="text-sm font-bold text-[#1E1B4B]">🏢 수혜기관 등록 ({rows.length})</h3>
+        <button type="button" onClick={() => setBulkOpen(true)}
+          className="inline-flex items-center gap-1 px-2.5 h-8 rounded-lg border border-violet-200 text-violet-700 text-xs font-bold hover:bg-violet-50">
+          <Upload size={12} aria-hidden="true" /> 일괄 등록
+        </button>
+      </div>
 
       {/* 등록 폼 */}
       <div className="rounded-xl border border-violet-100 bg-violet-50/30 p-3 space-y-2">
@@ -178,6 +186,13 @@ export default function PortalBeneficiarySection({ portalId }: Props) {
           })}
         </div>
       )}
+
+      <PortalBeneficiaryBulkModal
+        portalId={portalId}
+        isOpen={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onSuccess={() => { void reload(); }}
+      />
     </section>
   );
 }

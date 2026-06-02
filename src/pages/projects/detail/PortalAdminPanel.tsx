@@ -12,6 +12,8 @@ import PortalItemFormModal from '../../portal/PortalItemFormModal';
 import PortalIntroSection from './PortalIntroSection';
 import PortalBeneficiarySection from './PortalBeneficiarySection';
 import PortalSurveyConfigSection, { type SurveyConfig } from './PortalSurveyConfigSection';
+// 박경수님 2026-05-30 STEP-PORTAL-BULK-REGISTER — 수혜자 팀 섹션 분리
+import PortalTeamSection from './PortalTeamSection';
 
 interface PortalRow {
   id: string;
@@ -27,7 +29,6 @@ interface PortalRow {
   survey_config: SurveyConfig | null;
 }
 
-interface TeamRow { id: string; team_code: string; team_name: string }
 interface ItemRow {
   id: string; item_type: string;
   label: string | null; title: string | null;
@@ -54,31 +55,24 @@ const TOKEN_ROWS: Array<{ key: keyof PortalRow; role: Exclude<PortalRole, 'admin
 export default function PortalAdminPanel({ portalId, onClose }: Props) {
   const toast = useToast();
   const [portal, setPortal] = useState<PortalRow | null>(null);
-  const [teams, setTeams] = useState<TeamRow[]>([]);
   const [items, setItems] = useState<ItemRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [pinDraft, setPinDraft] = useState('');
-  const [newTeamCode, setNewTeamCode] = useState('');
-  const [newTeamName, setNewTeamName] = useState('');
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemRow | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const [pRes, tRes, iRes] = await Promise.all([
+    const [pRes, iRes] = await Promise.all([
       supabase.from('project_portals')
         .select('id, title, operator_token, supporter_token, beneficiary_token, participant_token, beneficiary_pin, intro_title, intro_content, survey_config')
         .eq('id', portalId).maybeSingle(),
-      supabase.from('portal_teams').select('id, team_code, team_name')
-        .eq('portal_id', portalId).order('team_code'),
       supabase.from('portal_items').select('id, item_type, label, title, description, file_url, visible_roles, actionable_roles, required, sort_order')
         .eq('portal_id', portalId).order('sort_order'),
     ]);
     if (pRes.error) console.error('[PortalAdmin] portal fetch:', pRes.error.message);
-    if (tRes.error) console.error('[PortalAdmin] teams fetch:', tRes.error.message);
     if (iRes.error) console.error('[PortalAdmin] items fetch:', iRes.error.message);
     setPortal(pRes.data as PortalRow | null);
-    setTeams((tRes.data ?? []) as TeamRow[]);
     setItems((iRes.data ?? []) as ItemRow[]);
     setPinDraft((pRes.data?.beneficiary_pin as string | null) ?? '');
     setLoading(false);
@@ -115,30 +109,6 @@ export default function PortalAdminPanel({ portalId, onClose }: Props) {
       .eq('id', portalId);
     if (error) { console.error('[PortalAdmin] PIN 저장:', error.message); toast.error('PIN 저장 실패'); return; }
     toast.success(pin ? 'PIN 을 저장했어요.' : 'PIN 을 비활성화했어요.');
-    void reload();
-  }
-
-  async function addTeam() {
-    const code = newTeamCode.trim().toUpperCase();
-    const name = newTeamName.trim();
-    if (!code || !name) { toast.error('팀코드와 팀명을 모두 입력해 주세요.'); return; }
-    const { error } = await supabase.from('portal_teams')
-      .insert({ portal_id: portalId, team_code: code, team_name: name });
-    if (error) {
-      console.error('[PortalAdmin] 팀 추가:', error.message);
-      toast.error(error.message.includes('duplicate') ? '같은 팀코드가 이미 있어요.' : '팀 추가 실패');
-      return;
-    }
-    toast.success('팀을 추가했어요.');
-    setNewTeamCode(''); setNewTeamName('');
-    void reload();
-  }
-
-  async function removeTeam(id: string, name: string) {
-    if (!window.confirm(`"${name}" 팀을 삭제할까요?`)) return;
-    const { error } = await supabase.from('portal_teams').delete().eq('id', id);
-    if (error) { toast.error('삭제 실패'); return; }
-    toast.success('삭제했어요.');
     void reload();
   }
 
@@ -216,36 +186,8 @@ export default function PortalAdminPanel({ portalId, onClose }: Props) {
             <p className="text-[11px] text-slate-400">수혜기관 링크 접속 시 PIN 입력 요구. 비우면 토큰만으로 통과.</p>
           </section>
 
-          {/* 3) 팀 */}
-          <section className="space-y-2">
-            <h3 className="text-sm font-bold text-[#1E1B4B]">👥 수혜자 팀 등록 ({teams.length})</h3>
-            <div className="space-y-1">
-              {teams.map((t) => (
-                <div key={t.id} className="flex items-center gap-2 p-2 rounded-lg border border-slate-100 bg-slate-50">
-                  <span className="text-xs font-mono font-bold text-slate-700 w-20">{t.team_code}</span>
-                  <span className="flex-1 text-sm text-slate-700">{t.team_name}</span>
-                  <button type="button" onClick={() => void removeTeam(t.id, t.team_name)}
-                    className="p-1 rounded hover:bg-rose-50 text-rose-500" aria-label="삭제">
-                    <Trash2 size={12} aria-hidden="true" />
-                  </button>
-                </div>
-              ))}
-              <div className="flex items-center gap-2">
-                <input type="text" value={newTeamCode}
-                  onChange={(e) => setNewTeamCode(e.target.value.toUpperCase())}
-                  placeholder="팀코드"
-                  className="w-24 h-9 rounded-lg border border-slate-200 px-2 text-sm font-mono outline-none focus:border-violet-500" />
-                <input type="text" value={newTeamName}
-                  onChange={(e) => setNewTeamName(e.target.value)}
-                  placeholder="팀명"
-                  className="flex-1 h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500" />
-                <button type="button" onClick={() => void addTeam()}
-                  className="px-3 h-9 rounded-lg bg-violet-100 text-violet-700 text-xs font-bold hover:bg-violet-200 inline-flex items-center gap-1">
-                  <Plus size={12} aria-hidden="true" /> 추가
-                </button>
-              </div>
-            </div>
-          </section>
+          {/* 3) 팀 — PortalTeamSection 으로 분리 (일괄 등록 포함) */}
+          <PortalTeamSection portalId={portalId} />
 
           {/* 4) 체크리스트 항목 */}
           <section className="space-y-2">
