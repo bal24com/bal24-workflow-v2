@@ -1,8 +1,9 @@
 // 박경수님 2026-05-29 STEP-PORTAL-MULTI-ROLE 2차 — 관리자 통합 관리 패널.
 // 4종 토큰 URL / PIN 설정 / 팀 등록 / 체크리스트 항목 한 화면.
+// 박경수님 2026-05-30 STEP-PORTAL-DETAIL-INLINE — slideover 제거, 외부공유 탭 우측 인라인 패널.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Copy, RefreshCw, Plus, Trash2, Loader2, X, FileText } from 'lucide-react';
+import { Copy, RefreshCw, Plus, Trash2, Loader2, FileText } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import { copyToClipboard } from '../../../lib/clipboard';
@@ -42,7 +43,6 @@ interface ItemRow {
 
 interface Props {
   portalId: string;
-  onClose: () => void;
 }
 
 const TOKEN_ROWS: Array<{ key: keyof PortalRow; role: Exclude<PortalRole, 'admin'> }> = [
@@ -52,7 +52,7 @@ const TOKEN_ROWS: Array<{ key: keyof PortalRow; role: Exclude<PortalRole, 'admin
   { key: 'participant_token', role: 'participant' },
 ];
 
-export default function PortalAdminPanel({ portalId, onClose }: Props) {
+export default function PortalAdminPanel({ portalId }: Props) {
   const toast = useToast();
   const [portal, setPortal] = useState<PortalRow | null>(null);
   const [items, setItems] = useState<ItemRow[]>([]);
@@ -122,30 +122,22 @@ export default function PortalAdminPanel({ portalId, onClose }: Props) {
 
   if (loading || !portal) {
     return (
-      <div className="fixed inset-0 z-50 flex">
-        <div className="absolute inset-0 bg-black/30" onClick={onClose} aria-hidden="true" />
-        <div className="relative ml-auto w-full max-w-2xl bg-white h-full overflow-y-auto p-6">
-          <div className="flex justify-center py-12">
-            <Loader2 size={24} className="animate-spin text-violet-400" aria-hidden="true" />
-          </div>
-        </div>
+      <div className="flex justify-center py-16">
+        <Loader2 size={24} className="animate-spin text-violet-400" aria-hidden="true" />
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} aria-hidden="true" />
-      <div className="relative ml-auto w-full max-w-2xl bg-white h-full overflow-y-auto">
-        <header className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between z-10">
-          <h2 className="text-lg font-bold text-[#1E1B4B]">{portal.title} — 관리</h2>
-          <button type="button" onClick={onClose} aria-label="닫기"
-            className="p-1.5 rounded hover:bg-slate-100">
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
+    <div className="rounded-2xl border border-violet-100 bg-white shadow-card">
+      <header className="sticky top-0 bg-white border-b border-slate-100 px-5 py-3 flex items-center justify-between rounded-t-2xl z-10">
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-[#1E1B4B] truncate">{portal.title}</h2>
+          <p className="text-[10px] text-slate-400 mt-0.5">포털 자세히</p>
+        </div>
+      </header>
 
-        <div className="p-6 space-y-6">
+      <div className="p-5 space-y-6">
           {/* 1) 4종 토큰 */}
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-[#1E1B4B]">🔗 역할별 외부 링크</h3>
@@ -239,7 +231,6 @@ export default function PortalAdminPanel({ portalId, onClose }: Props) {
             />
           </div>
         </div>
-      </div>
 
       {itemModalOpen && (
         <PortalItemFormModal

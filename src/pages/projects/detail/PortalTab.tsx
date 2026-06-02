@@ -1,9 +1,9 @@
-// bal24 v2 — 프로젝트 상세 · 포털 탭
-// 포털 만들기 + 포털 목록 + 회신 패널
+// bal24 v2 — 프로젝트 상세 · 외부 공유 탭
+// 박경수님 2026-05-30 STEP-PORTAL-DETAIL-INLINE — 좌(포털 목록) + 우(자세한 사항) 분할.
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Plus, Loader2, Link2, Copy, Edit3, Power, PowerOff, Settings,
+  Plus, Loader2, Link2, Copy, Edit3, Power, PowerOff, ChevronRight,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
@@ -12,7 +12,6 @@ import { getPortalUrl, STAGE_LABELS } from '../../portal/portalConstants';
 import type { ProjectPortal } from '../../../types/database';
 import PortalCreateModal from '../../portal/PortalCreateModal';
 import PortalResponsesPanel from '../../portal/PortalResponsesPanel';
-// 박경수님 2026-05-29 STEP-PORTAL-MULTI-ROLE 2차 — 관리 패널
 import PortalAdminPanel from './PortalAdminPanel';
 
 type Props = {
@@ -34,8 +33,8 @@ export default function PortalTab({ projectId, clientId }: Props) {
   const [editing, setEditing] = useState<ProjectPortal | null>(null);
   const [activePortal, setActivePortal] = useState<PortalRow | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
-  // 박경수님 2026-05-29 STEP-PORTAL-MULTI-ROLE 2차 — 관리 패널 대상
-  const [adminPortalId, setAdminPortalId] = useState<string | null>(null);
+  // 박경수님 2026-05-30 STEP-PORTAL-DETAIL-INLINE — 우측 자세히 패널 대상
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -47,7 +46,10 @@ export default function PortalTab({ projectId, clientId }: Props) {
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setPortals((data ?? []) as PortalRow[]);
+      const rows = (data ?? []) as PortalRow[];
+      setPortals(rows);
+      // 첫 진입 시 — 첫 포털 자동 선택
+      setSelectedId((prev) => prev ?? rows[0]?.id ?? null);
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
       console.error('[portal-tab] 조회 실패:', raw);
@@ -119,46 +121,100 @@ export default function PortalTab({ projectId, clientId }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {portals.map((p) => {
-            const total = p.items.length;
-            const done = p.items.filter((i) => i.completed).length;
-            return (
-              <Card key={p.id} className="hover:border-primary/30 transition">
-                <CardContent className="p-3 space-y-2">
+        // 박경수님 2026-05-30 — 좌(280px) 카드 목록 + 우(자세히) 분할
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 items-start">
+          {/* 좌측 — 포털 카드 목록 */}
+          <aside className="space-y-2">
+            {portals.map((p) => {
+              const total = p.items.length;
+              const done = p.items.filter((i) => i.completed).length;
+              const active = selectedId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedId(p.id)}
+                  className={[
+                    'w-full text-left rounded-xl border transition p-3 space-y-1.5',
+                    active
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-slate-200 bg-white hover:border-primary/40',
+                  ].join(' ')}
+                >
                   <div className="flex items-start justify-between gap-2">
-                    <button type="button" onClick={() => setActivePortal(p)} className="text-left min-w-0 flex-1">
-                      <h3 className="text-sm font-bold text-text truncate hover:text-primary">{p.title}</h3>
-                      {p.stage_tag && <Badge variant="primary">{STAGE_LABELS[p.stage_tag]}</Badge>}
-                    </button>
+                    <div className="min-w-0 flex-1">
+                      <h3 className={`text-sm font-bold truncate ${active ? 'text-primary' : 'text-text'}`}>
+                        {p.title}
+                      </h3>
+                      {p.stage_tag && (
+                        <div className="mt-1">
+                          <Badge variant="primary">{STAGE_LABELS[p.stage_tag]}</Badge>
+                        </div>
+                      )}
+                    </div>
                     <Badge variant={p.is_active ? 'success' : 'default'}>{p.is_active ? '활성' : '비활성'}</Badge>
                   </div>
                   <div className="text-[11px] text-muted">
                     항목 {total} · 완료 <span className="text-success font-bold">{done}</span>
                   </div>
-                  <div className="flex items-center gap-1 pt-2 border-t border-slate-100 text-xs">
-                    <button type="button" onClick={() => void handleCopy(p.portal_token)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-primary hover:bg-primary/5">
-                      <Copy size={11} />{copiedToken === p.portal_token ? '복사됨!' : 'URL'}
-                    </button>
-                    <button type="button" onClick={() => { setEditing(p); setCreateOpen(true); }}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-500 hover:bg-slate-50">
+                  <div className="flex items-center gap-1 pt-1.5 border-t border-slate-100 text-xs">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); void handleCopy(p.portal_token); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); void handleCopy(p.portal_token); } }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-primary hover:bg-primary/10 cursor-pointer"
+                    >
+                      <Copy size={11} />{copiedToken === p.portal_token ? '복사됨' : 'URL'}
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); setEditing(p); setCreateOpen(true); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setEditing(p); setCreateOpen(true); } }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-slate-500 hover:bg-slate-100 cursor-pointer"
+                    >
                       <Edit3 size={11} />수정
-                    </button>
-                    {/* 박경수님 2026-05-29 — 5단계 역할 관리 패널 (토큰·PIN·팀·체크리스트) */}
-                    <button type="button" onClick={() => setAdminPortalId(p.id)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-violet-600 hover:bg-violet-50 font-semibold">
-                      <Settings size={11} />관리
-                    </button>
-                    <button type="button" onClick={() => void toggleActive(p)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-500 hover:bg-slate-50 ml-auto">
-                      {p.is_active ? <><PowerOff size={11} />비활성</> : <><Power size={11} />활성</>}
-                    </button>
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); void toggleActive(p); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); void toggleActive(p); } }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-slate-500 hover:bg-slate-100 cursor-pointer ml-auto"
+                      title={p.is_active ? '비활성으로 전환' : '활성으로 전환'}
+                    >
+                      {p.is_active ? <PowerOff size={11} /> : <Power size={11} />}
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); setActivePortal(p); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setActivePortal(p); } }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-slate-500 hover:bg-slate-100 cursor-pointer"
+                      title="회신 보기"
+                    >
+                      <ChevronRight size={11} />
+                    </span>
                   </div>
+                </button>
+              );
+            })}
+          </aside>
+
+          {/* 우측 — 선택된 포털의 자세한 사항 */}
+          <section>
+            {selectedId ? (
+              <PortalAdminPanel portalId={selectedId} />
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Link2 size={24} className="mx-auto text-slate-300 mb-2" />
+                  <p className="text-xs text-muted">좌측에서 포털을 선택하면 자세한 사항을 볼 수 있어요.</p>
                 </CardContent>
               </Card>
-            );
-          })}
+            )}
+          </section>
         </div>
       )}
 
@@ -175,10 +231,6 @@ export default function PortalTab({ projectId, clientId }: Props) {
         portal={activePortal}
         onClose={() => setActivePortal(null)}
       />
-      {/* 박경수님 2026-05-29 — 5단계 역할 관리 패널 */}
-      {adminPortalId && (
-        <PortalAdminPanel portalId={adminPortalId} onClose={() => { setAdminPortalId(null); void fetchData(); }} />
-      )}
     </div>
   );
 }
