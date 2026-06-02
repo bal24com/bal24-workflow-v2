@@ -929,11 +929,36 @@ export interface ActivityFile {
   size?: number;
 }
 
+// 박경수님 2026-06-02 CLUB-1 — 동아리(팀) 마스터 (캡쳐 표2)
+export interface ProgramClub {
+  id: string;
+  program_id: string;
+  school_name: string;
+  club_name: string;
+  teacher_name: string | null;
+  teacher_phone: string | null;
+  school_phone: string | null;
+  mentor_name: string | null;
+  mentor_phone: string | null;
+  student_count: number | null;
+  club_type: string | null;
+  operating_budget: number | null;
+  material_budget: number | null;
+  etc_budget: number | null;
+  operating_method: string | null;
+  club_token: string;
+  pin: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ActivityLog {
   id: string;
   program_id?: string | null;
   project_id?: string | null;
   expert_id?: string | null;
+  // 박경수님 2026-06-02 CLUB-1 — 동아리 활동 일지 재사용
+  club_id?: string | null;
   log_type: ActivityLogType;
   title: string;
   activity_date: string;
