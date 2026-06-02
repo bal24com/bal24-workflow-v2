@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Plus, Loader2, Link2, Edit3, Power, PowerOff, ChevronRight, ChevronDown, ChevronUp,
+  Plus, Loader2, Link2, Edit3, Power, PowerOff, ChevronRight, ChevronDown, ChevronUp, Trash2,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
@@ -70,6 +70,21 @@ export default function PortalTab({ projectId, clientId }: Props) {
   }, [projectId]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
+
+  // 박경수님 2026-06-02 STEP-MERGE-1 — 포털 삭제 (cascade 로 portal_items 등 함께 정리)
+  const handleDelete = async (p: PortalRow) => {
+    if (!window.confirm(`"${p.title}" 포털을 삭제할까요?\n관련 항목·응답·수혜기관 데이터가 모두 함께 삭제돼요. 되돌릴 수 없어요.`)) return;
+    try {
+      const { error } = await supabase.from('project_portals').delete().eq('id', p.id);
+      if (error) throw error;
+      if (selectedId === p.id) setSelectedId(null);
+      await fetchData();
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : '';
+      console.error('[portal-tab] 삭제 실패:', raw);
+      setErrorMsg('삭제 중 오류가 발생했어요.');
+    }
+  };
 
   const toggleActive = async (p: PortalRow) => {
     try {
@@ -210,6 +225,16 @@ export default function PortalTab({ projectId, clientId }: Props) {
                       title={p.is_active ? '클릭하면 비활성으로 전환' : '클릭하면 활성으로 전환'}
                     >
                       {p.is_active ? <><PowerOff size={11} />끄기</> : <><Power size={11} />켜기</>}
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); void handleDelete(p); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); void handleDelete(p); } }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-rose-500 hover:bg-rose-50 cursor-pointer"
+                      title="포털 삭제"
+                    >
+                      <Trash2 size={11} aria-hidden="true" />
                     </span>
                     <span
                       role="button"
