@@ -93,14 +93,16 @@ export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>>
     before: ['survey_results_view'],
     pre:    ['basic_info', 'curriculum', 'survey_results_view'],
     ready:  ['basic_info', 'curriculum', 'instructors', 'survey_results_view'],
-    progress: ['portal_progress', 'survey_results_view'],
+    // 박경수님 2026-06-02 CLUB-14 — 발주처는 진행 중에도 강사진·중간보고 확인 필요
+    progress: ['portal_progress', 'instructors', 'report_view', 'survey_results_view'],
     result: ['report_view', 'survey_results_view', 'survey_view', 'feedback_comments', 'tax_invoice'],
   },
   beneficiary: {
     before: ['survey_response'],
     pre:    ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response', 'approval'],
     ready:  ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response', 'approval'],
-    progress: ['portal_progress', 'feedback_comments', 'survey_response', 'file_upload'],
+    // 박경수님 2026-06-02 CLUB-14 — 학교도 진행 중 강사진·중간보고 확인
+    progress: ['portal_progress', 'instructors', 'report_view', 'feedback_comments', 'survey_response', 'file_upload'],
     result: ['survey_view', 'edit_request', 'survey_response', 'file_upload'],
   },
   team: {
