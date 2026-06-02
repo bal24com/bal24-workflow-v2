@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Upload, Copy, Trash2, ExternalLink, School, Users, CalendarDays, ChevronDown, ChevronUp, List, LayoutGrid,
+  Loader2, Upload, Copy, Trash2, ExternalLink, School, Users, CalendarDays, ChevronDown, ChevronUp, List, LayoutGrid, UserCog,
 } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
@@ -12,6 +12,7 @@ import type { ProgramClub } from '../../../../types/database';
 import ClubBulkModal from './ClubBulkModal';
 import ClubSessionSchedule from './ClubSessionSchedule';
 import ClubCardGrid from './ClubCardGrid';
+import ClubMentorSummary from './ClubMentorSummary';
 
 interface Props {
   programId: string;
@@ -33,8 +34,8 @@ export default function ClubManageTab({ programId }: Props) {
   const [bulkOpen, setBulkOpen] = useState(false);
   // 박경수님 2026-06-02 CLUB-7a — 차수 일정 펼친 동아리 id
   const [scheduleOpen, setScheduleOpen] = useState<string | null>(null);
-  // 박경수님 2026-06-02 CLUB-8 — 리스트 / 카드 보기 토글
-  const [view, setView] = useState<'list' | 'card'>('list');
+  // 박경수님 2026-06-02 CLUB-8/9 — 리스트 / 카드 / 멘토별 보기 토글
+  const [view, setView] = useState<'list' | 'card' | 'mentor'>('list');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -125,6 +126,9 @@ export default function ClubManageTab({ programId }: Props) {
             <button type="button" onClick={() => setView('card')}
               className={`p-1.5 rounded-md ${view === 'card' ? 'bg-white shadow-sm text-violet-700' : 'text-slate-400'}`}
               title="카드 보기"><LayoutGrid size={14} aria-hidden="true" /></button>
+            <button type="button" onClick={() => setView('mentor')}
+              className={`p-1.5 rounded-md ${view === 'mentor' ? 'bg-white shadow-sm text-violet-700' : 'text-slate-400'}`}
+              title="멘토별 보기"><UserCog size={14} aria-hidden="true" /></button>
           </div>
           <button type="button" onClick={() => setBulkOpen(true)}
             className="inline-flex items-center gap-1 px-3 h-9 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700">
@@ -148,6 +152,11 @@ export default function ClubManageTab({ programId }: Props) {
           bySchool={bySchool}
           onCopyLink={(c) => void copyClubLink(c)}
           onDelete={(c) => void handleDelete(c)}
+          onSchedule={(id) => { setView('list'); setScheduleOpen(id); }}
+        />
+      ) : view === 'mentor' ? (
+        <ClubMentorSummary
+          clubs={clubs}
           onSchedule={(id) => { setView('list'); setScheduleOpen(id); }}
         />
       ) : (
