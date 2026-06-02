@@ -463,7 +463,43 @@ export type ShareItem =
   | 'lecture_certificate'
   // STEP-TAB-RESTRUCTURE-B — progress 단계 보강
   | 'portal_progress'
-  | 'mypage';
+  | 'mypage'
+  // 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 외부 토큰 응답 동적 설문
+  | 'survey_response';
+
+// 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 설문 정의 + 동적 문항 + 4역할 대상
+export type SurveyFormKind = 'pre-demand' | 'mid' | 'satisfaction' | 'custom';
+
+export const SURVEY_FORM_KIND_LABEL: Record<SurveyFormKind, string> = {
+  'pre-demand':   '사전 수요조사',
+  'mid':          '중간 조사',
+  'satisfaction': '최종 만족도',
+  'custom':       '자유 설문',
+};
+
+// 박경수님 2026-06-02 — 기존 SurveyQuestionType (survey_questions 테이블용) 과 충돌 회피 위해 SurveyForm* prefix
+export type SurveyFormQuestionType = 'text' | 'select' | 'number' | 'date' | 'textarea';
+
+export interface SurveyFormQuestion {
+  id: string;
+  label: string;
+  type: SurveyFormQuestionType;
+  options?: string[];
+  required: boolean;
+}
+
+export interface ProgramSurveyForm {
+  id: string;
+  program_id: string;
+  title: string;
+  kind: SurveyFormKind;
+  questions: SurveyFormQuestion[];
+  /** 응답 대상 4역할 — 'supporter'|'beneficiary'|'team'|'staff' */
+  target_audiences: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 /** 노출 항목 toggle 상태 — audience × item × boolean */
 export type ShareVisibility = Partial<Record<ShareAudience, Partial<Record<ShareItem, boolean>>>>;

@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import SurveyResultTab from './SurveyResultTab';
 import SurveyFileUploadSection from './SurveyFileUploadSection';
+import ProgramSurveyFormsSection from './ProgramSurveyFormsSection';
 import type {
   SurveyQuestion, SurveyResponse,
   SurveyQuestionType, SurveyQuestionPhase,
@@ -309,6 +310,9 @@ export default function SurveyTab({ programId, canEdit }: Props) {
           </div>
         )}
       </section>
+
+      {/* 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 동적 설문(사전 수요조사·중간 등) + 4역할 응답 */}
+      <ProgramSurveyFormsSection programId={programId} canEdit={canEdit} />
 
       {/* STEP-CURRICULUM-ATTEND-SURVEY-FULL — 외부 만족도 파일 업로드·분석 */}
       {/* STEP-SURVEY-FIX — xlsx import 후 웹 폼 문항 목록 자동 재조회 */}

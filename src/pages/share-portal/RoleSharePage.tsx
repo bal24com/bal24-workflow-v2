@@ -16,6 +16,8 @@ import FeedbackCommentsItem from './items/FeedbackCommentsItem';
 import CheckinItem from './items/CheckinItem';
 import SurveySubmitItem from './items/SurveySubmitItem';
 import OutcomeUploadItem from './items/OutcomeUploadItem';
+// 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 동적 설문 응답
+import SurveyResponseItem from './items/SurveyResponseItem';
 // 박경수님 2026-06-02 — invite_response·activity_log·lecture_certificate 는 본인 식별 필요로 일단 안내문 처리
 import { fetchShareByToken, getPublicMaterials, type ShareContext } from './sharePortalUtils';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
@@ -29,6 +31,7 @@ interface Props {
 
 export default function RoleSharePage({ role }: Props) {
   const { token } = useParams<{ token: string }>();
+  const tokenStr = token ?? '';
   const [ctx, setCtx] = useState<ShareContext | null>(null);
   const [state, setState] = useState<'loading' | 'notfound' | 'before' | 'ok'>('loading');
 
@@ -101,6 +104,13 @@ export default function RoleSharePage({ role }: Props) {
                   );
                 case 'outcome_upload':
                   return <OutcomeUploadItem key={item} programId={ctx.program.id} />;
+                case 'survey_response':
+                  return (
+                    <SurveyResponseItem key={item}
+                      programId={ctx.program.id}
+                      role={role}
+                      respondentToken={tokenStr} />
+                  );
                 case 'invite_response':
                 case 'activity_log':
                 case 'lecture_certificate':

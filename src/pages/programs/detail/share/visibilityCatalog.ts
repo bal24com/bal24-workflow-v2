@@ -20,6 +20,8 @@ export const SHARE_ITEM_LABEL: Record<ShareItem, string> = {
   // STEP-TAB-RESTRUCTURE-B — progress 단계 보강
   portal_progress: '고객 포털 (진행현황)',
   mypage: '마이페이지',
+  // 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET
+  survey_response: '설문 응답 (수요조사·만족도 등)',
 };
 
 // 박경수님 2026-06-02 — 4역할 추가. 기존 3종은 호환 fallback (UI 에서는 숨길 수 있음).
@@ -70,33 +72,34 @@ export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>>
     result: ['lecture_certificate'],
   },
   // 신규 4종 — 박경수님 의도 매핑 (운영사·발주처·교육생·강사 시각)
+  // 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 4역할 모두 모든 단계에 survey_response 추가
   supporter: {
-    before: [],
-    pre:    ['basic_info', 'curriculum'],
-    ready:  ['basic_info', 'curriculum', 'instructors'],
-    progress: ['portal_progress'],
-    result: ['survey_view', 'feedback_comments'],
+    before: ['survey_response'],
+    pre:    ['basic_info', 'curriculum', 'survey_response'],
+    ready:  ['basic_info', 'curriculum', 'instructors', 'survey_response'],
+    progress: ['portal_progress', 'survey_response'],
+    result: ['survey_view', 'feedback_comments', 'survey_response'],
   },
   beneficiary: {
-    before: [],
-    pre:    ['basic_info', 'curriculum', 'instructors', 'materials'],
-    ready:  ['basic_info', 'curriculum', 'instructors', 'materials'],
-    progress: ['portal_progress', 'feedback_comments'],
-    result: ['survey_view', 'edit_request'],
+    before: ['survey_response'],
+    pre:    ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response'],
+    ready:  ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response'],
+    progress: ['portal_progress', 'feedback_comments', 'survey_response'],
+    result: ['survey_view', 'edit_request', 'survey_response'],
   },
   team: {
-    before: [],
-    pre:    [],
-    ready:  ['basic_info'],
-    progress: ['checkin', 'mypage'],
-    result: ['survey_submit', 'outcome_upload'],
+    before: ['survey_response'],
+    pre:    ['survey_response'],
+    ready:  ['basic_info', 'survey_response'],
+    progress: ['checkin', 'mypage', 'survey_response'],
+    result: ['survey_submit', 'outcome_upload', 'survey_response'],
   },
   staff: {
-    before: [],
-    pre:    ['invite_response'],
-    ready:  ['invite_response', 'curriculum'],
-    progress: ['activity_log', 'mypage'],
-    result: ['lecture_certificate'],
+    before: ['survey_response'],
+    pre:    ['invite_response', 'survey_response'],
+    ready:  ['invite_response', 'curriculum', 'survey_response'],
+    progress: ['activity_log', 'mypage', 'survey_response'],
+    result: ['lecture_certificate', 'survey_response'],
   },
 };
 
@@ -105,11 +108,11 @@ export const ITEMS_BY_AUDIENCE: Record<ShareAudience, ShareItem[]> = {
   client: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments'],
   student: ['checkin', 'mypage', 'survey_submit', 'outcome_upload'],
   expert: ['invite_response', 'activity_log', 'mypage', 'lecture_certificate'],
-  // 박경수님 2026-06-02 — 신규 4종
-  supporter:   ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'survey_view', 'feedback_comments'],
-  beneficiary: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments'],
-  team:        ['basic_info', 'checkin', 'mypage', 'survey_submit', 'outcome_upload'],
-  staff:       ['invite_response', 'curriculum', 'activity_log', 'mypage', 'lecture_certificate'],
+  // 박경수님 2026-06-02 — 신규 4종 (+ survey_response 추가)
+  supporter:   ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'survey_view', 'feedback_comments', 'survey_response'],
+  beneficiary: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments', 'survey_response'],
+  team:        ['basic_info', 'checkin', 'mypage', 'survey_submit', 'outcome_upload', 'survey_response'],
+  staff:       ['invite_response', 'curriculum', 'activity_log', 'mypage', 'lecture_certificate', 'survey_response'],
 };
 
 /** 대상×단계 매트릭스 헤더 (UI 안내용) */
