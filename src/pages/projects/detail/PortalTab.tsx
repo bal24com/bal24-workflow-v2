@@ -1,14 +1,15 @@
 // bal24 v2 — 프로젝트 상세 · 외부 공유 탭
 // 박경수님 2026-05-30 STEP-PORTAL-DETAIL-INLINE — 좌(포털 목록) + 우(자세한 사항) 분할.
+// 박경수님 2026-06-02 — 카드 [URL] 제거 (구식 portal_token 매칭 안 됨, 우측 4종 URL 이 정답).
+//                     비활성 카드 — opacity/배경 회색 톤으로 직관 강화.
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Plus, Loader2, Link2, Copy, Edit3, Power, PowerOff, ChevronRight,
+  Plus, Loader2, Link2, Edit3, Power, PowerOff, ChevronRight,
 } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
-import { copyToClipboard } from '../../../lib/clipboard';
-import { getPortalUrl, STAGE_LABELS } from '../../portal/portalConstants';
+import { STAGE_LABELS } from '../../portal/portalConstants';
 import type { ProjectPortal } from '../../../types/database';
 import PortalCreateModal from '../../portal/PortalCreateModal';
 import PortalResponsesPanel from '../../portal/PortalResponsesPanel';
@@ -32,7 +33,6 @@ export default function PortalTab({ projectId, clientId }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ProjectPortal | null>(null);
   const [activePortal, setActivePortal] = useState<PortalRow | null>(null);
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
   // 박경수님 2026-05-30 STEP-PORTAL-DETAIL-INLINE — 우측 자세히 패널 대상
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -65,16 +65,6 @@ export default function PortalTab({ projectId, clientId }: Props) {
   }, [projectId]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
-
-  const handleCopy = async (token: string) => {
-    const ok = await copyToClipboard(getPortalUrl(token));
-    if (ok) {
-      setCopiedToken(token);
-      setTimeout(() => setCopiedToken(null), 1500);
-    } else {
-      setErrorMsg('링크 복사에 실패했어요. 직접 선택해서 복사해 주세요.');
-    }
-  };
 
   const toggleActive = async (p: PortalRow) => {
     try {
@@ -128,22 +118,26 @@ export default function PortalTab({ projectId, clientId }: Props) {
             {portals.map((p) => {
               const total = p.items.length;
               const done = p.items.filter((i) => i.completed).length;
-              const active = selectedId === p.id;
+              const isSelected = selectedId === p.id;
+              // 박경수님 2026-06-02 — 활성/비활성을 카드 전체 색조로 직관 표시
+              const cardCls = [
+                'w-full text-left rounded-xl border transition p-3 space-y-1.5',
+                !p.is_active && 'border-l-4 border-l-slate-300 bg-slate-50 opacity-70',
+                isSelected && p.is_active && 'border-primary bg-primary/5 shadow-sm',
+                isSelected && !p.is_active && 'border-primary border-l-4 border-l-primary shadow-sm opacity-90',
+                !isSelected && p.is_active && 'border-slate-200 bg-white hover:border-primary/40',
+                !isSelected && !p.is_active && 'hover:border-primary/40',
+              ].filter(Boolean).join(' ');
               return (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => setSelectedId(p.id)}
-                  className={[
-                    'w-full text-left rounded-xl border transition p-3 space-y-1.5',
-                    active
-                      ? 'border-primary bg-primary/5 shadow-sm'
-                      : 'border-slate-200 bg-white hover:border-primary/40',
-                  ].join(' ')}
+                  className={cardCls}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <h3 className={`text-sm font-bold truncate ${active ? 'text-primary' : 'text-text'}`}>
+                      <h3 className={`text-sm font-bold truncate ${isSelected ? 'text-primary' : p.is_active ? 'text-text' : 'text-slate-500'}`}>
                         {p.title}
                       </h3>
                       {p.stage_tag && (
@@ -152,21 +146,23 @@ export default function PortalTab({ projectId, clientId }: Props) {
                         </div>
                       )}
                     </div>
-                    <Badge variant={p.is_active ? 'success' : 'default'}>{p.is_active ? '활성' : '비활성'}</Badge>
+                    {/* 박경수님 2026-06-02 — 활성/비활성을 색 강조한 큰 배지로 */}
+                    {p.is_active ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                        활성
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold border border-slate-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" aria-hidden="true" />
+                        비활성
+                      </span>
+                    )}
                   </div>
                   <div className="text-[11px] text-muted">
                     항목 {total} · 완료 <span className="text-success font-bold">{done}</span>
                   </div>
                   <div className="flex items-center gap-1 pt-1.5 border-t border-slate-100 text-xs">
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => { e.stopPropagation(); void handleCopy(p.portal_token); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); void handleCopy(p.portal_token); } }}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-primary hover:bg-primary/10 cursor-pointer"
-                    >
-                      <Copy size={11} />{copiedToken === p.portal_token ? '복사됨' : 'URL'}
-                    </span>
                     <span
                       role="button"
                       tabIndex={0}
@@ -181,10 +177,14 @@ export default function PortalTab({ projectId, clientId }: Props) {
                       tabIndex={0}
                       onClick={(e) => { e.stopPropagation(); void toggleActive(p); }}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); void toggleActive(p); } }}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-slate-500 hover:bg-slate-100 cursor-pointer ml-auto"
-                      title={p.is_active ? '비활성으로 전환' : '활성으로 전환'}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-semibold cursor-pointer ml-auto ${
+                        p.is_active
+                          ? 'text-rose-600 hover:bg-rose-50'
+                          : 'text-emerald-600 hover:bg-emerald-50'
+                      }`}
+                      title={p.is_active ? '클릭하면 비활성으로 전환' : '클릭하면 활성으로 전환'}
                     >
-                      {p.is_active ? <PowerOff size={11} /> : <Power size={11} />}
+                      {p.is_active ? <><PowerOff size={11} />끄기</> : <><Power size={11} />켜기</>}
                     </span>
                     <span
                       role="button"
