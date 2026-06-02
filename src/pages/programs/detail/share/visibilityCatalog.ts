@@ -22,6 +22,8 @@ export const SHARE_ITEM_LABEL: Record<ShareItem, string> = {
   mypage: '마이페이지',
   // 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET
   survey_response: '설문 응답 (수요조사·만족도 등)',
+  // 박경수님 2026-06-02 STEP-SURVEY-RESULTS-B
+  survey_results_view: '설문 응답 결과 조회',
 };
 
 // 박경수님 2026-06-02 — 4역할 추가. 기존 3종은 호환 fallback (UI 에서는 숨길 수 있음).
@@ -74,11 +76,11 @@ export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>>
   // 신규 4종 — 박경수님 의도 매핑 (운영사·발주처·교육생·강사 시각)
   // 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 4역할 모두 모든 단계에 survey_response 추가
   supporter: {
-    before: ['survey_response'],
-    pre:    ['basic_info', 'curriculum', 'survey_response'],
-    ready:  ['basic_info', 'curriculum', 'instructors', 'survey_response'],
-    progress: ['portal_progress', 'survey_response'],
-    result: ['survey_view', 'feedback_comments', 'survey_response'],
+    before: ['survey_response', 'survey_results_view'],
+    pre:    ['basic_info', 'curriculum', 'survey_response', 'survey_results_view'],
+    ready:  ['basic_info', 'curriculum', 'instructors', 'survey_response', 'survey_results_view'],
+    progress: ['portal_progress', 'survey_response', 'survey_results_view'],
+    result: ['survey_view', 'feedback_comments', 'survey_response', 'survey_results_view'],
   },
   beneficiary: {
     before: ['survey_response'],
@@ -109,7 +111,7 @@ export const ITEMS_BY_AUDIENCE: Record<ShareAudience, ShareItem[]> = {
   student: ['checkin', 'mypage', 'survey_submit', 'outcome_upload'],
   expert: ['invite_response', 'activity_log', 'mypage', 'lecture_certificate'],
   // 박경수님 2026-06-02 — 신규 4종 (+ survey_response 추가)
-  supporter:   ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'survey_view', 'feedback_comments', 'survey_response'],
+  supporter:   ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'survey_view', 'feedback_comments', 'survey_response', 'survey_results_view'],
   beneficiary: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments', 'survey_response'],
   team:        ['basic_info', 'checkin', 'mypage', 'survey_submit', 'outcome_upload', 'survey_response'],
   staff:       ['invite_response', 'curriculum', 'activity_log', 'mypage', 'lecture_certificate', 'survey_response'],
