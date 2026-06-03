@@ -1,7 +1,7 @@
 BalanceDot WorkFlow v2 — CLAUDE.md
 Claude Code가 매 세션마다 이 파일을 먼저 읽고 작업한다.
 수정 시 반드시 이 파일도 업데이트할 것.
-마지막 업데이트: 2026-05-25 (회계·견적·지출 흐름 재구성 — 견적 [종합·프로그램별] 탭, 부가세 10% 분리, 지급요청 [견적에서 가져오기] 선택·수정·전송, 행별 [↑↓ 수정 삭제]. 인수인계 HANDOVER_2026-05-25.md 참고)
+마지막 업데이트: 2026-06-03 (Skywork 세션 분석 및 신규 인수인계 문서 생성 완료. HANDOVER.md 참고)
 
 1. 프로젝트 개요
 •	앱명: BalanceDot WorkFlow v2
@@ -458,7 +458,7 @@ URL 구조: /consortium/:id/portal
 5. 문자/카카오 발송 — 현재는 URL 복사로 대체
 
 
-최종 업데이트: 2026-05-07
+최종 업데이트: 2026-06-03
 프로젝트: BalanceDot WorkFlow v2 by 박경수
 
 ---
@@ -602,8 +602,8 @@ URL 구조: /consortium/:id/portal
 | GitHub | `https://github.com/bal24com/bal24-workflow-v2` |
 | 배포 | `https://bal24-workflow-v2.netlify.app` / `https://bal24.kr` |
 | Supabase | `https://clsljkxvgmqwenettkrz.supabase.co` |
-| 최근 커밋 | `fbd494e` (PaymentRequestTab 행별 [수정][↑↓] + payroll_order_index) |
-| 인수인계 | `HANDOVER_2026-05-25.md` (SkyClaw 등 다른 AI 이어가기 컨텍스트) |
+| 최근 커밋 | `cb9da04` (CLUB-15 강사진 섹션에 동아리 멘토 포함) — 동아리·외부공유 줄기 |
+| 인수인계 | `HANDOVER.md` (2026-06-03 최신, 동아리·역할별 외부공유 반영) / `HANDOVER_2026-05-25.md` (회계 줄기 구버전) |
 | 이전 프로젝트 | `C:\workflow\workflow_v7_full` → **폐기, 사용 안 함** |
 
 ---
@@ -650,5 +650,8 @@ URL 구조: /consortium/:id/portal
 ### 모달은 드래그로 닫히지 않는다 (2026-05-26 박경수님 지시)
 - 사용자가 모달 내부에서 텍스트를 드래그 선택하다가 마우스를 백드롭 위에서 떼면 onClick 이 발동해 모달이 닫히는 버그가 흔히 발생한다.
 - 모든 모달·드로어·팝오버에서 mousedown 이 백드롭에서 시작된 경우에만 백드롭 클릭으로 인정해 닫는다.
+- 공용 `components/ui/Modal.tsx` 는 이미 처리됨. 신규 모달 작성 시 `mouseDownOnBackdropRef` 패턴을 따른다.
+
+�� 인정해 닫는다.
 - 공용 `components/ui/Modal.tsx` 는 이미 처리됨. 신규 모달 작성 시 `mouseDownOnBackdropRef` 패턴을 따른다.
 
