@@ -27,6 +27,7 @@ import ClubDashboardItem from './items/ClubDashboardItem';
 // 박경수님 2026-06-02 CLUB-13 — 진행 중 파일 제출 (과정 산출물·사진)
 import FileUploadItem from './items/FileUploadItem';
 // 박경수님 2026-06-02 — invite_response·activity_log·lecture_certificate 는 본인 식별 필요로 일단 안내문 처리
+import BeneficiarySchoolGate from './BeneficiarySchoolGate';
 import { fetchShareByToken, getPublicMaterials, type ShareContext } from './sharePortalUtils';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
 import { STAGE_ITEMS } from '../programs/detail/share/visibilityCatalog';
@@ -83,6 +84,10 @@ export default function RoleSharePage({ role }: Props) {
           {/* 박경수님 2026-06-02 CLUB-13 — 지원·수혜기관은 단계 무관 종합 현황을 상단 고정 (동아리 없으면 자동 숨김) */}
           {(role === 'supporter' || role === 'beneficiary') && (
             <ClubDashboardItem programId={ctx.program.id} />
+          )}
+          {/* 박경수님 2026-06-07 Task 3+4 — 수혜기관 학교별 동아리 관리 게이트 */}
+          {role === 'beneficiary' && (
+            <BeneficiarySchoolGate programId={ctx.program.id} />
           )}
           {visibleItems.length === 0 ? (
             <section className="rounded-2xl border border-violet-100 bg-white p-8 text-center">

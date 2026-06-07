@@ -14,7 +14,7 @@ type MemberOption = { id: string; client_name: string };
 
 type Props = {
   open: boolean;
-  projectId: string;
+  projectId?: string;
   onClose: () => void;
   onCreated: () => void;
   defaultConsortiumId?: string;
@@ -143,7 +143,7 @@ export default function TaskFormModal({ open, projectId, onClose, onCreated, def
     setSubmitting(true);
     try {
       const { error } = await supabase.from('tasks').insert({
-        project_id: projectId,
+        project_id: projectId || null,
         title: title.trim(),
         status,
         assignee_id: assigneeId || null,

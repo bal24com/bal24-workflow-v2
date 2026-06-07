@@ -24,9 +24,10 @@ interface ProgramClub {
 
 interface Props {
   orgName: string;
+  programId?: string;
 }
 
-export default function BeneficiaryClubTab({ orgName }: Props) {
+export default function BeneficiaryClubTab({ orgName, programId }: Props) {
   const [clubs, setClubs] = useState<ProgramClub[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,12 +36,14 @@ export default function BeneficiaryClubTab({ orgName }: Props) {
     void (async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('program_clubs')
           .select('*, programs:programs(name)')
           .eq('school_name', orgName)
           .is('deleted_at', null)
           .order('club_name');
+        if (programId) query = query.eq('program_id', programId);
+        const { data, error } = await query;
 
         if (cancelled) return;
         if (error) throw error;
@@ -59,7 +62,7 @@ export default function BeneficiaryClubTab({ orgName }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [orgName]);
+  }, [orgName, programId]);
 
   if (loading) {
     return <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-violet-400" /></div>;

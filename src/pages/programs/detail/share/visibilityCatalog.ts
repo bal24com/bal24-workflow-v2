@@ -93,8 +93,8 @@ export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>>
     before: ['survey_results_view'],
     pre:    ['basic_info', 'curriculum', 'survey_results_view'],
     ready:  ['basic_info', 'curriculum', 'instructors', 'survey_results_view'],
-    // 박경수님 2026-06-02 CLUB-14 — 발주처는 진행 중에도 강사진·중간보고 확인 필요
-    progress: ['portal_progress', 'instructors', 'report_view', 'survey_results_view'],
+    // 박경수님 2026-06-07 — 지원기관은 진행 중 프로그램 전반(커리큘럼·출석·산출물) 확인
+    progress: ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'checkin', 'outcome_upload', 'report_view', 'survey_results_view'],
     result: ['report_view', 'survey_results_view', 'survey_view', 'feedback_comments', 'tax_invoice'],
   },
   beneficiary: {
@@ -127,7 +127,7 @@ export const ITEMS_BY_AUDIENCE: Record<ShareAudience, ShareItem[]> = {
   student: ['checkin', 'mypage', 'survey_submit', 'outcome_upload'],
   expert: ['invite_response', 'activity_log', 'mypage', 'lecture_certificate'],
   // 박경수님 2026-06-02 CLUB-13 — club_dashboard 는 상단 고정으로 분리(목록 제외), 세금계산서는 지원기관만
-  supporter:   ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'survey_view', 'feedback_comments', 'survey_results_view', 'report_view', 'tax_invoice'],
+  supporter:   ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'checkin', 'outcome_upload', 'survey_view', 'feedback_comments', 'survey_results_view', 'report_view', 'tax_invoice'],
   beneficiary: ['basic_info', 'curriculum', 'instructors', 'materials', 'portal_progress', 'survey_view', 'edit_request', 'feedback_comments', 'survey_response', 'file_download', 'file_upload', 'approval'],
   team:        ['basic_info', 'checkin', 'survey_submit', 'outcome_upload', 'survey_response', 'file_download', 'file_upload'],
   staff:       ['invite_response', 'curriculum', 'activity_log', 'lecture_certificate', 'survey_response', 'file_download', 'file_upload'],
