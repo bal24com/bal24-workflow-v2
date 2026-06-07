@@ -23,6 +23,7 @@ export const MEMBER_TYPE_STYLE: Record<MemberType, string> = {
 
 export const CONSORTIUM_LINK_TYPE = [
   'apply', 'invite', 'attend', 'certificate', 'portal', 'report', 'settlement',
+  'supporter', 'beneficiary', 'team', 'staff',
 ] as const;
 export type ConsortiumLinkType = typeof CONSORTIUM_LINK_TYPE[number];
 
@@ -34,6 +35,28 @@ export const LINK_TYPE_LABEL: Record<ConsortiumLinkType, string> = {
   portal: '참여사 포털',
   report: '결과보고서',
   settlement: '정산 확인',
+  supporter: '지원기관 포털',
+  beneficiary: '수혜기관 포털',
+  team: '수혜팀 포털',
+  staff: '강사·멘토 포털',
+};
+
+/** 역할별 외부공유 링크 4종 */
+export const SHARE_ROLE_LINK_TYPES = ['supporter', 'beneficiary', 'team', 'staff'] as const;
+export type ShareRoleLinkType = typeof SHARE_ROLE_LINK_TYPES[number];
+
+export const SHARE_ROLE_LABEL: Record<ShareRoleLinkType, string> = {
+  supporter: '지원기관',
+  beneficiary: '수혜기관',
+  team: '수혜팀',
+  staff: '강사·멘토',
+};
+
+export const SHARE_ROLE_COLOR: Record<ShareRoleLinkType, string> = {
+  supporter: 'bg-violet-100 text-violet-700 border-violet-200',
+  beneficiary: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  team: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  staff: 'bg-orange-50 text-orange-700 border-orange-200',
 };
 
 export const PERM_LEVEL = ['none', 'read', 'write', 'manage'] as const;

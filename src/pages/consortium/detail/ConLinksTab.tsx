@@ -12,6 +12,7 @@ import EmptyState from '../../../components/EmptyState';
 import {
   CONSORTIUM_LINK_TYPE,
   LINK_TYPE_LABEL,
+  SHARE_ROLE_LINK_TYPES,
   type ConsortiumLink,
   type ConsortiumLinkType,
 } from '../consortiumTypes';
@@ -32,6 +33,10 @@ function buildPath(type: ConsortiumLinkType, token: string, consortiumId: string
     portal: `/portal/consortium/${consortiumId}`,
     report: `/report/${token}`,
     settlement: `/settlement/${token}`,
+    supporter:   `/share/supporter/${token}`,
+    beneficiary: `/share/beneficiary/${token}`,
+    team:        `/share/team/${token}`,
+    staff:       `/share/staff/${token}`,
   };
   return map[type];
 }
@@ -249,13 +254,22 @@ function CreateLinkModal({ consortiumId, onClose, onSaved }: CreateModalProps) {
       <form id="con-link-form" onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="space-y-1.5">
           <label className="text-sm font-semibold text-slate-700">유형</label>
-          <select 
-            value={linkType} 
-            onChange={(e) => setLinkType(e.target.value as ConsortiumLinkType)} 
+          <select
+            value={linkType}
+            onChange={(e) => setLinkType(e.target.value as ConsortiumLinkType)}
             disabled={submitting}
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary"
           >
-            {CONSORTIUM_LINK_TYPE.map((t) => (<option key={t} value={t}>{LINK_TYPE_LABEL[t]}</option>))}
+            <optgroup label="── 역할별 외부 포털 ──">
+              {SHARE_ROLE_LINK_TYPES.map((t) => (
+                <option key={t} value={t}>{LINK_TYPE_LABEL[t]}</option>
+              ))}
+            </optgroup>
+            <optgroup label="── 기타 링크 ──">
+              {CONSORTIUM_LINK_TYPE.filter((t) => !(SHARE_ROLE_LINK_TYPES as readonly string[]).includes(t)).map((t) => (
+                <option key={t} value={t}>{LINK_TYPE_LABEL[t]}</option>
+              ))}
+            </optgroup>
           </select>
         </div>
         <Input 

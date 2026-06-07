@@ -1,7 +1,7 @@
 // bal24 v2 — 컨소시엄 탭7: 포털 권한 (참여사별 섹션 권한 매트릭스)
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Plus, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Loader2, Plus, AlertTriangle, ShieldCheck, Copy, Check, ExternalLink } from 'lucide-react';
 import { Button } from '../../../components/ui';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
@@ -12,11 +12,25 @@ import {
   PERM_LEVEL_LABEL,
   MEMBER_TYPE_LABEL,
   MEMBER_TYPE_STYLE,
+  SHARE_ROLE_LINK_TYPES,
+  SHARE_ROLE_LABEL,
+  SHARE_ROLE_COLOR,
+  LINK_TYPE_LABEL,
   type ConsortiumMember,
   type ConsortiumStatus,
   type MemberType,
   type PermLevel,
+  type ShareRoleLinkType,
+  type ConsortiumLinkType,
 } from '../consortiumTypes';
+
+interface RoleLink {
+  id: string;
+  link_type: ShareRoleLinkType;
+  token: string;
+  label: string | null;
+  is_active: boolean;
+}
 
 interface Props {
   consortiumId: string;
@@ -55,6 +69,11 @@ export default function ConPortalTab({ consortiumId, status, members }: Props) {
   const [permModalTarget, setPermModalTarget] = useState<ConsortiumMember | null>(null);
   const debounceRef = useRef<Map<string, number>>(new Map());
 
+  // 역할별 외부 포털 링크
+  const [roleLinks, setRoleLinks] = useState<RoleLink[]>([]);
+  const [roleLinksLoading, setRoleLinksLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const dissolved = status === '해산';
 
   const fetchPerms = useCallback(async () => {
@@ -83,6 +102,63 @@ export default function ConPortalTab({ consortiumId, status, members }: Props) {
     })();
     return () => { cancelled = true; };
   }, [fetchPerms]);
+
+  const fetchRoleLinks = useCallback(async () => {
+    setRoleLinksLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('consortium_links')
+        .select('id, link_type, token, label, is_active')
+        .eq('consortium_id', consortiumId)
+        .in('link_type', SHARE_ROLE_LINK_TYPES as unknown as string[]);
+      if (error) throw error;
+      setRoleLinks((data as RoleLink[] | null) ?? []);
+    } catch (err) {
+      console.error('[con-portal-roles] 역할 링크 조회 실패:', err instanceof Error ? err.message : '');
+    } finally {
+      setRoleLinksLoading(false);
+    }
+  }, [consortiumId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await fetchRoleLinks();
+      if (cancelled) return;
+    })();
+    return () => { cancelled = true; };
+  }, [fetchRoleLinks]);
+
+  const handleCreateRoleLink = async (roleType: ShareRoleLinkType) => {
+    try {
+      const { data: created, error: insErr } = await supabase
+        .from('consortium_links')
+        .insert({
+          consortium_id: consortiumId,
+          link_type: roleType as ConsortiumLinkType,
+          url_path: '/__pending__',
+          label: LINK_TYPE_LABEL[roleType],
+        })
+        .select('id, token')
+        .single();
+      if (insErr || !created) throw insErr ?? new Error('생성 실패');
+      const path = `/share/${roleType}/${created.token as string}`;
+      await supabase.from('consortium_links').update({ url_path: path }).eq('id', created.id);
+      toast.success(`${SHARE_ROLE_LABEL[roleType]} 포털 링크를 생성했어요.`);
+      void fetchRoleLinks();
+    } catch (err) {
+      console.error('[con-portal-roles] 링크 생성 실패:', err instanceof Error ? err.message : '');
+      toast.error('링크 생성 중 오류가 발생했어요.');
+    }
+  };
+
+  const handleCopy = (id: string, token: string, roleType: ShareRoleLinkType) => {
+    const url = `${window.location.origin}/share/${roleType}/${token}`;
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((prev) => (prev === id ? null : prev)), 2000);
+    });
+  };
 
   // 권한 없는 참여사
   const missingMembers = useMemo(() => {
@@ -138,8 +214,94 @@ export default function ConPortalTab({ consortiumId, status, members }: Props) {
     setPermModalTarget(member);
   };
 
+  // 역할별로 링크 맵 (type → RoleLink)
+  const roleLinkMap = useMemo(
+    () => new Map(roleLinks.map((l) => [l.link_type, l])),
+    [roleLinks],
+  );
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+
+      {/* ── 역할별 외부 포털 링크 ── */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <ExternalLink size={15} className="text-violet-500" aria-hidden="true" />
+          <h3 className="text-sm font-bold text-[#1E1B4B]">역할별 외부 포털 링크</h3>
+          <span className="text-xs text-slate-400">지원기관·수혜기관·수혜팀·강사 등 외부 공유 URL</span>
+        </div>
+        {roleLinksLoading ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="animate-spin text-violet-400" size={20} aria-hidden="true" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {SHARE_ROLE_LINK_TYPES.map((roleType) => {
+              const link = roleLinkMap.get(roleType);
+              const url = link ? `${window.location.origin}/share/${roleType}/${link.token}` : null;
+              return (
+                <div
+                  key={roleType}
+                  className="rounded-2xl border border-violet-100 bg-white p-4 shadow-[0_2px_8px_rgba(124,58,237,0.05)] space-y-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`inline-flex text-[11px] font-bold px-2 py-0.5 rounded-full border ${SHARE_ROLE_COLOR[roleType]}`}>
+                      {SHARE_ROLE_LABEL[roleType]}
+                    </span>
+                    {link && (
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${link.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                        {link.is_active ? '활성' : '비활성'}
+                      </span>
+                    )}
+                  </div>
+
+                  {link && url ? (
+                    <>
+                      <p className="text-[11px] text-slate-400 font-mono truncate bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-100">
+                        {url}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(link.id, link.token, roleType)}
+                          className="flex-1 h-8 rounded-xl bg-violet-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-violet-700 transition-colors"
+                        >
+                          {copiedId === link.id ? <Check size={13} /> : <Copy size={13} />}
+                          {copiedId === link.id ? '복사됨' : 'URL 복사'}
+                        </button>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="h-8 w-8 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:text-violet-600 hover:border-violet-300 transition-colors"
+                          aria-label="새 탭으로 열기"
+                        >
+                          <ExternalLink size={13} />
+                        </a>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleCreateRoleLink(roleType)}
+                      disabled={dissolved}
+                      className="w-full h-8 rounded-xl border border-dashed border-violet-300 text-violet-600 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-violet-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Plus size={13} />
+                      링크 생성
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <hr className="border-slate-100" />
+
+      {/* ── 참여사 포털 권한 매트릭스 ── */}
+      <div className="space-y-4">
       {dissolved && (
         <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 flex items-start gap-2">
           <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" aria-hidden="true" />
@@ -269,6 +431,7 @@ export default function ConPortalTab({ consortiumId, status, members }: Props) {
         consortiumId={consortiumId}
         member={permModalTarget}
       />
+      </div>
     </div>
   );
 }
