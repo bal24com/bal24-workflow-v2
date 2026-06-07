@@ -2,7 +2,8 @@
 // 제목·종류·문항(text/select/number/date/textarea) + 4역할 응답 대상 선택.
 
 import { useEffect, useRef, useState } from 'react';
-import { Plus, Save, X, Trash2, Loader2, Sparkles, Upload } from 'lucide-react';
+import { Plus, Save, X, Trash2, Loader2, Sparkles, Upload, Edit3 } from 'lucide-react';
+import SurveyFormPreviewPanel from './SurveyFormPreviewPanel';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import {
@@ -20,14 +21,16 @@ interface Props {
 }
 
 const KIND_VALUES: SurveyFormKind[] = ['pre-demand', 'mid', 'satisfaction', 'custom'];
-const QUESTION_TYPE_VALUES: SurveyFormQuestionType[] = ['text', 'textarea', 'select', 'checkbox', 'number', 'date'];
+const QUESTION_TYPE_VALUES: SurveyFormQuestionType[] = ['text', 'textarea', 'select', 'checkbox', 'number', 'date', 'date-schedule', 'club-autofill'];
 const QUESTION_TYPE_LABEL: Record<SurveyFormQuestionType, string> = {
-  text:     '단답형',
-  textarea: '서술형',
-  select:   '선택형 (1개)',
-  checkbox: '다중 선택',
-  number:   '숫자',
-  date:     '날짜',
+  text:          '단답형',
+  textarea:      '서술형',
+  select:        '선택형 (1개)',
+  checkbox:      '다중 선택',
+  number:        '숫자',
+  date:          '날짜',
+  'date-schedule':  '월별 일정 수요조사',
+  'club-autofill':  '동아리 선택 + 자동완성',
 };
 
 const TARGET_AUDIENCES = [
@@ -57,6 +60,10 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
   const [newType, setNewType] = useState<SurveyFormQuestionType>('text');
   const [newOptions, setNewOptions] = useState('');
   const [newRequired, setNewRequired] = useState(false);
+  const [newMonths, setNewMonths] = useState('');
+  const [newPriorities, setNewPriorities] = useState<number>(2);
+  // 편집 중인 문항 id (null이면 신규 추가 모드)
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
 
   // 박경수님 2026-06-02 STEP-SURVEY-AI-IMPORT — AI 자동 생성
   const [aiLoading, setAiLoading] = useState(false);
@@ -104,9 +111,38 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
       toast.error('선택형·다중 선택은 선택지를 1개 이상 입력해 주세요. (쉼표 구분)');
       return;
     }
-    setQuestions((prev) => [...prev, { id: genId(), label, type: newType, options: opts, required: newRequired }]);
+    // date-schedule 전용: options = 월 목록
+    const monthOpts = newType === 'date-schedule'
+      ? newMonths.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+    if (newType === 'date-schedule' && (!monthOpts || monthOpts.length === 0)) {
+      toast.error('월별 수요조사는 월 목록을 1개 이상 입력해 주세요. (예: 6월, 9월, 10월)');
+      return;
+    }
+    const newQ = {
+      id: editingQuestionId ?? genId(), label, type: newType,
+      options: opts ?? monthOpts,
+      required: newRequired,
+      priorities: newType === 'date-schedule' ? newPriorities : undefined,
+    };
+    if (editingQuestionId) {
+      setQuestions((prev) => prev.map((q) => q.id === editingQuestionId ? newQ : q));
+    } else {
+      setQuestions((prev) => [...prev, newQ]);
+    }
     setNewLabel(''); setNewType('text'); setNewOptions(''); setNewRequired(false);
+    setNewMonths(''); setNewPriorities(2); setEditingQuestionId(null);
     setShowForm(false);
+  }
+
+  function startEditQuestion(q: SurveyFormQuestion) {
+    setNewLabel(q.label);
+    setNewType(q.type);
+    setNewOptions(q.type === 'select' || q.type === 'checkbox' ? (q.options ?? []).join(', ') : '');
+    setNewMonths(q.type === 'date-schedule' ? (q.options ?? []).join(', ') : '');
+    setNewPriorities(q.priorities ?? 2);
+    setNewRequired(q.required);
+    setEditingQuestionId(q.id);
+    setShowForm(true);
   }
 
   function removeQuestion(id: string) {
@@ -251,6 +287,8 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
                         <p className="text-[11px] text-slate-500 mt-0.5 truncate">{q.options.join(' · ')}</p>
                       )}
                     </div>
+                    <button type="button" onClick={() => startEditQuestion(q)}
+                      className="p-1 rounded hover:bg-violet-50 text-violet-500"><Edit3 size={12} aria-hidden="true" /></button>
                     <button type="button" onClick={() => removeQuestion(q.id)}
                       className="p-1 rounded hover:bg-rose-50 text-rose-500"><Trash2 size={12} aria-hidden="true" /></button>
                   </div>
@@ -278,6 +316,23 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
                   placeholder="선택지 (쉼표 구분) — 예: AI, 데이터분석, 마케팅"
                   className="w-full h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500" />
               )}
+              {newType === 'date-schedule' && (
+                <div className="grid grid-cols-[1fr_120px] gap-2">
+                  <input type="text" value={newMonths} onChange={(e) => setNewMonths(e.target.value)}
+                    placeholder="월 목록 (쉼표 구분) — 예: 6월, 9월, 10월"
+                    className="h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500" />
+                  <select value={newPriorities} onChange={(e) => setNewPriorities(Number(e.target.value))}
+                    className="h-9 rounded-lg border border-slate-200 px-2 text-sm bg-white outline-none focus:border-violet-500">
+                    <option value={1}>1순위만</option>
+                    <option value={2}>1·2순위</option>
+                  </select>
+                </div>
+              )}
+              {newType === 'club-autofill' && (
+                <p className="text-[11px] text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+                  동아리 선택 시 지도교사명·연락처를 프로그램 동아리 목록에서 자동으로 불러와요.
+                </p>
+              )}
               <div className="flex items-center justify-between gap-2">
                 <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
                   <input type="checkbox" checked={newRequired} onChange={(e) => setNewRequired(e.target.checked)}
@@ -285,11 +340,11 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
                   필수 응답
                 </label>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => { setShowForm(false); setNewLabel(''); }}
+                  <button type="button" onClick={() => { setShowForm(false); setNewLabel(''); setEditingQuestionId(null); }}
                     className="px-3 h-8 rounded-lg text-xs text-slate-600 hover:bg-slate-100">취소</button>
                   <button type="button" onClick={addQuestion}
                     className="inline-flex items-center gap-1 px-3 h-8 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700">
-                    <Plus size={12} aria-hidden="true" /> 문항 추가
+                    <Plus size={12} aria-hidden="true" /> {editingQuestionId ? '수정 완료' : '문항 추가'}
                   </button>
                 </div>
               </div>
@@ -300,6 +355,9 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
               <Plus size={12} aria-hidden="true" /> 문항 추가
             </button>
           )}
+
+          {/* 응답자 미리보기 */}
+          {questions.length > 0 && <SurveyFormPreviewPanel questions={questions} />}
 
           {/* 활성 토글 */}
           <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white cursor-pointer text-xs">

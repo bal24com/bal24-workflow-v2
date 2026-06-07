@@ -99,32 +99,30 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
   }
 
   return (
-    <section className="rounded-2xl border border-violet-100 bg-white p-4 sm:p-5 space-y-3">
-      <header className="flex items-center justify-between gap-2 flex-wrap">
+    <section className="rounded-2xl border border-violet-100 bg-white p-3 space-y-3">
+      <header className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h3 className="text-sm font-bold text-[#1E1B4B] inline-flex items-center gap-1.5">
             <ClipboardList size={14} className="text-violet-600" aria-hidden="true" />
             설문 조사 ({forms.length})
           </h3>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            동적 설문을 만들어 외부 4역할(지원기관·수혜기관·참여팀·강사/멘토) 토큰 페이지에서 응답받아요.
-          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">외부 4역할 토큰 페이지 응답 수집</p>
         </div>
         {canEdit && (
           <button type="button" onClick={() => { setEditing(null); setModalOpen(true); }}
-            className="inline-flex items-center gap-1 px-3 h-8 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700">
-            <Plus size={12} aria-hidden="true" /> 새 설문 만들기
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-600 text-white text-[11px] font-bold hover:bg-violet-700">
+            <Plus size={11} aria-hidden="true" /> 새 설문
           </button>
         )}
       </header>
 
       {loading ? (
-        <div className="flex justify-center py-6">
+        <div className="flex justify-center py-5">
           <Loader2 size={16} className="animate-spin text-violet-400" aria-hidden="true" />
         </div>
       ) : forms.length === 0 ? (
-        <p className="text-xs text-slate-400 italic text-center py-6 border border-dashed border-slate-200 rounded-lg">
-          아직 설문이 없어요. {canEdit && '[+ 새 설문 만들기] 로 시작하세요.'}
+        <p className="text-xs text-slate-400 italic text-center py-5 border border-dashed border-slate-200 rounded-lg">
+          아직 설문이 없어요.{canEdit && ' [+ 새 설문] 으로 시작하세요.'}
         </p>
       ) : (
         <ul className="space-y-2">

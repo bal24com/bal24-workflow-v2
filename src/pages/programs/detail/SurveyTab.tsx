@@ -1,7 +1,7 @@
 // bal24 v2 — STEP-SURVEY 프로그램 만족도 탭 (V9 신규 in-page + 기존 외부 폼 통계)
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Star, Trash2, Save, MessageSquare } from 'lucide-react';
+import { Loader2, Star, Trash2, Save, MessageSquare, Eye } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import SurveyResultTab from './SurveyResultTab';
@@ -158,6 +158,8 @@ export default function SurveyTab({ programId, canEdit }: Props) {
     return byQ;
   }, [responses]);
 
+  const [showSatisfactionPreview, setShowSatisfactionPreview] = useState(false);
+
   const dirty = useMemo(() => {
     if (questions.some((q) => q.isNew)) return true;
     if (questions.length !== originalIds.size) return true;
@@ -166,44 +168,42 @@ export default function SurveyTab({ programId, canEdit }: Props) {
   }, [questions, originalIds]);
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* 상단 — V9 신규 in-page 만족도 */}
-      <section className="rounded-2xl border border-violet-100 bg-white shadow-[0_4px_16px_rgba(124,58,237,0.06)] p-4">
-        <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div className="flex flex-col gap-4">
+      {/* 상단 2열 — 만족도 문항 + 설문 조사 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      {/* 만족도 문항 */}
+      <section className="rounded-2xl border border-violet-100 bg-white shadow-[0_4px_16px_rgba(124,58,237,0.06)] p-3">
+        <header className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div>
             <p className="text-sm font-bold text-[#1E1B4B]">만족도 문항</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              운영자가 직접 문항을 등록하면 참여자가 응답할 수 있어요.
-            </p>
+            <p className="text-[10px] text-slate-400 mt-0.5">참여자 직접 별점·텍스트 평가</p>
           </div>
           {canEdit && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => addQuestion('star')}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-violet-100 bg-white text-[11px] font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
               >
-                <Star size={12} aria-hidden="true" />
-                별점 문항 추가
+                <Star size={11} aria-hidden="true" />별점
               </button>
               <button
                 type="button"
                 onClick={() => addQuestion('text')}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-violet-100 bg-white text-xs font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-violet-100 bg-white text-[11px] font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
               >
-                <MessageSquare size={12} aria-hidden="true" />
-                텍스트 문항 추가
+                <MessageSquare size={11} aria-hidden="true" />텍스트
               </button>
             </div>
           )}
         </header>
 
         {loading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="animate-spin text-violet-400" size={20} aria-hidden="true" />
+          <div className="flex justify-center py-5">
+            <Loader2 className="animate-spin text-violet-400" size={18} aria-hidden="true" />
           </div>
         ) : questions.length === 0 ? (
-          <p className="text-sm text-slate-400 italic text-center py-8">
+          <p className="text-xs text-slate-400 italic text-center py-5">
             문항을 추가하면 참여자가 응답할 수 있어요.
           </p>
         ) : (
@@ -295,7 +295,15 @@ export default function SurveyTab({ programId, canEdit }: Props) {
             })}
 
             {canEdit && (
-              <div className="flex justify-end pt-2">
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSatisfactionPreview((v) => !v)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  <Eye size={12} aria-hidden="true" />
+                  {showSatisfactionPreview ? '미리보기 닫기' : '미리보기'}
+                </button>
                 <button
                   type="button"
                   onClick={() => void handleSave()}
@@ -309,10 +317,37 @@ export default function SurveyTab({ programId, canEdit }: Props) {
             )}
           </div>
         )}
+
+        {/* 만족도 문항 미리보기 */}
+        {showSatisfactionPreview && questions.length > 0 && (
+          <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/30 p-3 space-y-3">
+            <p className="text-[10px] font-bold text-violet-600 uppercase tracking-widest">참여자 미리보기</p>
+            {questions.map((q, i) => (
+              <div key={q.id} className="space-y-1">
+                <p className="text-xs font-bold text-[#1E1B4B]">
+                  <span className="text-slate-400 font-normal mr-1">{i + 1}.</span>
+                  {q.question_text || '(문항 내용 없음)'}
+                </p>
+                {q.question_type === 'star' ? (
+                  <div className="flex gap-1">
+                    {[1,2,3,4,5].map((n) => (
+                      <Star key={n} size={18} className="text-slate-300 hover:text-amber-400 cursor-pointer transition-colors" />
+                    ))}
+                    <span className="text-[10px] text-slate-400 ml-1 self-center">5점 만점</span>
+                  </div>
+                ) : (
+                  <textarea rows={2} placeholder="응답 내용 입력" readOnly
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs resize-none text-slate-400" />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
-      {/* 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 동적 설문(사전 수요조사·중간 등) + 4역할 응답 */}
+      {/* 설문 조사 — 2열 그리드 우측 */}
       <ProgramSurveyFormsSection programId={programId} canEdit={canEdit} />
+      </div>{/* end 2열 grid */}
 
       {/* STEP-CURRICULUM-ATTEND-SURVEY-FULL — 외부 만족도 파일 업로드·분석 */}
       {/* STEP-SURVEY-FIX — xlsx import 후 웹 폼 문항 목록 자동 재조회 */}

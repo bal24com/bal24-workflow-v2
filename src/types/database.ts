@@ -487,7 +487,8 @@ export const SURVEY_FORM_KIND_LABEL: Record<SurveyFormKind, string> = {
 
 // 박경수님 2026-06-02 — 기존 SurveyQuestionType (survey_questions 테이블용) 과 충돌 회피 위해 SurveyForm* prefix
 // 박경수님 2026-06-02 STEP-SURVEY-CHECKBOX — 다중 선택 'checkbox' 추가
-export type SurveyFormQuestionType = 'text' | 'select' | 'checkbox' | 'number' | 'date' | 'textarea';
+// 박경수님 2026-06-07 — date-schedule(월별 일정 수요조사) · club-autofill(동아리 자동완성) 추가
+export type SurveyFormQuestionType = 'text' | 'select' | 'checkbox' | 'number' | 'date' | 'textarea' | 'date-schedule' | 'club-autofill';
 
 export interface SurveyFormQuestion {
   id: string;
@@ -495,6 +496,8 @@ export interface SurveyFormQuestion {
   type: SurveyFormQuestionType;
   options?: string[];
   required: boolean;
+  /** date-schedule 전용: 순위 수 (기본 2) */
+  priorities?: number;
 }
 
 export interface ProgramSurveyForm {
