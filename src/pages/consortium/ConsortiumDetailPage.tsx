@@ -45,6 +45,8 @@ import ConLinksTab from './detail/ConLinksTab';
 import ConPortalTab from './detail/ConPortalTab';
 import ConsortiumFilesTab from './ConsortiumFilesTab';
 import ConsortiumFormModal from './ConsortiumFormModal';
+import ProgramFormModal from '../programs/ProgramFormModal';
+import TaskFormModal from '../projects/detail/TaskFormModal';
 
 interface ConsortiumDetail {
   id: string;
@@ -104,6 +106,8 @@ export default function ConsortiumDetailPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>('overview');
   const [editOpen, setEditOpen] = useState(false);
+  const [programModalOpen, setProgramModalOpen] = useState(false);
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   // STEP-DELETE-RESUME-FULL — soft-delete (admin 전용)
@@ -181,12 +185,12 @@ export default function ConsortiumDetailPage() {
     overview: <ConOverviewTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} description={consortium.description} />,
     members:  <ConMembersTab  consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} />,
     equity:   <ConEquityTab   consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} />,
-    programs: <ConProgramsTab consortiumId={id} members={members} />,
+    programs: <ConProgramsTab consortiumId={id} members={members} onAdd={() => setProgramModalOpen(true)} />,
     // 박경수님 2026-05-28 STEP-CONSORTIUM-PROGRAM-ASSIGN — 참여사 ↔ 프로그램 배정
     assign: <ConProgramAssignTab consortiumId={id} projectId={consortium.project_id ?? null} />,
     // STEP-CONSORTIUM-UPGRADE-FULL PART B (2026-05-28) — 견적 탭
     estimate: <ConEstimateTab consortiumId={id} projectId={consortium.project_id ?? null} totalBudget={Number(consortium.total_budget ?? 0)} members={members} />,
-    tasks: <ConTasksTab consortiumId={id} members={members} />,
+    tasks: <ConTasksTab consortiumId={id} members={members} onAdd={() => setTaskModalOpen(true)} />,
     finance: <ConFinanceTab consortiumId={id} totalBudget={Number(consortium.total_budget ?? 0)} members={members} />,
     staff: <ConStaffTab consortiumId={id} />,
     links: <ConLinksTab consortiumId={id} />,
@@ -391,6 +395,29 @@ export default function ConsortiumDetailPage() {
           end_date: consortium.end_date ?? '',
           total_budget: consortium.total_budget ?? null,
         }}
+      />
+
+      <ProgramFormModal
+        open={programModalOpen}
+        onClose={() => setProgramModalOpen(false)}
+        onCreated={() => {
+          setProgramModalOpen(false);
+          void loadConsortium();
+        }}
+        defaultProjectId={consortium.project_id ?? undefined}
+        defaultProjectName={consortium.project?.name}
+        defaultConsortiumId={id}
+      />
+
+      <TaskFormModal
+        open={taskModalOpen}
+        projectId={consortium.project_id ?? ''}
+        onClose={() => setTaskModalOpen(false)}
+        onCreated={() => {
+          setTaskModalOpen(false);
+          void loadConsortium();
+        }}
+        defaultConsortiumId={id}
       />
     </div>
   );

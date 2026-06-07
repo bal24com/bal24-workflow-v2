@@ -3,8 +3,25 @@
 
 import { supabase } from '../../lib/supabase';
 import { copyToClipboard as copyToClipboardLib } from '../../lib/clipboard';
+import {
+  Mic,
+  ClipboardCheck,
+  ShieldCheck,
+  FileText,
+  Handshake,
+  Link2,
+  Palette,
+  type LucideIcon,
+} from 'lucide-react';
 
-export type LinkCategory = 'invitation' | 'attendance' | 'portal' | 'form';
+export type LinkCategory =
+  | 'invitation'
+  | 'attendance'
+  | 'portal'
+  | 'form'
+  | 'consortium'
+  | 'program_share'
+  | 'club';
 
 export interface SharedLink {
   id: string;
@@ -12,10 +29,12 @@ export interface SharedLink {
   label: string;
   subLabel?: string;
   token: string;
-  /** "/invitation" | "/checkin" | "/portal" | "/form" */
+  /** "/invitation" | "/checkin" | "/portal" | "/form" | "/share/..." */
   path: string;
   createdAt: string;
   status?: string;
+  /** 클릭/응답 통계 (지원하는 경우) */
+  stats?: { clicks: number; responses: number };
 }
 
 export const CATEGORY_LABEL: Record<LinkCategory, string> = {
@@ -23,6 +42,9 @@ export const CATEGORY_LABEL: Record<LinkCategory, string> = {
   attendance: '출석 체크인',
   portal: '고객 포털',
   form: '외부 공개 폼',
+  consortium: '컨소시엄 공유',
+  program_share: '역할별 공유',
+  club: '동아리 활동',
 };
 
 export const CATEGORY_COLOR: Record<LinkCategory, string> = {
@@ -30,6 +52,9 @@ export const CATEGORY_COLOR: Record<LinkCategory, string> = {
   attendance: '#10B981',
   portal: '#06B6D4',
   form: '#F97316',
+  consortium: '#3B82F6',
+  program_share: '#8B5CF6',
+  club: '#EC4899',
 };
 
 export const CATEGORY_EMOJI: Record<LinkCategory, string> = {
@@ -37,6 +62,19 @@ export const CATEGORY_EMOJI: Record<LinkCategory, string> = {
   attendance: '📋',
   portal: '🔐',
   form: '📝',
+  consortium: '🤝',
+  program_share: '🔗',
+  club: '🎨',
+};
+
+export const CATEGORY_ICON: Record<LinkCategory, LucideIcon> = {
+  invitation: Mic,
+  attendance: ClipboardCheck,
+  portal: ShieldCheck,
+  form: FileText,
+  consortium: Handshake,
+  program_share: Link2,
+  club: Palette,
 };
 
 /** 토큰으로 외부 공개 링크 생성 */
@@ -97,17 +135,50 @@ interface FormRow {
   created_at: string;
 }
 
+interface ConsortiumLinkRow {
+  id: string;
+  token: string;
+  link_type: string;
+  label: string | null;
+  url_path: string;
+  is_active: boolean;
+  click_count: number;
+  response_count: number;
+  created_at: string;
+  consortiums: { name: string } | { name: string }[] | null;
+}
+
+interface ProgramShareRow {
+  program_id: string;
+  supporter_token: string | null;
+  beneficiary_token: string | null;
+  team_token: string | null;
+  staff_token: string | null;
+  created_at: string;
+  programs: { name: string } | { name: string }[] | null;
+}
+
+interface ProgramClubRow {
+  id: string;
+  club_token: string;
+  school_name: string;
+  club_name: string;
+  mentor_name: string | null;
+  created_at: string;
+  programs: { name: string } | { name: string }[] | null;
+}
+
 function pickName(rel: { name: string } | { name: string }[] | null | undefined): string | undefined {
   if (!rel) return undefined;
   if (Array.isArray(rel)) return rel[0]?.name;
   return rel.name;
 }
 
-/** 4종 외부 링크를 통합 조회 — 테이블 없으면 해당 카테고리 빈 배열 */
+/** 7종 외부 링크를 통합 조회 — 테이블 없으면 해당 카테고리 빈 배열 */
 export async function fetchAllLinks(): Promise<SharedLink[]> {
   const links: SharedLink[] = [];
 
-  const [invRes, sessRes, portalRes, formRes] = await Promise.all([
+  const [invRes, sessRes, portalRes, formRes, conRes, shareRes, clubRes] = await Promise.all([
     supabase
       .from('instructor_invitations')
       .select('id, portal_token, status, created_at, name, programs(name)')
@@ -131,12 +202,27 @@ export async function fetchAllLinks(): Promise<SharedLink[]> {
       .select('id, form_token, title, is_active, created_at')
       .order('created_at', { ascending: false })
       .limit(20),
+    supabase
+      .from('consortium_links')
+      .select('id, token, link_type, label, url_path, is_active, click_count, response_count, created_at, consortiums(name)')
+      .order('created_at', { ascending: false })
+      .limit(30),
+    supabase
+      .from('program_share')
+      .select('program_id, supporter_token, beneficiary_token, team_token, staff_token, created_at, programs(name)')
+      .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('program_clubs')
+      .select('id, club_token, school_name, club_name, mentor_name, created_at, programs(name)')
+      .order('created_at', { ascending: false })
+      .limit(30),
   ]);
 
   if (invRes.error) {
     console.error('[shares] 강사 초대 조회 실패:', invRes.error.message);
   } else {
-    for (const r of (invRes.data as InvitationRow[] | null) ?? []) {
+    for (const r of (invRes.data as unknown as InvitationRow[] | null) ?? []) {
       if (!r.portal_token) continue;
       links.push({
         id: `inv-${r.id}`,
@@ -154,7 +240,7 @@ export async function fetchAllLinks(): Promise<SharedLink[]> {
   if (sessRes.error) {
     console.error('[shares] 출석 세션 조회 실패:', sessRes.error.message);
   } else {
-    for (const s of (sessRes.data as SessionRow[] | null) ?? []) {
+    for (const s of (sessRes.data as unknown as SessionRow[] | null) ?? []) {
       const sub = pickName(s.programs)
         ? `${pickName(s.programs)} · ${s.session_date}`
         : s.session_date;
@@ -181,10 +267,9 @@ export async function fetchAllLinks(): Promise<SharedLink[]> {
   }
 
   if (portalRes.error) {
-    // 테이블 없거나 컬럼 다르면 조용히 SKIP (명세 가정)
     console.error('[shares] 고객 포털 조회 실패:', portalRes.error.message);
   } else {
-    for (const p of (portalRes.data as PortalRow[] | null) ?? []) {
+    for (const p of (portalRes.data as unknown as PortalRow[] | null) ?? []) {
       if (!p.portal_token) continue;
       links.push({
         id: `portal-${p.id}`,
@@ -202,7 +287,7 @@ export async function fetchAllLinks(): Promise<SharedLink[]> {
   if (formRes.error) {
     console.error('[shares] 외부 폼 조회 실패:', formRes.error.message);
   } else {
-    for (const f of (formRes.data as FormRow[] | null) ?? []) {
+    for (const f of (formRes.data as unknown as FormRow[] | null) ?? []) {
       if (!f.form_token) continue;
       links.push({
         id: `form-${f.id}`,
@@ -212,6 +297,69 @@ export async function fetchAllLinks(): Promise<SharedLink[]> {
         path: '/form',
         createdAt: f.created_at,
         status: f.is_active ? '활성' : '비활성',
+      });
+    }
+  }
+
+  if (conRes.error) {
+    console.error('[shares] 컨소시엄 링크 조회 실패:', conRes.error.message);
+  } else {
+    for (const c of (conRes.data as unknown as ConsortiumLinkRow[] | null) ?? []) {
+      links.push({
+        id: `con-${c.id}`,
+        category: 'consortium',
+        label: `${c.label || '컨소시엄 공유'}`,
+        subLabel: pickName(c.consortiums),
+        token: c.token,
+        path: c.url_path.replace(c.token, '').replace(/\/$/, ''), // url_path에서 token 제거하여 base path 추출
+        createdAt: c.created_at,
+        status: c.is_active ? '활성' : '비활성',
+        stats: { clicks: c.click_count, responses: c.response_count },
+      });
+    }
+  }
+
+  if (shareRes.error) {
+    console.error('[shares] 역할별 공유 조회 실패:', shareRes.error.message);
+  } else {
+    const data = (shareRes.data as unknown as ProgramShareRow[] | null) ?? [];
+    for (const r of data) {
+      const progName = pickName(r.programs) ?? '프로그램';
+      const tokens: Array<{ token: string | null; role: string; path: string }> = [
+        { token: r.supporter_token, role: '지원기관', path: '/share/supporter' },
+        { token: r.beneficiary_token, role: '수혜기관', path: '/share/beneficiary' },
+        { token: r.team_token, role: '참여팀', path: '/share/team' },
+        { token: r.staff_token, role: '강사/멘토', path: '/share/staff' },
+      ];
+      for (const { token, role, path } of tokens) {
+        if (!token) continue;
+        links.push({
+          id: `share-${r.program_id}-${role}`,
+          category: 'program_share',
+          label: `${progName} — ${role} 공유`,
+          subLabel: progName,
+          token,
+          path,
+          createdAt: r.created_at,
+          status: '활성',
+        });
+      }
+    }
+  }
+
+  if (clubRes.error) {
+    console.error('[shares] 동아리 조회 실패:', clubRes.error.message);
+  } else {
+    for (const c of (clubRes.data as unknown as ProgramClubRow[] | null) ?? []) {
+      links.push({
+        id: `club-${c.id}`,
+        category: 'club',
+        label: `동아리 — ${c.school_name} ${c.club_name}`,
+        subLabel: `${pickName(c.programs) ?? ''} · 멘토: ${c.mentor_name ?? '미지정'}`,
+        token: c.club_token,
+        path: '/share/club',
+        createdAt: c.created_at,
+        status: '활성',
       });
     }
   }

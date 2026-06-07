@@ -17,13 +17,14 @@ type Props = {
   projectId: string;
   onClose: () => void;
   onCreated: () => void;
+  defaultConsortiumId?: string;
 };
 
-export default function TaskFormModal({ open, projectId, onClose, onCreated }: Props) {
+export default function TaskFormModal({ open, projectId, onClose, onCreated, defaultConsortiumId }: Props) {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<TaskStatus>('인식');
   const [assigneeId, setAssigneeId] = useState('');
-  const [consortiumId, setConsortiumId] = useState('');
+  const [consortiumId, setConsortiumId] = useState(defaultConsortiumId ?? '');
   const [memberId, setMemberId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -116,14 +117,14 @@ export default function TaskFormModal({ open, projectId, onClose, onCreated }: P
     setTitle('');
     setStatus('인식');
     setAssigneeId('');
-    setConsortiumId('');
+    setConsortiumId(defaultConsortiumId ?? '');
     setMemberId('');
     setStartDate('');
     setDueDate('');
     setDescription('');
     setTitleError(null);
     setErrorMsg(null);
-  }, [open]);
+  }, [open, defaultConsortiumId]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

@@ -75,9 +75,10 @@ const SECTIONS: MenuSection[] = [
     items: [
       { to: '/attendance',    label: '출석 관리', Icon: ClipboardCheck },
       { to: '/activity-logs', label: '통합 일지', Icon: FileText },
-      { to: '/certificates',  label: '수료증 발급', Icon: FileText }, // 아이콘 추후 Scroll 등으로 변경 가능
+      { to: '/certificates',  label: '수료증 발급', Icon: FileText },
       { to: '/forms',         label: '외부 폼 관리', Icon: UserPlus },
-      { to: '/portals',       label: '포털 관리',   Icon: Share2 },
+      { to: '/shares',        label: '공유 링크 관리', Icon: Share2 },
+      { to: '/portals',       label: '포털 관리',   Icon: LayoutDashboard }, // 포털은 대시보드 느낌이므로 아이콘 변경 고려
     ],
   },
   {

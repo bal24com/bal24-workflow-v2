@@ -25,6 +25,8 @@ import StageDateBar from './share/StageDateBar';
 import AudienceTab from './share/AudienceTab';
 import { SHARE_AUDIENCE_LABEL } from './share/visibilityCatalog';
 import ExposureMatrixPanel from './share/ExposureMatrixPanel';
+import ShareLinkCard from '../../../components/shares/ShareLinkCard';
+import type { SharedLink } from '../../shares/sharesUtils';
 
 // 박경수님 2026-06-02 — 4역할 (지원기관·수혜기관·참여팀(개인)·강사/멘토) 메인 탭
 const AUDIENCE_TABS: ShareAudience[] = ['supporter', 'beneficiary', 'team', 'staff'];
@@ -296,57 +298,82 @@ interface LegacyProps {
 }
 
 function LegacyLinks({ programId, recruits, sessions, forms, toastSuccess, toastError }: LegacyProps) {
-  const base = buildBase();
-  async function copy(href: string, label: string) {
-    const ok = await copyToClipboard(href);
-    if (ok) toastSuccess(`${label} 링크 복사 완료`);
-    else toastError('링크 복사에 실패했어요.');
+  const links: SharedLink[] = useMemo(() => {
+    const list: SharedLink[] = [];
+
+    // 1. 교육생 신청 폼
+    list.push({
+      id: `apply-${programId}`,
+      category: 'program_share',
+      label: '교육생 신청 폼',
+      subLabel: '신청',
+      path: '/apply',
+      token: programId,
+      status: '활성',
+      createdAt: new Date().toISOString(),
+    });
+
+    // 2. 모집 공고
+    recruits.filter(r => r.is_active).forEach(r => {
+      list.push({
+        id: `recruit-${r.id}`,
+        category: 'form',
+        label: r.title,
+        subLabel: RECRUIT_TYPE_LABEL[r.recruit_type],
+        path: '/recruit',
+        token: r.form_token,
+        status: '활성',
+        createdAt: r.created_at || new Date().toISOString(),
+      });
+    });
+
+    // 3. 출석 세션
+    sessions.filter(s => s.check_in_open).forEach(s => {
+      list.push({
+        id: `attend-${s.id}`,
+        category: 'attendance',
+        label: s.title,
+        subLabel: '출석',
+        path: '/attend',
+        token: s.session_token,
+        status: '열림',
+        createdAt: s.created_at || new Date().toISOString(),
+      });
+    });
+
+    // 4. 외부 폼
+    forms.filter(f => f.is_active).forEach(f => {
+      list.push({
+        id: `form-${f.id}`,
+        category: 'form',
+        label: f.title,
+        subLabel: formTypeLabel(f.form_type),
+        path: '/form',
+        token: f.form_token,
+        status: '활성',
+        createdAt: f.created_at || new Date().toISOString(),
+      });
+    });
+
+    return list;
+  }, [programId, recruits, sessions, forms]);
+
+  if (links.length === 0) {
+    return (
+      <div className="py-10 text-center">
+        <p className="text-sm text-slate-400">진행 중인 외부 링크가 없습니다.</p>
+      </div>
+    );
   }
-  const apply = `${base}/apply/${programId}`;
-  const recruitLinks = recruits.filter((r) => r.is_active);
-  const attendLinks = sessions.filter((s) => s.check_in_open);
-  const formLinks = forms.filter((f) => f.is_active);
 
   return (
-    <div className="flex flex-col gap-2 mt-3">
-      <Row label="교육생 신청 폼" badge="신청" href={apply} icon={<Share2 size={13} className="text-violet-500" aria-hidden="true" />} onCopy={copy} />
-      {recruitLinks.length === 0 ? (
-        <Empty msg="진행중 모집 공고가 없어요." />
-      ) : recruitLinks.map((r) => (
-        <Row
-          key={`r-${r.id}`}
-          label={r.title}
-          badge={RECRUIT_TYPE_LABEL[r.recruit_type]}
-          href={`${base}/recruit/${r.form_token}`}
-          icon={<Megaphone size={13} className="text-orange-500" aria-hidden="true" />}
-          onCopy={copy}
-        />
-      ))}
-      {attendLinks.length === 0 ? (
-        <Empty msg="진행중 출석 세션이 없어요." />
-      ) : attendLinks.map((s) => (
-        <Row
-          key={`s-${s.id}`}
-          label={s.title}
-          badge="출석"
-          href={`${base}/attend/${s.session_token}`}
-          icon={<ClipboardCheck size={13} className="text-emerald-500" aria-hidden="true" />}
-          onCopy={copy}
-        />
-      ))}
-      {formLinks.length === 0 ? (
-        <Empty msg="진행중 외부 폼이 없어요." />
-      ) : formLinks.map((f) => (
-        <Row
-          key={`f-${f.id}`}
-          label={f.title}
-          badge={formTypeLabel(f.form_type)}
-          href={`${base}/form/${f.form_token}`}
-          icon={<FileText size={13} className="text-cyan-500" aria-hidden="true" />}
-          onCopy={copy}
-        />
-      ))}
-      <p className="text-[11px] text-slate-400 italic flex items-center gap-1.5 mt-1">
+    <div className="flex flex-col gap-4 mt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {links.map((link) => (
+          <ShareLinkCard key={link.id} link={link} />
+        ))}
+      </div>
+      <p className="text-[11px] text-slate-400 italic flex items-center gap-1.5 mt-2">
         <ListChecks size={11} aria-hidden="true" />
         일지 외부 작성 토큰은 향후 일지별로 발행 예정.
       </p>
@@ -354,12 +381,10 @@ function LegacyLinks({ programId, recruits, sessions, forms, toastSuccess, toast
   );
 }
 
-function Row({
-  label, badge, href, icon, onCopy,
-}: {
-  label: string; badge?: string; href: string;
-  icon: React.ReactNode;
-  onCopy: (href: string, label: string) => Promise<void>;
+function Empty({ msg }: { msg: string }) {
+  return <p className="text-[11px] text-slate-400 italic text-center py-1">{msg}</p>;
+}
+nCopy: (href: string, label: string) => Promise<void>;
 }) {
   return (
     <div className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2">

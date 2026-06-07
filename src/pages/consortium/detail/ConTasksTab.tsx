@@ -14,6 +14,7 @@ import type { TaskStatus } from '../../../types/database';
 interface Props {
   consortiumId: string;
   members: ConsortiumMember[];
+  onAdd?: () => void;
 }
 
 interface TaskRow {
@@ -34,7 +35,7 @@ const TASK_SELECT = `
   assignee:profiles!tasks_assignee_id_fkey(id, name)
 `.replace(/\s+/g, ' ');
 
-export default function ConTasksTab({ consortiumId, members }: Props) {
+export default function ConTasksTab({ consortiumId, members, onAdd }: Props) {
   const toast = useToast();
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,7 +95,11 @@ export default function ConTasksTab({ consortiumId, members }: Props) {
   }, [members, tasks]);
 
   const handleAdd = () => {
-    toast.info('프로젝트 페이지의 태스크 탭에서 등록 시 컨소시엄·담당 참여사를 선택해 주세요. (모달 통합은 STEP-CON 후속)');
+    if (onAdd) {
+      onAdd();
+    } else {
+      toast.info('프로젝트 페이지의 태스크 탭에서 등록 시 컨소시엄·담당 참여사를 선택해 주세요.');
+    }
   };
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);

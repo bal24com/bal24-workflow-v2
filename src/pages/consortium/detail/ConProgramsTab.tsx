@@ -15,14 +15,10 @@ import type { Program, ProgramStatus, ProgramType } from '../../../types/databas
 interface Props {
   consortiumId: string;
   members: ConsortiumMember[];
+  onAdd?: () => void;
 }
 
-interface ProgramRow extends Program {
-  attendance_count?: number;
-  completed_count?: number;
-}
-
-export default function ConProgramsTab({ consortiumId, members }: Props) {
+export default function ConProgramsTab({ consortiumId, members, onAdd }: Props) {
   const toast = useToast();
   const [programs, setPrograms] = useState<ProgramRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,8 +54,13 @@ export default function ConProgramsTab({ consortiumId, members }: Props) {
   }, [fetchPrograms]);
 
   const handleAdd = () => {
-    toast.info('프로그램 페이지에서 등록 시 컨소시엄을 선택해 주세요. (모달 통합은 STEP-CON 후속)');
+    if (onAdd) {
+      onAdd();
+    } else {
+      toast.info('프로그램 페이지에서 등록 시 컨소시엄을 선택해 주세요.');
+    }
   };
+
 
   if (loading) {
     return (
@@ -157,6 +158,12 @@ export default function ConProgramsTab({ consortiumId, members }: Props) {
               )}
             </article>
           );
+        })}
+      </div>
+    </div>
+  );
+}
+     );
         })}
       </div>
     </div>

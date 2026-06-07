@@ -34,16 +34,30 @@ type ProjectOption = Pick<Project, 'id' | 'name'>;
 type ConsortiumOption = { id: string; name: string };
 
 // 박경수님 + SkyClaw STEP-ESTIMATE-UPGRADE-FULL PART E (2026-05-28) — 프로젝트명 자동 prefill
-type Props = { open: boolean; onClose: () => void; onCreated: () => void; defaultProjectId?: string; defaultProjectName?: string };
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+  defaultProjectId?: string;
+  defaultProjectName?: string;
+  defaultConsortiumId?: string;
+};
 
-export default function ProgramFormModal({ open, onClose, onCreated, defaultProjectId, defaultProjectName }: Props) {
+export default function ProgramFormModal({
+  open,
+  onClose,
+  onCreated,
+  defaultProjectId,
+  defaultProjectName,
+  defaultConsortiumId,
+}: Props) {
   const toast = useToast();
   const { user } = useAuth();
   const [name, setName] = useState('');
   const [programType, setProgramType] = useState<ExtendedProgramType>('education');
   const [status, setStatus] = useState<ProgramStatus>('준비');
   const [projectId, setProjectId] = useState(defaultProjectId ?? '');
-  const [consortiumId, setConsortiumId] = useState('');
+  const [consortiumId, setConsortiumId] = useState(defaultConsortiumId ?? '');
   const [displayOrder, setDisplayOrder] = useState('0');
   const [modules, setModules] = useState<string[]>([]);
   const [startDate, setStartDate] = useState('');
@@ -111,14 +125,14 @@ export default function ProgramFormModal({ open, onClose, onCreated, defaultProj
   useEffect(() => {
     if (open) return;
     setName(''); setProgramType('education'); setStatus('준비');
-    setProjectId(defaultProjectId ?? ''); setConsortiumId('');
+    setProjectId(defaultProjectId ?? ''); setConsortiumId(defaultConsortiumId ?? '');
     setDisplayOrder('0'); setModules([]);
     setStartDate(''); setEndDate(''); setVenue(''); setCapacity(''); setDescription('');
     setOrgValues(EMPTY_ORG_VALUES); setPendingSessions([]); setVisibility('internal');
     setApplicationType('open'); setApplicationStartDate(''); setApplicationEndDate('');
     setMaxApplicants(''); setGrantEnabled(false); setGrantBudget(''); setPhaseDates({});
     setNameError(null); setErrorMsg(null);
-  }, [open]);
+  }, [open, defaultProjectId, defaultConsortiumId]);
 
   const handleAutoApply = (prog: ExtractedProgram): number => applyExtractedProgram(prog, {
     setName, setDescription, setStartDate, setEndDate, setVenue,

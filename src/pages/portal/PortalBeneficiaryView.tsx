@@ -1,18 +1,17 @@
 // 박경수님 2026-06-07 STEP-PORTAL-BENEFICIARY-ENHANCE — 수혜기관(학교/기업) 고도화 포털.
-// 대시보드(KPI) + 참가자 관리 + 행정 서류 보관함 + 신청 설문 통합.
+// 대시보드(KPI) + 동아리 관리 + 참가자 관리 + 행정 서류 보관함 + 신청 설문 통합.
 
 import { useEffect, useState } from 'react';
 import { 
   Loader2, CheckCircle2, FileText, Send, Users, 
-  BarChart3, Clock, Download, Upload, ShieldCheck, 
-  MessageSquare, Sparkles, Phone, X
+  BarChart3, Clock, MessageSquare, Activity, Phone, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
-import { ITEM_TYPE_LABEL, canAct } from './portalUtils';
-import { FileDropZone } from '../../components/ui';
-import { PORTAL_FILES_BUCKET } from './portalConstants';
 import PortalBoardTab from './PortalBoardTab';
+import BeneficiaryClubTab from './BeneficiaryClubTab';
+import PortalItemCard from './PortalItemCard';
+import type { PortalItemRow, PortalResponseRow } from './PortalItemCard';
 
 interface SurveyConfig {
   schedule_options?: string[];
@@ -45,33 +44,13 @@ interface ParticipantRow {
   created_at: string;
 }
 
-interface PortalItemRow {
-  id: string;
-  item_type: string;
-  title: string | null;
-  label: string | null;
-  description: string | null;
-  file_url: string | null;
-  file_name: string | null;
-  actionable_roles: string[] | null;
-}
-
-interface PortalResponseRow {
-  id: string;
-  item_id: string;
-  content: string | null;
-  file_url: string | null;
-  is_approved: boolean | null;
-  submitted_at: string;
-}
-
 interface Props {
   portal: PortalLite;
   org: BeneficiaryOrg;
   onStatusChange: (status: string) => void;
 }
 
-type TabKey = 'dashboard' | 'personnel' | 'documents' | 'board' | 'apply' | 'intro';
+type TabKey = 'dashboard' | 'board' | 'clubs' | 'personnel' | 'documents' | 'apply' | 'intro';
 
 const STATUS_STEP = [
   { key: 'pending',   label: '신청 대기', desc: '사업 참여 신청을 준비 중입니다.' },
@@ -115,7 +94,7 @@ export default function PortalBeneficiaryView({ portal, org, onStatusChange }: P
           supabase.from('participant_applications').select('id, name, phone, status, created_at').eq('organization', org.org_name).order('name'),
           // 2) 포털 아이템 (수혜기관 노출 대상)
           supabase.from('portal_items').select('*').eq('portal_id', portal.id).order('sort_order'),
-          // 3) 포털 응답 (우리 조직의 응답만 필터링은 클라이언트에서 respondent_id 등으로 해야 하나, 현재 respondent_id 가 UUID 가 아닐 수 있어 전체 로드 후 필터링)
+          // 3) 포털 응답
           supabase.from('portal_responses').select('*').order('submitted_at', { ascending: false }),
           // 4) 기존 설문 응답
           supabase.from('portal_survey_responses').select('*').eq('beneficiary_org_id', org.id).order('submitted_at', { ascending: false }),
@@ -181,7 +160,6 @@ export default function PortalBeneficiaryView({ portal, org, onStatusChange }: P
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-12">
-      {/* 고정 상단 헤더 */}
       <header className="bg-white border-b border-violet-100 sticky top-0 z-30 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div>
@@ -201,30 +179,19 @@ export default function PortalBeneficiaryView({ portal, org, onStatusChange }: P
       </header>
 
       <div className="max-w-4xl mx-auto px-4 mt-6 space-y-6">
-        {/* 탭 내비게이션 */}
         <div className="flex gap-1.5 p-1 bg-white rounded-2xl border border-violet-100 shadow-sm overflow-x-auto">
           <TabButton active={tab === 'dashboard'} onClick={() => setTab('dashboard')} label="홈" Icon={BarChart3} />
           <TabButton active={tab === 'board'} onClick={() => setTab('board')} label="게시판" Icon={MessageSquare} />
+          <TabButton active={tab === 'clubs'} onClick={() => setTab('clubs')} label="동아리" Icon={Activity} />
           <TabButton active={tab === 'personnel'} onClick={() => setTab('personnel')} label="소속 인원" Icon={Users} />
           <TabButton active={tab === 'documents'} onClick={() => setTab('documents')} label="서류 보관함" Icon={FileText} />
           {!submitted && <TabButton active={tab === 'apply'} onClick={() => setTab('apply')} label="신청하기" Icon={Send} />}
           <TabButton active={tab === 'intro'} onClick={() => setTab('intro')} label="안내" Icon={Clock} />
         </div>
 
-        {/* 탭 콘텐츠 */}
         <main className="space-y-6">
-          {tab === 'board' && (
-            <PortalBoardTab 
-              portalId={portal.id} 
-              beneficiaryOrgId={org.id} 
-              authorName={org.org_name} 
-              authorRole="beneficiary_org" 
-            />
-          )}
-
           {tab === 'dashboard' && (
             <div className="space-y-6">
-              {/* 진행 단계 트래커 */}
               <div className="bg-white rounded-3xl border border-violet-100 p-6 sm:p-8 shadow-sm">
                 <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">진행 상황</h2>
                 <div className="relative flex justify-between">
@@ -247,14 +214,12 @@ export default function PortalBeneficiaryView({ portal, org, onStatusChange }: P
                 </div>
               </div>
 
-              {/* KPI 요약 */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <KpiCard label="소속 인원" value={`${participants.length}명`} Icon={Users} tone="violet" />
                 <KpiCard label="제출 서류" value={`${responses.length}건`} sub={`전체 ${items.filter(i => i.item_type === 'file_upload').length}건 중`} Icon={FileText} tone="cyan" />
                 <KpiCard label="사업 안내" value={portal.intro_title || '진행 중'} Icon={Clock} tone="emerald" />
               </div>
 
-              {/* 최근 응답 (설문) */}
               {surveyResponses.length > 0 && (
                 <div className="bg-white rounded-3xl border border-violet-100 p-6 shadow-sm">
                   <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">나의 신청 정보</h3>
@@ -271,6 +236,19 @@ export default function PortalBeneficiaryView({ portal, org, onStatusChange }: P
                 </div>
               )}
             </div>
+          )}
+
+          {tab === 'board' && (
+            <PortalBoardTab 
+              portalId={portal.id} 
+              beneficiaryOrgId={org.id} 
+              authorName={org.org_name} 
+              authorRole="beneficiary_org" 
+            />
+          )}
+
+          {tab === 'clubs' && (
+            <BeneficiaryClubTab orgName={org.org_name} />
           )}
 
           {tab === 'personnel' && (
@@ -331,12 +309,12 @@ export default function PortalBeneficiaryView({ portal, org, onStatusChange }: P
                   </div>
                 ) : (
                   items.map((item) => (
-                    <ItemCard 
+                    <PortalItemCard 
                       key={item.id} 
-                      item={item} 
+                      item={item as PortalItemRow} 
                       org={org}
                       responses={responses.filter(r => r.item_id === item.id)} 
-                      onSaved={(r) => setResponses(prev => [r, ...prev])}
+                      onSaved={(r) => setResponses(prev => [r as PortalResponseRow, ...prev])}
                     />
                   ))
                 )}
@@ -416,6 +394,33 @@ function KpiCard({ label, value, sub, Icon, tone, progress }: { label: string; v
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
         <div className={`p-2 rounded-xl ${styles}`}>
+          <Icon size={18} />
+        </div>
+      </div>
+      <div>
+        <div className="text-2xl font-black text-[#1E1B4B] tracking-tight">{value}</div>
+        {sub && <p className="text-[11px] text-slate-500 font-medium mt-0.5">{sub}</p>}
+      </div>
+      {progress != null && (
+        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-violet-600" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, label, Icon }: { active: boolean; onClick: () => void; label: string; Icon: any }) {
+  return (
+    <button onClick={onClick} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all whitespace-nowrap ${
+      active ? 'bg-violet-600 text-white shadow-md shadow-violet-100' : 'text-slate-500 hover:bg-slate-50'
+    }`}>
+      <Icon size={16} />
+      {label}
+    </button>
+  );
+}
+ <div className={`p-2 rounded-xl ${styles}`}>
           <Icon size={18} />
         </div>
       </div>

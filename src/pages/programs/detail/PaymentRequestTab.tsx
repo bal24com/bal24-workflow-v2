@@ -118,19 +118,31 @@ export default function PaymentRequestTab({ programId, projectId }: Props) {
   async function handleDelete(row: Row) {
     if (!window.confirm(`"${row.expense_type} · ${row.payee_name}" 항목을 휴지통으로 보낼까요?`)) return;
     setActing(row.id);
-    const { error } = await supabase.from('payroll_expenses')
-      .update({ deleted_at: new Date().toISOString() }).eq('id', row.id);
-    setActing(null);
-    if (error) {
-      const raw = error.message.toLowerCase();
-      console.error('[PaymentRequestTab] 삭제 실패:', error.message);
-      if (raw.includes('column') && raw.includes('does not exist')) toast.error(`payroll_expenses 컬럼이 누락됐어요. 마이그레이션 실행 필요.\n(${error.message})`);
-      else if (raw.includes('row-level security')) toast.error(`삭제 권한이 없어요. RLS UPDATE 정책 필요.\n(${error.message})`);
-      else toast.error(`삭제 실패: ${error.message}`);
-      return;
+    try {
+      const { error } = await supabase.from('payroll_expenses')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', row.id);
+
+      if (error) {
+        console.error('[PaymentRequestTab] 삭제 에러:', error);
+        const raw = error.message.toLowerCase();
+        if (raw.includes('column') && raw.includes('does not exist')) {
+          toast.error(`필수 컬럼(deleted_at)이 누락됐어요. 마이그레이션 확인이 필요합니다.\n(${error.message})`);
+        } else if (raw.includes('row-level security') || error.code === '42501') {
+          toast.error(`삭제 권한이 없어요. RLS 정책을 확인해 주세요.\n(${error.message})`);
+        } else {
+          toast.error(`삭제 실패: ${error.message} (코드: ${error.code})`);
+        }
+        return;
+      }
+      toast.success('삭제했어요. 외주/급여 페이지에서도 사라집니다.');
+      void reload();
+    } catch (err) {
+      console.error('[PaymentRequestTab] 런타임 에러:', err);
+      toast.error('삭제 처리 중 예기치 못한 오류가 발생했어요.');
+    } finally {
+      setActing(null);
     }
-    toast.success('삭제했어요. 외주/급여 페이지에서도 사라집니다.');
-    void reload();
   }
 
   // 박경수님 + SkyClaw — 지출요청 실행 (초안 → 외주/급여 확정)
