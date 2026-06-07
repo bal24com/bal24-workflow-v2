@@ -2,8 +2,9 @@
 // /share/{role}/:token 4개 라우트가 role prop 만 다르게 호출.
 // 무인증 + 모바일 반응형. program_share 토큰 → 폴백으로 project_portals 토큰 지원.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import SharePortalShell from './SharePortalShell';
 import BasicInfoItem from './items/BasicInfoItem';
 import CurriculumItem from './items/CurriculumItem';
@@ -37,6 +38,54 @@ interface Props {
   role: Extract<ShareAudience, 'supporter' | 'beneficiary' | 'team' | 'staff'>;
 }
 
+// ── 프로그램 아코디언 카드 (지원기관용) ────────────────────────────────────────
+function SupporterProgramCard({
+  program,
+}: {
+  program: ProjectShareContext['programs'][number];
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((v) => !v), []);
+
+  return (
+    <div className="rounded-2xl border border-violet-100 bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-violet-50/40 transition-colors"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-[#1E1B4B] truncate">{program.name}</p>
+          {(program.start_date || program.end_date) && (
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {program.start_date ?? '?'} ~ {program.end_date ?? '?'}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {program.status && (
+            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold">
+              {program.status}
+            </span>
+          )}
+          {open
+            ? <ChevronUp size={15} className="text-violet-500" />
+            : <ChevronDown size={15} className="text-slate-400" />}
+        </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-violet-50 px-5 py-4 flex flex-col gap-4 bg-slate-50/30">
+          <BasicInfoItem program={program} />
+          <CurriculumItem programId={program.id} />
+          <InstructorsItem programId={program.id} />
+          <ClubDashboardItem programId={program.id} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── 프로젝트 레벨 뷰 (program_share 없고 project_portals 토큰일 때) ──────────
 function ProjectShareView({
   role,
@@ -49,7 +98,6 @@ function ProjectShareView({
 
   return (
     <div className="min-h-screen bg-slate-50/60 flex flex-col items-center px-4 py-10 gap-6">
-      {/* 헤더 */}
       <div className="w-full max-w-2xl space-y-1">
         <span className="inline-flex px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[11px] font-bold">
           {roleLabel}
@@ -58,10 +106,17 @@ function ProjectShareView({
         <p className="text-xs text-slate-400">프로젝트 외부 공유 포털입니다.</p>
       </div>
 
-      {/* 수혜기관 — 학교별 동아리 관리 (전체 프로그램 대상) */}
-      {role === 'beneficiary' && ctx.programs.length > 0 && (
-        <div className="w-full max-w-2xl space-y-4">
-          {ctx.programs.map((p) => (
+      <div className="w-full max-w-2xl space-y-3">
+        {ctx.programs.length === 0 ? (
+          <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center">
+            <p className="text-sm text-slate-400">등록된 프로그램이 없어요.</p>
+          </div>
+        ) : role === 'supporter' ? (
+          ctx.programs.map((p) => (
+            <SupporterProgramCard key={p.id} program={p} />
+          ))
+        ) : role === 'beneficiary' ? (
+          ctx.programs.map((p) => (
             <div key={p.id} className="rounded-3xl border border-violet-100 bg-white p-5 shadow-sm space-y-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-[#1E1B4B]">{p.name}</span>
@@ -73,19 +128,10 @@ function ProjectShareView({
               </div>
               <BeneficiarySchoolGate programId={p.id} />
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* 지원기관·수혜팀·강사 — 프로그램 목록 안내 */}
-      {role !== 'beneficiary' && (
-        <div className="w-full max-w-2xl space-y-3">
-          {ctx.programs.length === 0 ? (
-            <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center">
-              <p className="text-sm text-slate-400">등록된 프로그램이 없어요.</p>
-            </div>
-          ) : (
-            ctx.programs.map((p) => (
+          ))
+        ) : (
+          <>
+            {ctx.programs.map((p) => (
               <div
                 key={p.id}
                 className="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm flex items-center justify-between gap-3"
@@ -104,13 +150,13 @@ function ProjectShareView({
                   </span>
                 )}
               </div>
-            ))
-          )}
-          <p className="text-xs text-slate-400 text-center">
-            각 프로그램의 상세 공유 링크는 담당자에게 문의해 주세요.
-          </p>
-        </div>
-      )}
+            ))}
+            <p className="text-xs text-slate-400 text-center">
+              각 프로그램의 상세 공유 링크는 담당자에게 문의해 주세요.
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }

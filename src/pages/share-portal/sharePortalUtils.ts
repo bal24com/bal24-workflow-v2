@@ -21,7 +21,7 @@ export interface ProjectShareContext {
   type: 'project';
   projectId: string;
   projectName: string;
-  programs: Array<{ id: string; name: string; status: string | null; start_date: string | null; end_date: string | null }>;
+  programs: Program[];
 }
 
 const PROJECT_TOKEN_COL: Record<string, string> = {
@@ -123,7 +123,7 @@ export async function fetchProjectShareByToken(
 
   const { data: programs, error: pgErr } = await supabase
     .from('programs')
-    .select('id, name, status, start_date, end_date')
+    .select('*')
     .eq('project_id', portalRow.project_id)
     .is('deleted_at', null)
     .order('start_date', { ascending: false });
