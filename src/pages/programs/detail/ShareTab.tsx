@@ -3,11 +3,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ChevronDown, ChevronRight, Copy, ExternalLink, Loader2, Megaphone,
-  ClipboardCheck, ListChecks, FileText, Share2,
+  ChevronDown, ChevronRight, Loader2,
+  ListChecks, Share2,
 } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
-import { copyToClipboard } from '../../../lib/clipboard';
 import { RECRUIT_TYPE_LABEL } from '../../../types/application';
 import type {
   ProgramShare, ShareAudience, ShareItem,
@@ -50,10 +49,6 @@ function todayIso(): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${m}-${day}`;
-}
-
-function buildBase(): string {
-  return typeof window !== 'undefined' ? window.location.origin : '';
 }
 
 export default function ShareTab({ programId }: { programId: string }) {
@@ -279,8 +274,6 @@ export default function ShareTab({ programId }: { programId: string }) {
             recruits={recruits}
             sessions={sessions}
             forms={forms}
-            toastSuccess={(m) => toast.success(m)}
-            toastError={(m) => toast.error(m)}
           />
         )}
       </section>
@@ -293,11 +286,9 @@ interface LegacyProps {
   recruits: RecruitRow[];
   sessions: SessionRow[];
   forms: FormRow[];
-  toastSuccess: (m: string) => void;
-  toastError: (m: string) => void;
 }
 
-function LegacyLinks({ programId, recruits, sessions, forms, toastSuccess, toastError }: LegacyProps) {
+function LegacyLinks({ programId, recruits, sessions, forms }: LegacyProps) {
   const links: SharedLink[] = useMemo(() => {
     const list: SharedLink[] = [];
 
@@ -379,44 +370,4 @@ function LegacyLinks({ programId, recruits, sessions, forms, toastSuccess, toast
       </p>
     </div>
   );
-}
-
-function Empty({ msg }: { msg: string }) {
-  return <p className="text-[11px] text-slate-400 italic text-center py-1">{msg}</p>;
-}
-
-Copy: (href: string, label: string) => Promise<void>;
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2">
-      {icon}
-      {badge && (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 shrink-0">
-          {badge}
-        </span>
-      )}
-      <span className="flex-1 min-w-0 truncate text-xs font-semibold text-[#1E1B4B]">{label}</span>
-      <button
-        type="button"
-        onClick={() => void onCopy(href, label)}
-        title="링크 복사"
-        className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md hover:bg-violet-100 text-slate-500 hover:text-violet-700 transition-colors"
-      >
-        <Copy size={12} aria-hidden="true" />
-      </button>
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        title="새 탭 열기"
-        className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md hover:bg-violet-100 text-slate-500 hover:text-violet-700 transition-colors"
-      >
-        <ExternalLink size={12} aria-hidden="true" />
-      </a>
-    </div>
-  );
-}
-
-function Empty({ msg }: { msg: string }) {
-  return <p className="text-[11px] text-slate-400 italic text-center py-1">{msg}</p>;
 }

@@ -421,33 +421,6 @@ function TabButton({ active, onClick, label, Icon }: { active: boolean; onClick:
   );
 }
 
-<div className={`p-2 rounded-xl ${styles}`}>
-          <Icon size={18} />
-        </div>
-      </div>
-      <div>
-        <div className="text-2xl font-black text-[#1E1B4B] tracking-tight">{value}</div>
-        {sub && <p className="text-[11px] text-slate-500 font-medium mt-0.5">{sub}</p>}
-      </div>
-      {progress != null && (
-        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-          <div className="h-full bg-violet-600" style={{ width: `${progress}%` }} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TabButton({ active, onClick, label, Icon }: { active: boolean; onClick: () => void; label: string; Icon: any }) {
-  return (
-    <button onClick={onClick} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all whitespace-nowrap ${
-      active ? 'bg-violet-600 text-white shadow-md shadow-violet-100' : 'text-slate-500 hover:bg-slate-50'
-    }`}>
-      <Icon size={16} />
-      {label}
-    </button>
-  );
-}
 
 function ItemCard({ 
   item, org, responses, onSaved 
