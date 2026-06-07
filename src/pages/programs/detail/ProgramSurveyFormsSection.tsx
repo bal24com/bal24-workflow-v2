@@ -2,7 +2,7 @@
 // 만족도 탭 안에서 동적 설문 (사전 수요조사 등) 을 만들고 4역할 외부 응답을 받음.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Loader2, Trash2, Edit3, ClipboardList, Users } from 'lucide-react';
+import { Plus, Loader2, Trash2, Edit3, ClipboardList, Users, Eye } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import {
@@ -155,25 +155,37 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
                     </span>
                   </div>
                 </div>
-                {canEdit && (
-                  <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => void toggleActive(f)}
-                      title={f.is_active ? '비활성으로' : '활성으로'}
-                      className={`px-2 h-7 rounded-lg text-[10px] font-bold ${
-                        f.is_active ? 'text-rose-600 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'
-                      }`}>
-                      {f.is_active ? '끄기' : '켜기'}
-                    </button>
-                    <button type="button" onClick={() => { setEditing(f); setModalOpen(true); }}
-                      title="수정" className="p-1 rounded hover:bg-white text-slate-500">
-                      <Edit3 size={12} aria-hidden="true" />
-                    </button>
-                    <button type="button" onClick={() => void handleDelete(f)}
-                      title="삭제" className="p-1 rounded hover:bg-rose-50 text-rose-500">
-                      <Trash2 size={12} aria-hidden="true" />
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-1">
+                  {/* 미리보기 — 항상 표시 */}
+                  <a
+                    href={`/survey-preview/${f.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="응답 화면 미리보기"
+                    className="p-1 rounded hover:bg-violet-50 text-violet-500 inline-flex items-center"
+                  >
+                    <Eye size={12} aria-hidden="true" />
+                  </a>
+                  {canEdit && (
+                    <>
+                      <button type="button" onClick={() => void toggleActive(f)}
+                        title={f.is_active ? '비활성으로' : '활성으로'}
+                        className={`px-2 h-7 rounded-lg text-[10px] font-bold ${
+                          f.is_active ? 'text-rose-600 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'
+                        }`}>
+                        {f.is_active ? '끄기' : '켜기'}
+                      </button>
+                      <button type="button" onClick={() => { setEditing(f); setModalOpen(true); }}
+                        title="수정" className="p-1 rounded hover:bg-white text-slate-500">
+                        <Edit3 size={12} aria-hidden="true" />
+                      </button>
+                      <button type="button" onClick={() => void handleDelete(f)}
+                        title="삭제" className="p-1 rounded hover:bg-rose-50 text-rose-500">
+                        <Trash2 size={12} aria-hidden="true" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </li>
             );
           })}

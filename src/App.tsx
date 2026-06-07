@@ -56,6 +56,8 @@ const YeosuMarineStartupSurveyPage = lazy(() => import('./pages/public/YeosuMari
 // 박경수님 2026-05-28 STEP-SCHOOL-PORTAL — 학교/팀/지원청 포털
 const SchoolPortalPage      = lazy(() => import('./pages/portal/SchoolPortalPage'));
 const SurveyFormPage        = lazy(() => import('./pages/portal/survey/SurveyFormPage'));
+// 박경수님 2026-06-08 — 설문 응답 화면 PM 미리보기
+const SurveyPreviewPage     = lazy(() => import('./pages/programs/detail/SurveyPreviewPage'));
 const SupervisorPortalPage  = lazy(() => import('./pages/portal/supervisor/SupervisorPortalPage'));
 
 // ── PrivateRoute 안쪽이지만 vendor-docs(docx/jspdf/html2canvas/xlsx) 를 끌어오는
@@ -152,6 +154,8 @@ export default function App() {
             {/* 박경수님 2026-05-28 STEP-SCHOOL-PORTAL — 학교 담당자/팀 포털 */}
             <Route path="/program-portal/:token" element={<SchoolPortalPage />} />
             <Route path="/survey-respond/:surveyId" element={<SurveyFormPage />} />
+            {/* 박경수님 2026-06-08 — 설문 응답 화면 PM 미리보기 */}
+            <Route path="/survey-preview/:formId" element={<SurveyPreviewPage />} />
             <Route path="/project-portal/:token" element={<SupervisorPortalPage />} />
             {/* 박경수님 2026-05-29 STEP-PORTAL-MULTI-ROLE — 5단계 역할 통합. 기존 ClientPortalPage 는 /legacy-portal 로 이전. */}
             <Route path="/portal/:token" element={<PortalPublicPage />} />

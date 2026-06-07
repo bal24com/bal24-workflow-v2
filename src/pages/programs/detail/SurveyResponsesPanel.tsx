@@ -2,10 +2,11 @@
 // 응답자별 행 + 문항별 답변 + 종류별 집계 + CSV 다운로드.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, X, Download, BarChart3, FileText } from 'lucide-react';
+import { Loader2, X, Download, BarChart3, FileText, UserCog } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import type { ProgramSurveyForm, SurveyFormQuestion } from '../../../types/database';
+import SurveyMentorMatchPanel from './SurveyMentorMatchPanel';
 
 interface Props {
   form: ProgramSurveyForm;
@@ -44,6 +45,7 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
   const toast = useToast();
   const [rows, setRows] = useState<ResponseRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'responses' | 'mentor'>('responses');
   const mouseDownOnBackdropRef = useRef(false);
 
   const reload = useCallback(async () => {
@@ -118,28 +120,50 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
       onMouseUp={(e) => { if (mouseDownOnBackdropRef.current && e.target === e.currentTarget) onClose(); }}>
       <div className="absolute inset-0 bg-black/30" aria-hidden="true" />
       <div className="relative ml-auto w-full max-w-3xl bg-white h-full overflow-y-auto shadow-xl">
-        <header className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between z-10">
-          <div className="min-w-0">
-            <h2 className="text-base font-bold text-[#1E1B4B] truncate">{form.title}</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              응답 {responseSets.length}건 · 문항 {questions.length}개
-            </p>
+        {/* 상단 헤더 */}
+        <div className="sticky top-0 bg-white z-10 border-b border-slate-100">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-[#1E1B4B] truncate">{form.title}</h2>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                응답 {responseSets.length}건 · 문항 {questions.length}개
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={handleCsvDownload}
+                className="inline-flex items-center gap-1 px-3 h-8 rounded-lg border border-violet-200 text-violet-700 text-xs font-bold hover:bg-violet-50">
+                <Download size={12} aria-hidden="true" /> CSV
+              </button>
+              <button type="button" onClick={onClose} aria-label="닫기"
+                className="p-1.5 rounded hover:bg-slate-100"><X size={16} aria-hidden="true" /></button>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={handleCsvDownload}
-              className="inline-flex items-center gap-1 px-3 h-8 rounded-lg border border-violet-200 text-violet-700 text-xs font-bold hover:bg-violet-50">
-              <Download size={12} aria-hidden="true" /> CSV
-            </button>
-            <button type="button" onClick={onClose} aria-label="닫기"
-              className="p-1.5 rounded hover:bg-slate-100"><X size={16} aria-hidden="true" /></button>
+          {/* 탭 */}
+          <div className="px-5 flex gap-0">
+            {([
+              { key: 'responses', label: '응답 보기', icon: <FileText size={12} /> },
+              { key: 'mentor',    label: '멘토 매칭', icon: <UserCog size={12} /> },
+            ] as const).map((t) => (
+              <button key={t.key} type="button"
+                onClick={() => setActiveTab(t.key)}
+                className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${
+                  activeTab === t.key
+                    ? 'border-violet-600 text-violet-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}>
+                {t.icon}{t.label}
+              </button>
+            ))}
           </div>
-        </header>
+        </div>
 
         <div className="p-5 space-y-4">
           {loading ? (
             <div className="flex justify-center py-10">
               <Loader2 size={20} className="animate-spin text-violet-400" aria-hidden="true" />
             </div>
+          ) : activeTab === 'mentor' ? (
+            <SurveyMentorMatchPanel questions={questions} responseSets={responseSets} />
           ) : responseSets.length === 0 ? (
             <p className="text-sm text-slate-400 italic text-center py-10">
               아직 응답이 없어요. 외부 토큰 페이지에서 응답이 들어오면 여기에 나타나요.
