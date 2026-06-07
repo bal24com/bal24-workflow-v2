@@ -38,11 +38,15 @@ interface Props {
   role: Extract<ShareAudience, 'supporter' | 'beneficiary' | 'team' | 'staff'>;
 }
 
-// ── 프로그램 아코디언 카드 (지원기관용) ────────────────────────────────────────
-function SupporterProgramCard({
+// ── 역할별 아코디언 카드 (프로젝트 레벨 공통) ────────────────────────────────
+function RoleAccordionCard({
+  role,
   program,
+  token,
 }: {
+  role: Props['role'];
   program: ProjectShareContext['programs'][number];
+  token: string;
 }) {
   const [open, setOpen] = useState(false);
   const toggle = useCallback(() => setOpen((v) => !v), []);
@@ -76,10 +80,40 @@ function SupporterProgramCard({
 
       {open && (
         <div className="border-t border-violet-50 px-5 py-4 flex flex-col gap-4 bg-slate-50/30">
-          <BasicInfoItem program={program} />
-          <CurriculumItem programId={program.id} />
-          <InstructorsItem programId={program.id} />
-          <ClubDashboardItem programId={program.id} />
+          {/* 지원기관: 기초정보·커리큘럼·강사진·동아리현황 */}
+          {role === 'supporter' && (
+            <>
+              <BasicInfoItem program={program} />
+              <CurriculumItem programId={program.id} />
+              <InstructorsItem programId={program.id} />
+              <ClubDashboardItem programId={program.id} />
+            </>
+          )}
+          {/* 수혜기관: 학교별 동아리 관리 + 멘토링 모집 설문 */}
+          {role === 'beneficiary' && (
+            <>
+              <BeneficiarySchoolGate programId={program.id} />
+              <SurveyResponseItem
+                programId={program.id}
+                role="beneficiary"
+                respondentToken={token}
+              />
+            </>
+          )}
+          {/* 참여팀(개인): 기초정보·커리큘럼 */}
+          {role === 'team' && (
+            <>
+              <BasicInfoItem program={program} />
+              <CurriculumItem programId={program.id} />
+            </>
+          )}
+          {/* 강사·멘토: 커리큘럼·강사진 */}
+          {role === 'staff' && (
+            <>
+              <CurriculumItem programId={program.id} />
+              <InstructorsItem programId={program.id} />
+            </>
+          )}
         </div>
       )}
     </div>
@@ -90,9 +124,11 @@ function SupporterProgramCard({
 function ProjectShareView({
   role,
   ctx,
+  token,
 }: {
   role: Props['role'];
   ctx: ProjectShareContext;
+  token: string;
 }) {
   const roleLabel = SHARE_AUDIENCE_LABEL[role];
 
@@ -111,50 +147,10 @@ function ProjectShareView({
           <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center">
             <p className="text-sm text-slate-400">등록된 프로그램이 없어요.</p>
           </div>
-        ) : role === 'supporter' ? (
-          ctx.programs.map((p) => (
-            <SupporterProgramCard key={p.id} program={p} />
-          ))
-        ) : role === 'beneficiary' ? (
-          ctx.programs.map((p) => (
-            <div key={p.id} className="rounded-3xl border border-violet-100 bg-white p-5 shadow-sm space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-[#1E1B4B]">{p.name}</span>
-                {p.status && (
-                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold">
-                    {p.status}
-                  </span>
-                )}
-              </div>
-              <BeneficiarySchoolGate programId={p.id} />
-            </div>
-          ))
         ) : (
-          <>
-            {ctx.programs.map((p) => (
-              <div
-                key={p.id}
-                className="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm flex items-center justify-between gap-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-[#1E1B4B] truncate">{p.name}</p>
-                  {(p.start_date || p.end_date) && (
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {p.start_date ?? '?'} ~ {p.end_date ?? '?'}
-                    </p>
-                  )}
-                </div>
-                {p.status && (
-                  <span className="shrink-0 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold">
-                    {p.status}
-                  </span>
-                )}
-              </div>
-            ))}
-            <p className="text-xs text-slate-400 text-center">
-              각 프로그램의 상세 공유 링크는 담당자에게 문의해 주세요.
-            </p>
-          </>
+          ctx.programs.map((p) => (
+            <RoleAccordionCard key={p.id} role={role} program={p} token={token} />
+          ))
         )}
       </div>
     </div>
@@ -199,7 +195,7 @@ export default function RoleSharePage({ role }: Props) {
 
   // 프로젝트 레벨 뷰 — SharePortalShell 없이 직접 렌더
   if (state === 'project' && projectCtx) {
-    return <ProjectShareView role={role} ctx={projectCtx} />;
+    return <ProjectShareView role={role} ctx={projectCtx} token={tokenStr} />;
   }
 
   const visibleItems = ctx
