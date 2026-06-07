@@ -21,6 +21,8 @@ import ProgramDeleteButton from './ProgramDeleteButton';
 import ProgramOverviewCard from './detail/overview/ProgramOverviewCard';
 import ProgramCurriculumSummaryCard from './detail/overview/ProgramCurriculumSummaryCard';
 import ProgramParticipantSummaryCard from './detail/overview/ProgramParticipantSummaryCard';
+// 박경수님 2026-06-08 CLUB-B — 참여학교 요약 카드
+import ClubSchoolSummaryCard from './detail/overview/ClubSchoolSummaryCard';
 // STEP-OVERVIEW-CARD-FIX — ProgramInstructorSummaryCard 제거 (강사 정보를 커리큘럼 카드에 통합)
 import ParticipantManageTab from './detail/ParticipantManageTab';
 import InstructorManageTab from './detail/InstructorManageTab';
@@ -297,6 +299,7 @@ export default function ProgramDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ProgramCurriculumSummaryCard programId={programId} />
               <ProgramParticipantSummaryCard programId={programId} />
+              <ClubSchoolSummaryCard programId={programId} />
             </div>
           </div>
         )}

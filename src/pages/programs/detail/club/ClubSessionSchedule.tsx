@@ -1,19 +1,17 @@
 // 박경수님 2026-06-02 CLUB-7 — 동아리 차수별 멘토링 일정 공용 컴포넌트.
-// PM·외부(팀·교사·멘토) 양쪽에서 사용. 누구나 날짜·시간 수정, 확정은 PM·담당 선생님만 (CLUB-12).
+// 박경수님 2026-06-08 CLUB-C — 차수별 복수 멘토 배정 UI 추가.
+// PM·외부(팀·교사·멘토) 양쪽에서 사용. 누구나 날짜·시간 수정, 확정은 PM·담당 선생님만.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, CalendarDays, CheckCircle2, Trash2 } from 'lucide-react';
+import { Loader2, Plus, CalendarDays, CheckCircle2, Trash2, UserCog, X } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
-import type { ProgramClubSession, ClubSessionStatus } from '../../../../types/database';
+import type { ProgramClubSession, ClubSessionStatus, MentorRef } from '../../../../types/database';
 
 interface Props {
   clubId: string;
-  /** 날짜·시간 수정·차수 추가·삭제 권한 (PM·선생님·멘토 모두 true) */
   canEdit: boolean;
-  /** 박경수님 2026-06-02 — 확정·확정해제 권한. PM·수혜기관(선생님)만 true. 멘토·팀은 false. */
   canConfirm?: boolean;
-  /** 확정 주체 라벨 (예: '관리자', '담당 선생님') */
   decidedByLabel?: string;
 }
 
@@ -28,6 +26,8 @@ export default function ClubSessionSchedule({ clubId, canEdit, canConfirm = fals
   const [sessions, setSessions] = useState<ProgramClubSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // 박경수님 2026-06-08 CLUB-C — 차수별 멘토 입력 값 관리
+  const [mentorInput, setMentorInput] = useState<Record<string, string>>({});
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -66,7 +66,6 @@ export default function ClubSessionSchedule({ clubId, canEdit, canConfirm = fals
     void reload();
   }
 
-  // 박경수님 2026-06-02 CLUB-11 — 단순 확정 (1·2순위 제거). wish_date_1 을 날짜 입력으로 사용.
   async function confirmSession(s: ProgramClubSession) {
     if (!s.wish_date_1) { toast.error('날짜를 먼저 입력해 주세요.'); return; }
     await patch(s.id, {
@@ -84,6 +83,27 @@ export default function ClubSessionSchedule({ clubId, canEdit, canConfirm = fals
     void reload();
   }
 
+  // 박경수님 2026-06-08 CLUB-C — 멘토 추가
+  async function addMentor(s: ProgramClubSession) {
+    const name = (mentorInput[s.id] ?? '').trim();
+    if (!name) return;
+    const current: MentorRef[] = Array.isArray(s.mentor_names) ? s.mentor_names : [];
+    if (current.some((m) => m.name === name)) {
+      toast.error('이미 추가된 멘토예요.'); return;
+    }
+    const updated: MentorRef[] = [...current, { name, source: 'raw' }];
+    await patch(s.id, { mentor_names: updated });
+    setMentorInput((prev) => ({ ...prev, [s.id]: '' }));
+    toast.success(`${name} 멘토를 배정했어요.`);
+  }
+
+  // 박경수님 2026-06-08 CLUB-C — 멘토 제거
+  async function removeMentor(s: ProgramClubSession, idx: number) {
+    const current: MentorRef[] = Array.isArray(s.mentor_names) ? s.mentor_names : [];
+    const updated = current.filter((_, i) => i !== idx);
+    await patch(s.id, { mentor_names: updated });
+  }
+
   if (loading) {
     return <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-violet-400" aria-hidden="true" /></div>;
   }
@@ -95,8 +115,11 @@ export default function ClubSessionSchedule({ clubId, canEdit, canConfirm = fals
       ) : sessions.map((s) => {
         const badge = STATUS_BADGE[s.status] ?? STATUS_BADGE.wish;
         const busy = busyId === s.id;
+        const mentors: MentorRef[] = Array.isArray(s.mentor_names) ? s.mentor_names : [];
+
         return (
           <div key={s.id} className="rounded-xl border border-violet-100 bg-violet-50/30 p-3 space-y-2">
+            {/* 차수 헤더 */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">{s.session_no}차</span>
               <span className="text-sm font-bold text-[#1E1B4B] flex-1 min-w-0 truncate">{s.session_label ?? `${s.session_no}차`}</span>
@@ -108,7 +131,7 @@ export default function ClubSessionSchedule({ clubId, canEdit, canConfirm = fals
               )}
             </div>
 
-            {/* 박경수님 2026-06-02 CLUB-12 — 수정은 누구나, 확정·변경은 PM·담당 선생님만 (canConfirm) */}
+            {/* 일정 섹션 */}
             {s.status !== 'wish' && s.confirmed_date ? (
               <div className="flex items-center gap-2 text-sm text-violet-800 bg-white rounded-lg px-3 py-2 flex-wrap">
                 <CheckCircle2 size={14} className="text-violet-600" aria-hidden="true" />
@@ -151,7 +174,59 @@ export default function ClubSessionSchedule({ clubId, canEdit, canConfirm = fals
               </div>
             )}
 
-            {/* 완료 처리 (확정된 차수만 · PM·담당 선생님) */}
+            {/* 박경수님 2026-06-08 CLUB-C — 차수별 멘토 배정 */}
+            {canEdit && (
+              <div className="rounded-lg border border-slate-100 bg-white px-2.5 py-2 space-y-1.5">
+                <p className="text-[10px] font-bold text-slate-500 inline-flex items-center gap-1">
+                  <UserCog size={11} aria-hidden="true" /> 이 차수 담당 멘토
+                </p>
+                {/* 현재 멘토 칩 */}
+                {mentors.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {mentors.map((m, idx) => (
+                      <span key={idx}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 text-[11px] font-bold">
+                        {m.name}
+                        <button type="button" onClick={() => void removeMentor(s, idx)}
+                          className="ml-0.5 hover:text-rose-500">
+                          <X size={10} aria-hidden="true" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {/* 멘토 추가 인풋 */}
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={mentorInput[s.id] ?? ''}
+                    placeholder="멘토 이름 입력"
+                    onChange={(e) => setMentorInput((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void addMentor(s); }}
+                    className="flex-1 h-7 px-2 rounded-lg border border-slate-200 text-xs outline-none focus:border-violet-400"
+                  />
+                  <button type="button" onClick={() => void addMentor(s)}
+                    disabled={!(mentorInput[s.id] ?? '').trim()}
+                    className="px-2 h-7 rounded-lg bg-violet-100 text-violet-700 text-[11px] font-bold hover:bg-violet-200 disabled:opacity-40 shrink-0">
+                    <Plus size={11} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 멘토 표시 (canEdit 아닐 때 — 읽기 전용) */}
+            {!canEdit && mentors.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {mentors.map((m, idx) => (
+                  <span key={idx}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 text-[11px] font-bold">
+                    <UserCog size={10} aria-hidden="true" /> {m.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* 완료 처리 */}
             {s.status === 'confirmed' && canConfirm && (
               <button type="button" onClick={() => void patch(s.id, { status: 'done' })}
                 className="w-full inline-flex items-center justify-center gap-1 h-8 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100">

@@ -13,6 +13,7 @@ import ClubBulkModal from './ClubBulkModal';
 import ClubSessionSchedule from './ClubSessionSchedule';
 import ClubCardGrid from './ClubCardGrid';
 import ClubMentorSummary from './ClubMentorSummary';
+import ClubMembersPanel from './ClubMembersPanel';
 
 interface Props {
   programId: string;
@@ -212,11 +213,13 @@ export default function ClubManageTab({ programId }: Props) {
                       </button>
                     </div>
                   </div>
+                  {/* 박경수님 2026-06-08 CLUB-A — 팀원 개별 명단 */}
+                  <ClubMembersPanel clubId={c.id} clubName={c.club_name} canEdit />
                   {/* 박경수님 2026-06-02 CLUB-7a — 차수 멘토링 일정 펼침 */}
                   {scheduleOpen === c.id && (
                     <div className="mt-3 pt-3 border-t border-slate-100">
                       <p className="text-[11px] font-bold text-violet-700 mb-2 inline-flex items-center gap-1">
-                        <CalendarDays size={12} aria-hidden="true" /> 멘토링 일정 — {c.mentor_name ?? '멘토 미지정'}
+                        <CalendarDays size={12} aria-hidden="true" /> 멘토링 차수별 일정 및 멘토 배정
                       </p>
                       <ClubSessionSchedule clubId={c.id} canEdit canConfirm decidedByLabel="관리자" />
                     </div>

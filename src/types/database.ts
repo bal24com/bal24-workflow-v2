@@ -964,6 +964,13 @@ export interface ProgramClub {
 // 박경수님 2026-06-02 CLUB-6 — 동아리 차수별 멘토링 일정 (캡쳐 표1)
 export type ClubSessionStatus = 'wish' | 'confirmed' | 'done';
 
+/** CLUB-C — 차수별 멘토 참조 (복수 지원) */
+export interface MentorRef {
+  name: string;
+  source: 'pool' | 'profile' | 'raw';
+  id?: string;
+}
+
 export interface ProgramClubSession {
   id: string;
   club_id: string;
@@ -978,8 +985,22 @@ export interface ProgramClubSession {
   status: ClubSessionStatus;
   decided_by: string | null;
   note: string | null;
+  /** CLUB-C — 차수별 복수 멘토 (jsonb) */
+  mentor_names: MentorRef[] | null;
   created_at: string;
   updated_at: string;
+}
+
+/** CLUB-A — 팀원 개별 명단 */
+export interface ProgramClubMember {
+  id: string;
+  club_id: string;
+  name: string;
+  grade: string | null;
+  role: string | null;
+  phone: string | null;
+  email: string | null;
+  created_at: string;
 }
 
 export interface ActivityLog {
