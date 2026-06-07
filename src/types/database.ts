@@ -504,6 +504,8 @@ export interface ProgramSurveyForm {
   id: string;
   program_id: string;
   title: string;
+  /** 설문 상단 안내문 (응답자에게 표시) */
+  description?: string | null;
   kind: SurveyFormKind;
   questions: SurveyFormQuestion[];
   /** 응답 대상 4역할 — 'supporter'|'beneficiary'|'team'|'staff' */

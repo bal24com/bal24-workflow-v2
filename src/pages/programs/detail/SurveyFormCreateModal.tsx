@@ -47,6 +47,7 @@ function genId(): string {
 export default function SurveyFormCreateModal({ programId, form, onClose, onSaved }: Props) {
   const toast = useToast();
   const [title, setTitle] = useState(form?.title ?? '');
+  const [description, setDescription] = useState(form?.description ?? '');
   const [kind, setKind] = useState<SurveyFormKind>(form?.kind ?? 'custom');
   const [questions, setQuestions] = useState<SurveyFormQuestion[]>(form?.questions ?? []);
   const [targets, setTargets] = useState<string[]>(form?.target_audiences ?? []);
@@ -90,6 +91,7 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
 
   useEffect(() => {
     setTitle(form?.title ?? '');
+    setDescription(form?.description ?? '');
     setKind(form?.kind ?? 'custom');
     setQuestions(form?.questions ?? []);
     setTargets(form?.target_audiences ?? []);
@@ -158,6 +160,7 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
     const payload = {
       program_id: programId,
       title: title.trim(),
+      description: description.trim() || null,
       kind,
       questions,
       target_audiences: targets,
@@ -221,7 +224,7 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
             </div>
           )}
 
-          {/* 제목·종류·활성 */}
+          {/* 제목·종류 */}
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2">
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-700">설문 제목 *</label>
@@ -238,6 +241,20 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* 상단 안내문 */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-700">
+              상단 안내문 <span className="text-slate-400 font-normal">(선택) — 응답자 화면 상단에 표시돼요</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder="예) 안녕하세요! 멘토링 사전 수요조사입니다. 팀별로 1명이 응답해 주세요. 작성 기한: 6월 20일"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-500 resize-none leading-relaxed"
+            />
           </div>
 
           {/* 응답 대상 4역할 */}
@@ -356,8 +373,8 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
             </button>
           )}
 
-          {/* 응답자 미리보기 */}
-          {questions.length > 0 && <SurveyFormPreviewPanel questions={questions} />}
+          {/* 응답자 미리보기 — 항상 표시 */}
+          <SurveyFormPreviewPanel questions={questions} description={description} />
 
           {/* 활성 토글 */}
           <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white cursor-pointer text-xs">
