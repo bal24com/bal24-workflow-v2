@@ -163,7 +163,8 @@ export default function ConProgramsTab({ consortiumId, members, onAdd }: Props) 
     </div>
   );
 }
-     );
+
+    );
         })}
       </div>
     </div>

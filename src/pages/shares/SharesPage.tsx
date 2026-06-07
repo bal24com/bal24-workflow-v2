@@ -185,7 +185,8 @@ export default function SharesPage() {
     </div>
   );
 }
-}…
+
+…
                     </span>
                     <span className="text-slate-300">·</span>
                     <span>{formatDateKo(link.createdAt)}</span>

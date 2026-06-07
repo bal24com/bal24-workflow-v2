@@ -384,7 +384,8 @@ function LegacyLinks({ programId, recruits, sessions, forms, toastSuccess, toast
 function Empty({ msg }: { msg: string }) {
   return <p className="text-[11px] text-slate-400 italic text-center py-1">{msg}</p>;
 }
-nCopy: (href: string, label: string) => Promise<void>;
+
+Copy: (href: string, label: string) => Promise<void>;
 }) {
   return (
     <div className="flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2">

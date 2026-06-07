@@ -420,7 +420,8 @@ function TabButton({ active, onClick, label, Icon }: { active: boolean; onClick:
     </button>
   );
 }
- <div className={`p-2 rounded-xl ${styles}`}>
+
+<div className={`p-2 rounded-xl ${styles}`}>
           <Icon size={18} />
         </div>
       </div>

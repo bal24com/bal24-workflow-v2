@@ -290,7 +290,8 @@ function CreateLinkModal({ consortiumId, onClose, onSaved }: CreateModalProps) {
     </Modal>
   );
 }
-get.value)} disabled={submitting}
+
+et.value)} disabled={submitting}
           helperText="비워두면 무기한" />
       </form>
     </Modal>
