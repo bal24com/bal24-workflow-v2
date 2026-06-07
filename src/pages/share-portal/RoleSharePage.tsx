@@ -38,7 +38,15 @@ interface Props {
   role: Extract<ShareAudience, 'supporter' | 'beneficiary' | 'team' | 'staff'>;
 }
 
-// ── 역할별 아코디언 카드 (프로젝트 레벨 공통) ────────────────────────────────
+// ── 역할별 탭 정의 ────────────────────────────────────────────────────────────
+const ROLE_TABS: Record<Props['role'], Array<{ key: string; label: string }>> = {
+  supporter:   [{ key: 'info', label: '기초정보' }, { key: 'curriculum', label: '커리큘럼' }, { key: 'instructors', label: '강사진' }, { key: 'clubs', label: '동아리 현황' }],
+  beneficiary: [{ key: 'clubs', label: '동아리 관리' }, { key: 'survey', label: '설문·모집' }],
+  team:        [{ key: 'info', label: '기초정보' }, { key: 'curriculum', label: '커리큘럼' }],
+  staff:       [{ key: 'curriculum', label: '커리큘럼' }, { key: 'instructors', label: '강사진' }],
+};
+
+// ── 역할별 아코디언 카드 (탭 내장) ───────────────────────────────────────────
 function RoleAccordionCard({
   role,
   program,
@@ -49,10 +57,13 @@ function RoleAccordionCard({
   token: string;
 }) {
   const [open, setOpen] = useState(false);
+  const tabs = ROLE_TABS[role];
+  const [activeTab, setActiveTab] = useState(tabs[0].key);
   const toggle = useCallback(() => setOpen((v) => !v), []);
 
   return (
     <div className="rounded-2xl border border-violet-100 bg-white shadow-sm overflow-hidden">
+      {/* 헤더 */}
       <button
         type="button"
         onClick={toggle}
@@ -78,42 +89,38 @@ function RoleAccordionCard({
         </div>
       </button>
 
+      {/* 탭 바 + 콘텐츠 */}
       {open && (
-        <div className="border-t border-violet-50 px-5 py-4 flex flex-col gap-4 bg-slate-50/30">
-          {/* 지원기관: 기초정보·커리큘럼·강사진·동아리현황 */}
-          {role === 'supporter' && (
-            <>
-              <BasicInfoItem program={program} />
-              <CurriculumItem programId={program.id} />
-              <InstructorsItem programId={program.id} />
-              <ClubDashboardItem programId={program.id} />
-            </>
-          )}
-          {/* 수혜기관: 학교별 동아리 관리 + 멘토링 모집 설문 */}
-          {role === 'beneficiary' && (
-            <>
-              <BeneficiarySchoolGate programId={program.id} />
-              <SurveyResponseItem
-                programId={program.id}
-                role="beneficiary"
-                respondentToken={token}
-              />
-            </>
-          )}
-          {/* 참여팀(개인): 기초정보·커리큘럼 */}
-          {role === 'team' && (
-            <>
-              <BasicInfoItem program={program} />
-              <CurriculumItem programId={program.id} />
-            </>
-          )}
-          {/* 강사·멘토: 커리큘럼·강사진 */}
-          {role === 'staff' && (
-            <>
-              <CurriculumItem programId={program.id} />
-              <InstructorsItem programId={program.id} />
-            </>
-          )}
+        <div className="border-t border-violet-100">
+          {/* 탭 버튼 목록 */}
+          <div className="flex border-b border-violet-50 bg-slate-50/60 px-4 gap-1 overflow-x-auto">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`shrink-0 px-3 py-2.5 text-xs font-bold border-b-2 transition-colors ${
+                  activeTab === tab.key
+                    ? 'border-violet-600 text-violet-700'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 탭 콘텐츠 */}
+          <div className="px-5 py-4">
+            {activeTab === 'info'        && <BasicInfoItem program={program} />}
+            {activeTab === 'curriculum'  && <CurriculumItem programId={program.id} />}
+            {activeTab === 'instructors' && <InstructorsItem programId={program.id} />}
+            {activeTab === 'clubs'       && role === 'supporter' && <ClubDashboardItem programId={program.id} />}
+            {activeTab === 'clubs'       && role === 'beneficiary' && <BeneficiarySchoolGate programId={program.id} />}
+            {activeTab === 'survey'      && (
+              <SurveyResponseItem programId={program.id} role="beneficiary" respondentToken={token} />
+            )}
+          </div>
         </div>
       )}
     </div>
