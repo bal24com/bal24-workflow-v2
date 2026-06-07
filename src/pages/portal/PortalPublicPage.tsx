@@ -14,6 +14,7 @@ import PortalPinGate from './PortalPinGate';
 import PortalTeamGate from './PortalTeamGate';
 import PortalChecklistView from './PortalChecklistView';
 import PortalOperatorView from './PortalOperatorView';
+import PortalBeneficiaryView from './PortalBeneficiaryView';
 
 type Screen = 'loading' | 'notfound' | 'expired' | 'pin' | 'team' | 'ready';
 
@@ -39,7 +40,7 @@ export default function PortalPublicPage() {
         setScreen('expired'); return;
       }
 
-      // operator 의 경우 안내·설문 정보도 필요 — 별도 SELECT
+      // 안내·설문 정보도 필요 — 별도 SELECT (role 상관없이 노출 정보 보강)
       const { data: full } = await supabase.from('project_portals')
         .select('intro_title, intro_content, survey_config')
         .eq('id', result.portal.id)
@@ -83,7 +84,7 @@ export default function PortalPublicPage() {
       return (
         <PortalPinGate
           portalId={pwr.portal.id} portalTitle={pwr.portal.title}
-          storedPin={pwr.portal.beneficiary_pin}
+          storedPin={pwr.customPin ?? pwr.portal.beneficiary_pin}
           onSuccess={() => setScreen('ready')} />
       );
     }
@@ -98,6 +99,26 @@ export default function PortalPublicPage() {
     if (pwr.role === 'operator') {
       return <PortalOperatorView portal={pwr.portal} />;
     }
+
+    // 수혜기관 개별 포털 (고도화 버전)
+    if (pwr.role === 'beneficiary_org' && pwr.beneficiaryOrg) {
+      return (
+        <PortalBeneficiaryView
+          portal={{
+            ...pwr.portal,
+            project_id: pwr.portal.project_id,
+            intro_title: pwr.portal.intro_title ?? null,
+            intro_content: pwr.portal.intro_content ?? null,
+            survey_config: pwr.portal.survey_config ?? null,
+          }}
+          org={pwr.beneficiaryOrg as any}
+          onStatusChange={(newStatus) => {
+            if (pwr.beneficiaryOrg) pwr.beneficiaryOrg.status = newStatus;
+          }}
+        />
+      );
+    }
+
     return (
       <PortalChecklistView
         portalId={pwr.portal.id}

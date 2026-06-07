@@ -20,6 +20,7 @@ export interface StaffPortalProgram {
   status: string;
   start_date: string | null;
   end_date: string | null;
+  project_id: string;
 }
 
 export interface StaffUpcomingSession {
@@ -167,10 +168,10 @@ export async function fetchStaffPrograms(
 
   if (programIds.size === 0) return [];
 
-  // 5) programs 조회 (name 컬럼)
+  // 5) programs 조회 (name, project_id 컬럼)
   const { data: programs, error: pErr } = await supabase
     .from('programs')
-    .select('id, name, status, start_date, end_date')
+    .select('id, name, status, start_date, end_date, project_id')
     .in('id', Array.from(programIds))
     .order('start_date', { ascending: false });
   if (pErr) {

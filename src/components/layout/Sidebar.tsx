@@ -45,8 +45,7 @@ type MenuSection = {
   items: MenuItem[];
 };
 
-// SECTIONS — 박경수님 2026-05-29 STEP-MENU-REFACTOR — 6그룹 + 메뉴명 명료화.
-// 홈 / 사업 관리 / 운영 / 모집 관리 / 재무 / 설정.
+// SECTIONS — 박경수님 2026-06-03 STEP-NAV-ENHANCE — 운영 지원 그룹 신설 및 메뉴 가시화.
 const SECTIONS: MenuSection[] = [
   {
     heading: '홈',
@@ -58,10 +57,10 @@ const SECTIONS: MenuSection[] = [
   {
     heading: '사업 관리',
     items: [
-      { to: '/projects',   label: '사업',     Icon: FolderKanban },
-      { to: '/clients',    label: '기관',     Icon: Briefcase },
-      { to: '/consortium', label: '컨소시엄', Icon: Building2 },
-      { to: '/contracts',  label: '계약',     Icon: FileText },
+      { to: '/projects',   label: '사업(프로젝트)', Icon: FolderKanban },
+      { to: '/clients',    label: '기관·고객사',   Icon: Briefcase },
+      { to: '/consortium', label: '컨소시엄',      Icon: Building2 },
+      { to: '/contracts',  label: '수입·계약',     Icon: FileText },
     ],
   },
   {
@@ -69,22 +68,29 @@ const SECTIONS: MenuSection[] = [
     items: [
       { to: '/programs', label: '프로그램',  Icon: BookOpen },
       { to: '/experts',  label: '강사·멘토', Icon: Users },
-      // 박경수님 2026-05-29 STEP-MENU-REFACTOR Phase 3 — 포털 외부 공유 사이드바 노출.
-      { to: '/portals',  label: '외부 공유', Icon: Share2 },
-      // 박경수님 2026-05-29 STEP-CLEANUP — 강사 포털 사이드바 항목 제거 완료.
-      // 강사 포털은 /portal 라우트로 유지하되, PM 은 [강사·멘토] 카드의 [링크 복사] 로 강사에게 전달.
+    ],
+  },
+  {
+    heading: '운영 지원',
+    items: [
+      { to: '/attendance',    label: '출석 관리', Icon: ClipboardCheck },
+      { to: '/activity-logs', label: '통합 일지', Icon: FileText },
+      { to: '/certificates',  label: '수료증 발급', Icon: FileText }, // 아이콘 추후 Scroll 등으로 변경 가능
+      { to: '/forms',         label: '외부 폼 관리', Icon: UserPlus },
+      { to: '/portals',       label: '포털 관리',   Icon: Share2 },
     ],
   },
   {
     heading: '모집 관리',
     items: [
-      { to: '/applications', label: '모집·신청', Icon: UserPlus },
+      { to: '/applications', label: '신청자 검토', Icon: UserPlus },
+      { to: '/recruit-manage', label: '강사·TA 모집', Icon: UserPlus },
     ],
   },
   {
     heading: '재무',
     items: [
-      { to: '/payroll', label: '지급 관리', Icon: CreditCard },
+      { to: '/payroll', label: '외주·급여', Icon: CreditCard },
       { to: '/reports', label: '재무 현황', Icon: BarChart3 },
     ],
   },

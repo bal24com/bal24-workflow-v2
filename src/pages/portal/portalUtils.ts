@@ -29,10 +29,44 @@ export interface ProjectPortal {
 export interface PortalWithRole {
   portal: ProjectPortal;
   role: PortalRole;
+  customPin?: string | null;
+  beneficiaryOrg?: {
+    id: string;
+    org_name: string;
+    contact_name: string | null;
+    contact_phone: string | null;
+    status: string;
+  };
 }
 
 /** 토큰 한 개로 4가지 역할 중 어느 것인지 식별. */
 export async function resolvePortalRole(token: string): Promise<PortalWithRole | null> {
+  // 1) 수혜기관 개별 토큰 먼저 확인 (가장 구체적인 정보)
+  const { data: bData } = await supabase
+    .from('portal_beneficiary_orgs')
+    .select(`
+      id, org_name, contact_name, contact_phone, status, pin, portal_id,
+      portal:project_portals (*)
+    `)
+    .eq('token', token)
+    .maybeSingle();
+
+  if (bData && bData.portal) {
+    return {
+      portal: bData.portal as unknown as ProjectPortal,
+      role: 'beneficiary_org',
+      customPin: bData.pin,
+      beneficiaryOrg: {
+        id: bData.id,
+        org_name: bData.org_name,
+        contact_name: bData.contact_name,
+        contact_phone: bData.contact_phone,
+        status: bData.status,
+      },
+    };
+  }
+
+  // 2) project_portals 4종 공통 토큰 매칭
   const { data, error } = await supabase
     .from('project_portals')
     .select('id, project_id, title, description, is_active, operator_token, supporter_token, beneficiary_token, participant_token, beneficiary_pin')

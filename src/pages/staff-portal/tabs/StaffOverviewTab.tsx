@@ -2,7 +2,10 @@
 // 강사 통합 포털 · 개요 탭 — 담당 프로그램 카드 + D-7 일정 + 교육 개요·전체 커리큘럼 (PART B 2026-05-28)
 
 import { useEffect, useState } from 'react';
-import { Loader2, BookOpen, CheckCircle2, Info, ListChecks, User, Calendar, MapPin, Users, CalendarDays } from 'lucide-react';
+import { 
+  Loader2, BookOpen, CheckCircle2, Info, ListChecks, User, 
+  Calendar, MapPin, Users, CalendarDays, Wallet, Activity
+} from 'lucide-react';
 import ScheduleStagesSection from './ScheduleStagesSection';
 import { formatDateKo } from '../../../lib/utils';
 import EmptyState from '../../../components/EmptyState';
@@ -28,8 +31,15 @@ interface CurriculumRow {
   start_time: string | null;
   end_time: string | null;
   title: string | null;
-  staff_id: string | null;
+  is_completed?: boolean;
   staff?: { id: string; name: string } | { id: string; name: string }[] | null;
+}
+
+interface Stats {
+  totalSessions: number;
+  completedSessions: number;
+  totalFee: number;
+  paidFee: number;
 }
 
 interface Props {
@@ -52,6 +62,9 @@ export default function StaffOverviewTab({
   // STEP-STAFF-PORTAL-REDESIGN PART B (2026-05-28) — 선택 프로그램의 교육 개요 + 전체 커리큘럼
   const [programDetail, setProgramDetail] = useState<ProgramDetail | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumRow[]>([]);
+  const [stats, setStats] = useState<Stats>({ totalSessions: 0, completedSessions: 0, totalFee: 0, paidFee: 0 });
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [mySessionIds, setMySessionIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -67,33 +80,93 @@ export default function StaffOverviewTab({
 
   // PART B — 선택 프로그램의 상세 + 커리큘럼 fetch
   useEffect(() => {
-    if (!selectedProgramId) { setProgramDetail(null); setCurriculum([]); return; }
+    if (!selectedProgramId) { 
+      setProgramDetail(null); 
+      setCurriculum([]); 
+      setStats({ totalSessions: 0, completedSessions: 0, totalFee: 0, paidFee: 0 });
+      return; 
+    }
     let cancelled = false;
+    setStatsLoading(true);
+
     void (async () => {
-      const [pRes, cRes] = await Promise.all([
+      const staffCol = staff.sourceType === 'staff_pool' ? 'staff_pool_id' : 'profile_id';
+      
+      const [pRes, cRes, csRes, feeRes] = await Promise.all([
         supabase.from('programs')
           .select('description, venue, capacity, start_date, end_date, project:projects(name, client:clients(name))')
           .eq('id', selectedProgramId).maybeSingle(),
         supabase.from('program_curriculum')
-          .select('id, session_no, session_date, start_time, end_time, title, staff_id, staff:staff_pool!program_curriculum_staff_id_fkey(id, name)')
+          .select('id, session_no, session_date, start_time, end_time, title, is_completed')
           .eq('program_id', selectedProgramId).order('session_no', { ascending: true }),
+        supabase.from('curriculum_staff')
+          .select('curriculum_id, role')
+          .eq(staffCol, staff.id),
+        supabase.from('payroll_expenses')
+          .select('subtotal, net_amount, payment_status')
+          .eq(staffCol, staff.id)
+          .eq('program_id', selectedProgramId)
+          .is('deleted_at', null),
       ]);
+
       if (cancelled) return;
+
+      const curData = (cRes.data ?? []) as CurriculumRow[];
+      const assignedCurIds = new Set((csRes.data ?? []).map(r => r.curriculum_id));
+      setMySessionIds(assignedCurIds);
+      
+      // 담당 차시만 필터링하거나 전체 보여주되 담당 표시 (기존 로직 유지하며 stats 계산)
+      const mySessions = curData.filter(c => assignedCurIds.has(c.id));
+      const today = new Date().toISOString().slice(0, 10);
+      const completed = mySessions.filter(c => c.is_completed || (c.session_date && c.session_date < today)).length;
+      
+      let totalFee = 0;
+      let paidFee = 0;
+      (feeRes.data ?? []).forEach(f => {
+        totalFee += Number(f.subtotal ?? 0);
+        if (f.payment_status === 'paid') paidFee += Number(f.net_amount ?? f.subtotal ?? 0);
+      });
+
       setProgramDetail((pRes.data ?? null) as ProgramDetail | null);
-      setCurriculum(((cRes.data ?? []) as unknown) as CurriculumRow[]);
+      setCurriculum(curData);
+      setStats({
+        totalSessions: mySessions.length,
+        completedSessions: completed,
+        totalFee,
+        paidFee
+      });
+      setStatsLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [selectedProgramId]);
+  }, [selectedProgramId, staff.id, staff.sourceType]);
 
   const clientName = (() => {
     const c = programDetail?.project?.client;
     if (!c) return null;
     return Array.isArray(c) ? c[0]?.name : c.name;
   })();
-  const staffName = (s: CurriculumRow['staff']): string => {
-    if (!s) return '미정';
-    const x = Array.isArray(s) ? s[0] : s;
-    return x?.name ?? '미정';
+  
+  // curriculum_staff 정보를 한 번 더 가져와서 매칭 (join 에러 방지 위해 수동 매칭)
+  const [assignedStaffMap, setAssignedStaffMap] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!selectedProgramId) return;
+    void (async () => {
+      const { data } = await supabase
+        .from('curriculum_staff')
+        .select('curriculum_id, staff_pool:staff_pool(name), profile:profiles(name)')
+        .in('curriculum_id', curriculum.map(c => c.id));
+      
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((row: any) => {
+        const name = row.staff_pool?.name || row.profile?.name || '미정';
+        map[row.curriculum_id] = name;
+      });
+      setAssignedStaffMap(map);
+    })();
+  }, [selectedProgramId, curriculum.length]);
+
+  const getStaffName = (curriculumId: string): string => {
+    return assignedStaffMap[curriculumId] ?? '미정';
   };
 
   // STEP-TABLE-COMPACT PART C — filteredUpcoming 비사용 (D-7 위젯 제거)
@@ -161,7 +234,48 @@ export default function StaffOverviewTab({
       {/* STEP-TABLE-COMPACT PART C (2026-05-28) — D-7 다가오는 일정 위젯 제거 (일정 탭으로 통합)
           기존 fetchUpcomingSchedule 호출은 유지하되 UI 만 미노출 → 다른 활용처(useEffect) 영향 X */}
 
+      {/* 2026-06-07 — 전문가 KPI 요약 카드 */}
+      {selectedProgramId && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className={`${CARD_CLASS} flex flex-col justify-between border-violet-200/60`}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Activity size={14} className="text-violet-500" />
+              <span className="text-[11px] font-bold text-slate-500">배정 차시</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-[#1E1B4B] tabular-nums">{stats.totalSessions}</span>
+              <span className="text-xs text-slate-400 font-medium">차시</span>
+            </div>
+          </div>
+          <div className={`${CARD_CLASS} flex flex-col justify-between border-emerald-200/60`}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <CheckCircle2 size={14} className="text-emerald-500" />
+              <span className="text-[11px] font-bold text-slate-500">진행 상태</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-[#1E1B4B] tabular-nums">
+                {stats.totalSessions > 0 ? Math.round((stats.completedSessions / stats.totalSessions) * 100) : 0}
+              </span>
+              <span className="text-xs text-slate-400 font-medium">% ({stats.completedSessions}/{stats.totalSessions})</span>
+            </div>
+          </div>
+          <div className={`${CARD_CLASS} flex flex-col justify-between col-span-2 sm:col-span-1 border-blue-200/60`}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Wallet size={14} className="text-blue-500" />
+              <span className="text-[11px] font-bold text-slate-500">예정 강사료</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-[#1E1B4B] tabular-nums">
+                {(stats.totalFee / 10000).toLocaleString('ko-KR')}
+              </span>
+              <span className="text-xs text-slate-400 font-medium">만원</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2026-05-26 박경수님 — 교육 개요 단정화. 메타 인라인 한 줄 + 본문 단일 영역. */}
+
       {selectedProgramId && programDetail && (
         <section className={CARD_CLASS}>
           <h2 className="text-base font-bold text-[#1E1B4B] mb-3 flex items-center gap-2">
@@ -219,13 +333,22 @@ export default function StaffOverviewTab({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {curriculum.map((c) => {
-                  const mine = c.staff_id === staff.id;
+                  const mine = mySessionIds.has(c.id);
+                  const instructorName = getStaffName(c.id);
                   return (
                     <tr key={c.id} className={mine ? 'bg-violet-50' : 'hover:bg-violet-50/40'}>
                       <td className="px-3 py-2 text-xs font-bold text-violet-700 tabular-nums">{c.session_no ?? '-'}</td>
                       <td className="px-3 py-2 text-xs text-slate-600 tabular-nums whitespace-nowrap">{formatDateKo(c.session_date)}{c.start_time ? ` · ${c.start_time.slice(0, 5)}` : ''}</td>
                       <td className="px-3 py-2 text-sm font-medium text-slate-800">{c.title ?? '-'}</td>
-                      <td className="px-3 py-2 text-xs">{mine ? <span className="inline-flex items-center gap-1 text-violet-700 font-semibold"><User size={11} aria-hidden="true" />{staffName(c.staff)} (본인)</span> : <span className="text-slate-600">{staffName(c.staff)}</span>}</td>
+                      <td className="px-3 py-2 text-xs">
+                        {mine ? (
+                          <span className="inline-flex items-center gap-1 text-violet-700 font-semibold">
+                            <User size={11} aria-hidden="true" />{instructorName} (본인)
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">{instructorName}</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}

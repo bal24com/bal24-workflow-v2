@@ -1,26 +1,25 @@
 # BalanceDot WorkFlow v2 세션 인수인계 (HANDOVER.md)
 // 이 파일은 다음 AI 세션(Claude·Skywork 등)이 프로젝트의 현재 상태를 즉시 파악하도록 작성됨.
-// 최종 갱신: 2026-06-03 (Claude 세션 — 동아리 운영 + 역할별 외부공유 시스템 반영)
+// 최종 갱신: 2026-06-07 (Skywork 세션 — 수혜기관 포털 고도화 및 개별 토큰 시스템 반영)
 
 ## 0. ⚠️ 먼저 읽기 — 최근 작업 줄기 (중요)
-이 프로젝트는 두 갈래로 발전해 왔음. 아래 B 갈래가 가장 최신이며 git 에 모두 반영됨.
+이 프로젝트는 세 갈래로 발전해 왔음. 아래 C 갈래가 가장 최신이며 git 에 반영됨.
 
-- **갈래 A (회계·컨소시엄, ~2026-05-25)** — 지급요청·견적·리포트. 일부 미완성 (5번 참고).
+- **갈래 A (회계·컨소시엄, ~2026-05-25)** — 지급요청·견적·리포트.
 - **갈래 B (외부공유·동아리, ~2026-06-03)** — 강사 포털 → 역할별 외부공유 4종 → 동아리 운영 시스템.
-  최근 커밋 `cb9da04` (CLUB-15)까지 전부 main 에 push 완료.
+- **갈래 C (포털 고도화, 2026-06-07)** — 수혜기관(학교/기업) 포털 고도화. 개별 토큰 기반 진입 및 대시보드·참가자 관리·서류함 구현.
 
-→ 작업 이어갈 때 git log 로 실제 최신 커밋부터 확인할 것 (`git log --oneline -15`).
+## 2. 외부 공유 시스템 전체 구조 (갈래 C 추가분 반영)
+### (4) 수혜기관 개별 포털 — `/portal/:token` (개별 PIN 인증)
+- 컴포넌트 `src/pages/portal/PortalBeneficiaryView.tsx`
+- 진입: `portal_beneficiary_orgs.token` 으로 접속 시 개별 기관 모드로 진입.
+- 기능:
+  - **홈**: 사업 진행 단계(`pending`·`submitted`·`confirmed`) 트래커 및 KPI 요약.
+  - **소속 인원**: `participant_applications` 테이블에서 `organization` 명칭이 일치하는 참가자 실시간 목록.
+  - **서류 보관함**: `portal_items` 기반 파일 다운로드 및 업로드(Storage 연동).
+  - **신청하기**: `portal_survey_responses` 통합.
+- 인증: `resolvePortalRole` (portalUtils.ts) 에서 `portal_beneficiary_orgs` 테이블을 우선 검색하여 개별 PIN(`pbo.pin`)을 `customPin`으로 전달하도록 개선.
 
-## 1. 프로젝트 기본 정보
-- 앱 명칭: BalanceDot WorkFlow v2
-- 로컬 경로: `C:\workflow\bal24-workflow-v2` (Vite 환경)
-- 기술 스택: React 18 + TypeScript + Vite / Tailwind + shadcn/ui + Radix + Pretendard / Supabase (Auth·DB·Storage·Edge Functions)
-- GitHub: `https://github.com/bal24com/bal24-workflow-v2` (기본 브랜치 main)
-- 배포: `https://bal24.kr` (netlify)
-- Supabase: `https://clsljkxvgmqwenettkrz.supabase.co`
-- 타입체크: `cd /c/workflow/bal24-workflow-v2 && npx tsc -b --noEmit` (반드시 exit 0 확인 후 커밋)
-
-## 2. 외부 공유 시스템 전체 구조 (갈래 B 핵심 — 토큰 경로가 여러 갈래라 혼동 주의)
 프로그램 단위로 외부에 공유하는 경로가 3종류 있음. 각각 용도·인증이 다름.
 
 ### (1) 역할별 외부공유 — `/share/{role}/:token` (무인증)

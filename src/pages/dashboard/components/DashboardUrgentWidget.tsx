@@ -7,8 +7,87 @@ import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 
 interface UrgentCounts {
-  submittedCount: number;   // 승인 대기 멘토링 일지
-  rejectedCount: number;    // 반려 후 미수정 멘토링 일지
+  submittedLogCount: number;   // 승인 대기 멘토링 일지
+  rejectedLogCount: number;    // 반려 후 미수정 멘토링 일지
+  portalRespCount: number;     // 미검토 포털 응답 (체크리스트)
+  surveyRespCount: number;     // 신규 설문 응답 (최근 3일)
+}
+
+async function fetchUrgentCounts(): Promise<UrgentCounts> {
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [logSub, logRej, portalResp, surveyResp] = await Promise.all([
+    supabase.from('mentoring_logs').select('id', { count: 'exact', head: true }).eq('status', 'submitted'),
+    supabase.from('mentoring_logs').select('id', { count: 'exact', head: true }).eq('status', 'rejected'),
+    supabase.from('portal_responses').select('id', { count: 'exact', head: true }).is('is_approved', null),
+    supabase.from('portal_survey_responses').select('id', { count: 'exact', head: true }).gt('submitted_at', threeDaysAgo),
+  ]);
+
+  return {
+    submittedLogCount: logSub.count ?? 0,
+    rejectedLogCount:  logRej.count ?? 0,
+    portalRespCount:   portalResp.count ?? 0,
+    surveyRespCount:   surveyResp.count ?? 0,
+  };
+}
+
+// ... (UrgentRow 는 그대로 유지)
+
+export default function DashboardUrgentWidget() {
+  const [counts, setCounts] = useState<UrgentCounts | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const c = await fetchUrgentCounts();
+        if (!cancelled) setCounts(c);
+      } catch (err) {
+        if (!cancelled) setCounts({ submittedLogCount: 0, rejectedLogCount: 0, portalRespCount: 0, surveyRespCount: 0 });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 flex items-center gap-2" aria-hidden="true">
+        <Loader2 className="animate-spin text-amber-500" size={16} />
+        <span className="text-xs text-amber-700">긴급 처리 항목 확인 중...</span>
+      </div>
+    );
+  }
+
+  const total = (counts?.submittedLogCount ?? 0) + (counts?.rejectedLogCount ?? 0) 
+              + (counts?.portalRespCount ?? 0) + (counts?.surveyRespCount ?? 0);
+  if (total === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-[0_4px_16px_rgba(245,158,11,0.08)] flex flex-col gap-2">
+      <header className="flex items-center gap-1.5 px-1">
+        <AlertCircle size={16} className="text-amber-600" aria-hidden="true" />
+        <h2 className="text-sm font-bold text-amber-900">긴급 처리 및 응답 알림</h2>
+      </header>
+
+      <div className="flex flex-col gap-1">
+        {counts && counts.submittedLogCount > 0 && (
+          <UrgentRow label="승인 대기 멘토링 일지" count={counts.submittedLogCount} to="/programs" tone="amber" />
+        )}
+        {counts && counts.rejectedLogCount > 0 && (
+          <UrgentRow label="반려 후 미수정 일지" count={counts.rejectedLogCount} to="/programs" tone="rose" />
+        )}
+        {counts && counts.portalRespCount > 0 && (
+          <UrgentRow label="미검토 포털 제출 서류" count={counts.portalRespCount} to="/portals" tone="amber" />
+        )}
+        {counts && counts.surveyRespCount > 0 && (
+          <UrgentRow label="신규 설문 응답 (3일 이내)" count={counts.surveyRespCount} to="/portals" tone="amber" />
+        )}
+      </div>
+    </section>
+  );
 }
 
 async function fetchUrgentCounts(): Promise<UrgentCounts> {

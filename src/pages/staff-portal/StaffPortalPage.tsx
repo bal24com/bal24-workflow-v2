@@ -11,6 +11,7 @@ import StaffLectureTab from './tabs/StaffLectureTab';
 import StaffLogTab from './tabs/StaffLogTab';
 import StaffMaterialsTab from './tabs/StaffMaterialsTab';
 import StaffInfoEditModal from './StaffInfoEditModal';
+import PortalBoardTab from '../portal/PortalBoardTab';
 import {
   resolveStaffByToken, fetchStaffPrograms,
   type StaffPortalIdentity, type StaffPortalProgram,
@@ -19,6 +20,7 @@ import {
 // 박경수님 2026-05-26 STEP-PORTAL-MULTI-FIX PART E — 일정 탭 제거 (개요 탭 하단으로 이동).
 const TABS = [
   { key: 'overview',   label: '개요' },
+  { key: 'board',      label: '게시판' },
   { key: 'mentoring',  label: '멘토링' },
   { key: 'lecture',    label: '강의' },
   { key: 'log',        label: '일지' },
@@ -37,6 +39,7 @@ export default function StaffPortalPage() {
   const [programs, setPrograms] = useState<StaffPortalProgram[]>([]);
   const [programsLoading, setProgramsLoading] = useState(false);
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
+  const [portalId, setPortalId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) { setLoading(false); return; }
@@ -69,6 +72,19 @@ export default function StaffPortalPage() {
     () => programs.find((p) => p.id === selectedProgramId) ?? null,
     [programs, selectedProgramId],
   );
+
+  useEffect(() => {
+    if (!selectedProgram) { setPortalId(null); return; }
+    void (async () => {
+      const { data } = await supabase
+        .from('project_portals')
+        .select('id')
+        .eq('project_id', selectedProgram.project_id)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (data) setPortalId(data.id);
+    })();
+  }, [selectedProgram]);
 
   if (loading) {
     return (
@@ -124,6 +140,19 @@ export default function StaffPortalPage() {
             <StaffOverviewTab staff={staff} programs={programs} programsLoading={programsLoading}
               selectedProgramId={selectedProgramId}
               onSelectProgram={setSelectedProgramId} />
+          )}
+          {activeTab === 'board' && portalId && (
+            <PortalBoardTab 
+              portalId={portalId}
+              staffId={staff.id}
+              authorName={staff.name}
+              authorRole="staff"
+            />
+          )}
+          {activeTab === 'board' && !portalId && (
+             <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-12 text-center text-slate-400">
+                <p className="text-sm">해당 프로젝트에 활성화된 포털이 없어 게시판을 이용할 수 없어요.</p>
+             </div>
           )}
           {activeTab === 'mentoring' && <StaffMentoringTab staff={staff} selectedProgramId={selectedProgramId} onNavigateToLogTab={() => setActiveTab('log')} />}
           {activeTab === 'lecture'   && <StaffLectureTab   staff={staff} selectedProgramId={selectedProgramId} />}
