@@ -16,6 +16,21 @@ export interface ShareContext {
   todayIso: string;
 }
 
+/** project_portals 토큰 기반 — 프로그램 없이 프로젝트 레벨 접근 */
+export interface ProjectShareContext {
+  type: 'project';
+  projectId: string;
+  projectName: string;
+  programs: Array<{ id: string; name: string; status: string | null; start_date: string | null; end_date: string | null }>;
+}
+
+const PROJECT_TOKEN_COL: Record<string, string> = {
+  supporter:   'supporter_token',
+  beneficiary: 'beneficiary_token',
+  team:        'participant_token',
+  staff:       'operator_token',
+};
+
 function todayIso(): string {
   const d = new Date();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -72,6 +87,56 @@ export async function fetchShareByToken(
     program,
     stage: detectStage(today, share),
     todayIso: today,
+  };
+}
+
+/** project_portals 토큰 기반 프로젝트 레벨 컨텍스트 조회 */
+export async function fetchProjectShareByToken(
+  audience: Extract<ShareAudience, 'supporter' | 'beneficiary' | 'team' | 'staff'>,
+  token: string,
+): Promise<ProjectShareContext | null> {
+  if (!token) return null;
+  const col = PROJECT_TOKEN_COL[audience];
+  if (!col) return null;
+
+  const { data: portal, error: pErr } = await supabase
+    .from('project_portals')
+    .select('id, project_id')
+    .eq(col, token)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (pErr) {
+    console.error(`[share-portal/${audience}] project_portals 조회 실패:`, pErr.message);
+    return null;
+  }
+  if (!portal) return null;
+
+  const portalRow = portal as { id: string; project_id: string };
+
+  const { data: project, error: prErr } = await supabase
+    .from('projects')
+    .select('id, name')
+    .eq('id', portalRow.project_id)
+    .maybeSingle();
+  if (prErr || !project) return null;
+  const proj = project as { id: string; name: string };
+
+  const { data: programs, error: pgErr } = await supabase
+    .from('programs')
+    .select('id, name, status, start_date, end_date')
+    .eq('project_id', portalRow.project_id)
+    .is('deleted_at', null)
+    .order('start_date', { ascending: false });
+  if (pgErr) {
+    console.error(`[share-portal/${audience}] 프로그램 조회 실패:`, pgErr.message);
+    return null;
+  }
+
+  return {
+    type: 'project',
+    projectId: proj.id,
+    projectName: proj.name,
+    programs: (programs ?? []) as ProjectShareContext['programs'],
   };
 }
 

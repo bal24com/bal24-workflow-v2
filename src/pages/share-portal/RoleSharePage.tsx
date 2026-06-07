@@ -1,6 +1,6 @@
 // 박경수님 2026-06-02 STEP-B — 4역할(지원기관·수혜기관·참여팀(개인)·강사/멘토) 공용 외부 공유 페이지.
 // /share/{role}/:token 4개 라우트가 role prop 만 다르게 호출.
-// 무인증 + 모바일 반응형. ClientSharePage 패턴 재사용.
+// 무인증 + 모바일 반응형. program_share 토큰 → 폴백으로 project_portals 토큰 지원.
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -16,34 +16,112 @@ import FeedbackCommentsItem from './items/FeedbackCommentsItem';
 import CheckinItem from './items/CheckinItem';
 import SurveySubmitItem from './items/SurveySubmitItem';
 import OutcomeUploadItem from './items/OutcomeUploadItem';
-// 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 동적 설문 응답
 import SurveyResponseItem from './items/SurveyResponseItem';
-// 박경수님 2026-06-02 STEP-SURVEY-RESULTS-B — 동적 설문 결과 조회 (지원기관 공유)
 import SurveyResultsViewItem from './items/SurveyResultsViewItem';
-// 박경수님 2026-06-02 CLUB-3 — 결과보고서 외부 열람
 import ReportViewItem from './items/ReportViewItem';
-// 박경수님 2026-06-02 CLUB-10 — 동아리 전체 진행률 대시보드
 import ClubDashboardItem from './items/ClubDashboardItem';
-// 박경수님 2026-06-02 CLUB-13 — 진행 중 파일 제출 (과정 산출물·사진)
 import FileUploadItem from './items/FileUploadItem';
-// 박경수님 2026-06-02 — invite_response·activity_log·lecture_certificate 는 본인 식별 필요로 일단 안내문 처리
 import BeneficiarySchoolGate from './BeneficiarySchoolGate';
-import { fetchShareByToken, getPublicMaterials, type ShareContext } from './sharePortalUtils';
+import {
+  fetchShareByToken,
+  fetchProjectShareByToken,
+  getPublicMaterials,
+  type ShareContext,
+  type ProjectShareContext,
+} from './sharePortalUtils';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
-import { STAGE_ITEMS } from '../programs/detail/share/visibilityCatalog';
+import { STAGE_ITEMS, SHARE_AUDIENCE_LABEL } from '../programs/detail/share/visibilityCatalog';
 import type { ShareAudience, ShareStage } from '../../types/database';
 
 interface Props {
-  /** 박경수님 2026-06-02 — supporter·beneficiary·team·staff 중 하나 */
   role: Extract<ShareAudience, 'supporter' | 'beneficiary' | 'team' | 'staff'>;
 }
 
+// ── 프로젝트 레벨 뷰 (program_share 없고 project_portals 토큰일 때) ──────────
+function ProjectShareView({
+  role,
+  ctx,
+}: {
+  role: Props['role'];
+  ctx: ProjectShareContext;
+}) {
+  const roleLabel = SHARE_AUDIENCE_LABEL[role];
+
+  return (
+    <div className="min-h-screen bg-slate-50/60 flex flex-col items-center px-4 py-10 gap-6">
+      {/* 헤더 */}
+      <div className="w-full max-w-2xl space-y-1">
+        <span className="inline-flex px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[11px] font-bold">
+          {roleLabel}
+        </span>
+        <h1 className="text-xl font-black text-[#1E1B4B]">{ctx.projectName}</h1>
+        <p className="text-xs text-slate-400">프로젝트 외부 공유 포털입니다.</p>
+      </div>
+
+      {/* 수혜기관 — 학교별 동아리 관리 (전체 프로그램 대상) */}
+      {role === 'beneficiary' && ctx.programs.length > 0 && (
+        <div className="w-full max-w-2xl space-y-4">
+          {ctx.programs.map((p) => (
+            <div key={p.id} className="rounded-3xl border border-violet-100 bg-white p-5 shadow-sm space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-[#1E1B4B]">{p.name}</span>
+                {p.status && (
+                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold">
+                    {p.status}
+                  </span>
+                )}
+              </div>
+              <BeneficiarySchoolGate programId={p.id} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 지원기관·수혜팀·강사 — 프로그램 목록 안내 */}
+      {role !== 'beneficiary' && (
+        <div className="w-full max-w-2xl space-y-3">
+          {ctx.programs.length === 0 ? (
+            <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center">
+              <p className="text-sm text-slate-400">등록된 프로그램이 없어요.</p>
+            </div>
+          ) : (
+            ctx.programs.map((p) => (
+              <div
+                key={p.id}
+                className="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-[#1E1B4B] truncate">{p.name}</p>
+                  {(p.start_date || p.end_date) && (
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {p.start_date ?? '?'} ~ {p.end_date ?? '?'}
+                    </p>
+                  )}
+                </div>
+                {p.status && (
+                  <span className="shrink-0 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold">
+                    {p.status}
+                  </span>
+                )}
+              </div>
+            ))
+          )}
+          <p className="text-xs text-slate-400 text-center">
+            각 프로그램의 상세 공유 링크는 담당자에게 문의해 주세요.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── 메인 컴포넌트 ──────────────────────────────────────────────────────────────
 export default function RoleSharePage({ role }: Props) {
   const { token } = useParams<{ token: string }>();
   const tokenStr = token ?? '';
   const [ctx, setCtx] = useState<ShareContext | null>(null);
-  const [state, setState] = useState<'loading' | 'notfound' | 'before' | 'ok'>('loading');
-  // 박경수님 2026-06-02 SHARE-UX-1 — 외부인이 단계 탭으로 모든 과정 골라 보기
+  const [projectCtx, setProjectCtx] = useState<ProjectShareContext | null>(null);
+  const [state, setState] = useState<'loading' | 'notfound' | 'before' | 'ok' | 'project'>('loading');
   const [viewStage, setViewStage] = useState<ShareStage>('pre');
 
   useEffect(() => {
@@ -51,18 +129,33 @@ export default function RoleSharePage({ role }: Props) {
     let cancelled = false;
     setState('loading');
     void (async () => {
+      // 1차: program_share 토큰 시도
       const next = await fetchShareByToken(role, token);
       if (cancelled) return;
-      if (!next) { setState('notfound'); return; }
-      setCtx(next);
-      // 단계 탭 기본값 — 현재 단계 (before 면 pre 부터 보여줌)
-      setViewStage(next.stage === 'before' ? 'pre' : next.stage);
-      setState(next.stage === 'before' ? 'before' : 'ok');
+      if (next) {
+        setCtx(next);
+        setViewStage(next.stage === 'before' ? 'pre' : next.stage);
+        setState(next.stage === 'before' ? 'before' : 'ok');
+        return;
+      }
+      // 2차: project_portals 토큰 폴백
+      const proj = await fetchProjectShareByToken(role, token);
+      if (cancelled) return;
+      if (proj) {
+        setProjectCtx(proj);
+        setState('project');
+        return;
+      }
+      setState('notfound');
     })();
     return () => { cancelled = true; };
   }, [token, role]);
 
-  // 박경수님 2026-06-02 — 선택한 단계(viewStage) 기준으로 항목 필터
+  // 프로젝트 레벨 뷰 — SharePortalShell 없이 직접 렌더
+  if (state === 'project' && projectCtx) {
+    return <ProjectShareView role={role} ctx={projectCtx} />;
+  }
+
   const visibleItems = ctx
     ? STAGE_ITEMS[role][viewStage].filter((item) =>
         isItemVisible(ctx.share.visibility, role, item),
@@ -72,7 +165,7 @@ export default function RoleSharePage({ role }: Props) {
   return (
     <SharePortalShell
       audience={role}
-      state={state}
+      state={state === 'project' ? 'loading' : state}
       program={ctx?.program ?? null}
       stage={ctx?.stage}
       currentStage={ctx?.stage}
@@ -81,11 +174,9 @@ export default function RoleSharePage({ role }: Props) {
     >
       {ctx && state === 'ok' && (
         <div className="flex flex-col gap-4">
-          {/* 박경수님 2026-06-02 CLUB-13 — 지원·수혜기관은 단계 무관 종합 현황을 상단 고정 (동아리 없으면 자동 숨김) */}
           {(role === 'supporter' || role === 'beneficiary') && (
             <ClubDashboardItem programId={ctx.program.id} />
           )}
-          {/* 박경수님 2026-06-07 Task 3+4 — 수혜기관 학교별 동아리 관리 게이트 */}
           {role === 'beneficiary' && (
             <BeneficiarySchoolGate programId={ctx.program.id} />
           )}
@@ -133,18 +224,14 @@ export default function RoleSharePage({ role }: Props) {
                   return <SurveyResultsViewItem key={item} programId={ctx.program.id} />;
                 case 'report_view':
                   return <ReportViewItem key={item} programId={ctx.program.id} />;
-                // 박경수님 2026-06-02 CLUB-10 — 동아리 전체 진행률
                 case 'club_dashboard':
                   return <ClubDashboardItem key={item} programId={ctx.program.id} />;
-                // 박경수님 2026-06-02 MERGE-2 — 파일 다운/업로드 (기존 컴포넌트 재사용)
                 case 'file_download':
                   return <MaterialsItem key={item} files={getPublicMaterials(ctx.program)} />;
                 case 'file_upload':
-                  // 박경수님 2026-06-02 CLUB-13 — 실제 파일 업로드 (폼 발행 불필요)
                   return <FileUploadItem key={item} programId={ctx.program.id} />;
                 case 'approval':
                 case 'tax_invoice':
-                  // 박경수님 2026-06-02 MERGE-2 — 동의·세금계산서는 PM 안내 + 담당자 연락 흐름 (외부 입력은 추후 STEP)
                   return (
                     <section key={item} className="rounded-2xl border border-violet-100 bg-white p-4 text-center">
                       <p className="text-xs font-semibold text-[#1E1B4B]">
@@ -156,8 +243,6 @@ export default function RoleSharePage({ role }: Props) {
                 case 'invite_response':
                 case 'activity_log':
                 case 'lecture_certificate':
-                  // 박경수님 2026-06-02 — 강사/멘토 본인 식별이 필요한 항목들.
-                  //   ExpertSharePage 의 PhoneIdentityGate 흐름을 staff role 에 통합하는 작업은 별도 STEP.
                   return (
                     <section key={item} className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 text-center">
                       <p className="text-xs font-semibold text-amber-800">본인 확인이 필요한 항목이에요.</p>
