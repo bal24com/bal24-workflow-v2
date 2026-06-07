@@ -1,6 +1,6 @@
 // bal24 v2 — 공유 링크 카드 공용 컴포넌트
 import { useState } from 'react';
-import { Copy, Check, ExternalLink, MoreVertical, Power } from 'lucide-react';
+import { Copy, Check, ExternalLink, Power } from 'lucide-react';
 import { Button } from '../ui';
 import { formatDateKo } from '../../lib/utils';
 import {

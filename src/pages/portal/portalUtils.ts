@@ -24,6 +24,9 @@ export interface ProjectPortal {
   beneficiary_token: string | null;
   participant_token: string | null;
   beneficiary_pin: string | null;
+  intro_title?: string | null | undefined;
+  intro_content?: string | null | undefined;
+  survey_config?: Record<string, unknown> | null | undefined;
 }
 
 export interface PortalWithRole {

@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import StaffPortalHeader from './StaffPortalHeader';
 import StaffOverviewTab from './tabs/StaffOverviewTab';
 import StaffMentoringTab from './tabs/StaffMentoringTab';

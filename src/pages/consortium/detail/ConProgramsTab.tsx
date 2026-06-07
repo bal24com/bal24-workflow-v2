@@ -12,6 +12,8 @@ import { formatConDate } from '../consortiumUtils';
 import { MEMBER_TYPE_LABEL, MEMBER_TYPE_STYLE, type ConsortiumMember, type MemberType } from '../consortiumTypes';
 import type { Program, ProgramStatus, ProgramType } from '../../../types/database';
 
+type ProgramRow = Program;
+
 interface Props {
   consortiumId: string;
   members: ConsortiumMember[];

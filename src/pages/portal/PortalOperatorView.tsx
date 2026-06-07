@@ -2,7 +2,7 @@
 // 박경수님 2026-06-07 — 실시간 타임라인 및 갤러리 기능 구현 (activity_logs 연동).
 
 import { useEffect, useState } from 'react';
-import { Loader2, ChevronDown, ChevronUp, Phone, Calendar, BarChart3, Activity, Image as ImageIcon, MessageSquare, Clock } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, Phone, BarChart3, Activity, Image as ImageIcon, MessageSquare, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatDateKo } from '../../lib/utils';
 import type { ProjectPortal } from './portalUtils';
@@ -41,7 +41,7 @@ interface ActivityLogRow {
 }
 
 interface Props {
-  portal: ProjectPortal & { intro_title?: string; intro_content?: string };
+  portal: ProjectPortal;
 }
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {

@@ -314,7 +314,7 @@ function LegacyLinks({ programId, recruits, sessions, forms }: LegacyProps) {
         path: '/recruit',
         token: r.form_token,
         status: '활성',
-        createdAt: r.created_at || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       });
     });
 
@@ -326,9 +326,9 @@ function LegacyLinks({ programId, recruits, sessions, forms }: LegacyProps) {
         label: s.title,
         subLabel: '출석',
         path: '/attend',
-        token: s.session_token,
+        token: s.session_token ?? '',
         status: '열림',
-        createdAt: s.created_at || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       });
     });
 
@@ -342,7 +342,7 @@ function LegacyLinks({ programId, recruits, sessions, forms }: LegacyProps) {
         path: '/form',
         token: f.form_token,
         status: '활성',
-        createdAt: f.created_at || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       });
     });
 

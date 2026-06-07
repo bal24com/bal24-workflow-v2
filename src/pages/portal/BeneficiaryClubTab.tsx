@@ -2,12 +2,11 @@
 // 학교(org_name)에 소속된 모든 동아리 목록 및 활동 현황 조회.
 
 import { useEffect, useState } from 'react';
-import { 
+import {
   Loader2, Users, CalendarDays, ExternalLink, Activity,
-  ChevronRight, BookOpen, User, GraduationCap
+  BookOpen, User, GraduationCap
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { formatDateKo } from '../../lib/utils';
 import EmptyState from '../../components/EmptyState';
 
 interface ProgramClub {

@@ -63,7 +63,7 @@ export default function StaffOverviewTab({
   const [programDetail, setProgramDetail] = useState<ProgramDetail | null>(null);
   const [curriculum, setCurriculum] = useState<CurriculumRow[]>([]);
   const [stats, setStats] = useState<Stats>({ totalSessions: 0, completedSessions: 0, totalFee: 0, paidFee: 0 });
-  const [statsLoading, setStatsLoading] = useState(false);
+  const [, setStatsLoading] = useState(false);
   const [mySessionIds, setMySessionIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
