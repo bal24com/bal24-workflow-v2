@@ -100,6 +100,8 @@ export default function SurveyPreviewPage() {
 }
 
 function PreviewField({ q, index }: { q: SurveyFormQuestion; index: number }) {
+  const hopeDayLabels = ['희망 1일', '희망 2일', '희망 3일'];
+
   return (
     <div className="space-y-1.5">
       <label className="flex items-start gap-1.5 text-sm font-bold text-[#1E1B4B]">
@@ -107,32 +109,32 @@ function PreviewField({ q, index }: { q: SurveyFormQuestion; index: number }) {
         <span>{q.label}{q.required && <span className="text-rose-500 ml-0.5">*</span>}</span>
       </label>
       {(q.type === 'text') && (
-        <input type="text" disabled placeholder="단답 응답 입력"
-          className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
+        <input type="text" placeholder="단답 응답 입력"
+          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-400" />
       )}
       {(q.type === 'textarea') && (
-        <textarea disabled rows={3} placeholder="서술형 응답 입력"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm resize-none" />
+        <textarea rows={3} placeholder="서술형 응답 입력"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm resize-none outline-none focus:border-violet-400" />
       )}
       {(q.type === 'number') && (
-        <input type="number" disabled placeholder="숫자"
-          className="w-32 h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
+        <input type="number" placeholder="숫자"
+          className="w-32 h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-400" />
       )}
       {(q.type === 'date') && (
-        <input type="date" disabled
-          className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
+        <input type="date"
+          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-400" />
       )}
       {(q.type === 'select') && (
-        <select disabled className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm">
-          <option>선택해 주세요</option>
+        <select className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-400">
+          <option value="">선택해 주세요</option>
           {(q.options ?? []).map((o) => <option key={o}>{o}</option>)}
         </select>
       )}
       {(q.type === 'checkbox') && (
         <div className="grid grid-cols-2 gap-1.5">
           {(q.options ?? []).map((o) => (
-            <label key={o} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-              <input type="checkbox" disabled className="rounded" /> {o}
+            <label key={o} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 cursor-pointer hover:bg-violet-50/50">
+              <input type="checkbox" className="rounded text-violet-600" /> {o}
             </label>
           ))}
         </div>
@@ -140,21 +142,40 @@ function PreviewField({ q, index }: { q: SurveyFormQuestion; index: number }) {
       {(q.type === 'date-schedule') && (
         <div className="space-y-2">
           {(q.options ?? []).map((m) => (
-            <div key={m} className="rounded-xl border border-violet-100 bg-violet-50/30 px-3 py-2.5">
-              <p className="text-xs font-bold text-violet-700 mb-1.5">{m}</p>
-              {Array.from({ length: q.priorities ?? 2 }, (_, pi) => (
-                <div key={pi} className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-bold text-slate-400 w-10">{pi + 1}순위</span>
-                  <input type="date" disabled className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs flex-1" />
-                  <input type="text" disabled placeholder="시간" className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs w-24" />
-                </div>
-              ))}
+            <div key={m} className="rounded-xl border border-violet-100 bg-violet-50/30 overflow-hidden">
+              <div className="px-3 py-2 bg-violet-100/60 border-b border-violet-100">
+                <span className="text-xs font-black text-violet-700">{m}</span>
+              </div>
+              <div className="p-3 space-y-2">
+                {Array.from({ length: q.priorities ?? 2 }, (_, pi) => (
+                  <div key={pi} className="space-y-1">
+                    <p className="text-[10px] font-bold text-violet-500">{hopeDayLabels[pi] ?? `희망 ${pi + 1}일`}</p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div>
+                        <p className="text-[9px] text-slate-400 mb-0.5">날짜</p>
+                        <input type="text" placeholder="예) 6월 10일(화)"
+                          className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs outline-none focus:border-violet-400" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-slate-400 mb-0.5">시작시간</p>
+                        <input type="text" placeholder="예) 14:00"
+                          className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs outline-none focus:border-violet-400" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-slate-400 mb-0.5">진행시간</p>
+                        <input type="text" placeholder="예) 2시간"
+                          className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs outline-none focus:border-violet-400" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
       )}
       {(q.type === 'club-autofill') && (
-        <select disabled className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm">
+        <select className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-400">
           <option>동아리 선택 → 지도교사 자동 완성</option>
         </select>
       )}

@@ -278,7 +278,7 @@ function DateScheduleField({ q, value, onChange, disabled }: {
     onChange(JSON.stringify(next));
   }
 
-  const priorityLabels = ['1순위', '2순위', '3순위'];
+  const priorityLabels = ['희망 1일', '희망 2일', '희망 3일'];
 
   // 편의기능: 1순위의 시간+소요시간을 나머지 순위에 복사
   function copyTimeToOthers(month: string) {
@@ -303,7 +303,7 @@ function DateScheduleField({ q, value, onChange, disabled }: {
             {priorities > 1 && !disabled && (
               <button type="button" onClick={() => copyTimeToOthers(month)}
                 className="text-[10px] text-violet-600 hover:text-violet-800 font-bold px-2 py-0.5 rounded bg-white border border-violet-200 hover:bg-violet-50">
-                1순위 시간 → 전체 복사
+                희망 1일 시간 → 전체 복사
               </button>
             )}
           </div>
