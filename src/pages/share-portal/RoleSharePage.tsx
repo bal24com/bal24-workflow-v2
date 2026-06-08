@@ -44,7 +44,7 @@ interface Props {
 
 // ── 역할별 탭 정의 ────────────────────────────────────────────────────────────
 const ROLE_TABS: Record<Props['role'], Array<{ key: string; label: string }>> = {
-  supporter:   [{ key: 'info', label: '기초정보' }, { key: 'curriculum', label: '커리큘럼' }, { key: 'instructors', label: '강사진' }, { key: 'clubs', label: '동아리 현황' }],
+  supporter:   [{ key: 'info', label: '기초정보' }, { key: 'curriculum', label: '커리큘럼' }, { key: 'instructors', label: '강사진' }, { key: 'clubs', label: '동아리 현황' }, { key: 'result', label: '진행·결과' }],
   beneficiary: [{ key: 'clubs', label: '동아리 관리' }, { key: 'survey', label: '설문·모집' }],
   team:        [{ key: 'info', label: '기초정보' }, { key: 'curriculum', label: '커리큘럼' }],
   staff:       [{ key: 'curriculum', label: '커리큘럼' }, { key: 'instructors', label: '강사진' }],
@@ -145,6 +145,13 @@ function RoleAccordionCard({
             {activeTab === 'survey'      && (
               <SurveyResponseItem programId={program.id} role="beneficiary" respondentToken={token} />
             )}
+            {activeTab === 'result'      && (
+              <div className="space-y-4">
+                <PortalProgressItem programId={program.id} />
+                <SurveyResultsViewItem programId={program.id} />
+                <ReportViewItem programId={program.id} />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -173,12 +180,10 @@ function ProjectShareView({
 
   // 박경수님 2026-06-08 #3 — 기본 진입은 '제일 먼저 진행되는(가장 이른)' 프로그램
   const [openId, setOpenId] = useState<string | null>(programs[0]?.id ?? null);
+  const selected = programs.find((p) => p.id === openId) ?? programs[0] ?? null;
 
   function jumpTo(id: string) {
     setOpenId(id);
-    requestAnimationFrame(() => {
-      document.getElementById(`prog-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
   }
 
   return (
@@ -239,18 +244,15 @@ function ProjectShareView({
         </div>
       )}
 
-      {/* 프로그램 카드 목록 (선택된 1개 펼침) */}
-      <div className="w-full max-w-2xl space-y-3">
-        {programs.length === 0 ? (
+      {/* 프로그램 상세 — 선택된 1개만 표시 */}
+      <div className="w-full max-w-2xl">
+        {!selected ? (
           <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center">
             <p className="text-sm text-slate-400">등록된 프로그램이 없어요.</p>
           </div>
         ) : (
-          programs.map((p) => (
-            <RoleAccordionCard key={p.id} role={role} program={p} token={token}
-              open={openId === p.id}
-              onToggle={() => setOpenId((cur) => (cur === p.id ? null : p.id))} />
-          ))
+          <RoleAccordionCard key={selected.id} role={role} program={selected} token={token}
+            open hideToggle onToggle={() => undefined} />
         )}
       </div>
     </div>
