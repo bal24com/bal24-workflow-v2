@@ -201,10 +201,13 @@ function ProjectShareView({
         </div>
       </div>
 
-      {/* 프로그램 흐름 — 창 안에서 줄바꿈 (모바일 2열·데스크톱 4열, 가로 스크롤 없음) */}
+      {/* 프로그램 흐름 — 별도 카드 블록으로 감싸 상세와 분리 */}
       {programs.length > 1 && (
-        <div className="w-full max-w-2xl">
-          <p className="text-[11px] font-bold text-slate-500 mb-2 px-1">프로그램 흐름</p>
+        <div className="w-full max-w-2xl rounded-2xl border border-violet-100 bg-white/70 p-3 sm:p-4 shadow-sm">
+          <p className="text-[11px] font-bold text-slate-500 mb-2 px-0.5 inline-flex items-center gap-1">
+            <span className="w-1 h-3 rounded-full bg-violet-400 inline-block" aria-hidden="true" />
+            프로그램 흐름
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {programs.map((p, i) => {
               const tone = PROGRAM_STATUS_TONE[p.status ?? ''] ?? 'bg-slate-100 text-slate-500';
@@ -212,7 +215,7 @@ function ProjectShareView({
               return (
                 <button key={p.id} type="button" onClick={() => jumpTo(p.id)}
                   className={`text-left rounded-xl border p-3 transition-all ${
-                    active ? 'border-violet-400 bg-white ring-1 ring-violet-200 shadow-sm' : 'border-slate-200 bg-white/70 hover:border-violet-200'
+                    active ? 'border-violet-400 bg-violet-50/60 ring-1 ring-violet-200 shadow-sm' : 'border-slate-200 bg-white hover:border-violet-200'
                   }`}>
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <span className="text-[9px] font-bold text-slate-400">STEP {i + 1}</span>
@@ -224,6 +227,15 @@ function ProjectShareView({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* 구분 — 흐름과 상세 영역 분리 */}
+      {programs.length > 1 && (
+        <div className="w-full max-w-2xl flex items-center gap-2 px-1">
+          <span className="text-xs font-bold text-[#1E1B4B]">프로그램 상세</span>
+          <span className="text-[10px] text-slate-400">위에서 프로그램을 선택하면 아래 내용이 펼쳐져요</span>
+          <span className="flex-1 h-px bg-slate-200" aria-hidden="true" />
         </div>
       )}
 
