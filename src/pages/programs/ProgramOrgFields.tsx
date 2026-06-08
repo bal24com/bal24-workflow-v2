@@ -33,13 +33,13 @@ export default function ProgramOrgFields({ values, onChange, clients, disabled }
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div className="space-y-1.5">
-        <label className="text-sm font-semibold text-slate-700">기관/단체</label>
+        <label className="text-sm font-semibold text-slate-700">주관기관 (운영)</label>
         <select value={values.hostClientId} onChange={(e) => set('hostClientId', e.target.value)}
           disabled={disabled} className={SELECT_CLASS}>
           <option value="">선택 안함</option>
           {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <p className="text-[10px] text-slate-400">목록에 없으면 고객사 메뉴에서 먼저 등록하세요.</p>
+        <p className="text-[10px] text-slate-400">이 프로그램을 운영·주관하는 기관이에요. (수혜학교·지원기관과 별개) 목록에 없으면 고객사 메뉴에서 먼저 등록하세요.</p>
       </div>
       <Input label="부서" value={values.department} onChange={(e) => set('department', e.target.value)}
         disabled={disabled} placeholder="예) 교육지원팀" />
