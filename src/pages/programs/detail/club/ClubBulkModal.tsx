@@ -112,9 +112,19 @@ function parseRows(raw: string): ParsedClub[] {
   if (lines.length === 0) return [];
 
   const firstCols = lines[0].split(/\t/).map((x) => x.trim());
-  const fmt = detectFormat(firstCols[0] ?? '');
+  let fmt = detectFormat(firstCols[0] ?? '');
+  let startIdx = 0;
 
-  return lines.map((line) => {
+  // 첫 행이 헤더(A형 감지)인데 두 번째 행이 숫자 시작이면 → 헤더 행 스킵 후 B형 적용
+  if (fmt === 'A' && lines.length > 1) {
+    const secondCols = lines[1].split(/\t/).map((x) => x.trim());
+    if (detectFormat(secondCols[0] ?? '') === 'B') {
+      startIdx = 1;
+      fmt = 'B';
+    }
+  }
+
+  return lines.slice(startIdx).map((line) => {
     const c = line.split(/\t/).map((x) => x.trim());
     return fmt === 'B' ? parseRowB(c) : parseRowA(c);
   });
