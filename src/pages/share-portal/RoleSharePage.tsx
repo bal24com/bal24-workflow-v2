@@ -3,7 +3,7 @@
 // 무인증 + 모바일 반응형. program_share 토큰 → 폴백으로 project_portals 토큰 지원.
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import SharePortalShell from './SharePortalShell';
 import BasicInfoItem from './items/BasicInfoItem';
@@ -171,6 +171,9 @@ function ProjectShareView({
 export default function RoleSharePage({ role }: Props) {
   const { token } = useParams<{ token: string }>();
   const tokenStr = token ?? '';
+  const [searchParams] = useSearchParams();
+  // 박경수님 2026-06-08 — URL ?org= 로 학교/기관 식별 (수혜기관 학교별·지원기관 기관별 링크)
+  const orgName = searchParams.get('org')?.trim() || undefined;
   const [ctx, setCtx] = useState<ShareContext | null>(null);
   const [projectCtx, setProjectCtx] = useState<ProjectShareContext | null>(null);
   const [consortiumData, setConsortiumData] = useState<ConsortiumPortalData | null>(null);
@@ -308,6 +311,7 @@ export default function RoleSharePage({ role }: Props) {
       state={state === 'project' || state === 'consortium' ? 'loading' : state}
       program={ctx?.program ?? null}
       stage={ctx?.stage}
+      orgName={orgName}
       currentStage={ctx?.stage}
       viewStage={viewStage}
       onStageChange={setViewStage}
@@ -321,7 +325,7 @@ export default function RoleSharePage({ role }: Props) {
             <ClubDashboardItem programId={ctx.program.id} />
           )}
           {role === 'beneficiary' && (
-            <BeneficiarySchoolGate programId={ctx.program.id} />
+            <BeneficiarySchoolGate programId={ctx.program.id} preselectedSchool={orgName} />
           )}
           {/* 3) 나머지 항목 */}
           {visibleItems.length === 0 ? (

@@ -1,12 +1,13 @@
 // bal24 v2 — 외부공유 대상별 탭 (Stage 3-B-1)
 // 단일 audience 영역 — 링크 + QR + 노출 항목 체크박스 + 토큰 재발급.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Copy, ExternalLink, QrCode, RefreshCw, ShieldCheck, Loader2,
+  Copy, ExternalLink, QrCode, RefreshCw, ShieldCheck, Loader2, School, Plus,
 } from 'lucide-react';
 import { useToast } from '../../../../contexts/ToastContext';
 import { copyToClipboard } from '../../../../lib/clipboard';
+import { supabase } from '../../../../lib/supabase';
 import type {
   ShareAudience, ShareItem, ShareStage, ShareVisibility,
 } from '../../../../types/database';
@@ -20,6 +21,7 @@ import QrPreviewModal from './QrPreviewModal';
 interface Props {
   audience: ShareAudience;
   token: string;
+  programId: string;
   visibility: ShareVisibility;
   currentStage: ShareStage;
   onToggleItem: (item: ShareItem, next: boolean) => Promise<void>;
@@ -29,7 +31,7 @@ interface Props {
 const STAGE_GROUPS: ShareStage[] = ['pre', 'ready', 'progress', 'result'];
 
 export default function AudienceTab({
-  audience, token, visibility, currentStage, onToggleItem, onRegenerateToken,
+  audience, token, programId, visibility, currentStage, onToggleItem, onRegenerateToken,
 }: Props) {
   const toast = useToast();
   const [qrOpen, setQrOpen] = useState(false);
@@ -117,6 +119,11 @@ export default function AudienceTab({
         </div>
       </section>
 
+      {/* 박경수님 2026-06-08 — 기관/학교별 개별 링크 (URL ?org= 방식) */}
+      {(audience === 'beneficiary' || audience === 'supporter') && (
+        <OrgLinkSection audience={audience} baseUrl={url} programId={programId} />
+      )}
+
       {/* 노출 항목 체크박스 — 단계별 그룹 */}
       <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
         <header className="flex items-center justify-between gap-2">
@@ -184,5 +191,111 @@ export default function AudienceTab({
         audienceLabel={audienceLabel}
       />
     </div>
+  );
+}
+
+// ── 기관/학교별 개별 링크 (URL ?org= 방식) ──────────────────────────────────────
+// 수혜기관: 사전 등록 동아리의 학교 목록을 자동으로 불러와 학교별 링크 생성.
+// 지원기관: 기관명을 직접 입력해 링크 생성.
+function OrgLinkSection({ audience, baseUrl, programId }: {
+  audience: ShareAudience; baseUrl: string; programId: string;
+}) {
+  const toast = useToast();
+  const [schools, setSchools] = useState<string[]>([]);
+  const [loading, setLoading] = useState(audience === 'beneficiary');
+  const [customOrg, setCustomOrg] = useState('');
+  const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (audience !== 'beneficiary') return;
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('program_clubs')
+        .select('school_name')
+        .eq('program_id', programId)
+        .is('deleted_at', null);
+      if (cancelled) return;
+      if (error) console.error('[OrgLinkSection] 학교 조회 실패:', error.message);
+      const unique = [...new Set(((data ?? []) as Array<{ school_name: string | null }>)
+        .map((r) => r.school_name ?? '').filter(Boolean))].sort();
+      setSchools(unique);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [audience, programId]);
+
+  function linkFor(org: string) {
+    return `${baseUrl}?org=${encodeURIComponent(org)}`;
+  }
+
+  async function copy(org: string) {
+    const ok = await copyToClipboard(linkFor(org));
+    if (ok) {
+      setCopied(org);
+      toast.success(`${org} 링크를 복사했어요.`);
+      setTimeout(() => setCopied((p) => (p === org ? null : p)), 2500);
+    } else {
+      toast.error('복사에 실패했어요.');
+    }
+  }
+
+  const isSchool = audience === 'beneficiary';
+
+  return (
+    <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
+      <header className="flex items-center gap-2">
+        <School size={16} className="text-cyan-600" aria-hidden="true" />
+        <h3 className="text-sm font-bold text-[#1E1B4B]">
+          {isSchool ? '학교별 개별 링크' : '기관별 개별 링크'}
+        </h3>
+        <span className="text-[11px] text-slate-400">접속 시 상단에 이름이 표시돼요</span>
+      </header>
+
+      {/* 직접 입력 (기관명/학교명 추가) */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={customOrg}
+          onChange={(e) => setCustomOrg(e.target.value)}
+          placeholder={isSchool ? '학교명 직접 입력' : '기관명 입력 (예: 여수교육지원청)'}
+          className="flex-1 h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500"
+        />
+        <button type="button" onClick={() => customOrg.trim() && void copy(customOrg.trim())}
+          disabled={!customOrg.trim()}
+          className="inline-flex items-center gap-1 px-3 h-9 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-40">
+          <Plus size={12} aria-hidden="true" /> 링크 복사
+        </button>
+      </div>
+
+      {/* 학교 자동 목록 (수혜기관) */}
+      {isSchool && (
+        loading ? (
+          <div className="flex items-center gap-1 text-xs text-slate-400"><Loader2 size={12} className="animate-spin" /> 학교 목록 로딩 중…</div>
+        ) : schools.length === 0 ? (
+          <p className="text-xs text-slate-400">사전 등록된 동아리가 없어 학교 목록이 비어 있어요. 위에 직접 입력해 주세요.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100">
+            {schools.map((s) => (
+              <li key={s} className="flex items-center justify-between gap-2 px-3 py-2">
+                <span className="text-sm font-semibold text-[#1E1B4B] truncate">{s}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button type="button" onClick={() => void copy(s)}
+                    className={`inline-flex items-center gap-1 px-2 h-7 rounded-md text-[11px] font-bold transition-colors ${
+                      copied === s ? 'bg-emerald-100 text-emerald-700' : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+                    }`}>
+                    <Copy size={11} aria-hidden="true" /> {copied === s ? '복사됨' : '링크 복사'}
+                  </button>
+                  <a href={linkFor(s)} target="_blank" rel="noreferrer"
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-slate-500 hover:text-violet-700 hover:bg-violet-50">
+                    <ExternalLink size={12} aria-hidden="true" />
+                  </a>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )
+      )}
+    </section>
   );
 }

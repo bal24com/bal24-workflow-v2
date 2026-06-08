@@ -239,6 +239,7 @@ export default function ShareTab({ programId }: { programId: string }) {
       <AudienceTab
         audience={audienceTab}
         token={pickAudienceToken(share, audienceTab)}
+        programId={share.program_id}
         visibility={share.visibility}
         currentStage={currentStage}
         onToggleItem={(item, next) => handleToggleItem(audienceTab, item, next)}

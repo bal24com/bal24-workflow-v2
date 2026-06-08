@@ -15,6 +15,8 @@ interface Props {
   state: 'loading' | 'notfound' | 'before' | 'ok';
   program?: Program | null;
   stage?: ShareStage;
+  /** 박경수님 2026-06-08 — URL ?org= 로 식별된 기관/학교명 (헤더 상단 표기) */
+  orgName?: string;
   children?: ReactNode;
   // 박경수님 2026-06-02 SHARE-UX-1 — 단계 탭 (외부인이 모든 과정 골라 보기)
   currentStage?: ShareStage;
@@ -34,7 +36,7 @@ const STAGE_TONE: Record<ShareStage, string> = {
 const STAGE_TABS: ShareStage[] = ['pre', 'ready', 'progress', 'result'];
 
 export default function SharePortalShell({
-  audience, state, program, stage, children,
+  audience, state, program, stage, orgName, children,
   currentStage, viewStage, onStageChange,
 }: Props) {
   const audienceLabel = SHARE_AUDIENCE_LABEL[audience];
@@ -73,6 +75,12 @@ export default function SharePortalShell({
                   </span>
                 )}
               </div>
+              {/* 박경수님 2026-06-08 — 기관/학교명 식별 표기 */}
+              {orgName && (
+                <div className="inline-flex items-center gap-1.5 self-start px-3 py-1 rounded-lg bg-violet-600 text-white text-sm font-bold">
+                  {orgName}
+                </div>
+              )}
               <h1 className="text-lg sm:text-xl font-bold text-[#1E1B4B] leading-snug">{program.name}</h1>
               <div className="text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-1">
                 {(program.start_date || program.end_date) && (

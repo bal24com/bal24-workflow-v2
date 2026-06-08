@@ -8,12 +8,15 @@ import BeneficiaryClubTab from '../portal/BeneficiaryClubTab';
 
 interface Props {
   programId: string;
+  /** 박경수님 2026-06-08 — URL ?org= 로 지정된 학교 (지정 시 선택 게이트 건너뜀·잠금) */
+  preselectedSchool?: string;
 }
 
-export default function BeneficiarySchoolGate({ programId }: Props) {
+export default function BeneficiarySchoolGate({ programId, preselectedSchool }: Props) {
   const [schools, setSchools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSchool, setSelectedSchool] = useState<string | null>(null);
+  const [selectedSchool, setSelectedSchool] = useState<string | null>(preselectedSchool ?? null);
+  const locked = Boolean(preselectedSchool);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +38,9 @@ export default function BeneficiarySchoolGate({ programId }: Props) {
           ),
         ].sort();
         setSchools(unique);
-        if (unique.length === 1) setSelectedSchool(unique[0]);
+        // 학교 1곳뿐이거나 URL 로 학교가 지정된 경우 자동 선택
+        if (preselectedSchool) setSelectedSchool(preselectedSchool);
+        else if (unique.length === 1) setSelectedSchool(unique[0]);
       } catch (err) {
         console.error('[BeneficiarySchoolGate] 학교 목록 조회 실패:', err);
       } finally {
@@ -85,8 +90,8 @@ export default function BeneficiarySchoolGate({ programId }: Props) {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* 선택된 학교 + 변경 버튼 (학교 2개 이상일 때만) */}
-          {schools.length > 1 && (
+          {/* 선택된 학교 + 변경 버튼 (학교 2개 이상 & URL 고정 아닐 때만) */}
+          {schools.length > 1 && !locked && (
             <div className="flex items-center justify-between gap-2 px-1">
               <div className="flex items-center gap-2">
                 <School size={14} className="text-cyan-600" />
