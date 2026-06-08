@@ -172,8 +172,8 @@ export default function RoleSharePage({ role }: Props) {
   const { token } = useParams<{ token: string }>();
   const tokenStr = token ?? '';
   const [searchParams] = useSearchParams();
-  // 박경수님 2026-06-08 — URL ?org= 로 학교/기관 식별 (수혜기관 학교별·지원기관 기관별 링크)
-  const orgName = searchParams.get('org')?.trim() || undefined;
+  // 박경수님 2026-06-08 — URL ?org= 우선, 없으면 지원기관은 저장된 거래처명으로 자동 표기
+  const orgParam = searchParams.get('org')?.trim() || undefined;
   const [ctx, setCtx] = useState<ShareContext | null>(null);
   const [projectCtx, setProjectCtx] = useState<ProjectShareContext | null>(null);
   const [consortiumData, setConsortiumData] = useState<ConsortiumPortalData | null>(null);
@@ -230,6 +230,10 @@ export default function RoleSharePage({ role }: Props) {
         isItemVisible(ctx.share.visibility, role, item),
       )
     : [];
+
+  // 헤더 기관명: URL ?org= 우선, 없으면 지원기관은 저장된 거래처명 사용
+  const orgName = orgParam
+    || (role === 'supporter' ? (ctx?.share.supporter_org_name ?? undefined) : undefined);
 
   // 박경수님 2026-06-08 — 기본정보·커리큘럼은 항상 탭 상단에 먼저 노출
   const LEAD_ITEMS: ShareItem[] = ['basic_info', 'curriculum'];
@@ -325,7 +329,7 @@ export default function RoleSharePage({ role }: Props) {
             <ClubDashboardItem programId={ctx.program.id} />
           )}
           {role === 'beneficiary' && (
-            <BeneficiarySchoolGate programId={ctx.program.id} preselectedSchool={orgName} />
+            <BeneficiarySchoolGate programId={ctx.program.id} preselectedSchool={orgParam} />
           )}
           {/* 3) 나머지 항목 */}
           {visibleItems.length === 0 ? (

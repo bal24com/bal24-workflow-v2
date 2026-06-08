@@ -7,6 +7,7 @@ import {
   ListChecks, Share2,
 } from 'lucide-react';
 import { useToast } from '../../../contexts/ToastContext';
+import { supabase } from '../../../lib/supabase';
 import { RECRUIT_TYPE_LABEL } from '../../../types/application';
 import type {
   ProgramShare, ShareAudience, ShareItem,
@@ -175,6 +176,21 @@ export default function ShareTab({ programId }: { programId: string }) {
     toast.success('노출 항목이 저장되었습니다.');
   }
 
+  // 박경수님 2026-06-08 — 지원기관(거래처) 연결 + 이름 스냅샷 저장
+  async function handleSetSupporterOrg(clientId: string | null, name: string) {
+    const { error } = await supabase
+      .from('program_share')
+      .update({ supporter_client_id: clientId, supporter_org_name: name || null })
+      .eq('program_id', programId);
+    if (error) {
+      console.error('[ShareTab] 지원기관 저장 실패:', error.message);
+      toast.error('지원기관 저장에 실패했어요.');
+      return;
+    }
+    setShare((s) => (s ? { ...s, supporter_client_id: clientId, supporter_org_name: name || null } : s));
+    toast.success(name ? `지원기관을 '${name}'(으)로 저장했어요.` : '지원기관 연결을 해제했어요.');
+  }
+
   async function handleRegenerate(audience: ShareAudience) {
     const ok = await regenerateToken(programId, audience);
     if (!ok) {
@@ -240,6 +256,9 @@ export default function ShareTab({ programId }: { programId: string }) {
         audience={audienceTab}
         token={pickAudienceToken(share, audienceTab)}
         programId={share.program_id}
+        supporterOrgName={share.supporter_org_name ?? ''}
+        supporterClientId={share.supporter_client_id ?? null}
+        onSetSupporterOrg={handleSetSupporterOrg}
         visibility={share.visibility}
         currentStage={currentStage}
         onToggleItem={(item, next) => handleToggleItem(audienceTab, item, next)}

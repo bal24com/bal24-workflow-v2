@@ -539,6 +539,9 @@ export interface ProgramShare {
   beneficiary_token?: string | null;
   team_token?: string | null;
   staff_token?: string | null;
+  // 박경수님 2026-06-08 — 지원기관 거래처 연결 + 표시용 이름 스냅샷
+  supporter_client_id?: string | null;
+  supporter_org_name?: string | null;
   visibility: ShareVisibility;
   created_at: string;
   updated_at: string;

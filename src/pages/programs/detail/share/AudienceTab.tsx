@@ -26,12 +26,17 @@ interface Props {
   currentStage: ShareStage;
   onToggleItem: (item: ShareItem, next: boolean) => Promise<void>;
   onRegenerateToken: () => Promise<void>;
+  // 박경수님 2026-06-08 — 지원기관 거래처 연결
+  supporterOrgName?: string;
+  supporterClientId?: string | null;
+  onSetSupporterOrg?: (clientId: string | null, name: string) => Promise<void>;
 }
 
 const STAGE_GROUPS: ShareStage[] = ['pre', 'ready', 'progress', 'result'];
 
 export default function AudienceTab({
   audience, token, programId, visibility, currentStage, onToggleItem, onRegenerateToken,
+  supporterOrgName, supporterClientId, onSetSupporterOrg,
 }: Props) {
   const toast = useToast();
   const [qrOpen, setQrOpen] = useState(false);
@@ -119,8 +124,15 @@ export default function AudienceTab({
         </div>
       </section>
 
-      {/* 박경수님 2026-06-08 — 기관/학교별 개별 링크 (URL ?org= 방식) */}
-      {(audience === 'beneficiary' || audience === 'supporter') && (
+      {/* 박경수님 2026-06-08 — 지원기관: 거래처 연결(자동 표기) / 수혜기관: 학교별 링크 */}
+      {audience === 'supporter' && onSetSupporterOrg && (
+        <SupporterOrgSection
+          orgName={supporterOrgName ?? ''}
+          clientId={supporterClientId ?? null}
+          onSave={onSetSupporterOrg}
+        />
+      )}
+      {audience === 'beneficiary' && (
         <OrgLinkSection audience={audience} baseUrl={url} programId={programId} />
       )}
 
@@ -191,6 +203,76 @@ export default function AudienceTab({
         audienceLabel={audienceLabel}
       />
     </div>
+  );
+}
+
+// ── 지원기관 거래처 연결 (외부 헤더 자동 표기) ────────────────────────────────
+function SupporterOrgSection({ orgName, clientId, onSave }: {
+  orgName: string; clientId: string | null; onSave: (clientId: string | null, name: string) => Promise<void>;
+}) {
+  const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .order('name');
+      if (cancelled) return;
+      if (error) console.error('[SupporterOrgSection] 거래처 조회 실패:', error.message);
+      setClients((data ?? []) as Array<{ id: string; name: string }>);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleChange(id: string) {
+    setSaving(true);
+    try {
+      if (!id) { await onSave(null, ''); return; }
+      const c = clients.find((x) => x.id === id);
+      await onSave(id, c?.name ?? '');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-violet-100 bg-white p-5 shadow-[0_4px_16px_rgba(124,58,237,0.06)] flex flex-col gap-3">
+      <header className="flex items-center gap-2">
+        <School size={16} className="text-violet-600" aria-hidden="true" />
+        <h3 className="text-sm font-bold text-[#1E1B4B]">지원기관 연결</h3>
+        <span className="text-[11px] text-slate-400">선택하면 외부 페이지 상단에 기관명이 자동 표시돼요</span>
+      </header>
+      {loading ? (
+        <div className="flex items-center gap-1 text-xs text-slate-400"><Loader2 size={12} className="animate-spin" /> 거래처 목록 로딩 중…</div>
+      ) : (
+        <>
+          <select
+            value={clientId ?? ''}
+            onChange={(e) => void handleChange(e.target.value)}
+            disabled={saving}
+            className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-500 disabled:opacity-60"
+          >
+            <option value="">지원기관 선택 안 함</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          {orgName && (
+            <p className="text-[11px] text-slate-500">
+              현재 표시 기관명: <strong className="text-violet-700">{orgName}</strong>
+            </p>
+          )}
+          <p className="text-[11px] text-slate-400">
+            거래처(고객사·기관) 목록에서 지원기관을 고르면, 별도 URL 파라미터 없이도 외부 페이지에 기관명이 떠요.
+          </p>
+        </>
+      )}
+    </section>
   );
 }
 
