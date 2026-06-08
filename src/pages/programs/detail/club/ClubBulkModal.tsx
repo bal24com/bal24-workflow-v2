@@ -1,7 +1,7 @@
 // 박경수님 2026-06-02 CLUB-2 — 동아리 엑셀 일괄 등록 모달.
 // 박경수님 2026-06-08 — 두 가지 붙여넣기 형식 자동 감지
 //   [A형] 기존 13열: 학교명·지도교사·휴대전화·일반전화·멘토명·멘토연락처·동아리명·학생수·유형·운영비·재료비·기타·운영방법
-//   [B형] 스프레드시트: 연번·학교급·학교명·분야·팀명·참여인원·지도교사·연락처·(기타)
+//   [B형] 실제 스프레드시트: 연번·구분(학교급)·참여방법·학교명·분야·팀명·팀원수·지도교사·연락처·초기아이디어·구호·비고
 
 import { useMemo, useRef, useState } from 'react';
 import { Loader2, X, Upload } from 'lucide-react';
@@ -46,36 +46,26 @@ function detectFormat(firstCell: string): 'A' | 'B' {
 }
 
 /**
- * [B형] 연번·학교급·학교명·분야·팀명·참여인원·지도교사·연락처·(초기아이디어)·(구호)
- * 학교명 = 학교급(c[1]) + 학교명(c[2]) 합치기
+ * [B형] 연번(0)·구분/학교급(1)·참여방법(2)·학교명(3)·분야(4)·팀명(5)·팀원수(6)·지도교사(7)·연락처(8)·초기아이디어(9)·구호(10)·비고(11)
  */
 function parseRowB(c: string[]): ParsedClub {
-  // 학교급(중학교/고등학교)과 학교명(나주상고) 합치기
-  const schoolLevel = (c[1] ?? '').trim();
-  const schoolName  = (c[2] ?? '').trim();
-  // 이미 합쳐진 경우(학교명에 "교" 포함) 중복 방지
-  const school = schoolName
-    ? schoolName.endsWith('교') || !schoolLevel
-      ? schoolName
-      : `${schoolName}`   // 짧은 학교명만 사용 (나주상고, 금성중 등)
-    : schoolLevel;
-
-  const club = (c[4] ?? '').trim();
-  const valid = school.length > 0 && club.length > 0;
+  const school = (c[3] ?? '').trim();   // 학교명
+  const club   = (c[5] ?? '').trim();   // 팀명
+  const valid  = school.length > 0 && club.length > 0;
   return {
     school_name: school,
-    teacher_name: (c[6] ?? '').trim(),
-    teacher_phone: (c[7] ?? '').trim(),
+    teacher_name: (c[7] ?? '').trim(),  // 지도교사
+    teacher_phone: (c[8] ?? '').trim(), // 연락처
     school_phone: '',
     mentor_name: '',
     mentor_phone: '',
     club_name: club,
-    student_count: num(c[5]),
-    club_type: (c[3] ?? '').trim(),
+    student_count: num(c[6]),           // 팀원수
+    club_type: (c[2] ?? '').trim(),     // 참여방법 (멘토링/집중교육)
     operating_budget: null,
     material_budget: null,
     etc_budget: null,
-    operating_method: (c[8] ?? '').trim(),  // 초기아이디어 → 운영방법으로 활용
+    operating_method: (c[9] ?? '').trim(), // 초기아이디어
     valid,
     error: valid ? undefined : '학교명·팀명 필수',
   };
@@ -140,12 +130,18 @@ export default function ClubBulkModal({ programId, isOpen, onClose, onSuccess }:
   const validCount   = parsed.filter((p) => p.valid).length;
   const invalidCount = parsed.length - validCount;
 
-  // 자동 감지된 형식
+  // 자동 감지된 형식 — 헤더 행 포함 케이스도 반영
   const detectedFmt = useMemo(() => {
     if (!raw.trim()) return null;
-    const firstLine = raw.trim().split(/\r?\n/)[0] ?? '';
-    const firstCell = firstLine.split(/\t/)[0] ?? '';
-    return detectFormat(firstCell);
+    const lines = raw.trim().split(/\r?\n/).filter((l) => l.trim().length > 0);
+    const firstCell = (lines[0] ?? '').split(/\t/)[0]?.trim() ?? '';
+    const fmt = detectFormat(firstCell);
+    // 첫 행이 A형(헤더)인데 두 번째 행이 숫자면 실질적으로 B형
+    if (fmt === 'A' && lines.length > 1) {
+      const secondCell = (lines[1] ?? '').split(/\t/)[0]?.trim() ?? '';
+      if (detectFormat(secondCell) === 'B') return 'B';
+    }
+    return fmt;
   }, [raw]);
 
   async function handleSubmit() {
@@ -199,7 +195,7 @@ export default function ClubBulkModal({ programId, isOpen, onClose, onSuccess }:
           {/* 안내 */}
           <div className="bg-slate-50 rounded-lg p-3 space-y-1.5 text-xs text-slate-600 leading-relaxed">
             <p><strong className="text-violet-700">[형식 A]</strong> 학교명·지도교사·휴대전화·일반전화·멘토명·멘토연락처·<strong>동아리명</strong>·학생수·유형·운영비·재료비·기타·운영방법</p>
-            <p><strong className="text-violet-700">[형식 B]</strong> <strong>연번</strong>·학교급·학교명·분야·<strong>팀명</strong>·참여인원·지도교사·연락처·(기타…) — <em>첫 열이 숫자면 자동 감지</em></p>
+            <p><strong className="text-violet-700">[형식 B]</strong> <strong>연번</strong>·구분·참여방법·<strong>학교명</strong>·분야·<strong>팀명</strong>·팀원수·지도교사·연락처·(초기아이디어…) — <em>첫 열이 숫자면 자동 감지</em></p>
             <p className="text-slate-400">엑셀에서 해당 열을 선택 후 복사(Ctrl+C) → 아래에 붙여넣기(Ctrl+V). 한 줄에 1개 동아리.</p>
           </div>
 
@@ -207,7 +203,7 @@ export default function ClubBulkModal({ programId, isOpen, onClose, onSuccess }:
           {detectedFmt && (
             <p className="text-[11px] font-bold">
               자동 감지: <span className={`px-1.5 py-0.5 rounded ${detectedFmt === 'B' ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-700'}`}>
-                {detectedFmt === 'B' ? '형식 B (연번·학교급·학교명·팀명…)' : '형식 A (학교명·동아리명 13열)'}
+                {detectedFmt === 'B' ? '형식 B (연번·구분·참여방법·학교명·팀명…)' : '형식 A (학교명·동아리명 13열)'}
               </span>
             </p>
           )}
