@@ -314,9 +314,8 @@ function DateScheduleField({ q, value, onChange, disabled }: {
                 <div className="grid grid-cols-3 gap-1.5">
                   <div>
                     <p className="text-[9px] text-slate-400 mb-0.5">날짜</p>
-                    <input type="text" value={getSlot(month, idx).date} disabled={disabled}
+                    <input type="date" value={getSlot(month, idx).date} disabled={disabled}
                       onChange={(e) => setSlot(month, idx, 'date', e.target.value)}
-                      placeholder="예) 6월 10일(화)"
                       className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs outline-none focus:border-violet-500 disabled:opacity-60" />
                   </div>
                   <div>
@@ -427,11 +426,20 @@ function ClubAutofillDropdown({ programId, value, onChange, disabled }: {
 
   if (loadingClubs) return <div className="flex items-center gap-1 text-xs text-slate-400"><Loader2 size={12} className="animate-spin" /> 동아리 목록 로딩 중…</div>;
 
+  // 사전 등록된 동아리가 없을 때 안내
+  if (clubs.length === 0) {
+    return (
+      <p className="text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        아직 사전 등록된 동아리가 없어요. 담당자가 동아리를 등록하면 여기서 선택할 수 있어요.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <select value={parsed.clubId ?? ''} onChange={(e) => handleSelect(e.target.value)} disabled={disabled}
         className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-violet-500 disabled:opacity-60">
-        <option value="">동아리 선택</option>
+        <option value="">동아리 선택 ({clubs.length}개)</option>
         {clubs.map((c) => (
           <option key={c.id} value={c.id}>{c.club_name}{c.school_name ? ` (${c.school_name})` : ''}</option>
         ))}

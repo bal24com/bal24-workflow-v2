@@ -99,20 +99,24 @@ export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>>
     result: ['basic_info', 'curriculum', 'report_view', 'survey_results_view', 'survey_view', 'feedback_comments', 'tax_invoice'],
   },
   beneficiary: {
-    before: ['survey_response'],
-    pre:    ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response', 'approval'],
+    before: [],
+    // 박경수님 2026-06-08 — 설문(수요조사)은 '준비' 단계에만 노출
+    pre:    ['basic_info', 'curriculum', 'instructors', 'materials', 'approval'],
     ready:  ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response', 'approval'],
     // 박경수님 2026-06-02 CLUB-14 — 학교도 진행 중 강사진·중간보고 확인
-    // 박경수님 2026-06-08 — 진행·결과 탭에도 기본정보·커리큘럼 노출
-    progress: ['basic_info', 'curriculum', 'portal_progress', 'instructors', 'report_view', 'feedback_comments', 'survey_response', 'file_upload'],
-    result: ['basic_info', 'curriculum', 'survey_view', 'edit_request', 'survey_response', 'file_upload'],
+    // 박경수님 2026-06-08 — 진행·결과 탭에도 기본정보·커리큘럼 노출 + 설문은 제거(준비에만)
+    // 박경수님 2026-06-08 — 멘토 매칭 확정 결과는 진행 단계에서 확인 (survey_results_view)
+    progress: ['basic_info', 'curriculum', 'survey_results_view', 'portal_progress', 'instructors', 'report_view', 'feedback_comments', 'file_upload'],
+    result: ['basic_info', 'curriculum', 'survey_view', 'edit_request', 'file_upload'],
   },
   team: {
     before: [],
-    pre:    ['basic_info', 'survey_response'],
+    // 박경수님 2026-06-08 — 설문(수요조사)은 '준비' 단계에만 노출
+    pre:    ['basic_info'],
     ready:  ['basic_info', 'survey_response', 'file_download'],
-    progress: ['checkin', 'survey_response', 'file_upload'],
-    result: ['survey_submit', 'outcome_upload', 'survey_response', 'file_upload'],
+    // 박경수님 2026-06-08 — 진행 단계에서 멘토 매칭 확정 결과 확인
+    progress: ['basic_info', 'survey_results_view', 'checkin', 'file_upload'],
+    result: ['survey_submit', 'outcome_upload', 'file_upload'],
   },
   staff: {
     before: [],

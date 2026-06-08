@@ -153,7 +153,7 @@ function PreviewField({ q, index }: { q: SurveyFormQuestion; index: number }) {
                     <div className="grid grid-cols-3 gap-1.5">
                       <div>
                         <p className="text-[9px] text-slate-400 mb-0.5">날짜</p>
-                        <input type="text" placeholder="예) 6월 10일(화)"
+                        <input type="date"
                           className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs outline-none focus:border-violet-400" />
                       </div>
                       <div>
