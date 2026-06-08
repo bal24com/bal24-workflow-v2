@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase';
 import type { ProgramClub, ActivityLog, ActivityFile } from '../../types/database';
 import ClubSessionSchedule from '../programs/detail/club/ClubSessionSchedule';
 import MultiFileUpload from '../../components/MultiFileUpload';
+import SurveyResponseItem from './items/SurveyResponseItem';
 
 type Screen = 'loading' | 'notfound' | 'ready';
 
@@ -123,6 +124,20 @@ export default function ClubSharePage() {
           <ClubSessionSchedule clubId={club.id} canEdit canConfirm={isTeacher}
             decidedByLabel={isTeacher ? (club.teacher_name ?? '담당 선생님') : (club.mentor_name ?? '담당자')} />
         </section>
+
+        {/* 박경수님 2026-06-08 — 동아리 토큰 페이지 설문 응답 (club-autofill 자동완성) */}
+        <SurveyResponseItem
+          programId={club.program_id}
+          role="team"
+          respondentToken={club.club_token}
+          prefilledClub={{
+            clubId: club.id,
+            clubName: club.club_name,
+            school: club.school_name ?? '',
+            teacher: club.teacher_name ?? '',
+            phone: club.teacher_phone ?? '',
+          }}
+        />
 
         {/* 활동 등록 */}
         <ClubActivityForm clubId={club.id} programId={club.program_id} onSaved={() => void loadLogs(club.id)} />

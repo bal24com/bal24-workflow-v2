@@ -2,11 +2,12 @@
 // 응답자별 행 + 문항별 답변 + 종류별 집계 + CSV 다운로드.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, X, Download, BarChart3, FileText, UserCog } from 'lucide-react';
+import { Loader2, X, Download, BarChart3, FileText, UserCog, Send } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
 import type { ProgramSurveyForm, SurveyFormQuestion } from '../../../types/database';
 import SurveyMentorMatchPanel from './SurveyMentorMatchPanel';
+import SurveyDistributionTab from './SurveyDistributionTab';
 
 interface Props {
   form: ProgramSurveyForm;
@@ -45,7 +46,7 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
   const toast = useToast();
   const [rows, setRows] = useState<ResponseRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'responses' | 'mentor'>('responses');
+  const [activeTab, setActiveTab] = useState<'responses' | 'mentor' | 'distribution'>('responses');
   const mouseDownOnBackdropRef = useRef(false);
 
   const reload = useCallback(async () => {
@@ -141,8 +142,9 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
           {/* 탭 */}
           <div className="px-5 flex gap-0">
             {([
-              { key: 'responses', label: '응답 보기', icon: <FileText size={12} /> },
-              { key: 'mentor',    label: '멘토 매칭', icon: <UserCog size={12} /> },
+              { key: 'responses',     label: '응답 보기', icon: <FileText size={12} /> },
+              { key: 'mentor',        label: '멘토 매칭', icon: <UserCog size={12} /> },
+              { key: 'distribution', label: '배포 관리', icon: <Send size={12} /> },
             ] as const).map((t) => (
               <button key={t.key} type="button"
                 onClick={() => setActiveTab(t.key)}
@@ -158,7 +160,9 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
         </div>
 
         <div className="p-5 space-y-4">
-          {loading ? (
+          {activeTab === 'distribution' ? (
+            <SurveyDistributionTab form={form} />
+          ) : loading ? (
             <div className="flex justify-center py-10">
               <Loader2 size={20} className="animate-spin text-violet-400" aria-hidden="true" />
             </div>

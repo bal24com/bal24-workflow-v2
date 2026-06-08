@@ -16,9 +16,11 @@ interface Props {
   role: string;
   /** 응답자 식별 토큰 (URL token) */
   respondentToken: string;
+  /** 동아리 토큰 페이지에서 이미 식별된 팀 정보 — club-autofill 자동완성에 사용 */
+  prefilledClub?: ClubAnswer;
 }
 
-export default function SurveyResponseItem({ programId, role, respondentToken }: Props) {
+export default function SurveyResponseItem({ programId, role, respondentToken, prefilledClub }: Props) {
   const [forms, setForms] = useState<ProgramSurveyForm[]>([]);
   const [loading, setLoading] = useState(true);
   // 이미 응답한 form id 집합 (sessionStorage 기반 — 단순 중복 방지)
@@ -88,6 +90,7 @@ export default function SurveyResponseItem({ programId, role, respondentToken }:
           respondentToken={respondentToken}
           alreadySubmitted={submitted.has(form.id)}
           onSubmitted={() => markSubmitted(form.id)}
+          prefilledClub={prefilledClub}
         />
       ))}
     </>
@@ -101,13 +104,14 @@ interface ResponderProps {
   respondentToken: string;
   alreadySubmitted: boolean;
   onSubmitted: () => void;
+  prefilledClub?: ClubAnswer;
 }
 
 // ── 동아리 자동완성용 타입 ────────────────────────────────────────────────────
 interface ClubRow { id: string; club_name: string; school_name: string | null; teacher_name: string | null; teacher_phone: string | null; }
 type ClubAnswer = { clubId: string; clubName: string; school: string; teacher: string; phone: string; };
 
-function SurveyFormResponder({ form, programId, role, respondentToken, alreadySubmitted, onSubmitted }: ResponderProps) {
+function SurveyFormResponder({ form, programId, role, respondentToken, alreadySubmitted, onSubmitted, prefilledClub }: ResponderProps) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -168,7 +172,9 @@ function SurveyFormResponder({ form, programId, role, respondentToken, alreadySu
           {questions.map((q) => (
             <QuestionField key={q.id} q={q} programId={programId}
               value={answers[q.id] ?? ''}
-              onChange={(v) => setAnswer(q.id, v)} disabled={submitting} />
+              onChange={(v) => setAnswer(q.id, v)}
+              disabled={submitting}
+              prefilledClub={prefilledClub} />
           ))}
           {err && (
             <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{err}</p>
@@ -184,8 +190,8 @@ function SurveyFormResponder({ form, programId, role, respondentToken, alreadySu
   );
 }
 
-function QuestionField({ q, programId, value, onChange, disabled }: {
-  q: SurveyFormQuestion; programId: string; value: string; onChange: (v: string) => void; disabled: boolean;
+function QuestionField({ q, programId, value, onChange, disabled, prefilledClub }: {
+  q: SurveyFormQuestion; programId: string; value: string; onChange: (v: string) => void; disabled: boolean; prefilledClub?: ClubAnswer;
 }) {
   // 박경수님 2026-06-02 STEP-SURVEY-CHECKBOX — 다중 선택은 ", " 로 구분된 문자열로 저장
   const checkedSet = q.type === 'checkbox'
@@ -234,7 +240,7 @@ function QuestionField({ q, programId, value, onChange, disabled }: {
       ) : q.type === 'date-schedule' ? (
         <DateScheduleField q={q} value={value} onChange={onChange} disabled={disabled} />
       ) : q.type === 'club-autofill' ? (
-        <ClubAutofillField programId={programId} value={value} onChange={onChange} disabled={disabled} />
+        <ClubAutofillField programId={programId} value={value} onChange={onChange} disabled={disabled} prefilledClub={prefilledClub} />
       ) : (
         <input type={q.type} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} required={q.required}
           placeholder={q.type === 'number' ? '숫자' : q.type === 'date' ? '' : `${q.label} 입력`}
@@ -274,12 +280,32 @@ function DateScheduleField({ q, value, onChange, disabled }: {
 
   const priorityLabels = ['1순위', '2순위', '3순위'];
 
+  // 편의기능: 1순위의 시간+소요시간을 나머지 순위에 복사
+  function copyTimeToOthers(month: string) {
+    const first = getSlot(month, 0);
+    if (!first.time && !first.duration) return;
+    const next: ScheduleVal = { ...parsed };
+    const slots: ScheduleSlot[] = Array.from({ length: priorities }, (_, i) => ({
+      ...getSlot(month, i),
+      time: first.time,
+      duration: first.duration,
+    }));
+    next[month] = slots;
+    onChange(JSON.stringify(next));
+  }
+
   return (
     <div className="space-y-3">
       {months.map((month) => (
         <div key={month} className="rounded-xl border border-violet-100 bg-violet-50/30 overflow-hidden">
-          <div className="px-3 py-2 bg-violet-100/60 border-b border-violet-100">
+          <div className="px-3 py-2 bg-violet-100/60 border-b border-violet-100 flex items-center justify-between">
             <span className="text-xs font-black text-violet-700">{month}</span>
+            {priorities > 1 && !disabled && (
+              <button type="button" onClick={() => copyTimeToOthers(month)}
+                className="text-[10px] text-violet-600 hover:text-violet-800 font-bold px-2 py-0.5 rounded bg-white border border-violet-200 hover:bg-violet-50">
+                1순위 시간 → 전체 복사
+              </button>
+            )}
           </div>
           <div className="p-3 space-y-2">
             {Array.from({ length: priorities }, (_, idx) => (
@@ -319,7 +345,50 @@ function DateScheduleField({ q, value, onChange, disabled }: {
 
 // ── 동아리 선택 + 지도교사 자동완성 ──────────────────────────────────────────
 // 저장 형식: JSON { "clubId":"...", "clubName":"...", "school":"...", "teacher":"...", "phone":"..." }
-function ClubAutofillField({ programId, value, onChange, disabled }: {
+// prefilledClub 제공 시: 토큰으로 이미 식별된 팀 → 드롭다운 없이 자동 완성 + 잠금
+function ClubAutofillField({ programId, value, onChange, disabled, prefilledClub }: {
+  programId: string; value: string; onChange: (v: string) => void; disabled: boolean; prefilledClub?: ClubAnswer;
+}) {
+  // 토큰 자동완성 모드: 마운트 시 한 번 자동 세팅
+  useEffect(() => {
+    if (prefilledClub && !value) {
+      onChange(JSON.stringify(prefilledClub));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefilledClub]);
+
+  // 토큰 자동완성 모드 — 드롭다운 없이 잠금 카드로 표시
+  if (prefilledClub) {
+    return (
+      <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-bold text-[#1E1B4B]">{prefilledClub.clubName}</p>
+            <p className="text-[11px] text-slate-500">{prefilledClub.school}</p>
+          </div>
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700">
+            ✓ 자동 완성
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-violet-100">
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">지도교사</p>
+            <p className="text-xs font-semibold text-[#1E1B4B]">{prefilledClub.teacher || '미지정'}</p>
+          </div>
+          <div>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">연락처</p>
+            <p className="text-xs font-semibold text-[#1E1B4B]">{prefilledClub.phone || '미지정'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 일반 모드 — 드롭다운으로 직접 선택
+  return <ClubAutofillDropdown programId={programId} value={value} onChange={onChange} disabled={disabled} />;
+}
+
+function ClubAutofillDropdown({ programId, value, onChange, disabled }: {
   programId: string; value: string; onChange: (v: string) => void; disabled: boolean;
 }) {
   const [clubs, setClubs] = useState<ClubRow[]>([]);
@@ -340,7 +409,7 @@ function ClubAutofillField({ programId, value, onChange, disabled }: {
         .is('deleted_at', null)
         .order('club_name');
       if (cancelled) return;
-      if (error) { console.error('[ClubAutofillField] 동아리 조회 실패:', error.message); }
+      if (error) { console.error('[ClubAutofillDropdown] 동아리 조회 실패:', error.message); }
       setClubs((data ?? []) as ClubRow[]);
       setLoadingClubs(false);
     })();
@@ -350,14 +419,10 @@ function ClubAutofillField({ programId, value, onChange, disabled }: {
   function handleSelect(clubId: string) {
     const club = clubs.find((c) => c.id === clubId);
     if (!club) return;
-    const answer: ClubAnswer = {
-      clubId: club.id,
-      clubName: club.club_name,
-      school: club.school_name ?? '',
-      teacher: club.teacher_name ?? '',
-      phone: club.teacher_phone ?? '',
-    };
-    onChange(JSON.stringify(answer));
+    onChange(JSON.stringify({
+      clubId: club.id, clubName: club.club_name,
+      school: club.school_name ?? '', teacher: club.teacher_name ?? '', phone: club.teacher_phone ?? '',
+    }));
   }
 
   if (loadingClubs) return <div className="flex items-center gap-1 text-xs text-slate-400"><Loader2 size={12} className="animate-spin" /> 동아리 목록 로딩 중…</div>;

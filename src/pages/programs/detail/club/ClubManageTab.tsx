@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Upload, Copy, Trash2, ExternalLink, School, Users, CalendarDays, ChevronDown, ChevronUp, List, LayoutGrid, UserCog,
+  Loader2, Upload, Copy, Trash2, ExternalLink, School, Users, CalendarDays, ChevronDown, ChevronUp, List, LayoutGrid, UserCog, Send,
 } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
@@ -14,6 +14,7 @@ import ClubSessionSchedule from './ClubSessionSchedule';
 import ClubCardGrid from './ClubCardGrid';
 import ClubMentorSummary from './ClubMentorSummary';
 import ClubMembersPanel from './ClubMembersPanel';
+import ClubLinkDispatchPanel from './ClubLinkDispatchPanel';
 
 interface Props {
   programId: string;
@@ -37,6 +38,7 @@ export default function ClubManageTab({ programId }: Props) {
   const [scheduleOpen, setScheduleOpen] = useState<string | null>(null);
   // 박경수님 2026-06-02 CLUB-8/9 — 리스트 / 카드 / 멘토별 보기 토글
   const [view, setView] = useState<'list' | 'card' | 'mentor'>('list');
+  const [dispatchOpen, setDispatchOpen] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -131,6 +133,11 @@ export default function ClubManageTab({ programId }: Props) {
               className={`p-1.5 rounded-md ${view === 'mentor' ? 'bg-white shadow-sm text-violet-700' : 'text-slate-400'}`}
               title="멘토별 보기"><UserCog size={14} aria-hidden="true" /></button>
           </div>
+          <button type="button" onClick={() => setDispatchOpen(true)}
+            disabled={clubs.length === 0}
+            className="inline-flex items-center gap-1 px-3 h-9 rounded-lg border border-violet-200 text-violet-700 text-xs font-bold hover:bg-violet-50 disabled:opacity-40">
+            <Send size={13} aria-hidden="true" /> 링크 발송 준비
+          </button>
           <button type="button" onClick={() => setBulkOpen(true)}
             className="inline-flex items-center gap-1 px-3 h-9 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700">
             <Upload size={13} aria-hidden="true" /> 엑셀 일괄 등록
@@ -238,6 +245,13 @@ export default function ClubManageTab({ programId }: Props) {
         onClose={() => setBulkOpen(false)}
         onSuccess={() => { void reload(); }}
       />
+
+      {dispatchOpen && (
+        <ClubLinkDispatchPanel
+          bySchool={bySchool}
+          onClose={() => setDispatchOpen(false)}
+        />
+      )}
     </div>
   );
 }
