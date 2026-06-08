@@ -4,9 +4,10 @@
 //   [B형] 실제 스프레드시트: 연번·구분(학교급)·참여방법·학교명·분야·팀명·팀원수·지도교사·연락처·초기아이디어·구호·비고
 
 import { useMemo, useRef, useState } from 'react';
-import { Loader2, X, Upload } from 'lucide-react';
+import { Loader2, X, Upload, Sparkles, RotateCcw } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useToast } from '../../../../contexts/ToastContext';
+import { importClubsFromText, type AiParsedClub } from './clubAiImport';
 
 interface ParsedClub {
   school_name: string;
@@ -97,6 +98,27 @@ function parseRowA(c: string[]): ParsedClub {
   };
 }
 
+/** AI 분석 결과를 일괄 등록용 ParsedClub 으로 변환 */
+function fromAiClub(a: AiParsedClub): ParsedClub {
+  return {
+    school_name: a.school_name,
+    teacher_name: a.teacher_name,
+    teacher_phone: a.teacher_phone,
+    school_phone: '',
+    mentor_name: '',
+    mentor_phone: '',
+    club_name: a.club_name,
+    student_count: a.student_count,
+    club_type: a.club_type,
+    operating_budget: null,
+    material_budget: null,
+    etc_budget: null,
+    operating_method: a.operating_method,
+    valid: a.valid,
+    error: a.error,
+  };
+}
+
 function parseRows(raw: string): ParsedClub[] {
   const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
   if (lines.length === 0) return [];
@@ -124,9 +146,13 @@ export default function ClubBulkModal({ programId, isOpen, onClose, onSuccess }:
   const toast = useToast();
   const [raw, setRaw] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [aiClubs, setAiClubs] = useState<ParsedClub[] | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const mouseDownRef = useRef(false);
 
-  const parsed = useMemo(() => raw.trim() ? parseRows(raw) : [], [raw]);
+  const ruleParsed = useMemo(() => raw.trim() ? parseRows(raw) : [], [raw]);
+  // AI 분석 결과가 있으면 우선 사용, 없으면 규칙 기반 파싱
+  const parsed = aiClubs ?? ruleParsed;
   const validCount   = parsed.filter((p) => p.valid).length;
   const invalidCount = parsed.length - validCount;
 
@@ -143,6 +169,27 @@ export default function ClubBulkModal({ programId, isOpen, onClose, onSuccess }:
     }
     return fmt;
   }, [raw]);
+
+  async function handleAiParse() {
+    if (!raw.trim()) { toast.error('먼저 표를 붙여넣어 주세요.'); return; }
+    setAiLoading(true);
+    try {
+      const clubs = await importClubsFromText(raw);
+      setAiClubs(clubs.map(fromAiClub));
+      toast.success(`AI 가 ${clubs.length}개 동아리를 인식했어요.`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'AI 분석 중 오류가 발생했어요.';
+      console.error('[ClubBulkModal] AI 분석 실패:', msg);
+      toast.error(msg);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function handleRawChange(value: string) {
+    setRaw(value);
+    if (aiClubs) setAiClubs(null); // 입력이 바뀌면 AI 결과 초기화
+  }
 
   async function handleSubmit() {
     const rows = parsed.filter((p) => p.valid);
@@ -173,6 +220,7 @@ export default function ClubBulkModal({ programId, isOpen, onClose, onSuccess }:
     }
     toast.success(`${rows.length}개 동아리를 등록했어요.`);
     setRaw('');
+    setAiClubs(null);
     onSuccess();
     onClose();
   }
@@ -208,9 +256,31 @@ export default function ClubBulkModal({ programId, isOpen, onClose, onSuccess }:
             </p>
           )}
 
-          <textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={6}
+          <textarea value={raw} onChange={(e) => handleRawChange(e.target.value)} rows={6}
             placeholder="여기에 붙여넣기 (Ctrl+V)"
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200" />
+
+          {/* AI 분석 버튼 */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => void handleAiParse()} disabled={aiLoading || !raw.trim()}
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-bold hover:opacity-90 disabled:opacity-40">
+              {aiLoading
+                ? <><Loader2 size={14} className="animate-spin" /> AI 분석 중…</>
+                : <><Sparkles size={14} /> AI로 분석 (컬럼 자동 인식)</>}
+            </button>
+            {aiClubs && (
+              <button type="button" onClick={() => setAiClubs(null)}
+                className="inline-flex items-center gap-1 px-2.5 h-9 rounded-lg border border-slate-200 text-slate-500 text-xs font-bold hover:bg-slate-50">
+                <RotateCcw size={12} /> 규칙 분석으로
+              </button>
+            )}
+            {aiClubs && (
+              <span className="text-[11px] font-bold text-violet-600 inline-flex items-center gap-1">
+                <Sparkles size={11} /> AI 분석 결과 표시 중
+              </span>
+            )}
+            <span className="text-[11px] text-slate-400">컬럼 순서가 자동 감지와 안 맞으면 AI 분석을 써보세요.</span>
+          </div>
 
           {parsed.length > 0 && (
             <div className="rounded-lg border border-slate-200 overflow-x-auto">
