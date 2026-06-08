@@ -87,6 +87,13 @@ export default function SurveyPreviewPage() {
               questions.map((q, i) => <PreviewField key={q.id} q={q} index={i + 1} />)
             )}
 
+            {/* 하단 안내문 */}
+            {form.footer_note && form.footer_note.trim() && (
+              <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+                {form.footer_note}
+              </div>
+            )}
+
             {/* 제출 버튼 (비활성 — 미리보기용) */}
             <button type="button" disabled
               className="w-full h-12 rounded-xl bg-gradient-to-r from-violet-400 to-violet-500 text-white text-sm font-bold opacity-50 cursor-not-allowed">

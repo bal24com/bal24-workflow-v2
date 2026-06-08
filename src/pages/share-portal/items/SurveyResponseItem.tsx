@@ -176,6 +176,12 @@ function SurveyFormResponder({ form, programId, role, respondentToken, alreadySu
               disabled={submitting}
               prefilledClub={prefilledClub} />
           ))}
+          {/* 하단 안내문 */}
+          {form.footer_note && form.footer_note.trim() && (
+            <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+              {form.footer_note}
+            </div>
+          )}
           {err && (
             <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{err}</p>
           )}

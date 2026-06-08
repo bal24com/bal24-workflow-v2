@@ -508,6 +508,8 @@ export interface ProgramSurveyForm {
   title: string;
   /** 설문 상단 안내문 (응답자에게 표시) */
   description?: string | null;
+  /** 설문 하단 안내문 (문항 아래·제출 버튼 위) — 박경수님 2026-06-08 */
+  footer_note?: string | null;
   kind: SurveyFormKind;
   questions: SurveyFormQuestion[];
   /** 응답 대상 4역할 — 'supporter'|'beneficiary'|'team'|'staff' */

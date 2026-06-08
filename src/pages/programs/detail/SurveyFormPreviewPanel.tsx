@@ -8,9 +8,10 @@ import type { SurveyFormQuestion } from '../../../types/database';
 interface Props {
   questions: SurveyFormQuestion[];
   description?: string;
+  footer?: string;
 }
 
-export default function SurveyFormPreviewPanel({ questions, description }: Props) {
+export default function SurveyFormPreviewPanel({ questions, description, footer }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -43,6 +44,13 @@ export default function SurveyFormPreviewPanel({ questions, description }: Props
             questions.map((q, i) => (
               <PreviewField key={q.id} q={q} index={i + 1} />
             ))
+          )}
+
+          {/* 하단 안내문 */}
+          {footer && footer.trim() && (
+            <div className="rounded-lg bg-white border border-violet-100 px-4 py-3 text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+              {footer}
+            </div>
           )}
         </div>
       )}

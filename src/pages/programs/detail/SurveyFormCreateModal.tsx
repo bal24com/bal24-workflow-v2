@@ -2,7 +2,7 @@
 // 박경수님 2026-06-08 — 선택지·월 칩 방식 추가 UI, 예시 placeholder, description 안내문.
 
 import { useEffect, useRef, useState } from 'react';
-import { Plus, Save, X, Trash2, Loader2, Sparkles, Upload, Edit3 } from 'lucide-react';
+import { Plus, Save, X, Trash2, Loader2, Sparkles, Upload, Edit3, ArrowUp, ArrowDown } from 'lucide-react';
 import SurveyFormPreviewPanel from './SurveyFormPreviewPanel';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
@@ -41,6 +41,7 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
   const toast = useToast();
   const [title, setTitle] = useState(form?.title ?? '');
   const [description, setDescription] = useState(form?.description ?? '');
+  const [footer, setFooter] = useState(form?.footer_note ?? '');
   const [kind, setKind] = useState<SurveyFormKind>(form?.kind ?? 'custom');
   const [questions, setQuestions] = useState<SurveyFormQuestion[]>(form?.questions ?? []);
   const [targets, setTargets] = useState<string[]>(form?.target_audiences ?? []);
@@ -89,6 +90,7 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
   useEffect(() => {
     setTitle(form?.title ?? '');
     setDescription(form?.description ?? '');
+    setFooter(form?.footer_note ?? '');
     setKind(form?.kind ?? 'custom');
     setQuestions(form?.questions ?? []);
     setTargets(form?.target_audiences ?? []);
@@ -159,6 +161,17 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
     setQuestions((prev) => prev.filter((q) => q.id !== id));
   }
 
+  // 박경수님 2026-06-08 — 문항 순서 위/아래 이동
+  function moveQuestion(index: number, dir: -1 | 1) {
+    setQuestions((prev) => {
+      const next = [...prev];
+      const target = index + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   async function handleSave() {
     if (!title.trim()) { toast.error('설문 제목을 입력해 주세요.'); return; }
     if (questions.length === 0) { toast.error('문항을 1개 이상 추가해 주세요.'); return; }
@@ -166,6 +179,7 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
     setSaving(true);
     const payload = {
       program_id: programId, title: title.trim(), description: description.trim() || null,
+      footer_note: footer.trim() || null,
       kind, questions, target_audiences: targets, is_active: isActive,
       updated_at: new Date().toISOString(),
     };
@@ -277,6 +291,16 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
                       {(q.type === 'select' || q.type === 'checkbox' || q.type === 'date-schedule') && q.options && q.options.length > 0 && (
                         <p className="text-[11px] text-slate-500 mt-0.5 truncate">{q.options.join(' · ')}</p>
                       )}
+                    </div>
+                    <div className="flex flex-col">
+                      <button type="button" onClick={() => moveQuestion(i, -1)} disabled={i === 0}
+                        title="위로" className="p-0.5 rounded hover:bg-slate-200 text-slate-400 disabled:opacity-30">
+                        <ArrowUp size={11} aria-hidden="true" />
+                      </button>
+                      <button type="button" onClick={() => moveQuestion(i, 1)} disabled={i === questions.length - 1}
+                        title="아래로" className="p-0.5 rounded hover:bg-slate-200 text-slate-400 disabled:opacity-30">
+                        <ArrowDown size={11} aria-hidden="true" />
+                      </button>
                     </div>
                     <button type="button" onClick={() => startEdit(q)} className="p-1 rounded hover:bg-violet-50 text-violet-500">
                       <Edit3 size={12} aria-hidden="true" />
@@ -435,8 +459,18 @@ export default function SurveyFormCreateModal({ programId, form, onClose, onSave
             </button>
           )}
 
+          {/* 하단 안내문 */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-700">
+              하단 안내문 <span className="text-slate-400 font-normal">(선택) — 문항 아래·제출 버튼 위에 표시돼요</span>
+            </label>
+            <textarea value={footer} onChange={(e) => setFooter(e.target.value)} rows={2}
+              placeholder="예) 제출 후 수정이 어려우니 신중히 작성해 주세요.&#10;문의: 운영사무국 010-0000-0000"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-500 resize-none leading-relaxed" />
+          </div>
+
           {/* 응답자 미리보기 */}
-          <SurveyFormPreviewPanel questions={questions} description={description} />
+          <SurveyFormPreviewPanel questions={questions} description={description} footer={footer} />
 
           {/* 활성 토글 */}
           <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white cursor-pointer text-xs">
