@@ -2,9 +2,9 @@
 // /share/{role}/:token 4개 라우트가 role prop 만 다르게 호출.
 // 무인증 + 모바일 반응형. program_share 토큰 → 폴백으로 project_portals 토큰 지원.
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import SharePortalShell from './SharePortalShell';
 import BasicInfoItem from './items/BasicInfoItem';
 import CurriculumItem from './items/CurriculumItem';
@@ -50,40 +50,58 @@ const ROLE_TABS: Record<Props['role'], Array<{ key: string; label: string }>> = 
   staff:       [{ key: 'curriculum', label: '커리큘럼' }, { key: 'instructors', label: '강사진' }],
 };
 
+// 프로그램 상태 톤
+const PROGRAM_STATUS_TONE: Record<string, string> = {
+  '준비': 'bg-slate-100 text-slate-500',
+  '진행': 'bg-violet-100 text-violet-700',
+  '완료': 'bg-emerald-100 text-emerald-700',
+  '취소': 'bg-rose-100 text-rose-600',
+};
+
 // ── 역할별 아코디언 카드 (탭 내장) ───────────────────────────────────────────
 function RoleAccordionCard({
   role,
   program,
   token,
+  open,
+  onToggle,
 }: {
   role: Props['role'];
   program: ProjectShareContext['programs'][number];
   token: string;
+  open: boolean;
+  onToggle: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const tabs = ROLE_TABS[role];
   const [activeTab, setActiveTab] = useState(tabs[0].key);
-  const toggle = useCallback(() => setOpen((v) => !v), []);
+  const statusTone = PROGRAM_STATUS_TONE[program.status ?? ''] ?? 'bg-slate-100 text-slate-500';
 
   return (
-    <div className="rounded-2xl border border-violet-100 bg-white shadow-sm overflow-hidden">
+    <div id={`prog-${program.id}`} className={`rounded-2xl border bg-white shadow-sm overflow-hidden transition-colors ${open ? 'border-violet-300 ring-1 ring-violet-200' : 'border-violet-100'}`}>
       {/* 헤더 */}
       <button
         type="button"
-        onClick={toggle}
-        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-violet-50/40 transition-colors"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-4 text-left hover:bg-violet-50/40 transition-colors"
       >
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-[#1E1B4B] truncate">{program.name}</p>
-          {(program.start_date || program.end_date) && (
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {program.start_date ?? '?'} ~ {program.end_date ?? '?'}
-            </p>
+        <div className="min-w-0 flex-1 flex items-center gap-3">
+          {program.type && (
+            <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[10px] font-bold border border-violet-100">
+              {program.type}
+            </span>
           )}
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-[#1E1B4B] truncate">{program.name}</p>
+            {(program.start_date || program.end_date) && (
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {program.start_date ?? '?'} ~ {program.end_date ?? '?'}
+              </p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {program.status && (
-            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold">
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${statusTone}`}>
               {program.status}
             </span>
           )}
@@ -136,31 +154,95 @@ function ProjectShareView({
   role,
   ctx,
   token,
+  orgName,
 }: {
   role: Props['role'];
   ctx: ProjectShareContext;
   token: string;
+  orgName?: string;
 }) {
   const roleLabel = SHARE_AUDIENCE_LABEL[role];
 
+  // 흐름 순서: 시작일 오름차순 정렬
+  const programs = useMemo(() => {
+    return [...ctx.programs].sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''));
+  }, [ctx.programs]);
+
+  // 진행 중 프로그램을 기본 펼침, 없으면 첫 번째
+  const initialOpen = useMemo(() => {
+    const running = programs.find((p) => p.status === '진행');
+    return running?.id ?? programs[0]?.id ?? null;
+  }, [programs]);
+  const [openId, setOpenId] = useState<string | null>(initialOpen);
+
+  function jumpTo(id: string) {
+    setOpenId(id);
+    // 카드로 부드럽게 스크롤
+    requestAnimationFrame(() => {
+      document.getElementById(`prog-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50/60 flex flex-col items-center px-4 py-10 gap-6">
-      <div className="w-full max-w-2xl space-y-1">
-        <span className="inline-flex px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[11px] font-bold">
-          {roleLabel}
-        </span>
-        <h1 className="text-xl font-black text-[#1E1B4B]">{ctx.projectName}</h1>
-        <p className="text-xs text-slate-400">프로젝트 외부 공유 포털입니다.</p>
+    <div className="min-h-screen bg-gradient-to-b from-violet-50/50 to-slate-50/60 flex flex-col items-center px-4 py-8 sm:py-10 gap-5">
+      {/* 헤더 */}
+      <div className="w-full max-w-2xl">
+        <div className="rounded-2xl bg-gradient-to-r from-violet-600 to-violet-700 px-5 py-5 shadow-lg shadow-violet-200/50">
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            <span className="inline-flex px-2 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-bold">
+              {roleLabel}
+            </span>
+            {orgName && (
+              <span className="inline-flex px-2 py-0.5 rounded-full bg-white text-violet-700 text-[11px] font-bold">
+                {orgName}
+              </span>
+            )}
+          </div>
+          <h1 className="text-lg sm:text-xl font-black text-white leading-snug">{ctx.projectName}</h1>
+          <p className="text-[11px] text-violet-200 mt-1">사업 외부 공유 포털 · 프로그램 {programs.length}개</p>
+        </div>
       </div>
 
+      {/* 프로그램 흐름도 (가로 스크롤) */}
+      {programs.length > 0 && (
+        <div className="w-full max-w-2xl">
+          <p className="text-[11px] font-bold text-slate-500 mb-2 px-1">프로그램 흐름</p>
+          <div className="flex items-stretch gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+            {programs.map((p, i) => {
+              const tone = PROGRAM_STATUS_TONE[p.status ?? ''] ?? 'bg-slate-100 text-slate-500';
+              const active = openId === p.id;
+              return (
+                <div key={p.id} className="flex items-center gap-2 shrink-0">
+                  <button type="button" onClick={() => jumpTo(p.id)}
+                    className={`w-40 text-left rounded-xl border p-3 transition-all ${
+                      active ? 'border-violet-400 bg-white ring-1 ring-violet-200 shadow-sm' : 'border-slate-200 bg-white/70 hover:border-violet-200'
+                    }`}>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[9px] font-bold text-slate-400">STEP {i + 1}</span>
+                      {p.status && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${tone}`}>{p.status}</span>}
+                    </div>
+                    <p className="text-xs font-bold text-[#1E1B4B] line-clamp-2 leading-tight">{p.name}</p>
+                    {p.start_date && <p className="text-[9px] text-slate-400 mt-1">{p.start_date}</p>}
+                  </button>
+                  {i < programs.length - 1 && <ChevronRight size={14} className="text-slate-300 shrink-0" aria-hidden="true" />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 프로그램 카드 목록 */}
       <div className="w-full max-w-2xl space-y-3">
-        {ctx.programs.length === 0 ? (
+        {programs.length === 0 ? (
           <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center">
             <p className="text-sm text-slate-400">등록된 프로그램이 없어요.</p>
           </div>
         ) : (
-          ctx.programs.map((p) => (
-            <RoleAccordionCard key={p.id} role={role} program={p} token={token} />
+          programs.map((p) => (
+            <RoleAccordionCard key={p.id} role={role} program={p} token={token}
+              open={openId === p.id}
+              onToggle={() => setOpenId((cur) => (cur === p.id ? null : p.id))} />
           ))
         )}
       </div>
@@ -223,7 +305,7 @@ export default function RoleSharePage({ role }: Props) {
 
   // 프로젝트 레벨 뷰 — SharePortalShell 없이 직접 렌더
   if (state === 'project' && projectCtx) {
-    return <ProjectShareView role={role} ctx={projectCtx} token={tokenStr} />;
+    return <ProjectShareView role={role} ctx={projectCtx} token={tokenStr} orgName={orgParam} />;
   }
 
   const visibleItems = ctx
