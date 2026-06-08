@@ -209,8 +209,8 @@ export default function ConsortiumMemberModal({
             <label className="text-xs font-semibold text-slate-700 block mb-1.5">역할</label>
             <div className="flex items-center gap-4">
               {([
-                { v: '총괄' as ConsortiumRole, label: '총괄', desc: '운영사' },
-                { v: '참여' as ConsortiumRole, label: '참여', desc: '참여사' },
+                { v: '총괄' as ConsortiumRole, label: '주관사', desc: '운영 대표' },
+                { v: '참여' as ConsortiumRole, label: '참여사', desc: '참여 기관' },
               ]).map((r) => (
                 <label key={r.v} className="inline-flex items-center gap-1.5 cursor-pointer">
                   <input type="radio" name="role" value={r.v} checked={form.role === r.v}

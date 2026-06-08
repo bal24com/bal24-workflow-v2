@@ -16,13 +16,20 @@ export function getDirectionBadge(direction: ConsortiumSettlementDirection | str
   }
 }
 
+// 박경수님 2026-06-08 P2 — 저장값('총괄'/'참여')은 유지하고 표시 라벨만 통일
+const ROLE_DISPLAY_LABEL: Record<string, string> = {
+  '총괄': '주관사',
+  '참여': '참여사',
+};
+
 export function getRoleBadge(role: string | null | undefined, isSelf: boolean | null | undefined) {
+  const label = role ? (ROLE_DISPLAY_LABEL[role] ?? role) : '참여사';
   return (
     <div className="inline-flex items-center gap-1">
       {isSelf && (
         <span className="text-[10px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded">자사</span>
       )}
-      <span className="text-xs text-slate-700">{role ?? '참여사'}</span>
+      <span className="text-xs text-slate-700">{label}</span>
     </div>
   );
 }

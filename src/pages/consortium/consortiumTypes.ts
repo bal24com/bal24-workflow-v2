@@ -6,11 +6,11 @@ export type ConsortiumStatus = typeof CONSORTIUM_STATUS[number];
 export const MEMBER_TYPE = ['lead', 'co', 'sub', 'observer'] as const;
 export type MemberType = typeof MEMBER_TYPE[number];
 
-// STEP-CONSORTIUM-REDESIGN A안 (박경수님 2026-05-27) — '총괄/참여' 통일.
+// 박경수님 2026-06-08 P2 용어 통일 — 주관사/참여사 (저장값 lead/co/sub/observer 유지, 라벨만 변경)
 export const MEMBER_TYPE_LABEL: Record<MemberType, string> = {
-  lead: '총괄',
-  co: '참여',
-  sub: '참여',
+  lead: '주관사',
+  co: '참여사',
+  sub: '참여사',
   observer: '참관',
 };
 

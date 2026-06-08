@@ -10,7 +10,7 @@ import {
 import type { ConsortiumPortalData } from './sharePortalUtils';
 
 const MEMBER_TYPE_LABEL: Record<string, string> = {
-  lead: '총괄', co: '참여', sub: '참여', observer: '참관',
+  lead: '주관사', co: '참여사', sub: '참여사', observer: '참관',
 };
 
 const TASK_STATUS_STYLE: Record<string, string> = {
