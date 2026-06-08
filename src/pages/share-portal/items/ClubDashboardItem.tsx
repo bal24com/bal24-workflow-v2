@@ -2,7 +2,7 @@
 // 지원기관·수혜기관이 자기 토큰으로 8개 팀 진행 현황을 한눈에.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, LayoutGrid, School, Users, CheckCircle2 } from 'lucide-react';
+import { Loader2, LayoutGrid, School, Users, CheckCircle2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import type { ProgramClub, ProgramClubSession } from '../../../types/database';
 import ItemCard from './ItemCard';
@@ -20,6 +20,7 @@ interface ClubAgg extends ProgramClub {
 export default function ClubDashboardItem({ programId }: Props) {
   const [clubs, setClubs] = useState<ClubAgg[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -83,32 +84,50 @@ export default function ClubDashboardItem({ programId }: Props) {
           <Stat label="차수 진행" value={`${stats.doneSess}/${stats.totalSess}`} sub={`활동 ${stats.totalAct}건`} />
         </div>
 
-        {/* 동아리별 진행 행 */}
-        <ul className="space-y-1.5">
-          {clubs.map((c) => {
-            const pct = c.total_sessions > 0 ? Math.round((c.done_sessions / c.total_sessions) * 100) : 0;
-            return (
-              <li key={c.id} className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold text-[#1E1B4B]">{c.club_name}</span>
-                  <span className="text-[11px] text-slate-500 inline-flex items-center gap-0.5"><School size={10} aria-hidden="true" />{c.school_name}</span>
-                  {c.student_count != null && <span className="text-[11px] text-slate-500 inline-flex items-center gap-0.5"><Users size={10} aria-hidden="true" />{c.student_count}</span>}
-                  <span className="text-[11px] text-slate-500 ml-auto">활동 <strong className="text-violet-700">{c.activity_count}</strong></span>
-                </div>
-                {/* 차수 진행 바 */}
-                <div className="flex items-center gap-2 mt-1.5">
-                  <div className="flex-1 h-2 rounded-full bg-slate-200 overflow-hidden">
-                    <div className="h-full bg-violet-500 rounded-full" style={{ width: `${pct}%` }} aria-hidden="true" />
+        {/* 동아리 목록 접기/펼치기 */}
+        <button type="button" onClick={() => setExpanded((v) => !v)}
+          className="w-full inline-flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition-colors">
+          {expanded
+            ? <><ChevronUp size={13} aria-hidden="true" /> 동아리 {clubs.length}개 접기</>
+            : <><ChevronDown size={13} aria-hidden="true" /> 동아리 {clubs.length}개 펼치기</>}
+        </button>
+
+        {/* 동아리별 진행 행 (펼쳤을 때만) — 동아리명 클릭 시 해당 팀 포털로 이동 */}
+        {expanded && (
+          <ul className="space-y-1.5">
+            {clubs.map((c) => {
+              const pct = c.total_sessions > 0 ? Math.round((c.done_sessions / c.total_sessions) * 100) : 0;
+              return (
+                <li key={c.id} className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {c.club_token ? (
+                      <a href={`/share/club/${c.club_token}`} target="_blank" rel="noreferrer"
+                        className="text-sm font-bold text-violet-700 hover:underline inline-flex items-center gap-1">
+                        {c.club_name}
+                        <ExternalLink size={11} aria-hidden="true" />
+                      </a>
+                    ) : (
+                      <span className="text-sm font-bold text-[#1E1B4B]">{c.club_name}</span>
+                    )}
+                    <span className="text-[11px] text-slate-500 inline-flex items-center gap-0.5"><School size={10} aria-hidden="true" />{c.school_name}</span>
+                    {c.student_count != null && <span className="text-[11px] text-slate-500 inline-flex items-center gap-0.5"><Users size={10} aria-hidden="true" />{c.student_count}</span>}
+                    <span className="text-[11px] text-slate-500 ml-auto">활동 <strong className="text-violet-700">{c.activity_count}</strong></span>
                   </div>
-                  <span className="text-[10px] font-bold text-slate-600 tabular-nums shrink-0 inline-flex items-center gap-0.5">
-                    {c.done_sessions === c.total_sessions && c.total_sessions > 0 && <CheckCircle2 size={10} className="text-emerald-600" aria-hidden="true" />}
-                    {c.done_sessions}/{c.total_sessions}차
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                  {/* 차수 진행 바 */}
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex-1 h-2 rounded-full bg-slate-200 overflow-hidden">
+                      <div className="h-full bg-violet-500 rounded-full" style={{ width: `${pct}%` }} aria-hidden="true" />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-600 tabular-nums shrink-0 inline-flex items-center gap-0.5">
+                      {c.done_sessions === c.total_sessions && c.total_sessions > 0 && <CheckCircle2 size={10} className="text-emerald-600" aria-hidden="true" />}
+                      {c.done_sessions}/{c.total_sessions}차
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </ItemCard>
   );

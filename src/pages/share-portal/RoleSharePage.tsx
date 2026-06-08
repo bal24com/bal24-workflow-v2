@@ -35,7 +35,7 @@ import {
 import ConsortiumRolePortalPage from './ConsortiumRolePortalPage';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
 import { STAGE_ITEMS, SHARE_AUDIENCE_LABEL } from '../programs/detail/share/visibilityCatalog';
-import type { ShareAudience, ShareStage } from '../../types/database';
+import type { ShareAudience, ShareStage, ShareItem } from '../../types/database';
 
 interface Props {
   role: Extract<ShareAudience, 'supporter' | 'beneficiary' | 'team' | 'staff'>;
@@ -228,6 +228,80 @@ export default function RoleSharePage({ role }: Props) {
       )
     : [];
 
+  // 박경수님 2026-06-08 — 기본정보·커리큘럼은 항상 탭 상단에 먼저 노출
+  const LEAD_ITEMS: ShareItem[] = ['basic_info', 'curriculum'];
+  const leadItems = visibleItems.filter((i) => LEAD_ITEMS.includes(i));
+  const restItems = visibleItems.filter((i) => !LEAD_ITEMS.includes(i));
+
+  const renderItem = (item: ShareItem) => {
+    if (!ctx) return null;
+    switch (item) {
+      case 'basic_info':
+        return <BasicInfoItem key={item} program={ctx.program} />;
+      case 'curriculum':
+        return <CurriculumItem key={item} programId={ctx.program.id} />;
+      case 'instructors':
+        return <InstructorsItem key={item} programId={ctx.program.id} />;
+      case 'materials':
+        return <MaterialsItem key={item} files={getPublicMaterials(ctx.program)} />;
+      case 'portal_progress':
+        return <PortalProgressItem key={item} programId={ctx.program.id} />;
+      case 'survey_view':
+        return <SurveyViewItem key={item} programId={ctx.program.id} />;
+      case 'edit_request':
+        return <EditRequestItem key={item} programId={ctx.program.id} />;
+      case 'feedback_comments':
+        return <FeedbackCommentsItem key={item} programId={ctx.program.id} />;
+      case 'checkin':
+        return <CheckinItem key={item} programId={ctx.program.id} />;
+      case 'survey_submit':
+        return (
+          <SurveySubmitItem key={item} programId={ctx.program.id}
+            surveyOpenAt={ctx.share.survey_open_at ?? null} />
+        );
+      case 'outcome_upload':
+        return <OutcomeUploadItem key={item} programId={ctx.program.id} />;
+      case 'survey_response':
+        return (
+          <SurveyResponseItem key={item}
+            programId={ctx.program.id}
+            role={role}
+            respondentToken={tokenStr} />
+        );
+      case 'survey_results_view':
+        return <SurveyResultsViewItem key={item} programId={ctx.program.id} />;
+      case 'report_view':
+        return <ReportViewItem key={item} programId={ctx.program.id} />;
+      case 'club_dashboard':
+        return <ClubDashboardItem key={item} programId={ctx.program.id} />;
+      case 'file_download':
+        return <MaterialsItem key={item} files={getPublicMaterials(ctx.program)} />;
+      case 'file_upload':
+        return <FileUploadItem key={item} programId={ctx.program.id} />;
+      case 'approval':
+      case 'tax_invoice':
+        return (
+          <section key={item} className="rounded-2xl border border-violet-100 bg-white p-4 text-center">
+            <p className="text-xs font-semibold text-[#1E1B4B]">
+              {item === 'approval' ? '동의·확인 요청 항목이에요.' : '세금계산서 요청 항목이에요.'}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">담당자에게 문의해 주세요.</p>
+          </section>
+        );
+      case 'invite_response':
+      case 'activity_log':
+      case 'lecture_certificate':
+        return (
+          <section key={item} className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 text-center">
+            <p className="text-xs font-semibold text-amber-800">본인 확인이 필요한 항목이에요.</p>
+            <p className="text-[11px] text-amber-700 mt-0.5">기존 강사 외부공유 링크(/share/expert) 를 이용해 주세요.</p>
+          </section>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <SharePortalShell
       audience={role}
@@ -240,85 +314,23 @@ export default function RoleSharePage({ role }: Props) {
     >
       {ctx && state === 'ok' && (
         <div className="flex flex-col gap-4">
+          {/* 1) 기본정보·커리큘럼 먼저 */}
+          {leadItems.map(renderItem)}
+          {/* 2) 동아리 종합 현황 (지원기관·수혜기관) */}
           {(role === 'supporter' || role === 'beneficiary') && (
             <ClubDashboardItem programId={ctx.program.id} />
           )}
           {role === 'beneficiary' && (
             <BeneficiarySchoolGate programId={ctx.program.id} />
           )}
+          {/* 3) 나머지 항목 */}
           {visibleItems.length === 0 ? (
             <section className="rounded-2xl border border-violet-100 bg-white p-8 text-center">
               <p className="text-sm text-slate-500">이 단계에 노출된 항목이 없어요.</p>
               <p className="mt-1 text-[11px] text-slate-400">다른 단계 탭을 선택하거나 담당자에게 문의해 주세요.</p>
             </section>
           ) : (
-            visibleItems.map((item) => {
-              switch (item) {
-                case 'basic_info':
-                  return <BasicInfoItem key={item} program={ctx.program} />;
-                case 'curriculum':
-                  return <CurriculumItem key={item} programId={ctx.program.id} />;
-                case 'instructors':
-                  return <InstructorsItem key={item} programId={ctx.program.id} />;
-                case 'materials':
-                  return <MaterialsItem key={item} files={getPublicMaterials(ctx.program)} />;
-                case 'portal_progress':
-                  return <PortalProgressItem key={item} programId={ctx.program.id} />;
-                case 'survey_view':
-                  return <SurveyViewItem key={item} programId={ctx.program.id} />;
-                case 'edit_request':
-                  return <EditRequestItem key={item} programId={ctx.program.id} />;
-                case 'feedback_comments':
-                  return <FeedbackCommentsItem key={item} programId={ctx.program.id} />;
-                case 'checkin':
-                  return <CheckinItem key={item} programId={ctx.program.id} />;
-                case 'survey_submit':
-                  return (
-                    <SurveySubmitItem key={item} programId={ctx.program.id}
-                      surveyOpenAt={ctx.share.survey_open_at ?? null} />
-                  );
-                case 'outcome_upload':
-                  return <OutcomeUploadItem key={item} programId={ctx.program.id} />;
-                case 'survey_response':
-                  return (
-                    <SurveyResponseItem key={item}
-                      programId={ctx.program.id}
-                      role={role}
-                      respondentToken={tokenStr} />
-                  );
-                case 'survey_results_view':
-                  return <SurveyResultsViewItem key={item} programId={ctx.program.id} />;
-                case 'report_view':
-                  return <ReportViewItem key={item} programId={ctx.program.id} />;
-                case 'club_dashboard':
-                  return <ClubDashboardItem key={item} programId={ctx.program.id} />;
-                case 'file_download':
-                  return <MaterialsItem key={item} files={getPublicMaterials(ctx.program)} />;
-                case 'file_upload':
-                  return <FileUploadItem key={item} programId={ctx.program.id} />;
-                case 'approval':
-                case 'tax_invoice':
-                  return (
-                    <section key={item} className="rounded-2xl border border-violet-100 bg-white p-4 text-center">
-                      <p className="text-xs font-semibold text-[#1E1B4B]">
-                        {item === 'approval' ? '동의·확인 요청 항목이에요.' : '세금계산서 요청 항목이에요.'}
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">담당자에게 문의해 주세요.</p>
-                    </section>
-                  );
-                case 'invite_response':
-                case 'activity_log':
-                case 'lecture_certificate':
-                  return (
-                    <section key={item} className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 text-center">
-                      <p className="text-xs font-semibold text-amber-800">본인 확인이 필요한 항목이에요.</p>
-                      <p className="text-[11px] text-amber-700 mt-0.5">기존 강사 외부공유 링크(/share/expert) 를 이용해 주세요.</p>
-                    </section>
-                  );
-                default:
-                  return null;
-              }
-            })
+            restItems.map(renderItem)
           )}
         </div>
       )}

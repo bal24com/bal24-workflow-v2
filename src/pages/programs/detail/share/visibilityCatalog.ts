@@ -95,15 +95,17 @@ export const STAGE_ITEMS: Record<ShareAudience, Record<ShareStage, ShareItem[]>>
     ready:  ['basic_info', 'curriculum', 'instructors', 'survey_results_view'],
     // 박경수님 2026-06-07 — 지원기관은 진행 중 프로그램 전반(커리큘럼·출석·산출물) 확인
     progress: ['basic_info', 'curriculum', 'instructors', 'portal_progress', 'checkin', 'outcome_upload', 'report_view', 'survey_results_view'],
-    result: ['report_view', 'survey_results_view', 'survey_view', 'feedback_comments', 'tax_invoice'],
+    // 박경수님 2026-06-08 — 모든 탭 상단에 기본정보·커리큘럼 노출
+    result: ['basic_info', 'curriculum', 'report_view', 'survey_results_view', 'survey_view', 'feedback_comments', 'tax_invoice'],
   },
   beneficiary: {
     before: ['survey_response'],
     pre:    ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response', 'approval'],
     ready:  ['basic_info', 'curriculum', 'instructors', 'materials', 'survey_response', 'approval'],
     // 박경수님 2026-06-02 CLUB-14 — 학교도 진행 중 강사진·중간보고 확인
-    progress: ['portal_progress', 'instructors', 'report_view', 'feedback_comments', 'survey_response', 'file_upload'],
-    result: ['survey_view', 'edit_request', 'survey_response', 'file_upload'],
+    // 박경수님 2026-06-08 — 진행·결과 탭에도 기본정보·커리큘럼 노출
+    progress: ['basic_info', 'curriculum', 'portal_progress', 'instructors', 'report_view', 'feedback_comments', 'survey_response', 'file_upload'],
+    result: ['basic_info', 'curriculum', 'survey_view', 'edit_request', 'survey_response', 'file_upload'],
   },
   team: {
     before: [],

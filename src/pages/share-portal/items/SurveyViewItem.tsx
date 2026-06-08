@@ -35,6 +35,9 @@ export default function SurveyViewItem({ programId }: Props) {
 
   const total = stats.reduce((s, r) => s + r.count, 0);
 
+  // 박경수님 2026-06-08 — 만족도 응답이 0건이면 카드 자체를 숨김 (미진행 설문 노출 방지)
+  if (!loading && total === 0) return null;
+
   return (
     <ItemCard
       icon={<Star size={18} aria-hidden="true" />}
@@ -45,10 +48,6 @@ export default function SurveyViewItem({ programId }: Props) {
         <div className="flex justify-center py-6">
           <Loader2 className="animate-spin text-violet-400" size={18} aria-hidden="true" />
         </div>
-      ) : total === 0 ? (
-        <p className="text-sm text-slate-400 italic text-center py-2">
-          아직 만족도 응답이 없어요.
-        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {stats.map((s) => (

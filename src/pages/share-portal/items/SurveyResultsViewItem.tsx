@@ -97,12 +97,14 @@ export default function SurveyResultsViewItem({ programId }: Props) {
     );
   }
 
-  if (forms.length === 0) return null;
+  // 박경수님 2026-06-08 — 응답이 1건이라도 있는 설문만 결과로 노출 (미진행 설문은 숨김)
+  const formsWithResponses = forms.filter((f) => (responsesByForm.get(f.id) ?? []).length > 0);
+  if (formsWithResponses.length === 0) return null;
 
   return (
     <ItemCard icon={<BarChart3 size={18} className="text-violet-600" />} title="설문 응답 결과">
       <div className="space-y-3">
-        {forms.map((f) => (
+        {formsWithResponses.map((f) => (
           <FormResultBlock key={f.id} form={f} responses={responsesByForm.get(f.id) ?? []} />
         ))}
       </div>
