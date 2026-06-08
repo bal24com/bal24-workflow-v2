@@ -401,11 +401,11 @@ function ClubAutofillDropdown({ programId, value, onChange, disabled }: {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      // 박경수님 2026-06-08 — deleted_at 필터 제거 (동아리 진행률과 동일 쿼리로 정렬, anon 빈목록 버그 해결)
       const { data, error } = await supabase
         .from('program_clubs')
         .select('id, club_name, school_name, teacher_name, teacher_phone')
         .eq('program_id', programId)
-        .is('deleted_at', null)
         .order('club_name');
       if (cancelled) return;
       if (error) { console.error('[ClubAutofillDropdown] 동아리 조회 실패:', error.message); }

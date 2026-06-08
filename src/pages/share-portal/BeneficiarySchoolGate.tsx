@@ -26,8 +26,7 @@ export default function BeneficiarySchoolGate({ programId, preselectedSchool }: 
         const { data, error } = await supabase
           .from('program_clubs')
           .select('school_name')
-          .eq('program_id', programId)
-          .is('deleted_at', null);
+          .eq('program_id', programId);
         if (cancelled) return;
         if (error) throw error;
         const unique = [

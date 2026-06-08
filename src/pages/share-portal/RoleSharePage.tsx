@@ -235,10 +235,11 @@ export default function RoleSharePage({ role }: Props) {
   const orgName = orgParam
     || (role === 'supporter' ? (ctx?.share.supporter_org_name ?? undefined) : undefined);
 
-  // 박경수님 2026-06-08 — 기본정보·커리큘럼은 항상 탭 상단에 먼저 노출
-  const LEAD_ITEMS: ShareItem[] = ['basic_info', 'curriculum'];
-  const leadItems = visibleItems.filter((i) => LEAD_ITEMS.includes(i));
-  const restItems = visibleItems.filter((i) => !LEAD_ITEMS.includes(i));
+  // 박경수님 2026-06-08 — 상단 고정 순서: 기본정보 → 수요조사(설문) → 커리큘럼
+  //   (준비 단계에서 수요조사가 커리큘럼 위로 와야 함)
+  const LEAD_ORDER: ShareItem[] = ['basic_info', 'survey_response', 'curriculum'];
+  const leadItems = LEAD_ORDER.filter((i) => visibleItems.includes(i));
+  const restItems = visibleItems.filter((i) => !LEAD_ORDER.includes(i));
 
   const renderItem = (item: ShareItem) => {
     if (!ctx) return null;
