@@ -1,56 +1,13 @@
-// 컨소시엄 역할별 외부 포털 — /share/{roleType}/:token (로그인 불필요)
+// 컨소시엄 역할별 외부 포털 화면 — 데이터는 보안 RPC(get_consortium_portal)로 받아 prop 으로 주입.
+// 토큰 검증·역할별 필터는 서버(RPC)에서 처리하므로 여기선 렌더링만 담당.
 
-import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Loader2, Building2, CalendarDays, BookOpen, CheckSquare } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { Building2, CalendarDays, BookOpen, CheckSquare } from 'lucide-react';
 import {
   SHARE_ROLE_LABEL,
   SHARE_ROLE_COLOR,
   type ShareRoleLinkType,
 } from '../consortium/consortiumTypes';
-
-interface ConsortiumBasic {
-  id: string;
-  name: string;
-  status: string;
-  start_date: string | null;
-  end_date: string | null;
-  total_budget: number | null;
-  description: string | null;
-  lead_client: { name: string } | null;
-}
-
-interface MemberRow {
-  id: string;
-  member_type: string;
-  clients: { name: string } | null;
-  allocated_budget: number | null;
-}
-
-interface ProgramRow {
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-  start_date: string | null;
-  end_date: string | null;
-}
-
-interface TaskRow {
-  id: string;
-  title: string;
-  status: string;
-  due_date: string | null;
-  group_name: string | null;
-}
-
-const ROLE_SECTIONS: Record<ShareRoleLinkType, { programs: boolean; tasks: boolean; finance: boolean; members: boolean }> = {
-  supporter:   { programs: true,  tasks: true,  finance: true,  members: true  },
-  beneficiary: { programs: true,  tasks: true,  finance: false, members: true  },
-  team:        { programs: true,  tasks: true,  finance: false, members: false },
-  staff:       { programs: true,  tasks: false, finance: false, members: false },
-};
+import type { ConsortiumPortalData } from './sharePortalUtils';
 
 const MEMBER_TYPE_LABEL: Record<string, string> = {
   lead: '총괄', co: '참여', sub: '참여', observer: '참관',
@@ -77,86 +34,23 @@ function fmtBudget(n: number | null): string {
     : `${Math.round(n / 10_000).toLocaleString()}만원`;
 }
 
-export default function ConsortiumRolePortalPage({ roleType }: { roleType: ShareRoleLinkType }) {
-  const { token } = useParams<{ token: string }>();
-  const [consortium, setConsortium] = useState<ConsortiumBasic | null>(null);
-  const [members, setMembers] = useState<MemberRow[]>([]);
-  const [programs, setPrograms] = useState<ProgramRow[]>([]);
-  const [tasks, setTasks] = useState<TaskRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface Props {
+  roleType: ShareRoleLinkType;
+  data: ConsortiumPortalData;
+}
 
-  const sections = ROLE_SECTIONS[roleType];
+export default function ConsortiumRolePortalPage({ roleType, data }: Props) {
+  const { consortium, members, programs, tasks } = data;
+  if (!consortium) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">
+        컨소시엄 정보를 불러오지 못했어요.
+      </div>
+    );
+  }
 
-  const load = useCallback(async () => {
-    if (!token) { setError('잘못된 링크예요.'); setLoading(false); return; }
-
-    // 1. 링크 조회 → consortium_id
-    const { data: link, error: linkErr } = await supabase
-      .from('consortium_links')
-      .select('consortium_id, is_active')
-      .eq('token', token)
-      .eq('link_type', roleType)
-      .maybeSingle();
-    if (linkErr || !link) { setError('링크를 찾을 수 없어요.'); setLoading(false); return; }
-    if (!link.is_active) { setError('비활성화된 링크예요. 담당자에게 문의해 주세요.'); setLoading(false); return; }
-
-    const cid = link.consortium_id as string;
-
-    // 2. 컨소시엄 기본 정보
-    const { data: c, error: cErr } = await supabase
-      .from('consortiums')
-      .select('id, name, status, start_date, end_date, total_budget, description, lead_client:clients!consortiums_lead_client_id_fkey(name)')
-      .eq('id', cid)
-      .maybeSingle();
-    if (cErr || !c) { setError('컨소시엄 정보를 불러오지 못했어요.'); setLoading(false); return; }
-    setConsortium(c as unknown as ConsortiumBasic);
-
-    // 3. 참여사 (members 섹션이 있을 때)
-    if (sections.members) {
-      const { data: m } = await supabase
-        .from('consortium_members')
-        .select('id, member_type, allocated_budget, clients!consortium_members_client_id_fkey(name)')
-        .eq('consortium_id', cid);
-      setMembers((m ?? []) as unknown as MemberRow[]);
-    }
-
-    // 4. 프로그램
-    if (sections.programs) {
-      const { data: p } = await supabase
-        .from('programs')
-        .select('id, name, type, status, start_date, end_date')
-        .eq('consortium_id', cid)
-        .is('deleted_at', null)
-        .order('start_date', { ascending: true });
-      setPrograms((p ?? []) as ProgramRow[]);
-    }
-
-    // 5. 태스크
-    if (sections.tasks) {
-      const { data: t } = await supabase
-        .from('tasks')
-        .select('id, title, status, due_date, group_name')
-        .eq('consortium_id', cid)
-        .order('due_date', { ascending: true });
-      setTasks((t ?? []) as TaskRow[]);
-    }
-
-    setLoading(false);
-  }, [token, roleType, sections.members, sections.programs, sections.tasks]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 size={24} className="animate-spin text-violet-400" />
-    </div>
-  );
-
-  if (error || !consortium) return (
-    <div className="min-h-screen flex items-center justify-center text-slate-500 text-sm">{error ?? '오류가 발생했어요.'}</div>
-  );
-
+  // 서버(RPC)가 역할별로 빈 배열을 반환하므로 길이로 노출 여부 판단
+  const showFinance = consortium.total_budget !== null;
   const taskDone = tasks.filter((t) => t.status === '완료').length;
   const taskPct = tasks.length > 0 ? Math.round((taskDone / tasks.length) * 100) : 0;
 
@@ -172,8 +66,8 @@ export default function ConsortiumRolePortalPage({ roleType }: { roleType: Share
                 {SHARE_ROLE_LABEL[roleType]} 포털
               </span>
               <h1 className="text-xl font-bold text-white leading-tight">{consortium.name}</h1>
-              {consortium.lead_client && (
-                <p className="text-violet-200 text-xs mt-1">주관기관 · {consortium.lead_client.name}</p>
+              {consortium.lead_client_name && (
+                <p className="text-violet-200 text-xs mt-1">주관기관 · {consortium.lead_client_name}</p>
               )}
             </div>
             <span className="text-xs font-bold px-2 py-1 rounded-lg bg-white/20 text-white shrink-0">
@@ -187,7 +81,7 @@ export default function ConsortiumRolePortalPage({ roleType }: { roleType: Share
                 {fmtDate(consortium.start_date)} ~ {fmtDate(consortium.end_date)}
               </span>
             )}
-            {sections.finance && consortium.total_budget && (
+            {showFinance && consortium.total_budget && (
               <span className="flex items-center gap-1">
                 총 예산 {fmtBudget(consortium.total_budget)}
               </span>
@@ -203,7 +97,7 @@ export default function ConsortiumRolePortalPage({ roleType }: { roleType: Share
         )}
 
         {/* 참여기관 */}
-        {sections.members && members.length > 0 && (
+        {members.length > 0 && (
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
               <Building2 size={14} className="text-violet-600" />
@@ -216,9 +110,9 @@ export default function ConsortiumRolePortalPage({ roleType }: { roleType: Share
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
                       {MEMBER_TYPE_LABEL[m.member_type] ?? m.member_type}
                     </span>
-                    <span className="font-semibold text-[#1E1B4B]">{m.clients?.name ?? '-'}</span>
+                    <span className="font-semibold text-[#1E1B4B]">{m.client_name ?? '-'}</span>
                   </div>
-                  {sections.finance && m.allocated_budget && (
+                  {showFinance && m.allocated_budget && (
                     <span className="text-xs text-slate-500 font-mono">{fmtBudget(m.allocated_budget)}</span>
                   )}
                 </li>
@@ -228,7 +122,7 @@ export default function ConsortiumRolePortalPage({ roleType }: { roleType: Share
         )}
 
         {/* 프로그램 */}
-        {sections.programs && programs.length > 0 && (
+        {programs.length > 0 && (
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
               <BookOpen size={14} className="text-violet-600" />
@@ -258,7 +152,7 @@ export default function ConsortiumRolePortalPage({ roleType }: { roleType: Share
         )}
 
         {/* 태스크 */}
-        {sections.tasks && tasks.length > 0 && (
+        {tasks.length > 0 && (
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -268,17 +162,14 @@ export default function ConsortiumRolePortalPage({ roleType }: { roleType: Share
               <span className="text-xs text-slate-500">{taskDone}/{tasks.length}건 완료 ({taskPct}%)</span>
             </div>
             <div className="px-5 py-3">
-              <div className="w-full bg-slate-100 rounded-full h-2 mb-4">
+              <div className="w-full bg-slate-100 rounded-full h-2">
                 <div className="bg-violet-500 h-2 rounded-full transition-all" style={{ width: `${taskPct}%` }} />
               </div>
             </div>
-            <ul className="divide-y divide-slate-100 px-0">
+            <ul className="divide-y divide-slate-100">
               {tasks.map((t) => (
                 <li key={t.id} className="flex items-center justify-between px-5 py-2.5 text-sm gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-[#1E1B4B] truncate">{t.title}</p>
-                    {t.group_name && <p className="text-[10px] text-slate-400">{t.group_name}</p>}
-                  </div>
+                  <p className="font-medium text-[#1E1B4B] truncate min-w-0">{t.title}</p>
                   <div className="flex items-center gap-2 shrink-0">
                     {t.due_date && (
                       <span className="text-[10px] text-slate-400 font-mono">{fmtDate(t.due_date)}</span>
@@ -293,15 +184,14 @@ export default function ConsortiumRolePortalPage({ roleType }: { roleType: Share
           </section>
         )}
 
-        {/* 참여기관·프로그램 없음 */}
-        {sections.programs && programs.length === 0 && sections.tasks && tasks.length === 0 && (
+        {programs.length === 0 && tasks.length === 0 && members.length === 0 && (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-6 py-10 text-center text-slate-400 text-sm">
-            아직 등록된 프로그램·과업이 없어요.
+            아직 공유된 내용이 없어요.
           </div>
         )}
 
         <p className="text-center text-[11px] text-slate-400">
-          © {new Date().getFullYear()} BalanceDot WorkFlow · 문의는 담당자에게 연락해 주세요
+          BalanceDot WorkFlow · 문의는 담당자에게 연락해 주세요
         </p>
       </div>
     </div>

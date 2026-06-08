@@ -30,6 +30,7 @@ import {
   getPublicMaterials,
   type ShareContext,
   type ProjectShareContext,
+  type ConsortiumPortalData,
 } from './sharePortalUtils';
 import ConsortiumRolePortalPage from './ConsortiumRolePortalPage';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
@@ -172,6 +173,7 @@ export default function RoleSharePage({ role }: Props) {
   const tokenStr = token ?? '';
   const [ctx, setCtx] = useState<ShareContext | null>(null);
   const [projectCtx, setProjectCtx] = useState<ProjectShareContext | null>(null);
+  const [consortiumData, setConsortiumData] = useState<ConsortiumPortalData | null>(null);
   const [state, setState] = useState<'loading' | 'notfound' | 'before' | 'ok' | 'project' | 'consortium'>('loading');
   const [viewStage, setViewStage] = useState<ShareStage>('pre');
 
@@ -197,10 +199,11 @@ export default function RoleSharePage({ role }: Props) {
         setState('project');
         return;
       }
-      // 3차: consortium_links 토큰 폴백
-      const isConsortium = await fetchConsortiumShareByToken(role, token);
+      // 3차: consortium_links 토큰 폴백 (보안 RPC)
+      const conData = await fetchConsortiumShareByToken(role, token);
       if (cancelled) return;
-      if (isConsortium) {
+      if (conData) {
+        setConsortiumData(conData);
         setState('consortium');
         return;
       }
@@ -210,8 +213,8 @@ export default function RoleSharePage({ role }: Props) {
   }, [token, role]);
 
   // 컨소시엄 포털 뷰
-  if (state === 'consortium') {
-    return <ConsortiumRolePortalPage roleType={role} />;
+  if (state === 'consortium' && consortiumData) {
+    return <ConsortiumRolePortalPage roleType={role} data={consortiumData} />;
   }
 
   // 프로젝트 레벨 뷰 — SharePortalShell 없이 직접 렌더
@@ -228,7 +231,7 @@ export default function RoleSharePage({ role }: Props) {
   return (
     <SharePortalShell
       audience={role}
-      state={state === 'project' ? 'loading' : state}
+      state={state === 'project' || state === 'consortium' ? 'loading' : state}
       program={ctx?.program ?? null}
       stage={ctx?.stage}
       currentStage={ctx?.stage}

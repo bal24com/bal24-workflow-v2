@@ -140,20 +140,58 @@ export async function fetchProjectShareByToken(
   };
 }
 
-/** consortium_links 토큰 기반 컨소시엄 포털 존재 여부 확인 */
+/** 컨소시엄 포털 데이터 (RPC get_consortium_portal 반환 형태) */
+export interface ConsortiumPortalData {
+  consortium: {
+    id: string;
+    name: string;
+    status: string;
+    start_date: string | null;
+    end_date: string | null;
+    total_budget: number | null;
+    description: string | null;
+    lead_client_name: string | null;
+  } | null;
+  members: Array<{
+    id: string;
+    member_type: string;
+    client_name: string | null;
+    allocated_budget: number | null;
+  }>;
+  programs: Array<{
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+    start_date: string | null;
+    end_date: string | null;
+  }>;
+  tasks: Array<{
+    id: string;
+    title: string;
+    status: string;
+    due_date: string | null;
+  }>;
+}
+
+/** consortium_links 토큰 → 보안 RPC 로 컨소시엄 포털 데이터 조회 (토큰 무효 시 null) */
 export async function fetchConsortiumShareByToken(
   roleType: Extract<ShareAudience, 'supporter' | 'beneficiary' | 'team' | 'staff'>,
   token: string,
-): Promise<boolean> {
-  if (!token) return false;
-  const { data, error } = await supabase
-    .from('consortium_links')
-    .select('id, is_active')
-    .eq('token', token)
-    .eq('link_type', roleType)
-    .maybeSingle();
-  if (error || !data) return false;
-  return (data as { is_active: boolean }).is_active;
+): Promise<ConsortiumPortalData | null> {
+  if (!token) return null;
+  const { data, error } = await supabase.rpc('get_consortium_portal', {
+    p_token: token,
+    p_role: roleType,
+  });
+  if (error) {
+    console.error('[share-portal/consortium] RPC 실패:', error.message);
+    return null;
+  }
+  if (!data || typeof data !== 'object') return null;
+  const d = data as ConsortiumPortalData;
+  if (!d.consortium) return null;
+  return d;
 }
 
 /** 커리큘럼 차시 fetch (program_id 기준) */
