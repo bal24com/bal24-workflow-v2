@@ -26,10 +26,12 @@ import BeneficiarySchoolGate from './BeneficiarySchoolGate';
 import {
   fetchShareByToken,
   fetchProjectShareByToken,
+  fetchConsortiumShareByToken,
   getPublicMaterials,
   type ShareContext,
   type ProjectShareContext,
 } from './sharePortalUtils';
+import ConsortiumRolePortalPage from './ConsortiumRolePortalPage';
 import { isItemVisible } from '../programs/detail/share/shareUtils';
 import { STAGE_ITEMS, SHARE_AUDIENCE_LABEL } from '../programs/detail/share/visibilityCatalog';
 import type { ShareAudience, ShareStage } from '../../types/database';
@@ -170,7 +172,7 @@ export default function RoleSharePage({ role }: Props) {
   const tokenStr = token ?? '';
   const [ctx, setCtx] = useState<ShareContext | null>(null);
   const [projectCtx, setProjectCtx] = useState<ProjectShareContext | null>(null);
-  const [state, setState] = useState<'loading' | 'notfound' | 'before' | 'ok' | 'project'>('loading');
+  const [state, setState] = useState<'loading' | 'notfound' | 'before' | 'ok' | 'project' | 'consortium'>('loading');
   const [viewStage, setViewStage] = useState<ShareStage>('pre');
 
   useEffect(() => {
@@ -195,10 +197,22 @@ export default function RoleSharePage({ role }: Props) {
         setState('project');
         return;
       }
+      // 3차: consortium_links 토큰 폴백
+      const isConsortium = await fetchConsortiumShareByToken(role, token);
+      if (cancelled) return;
+      if (isConsortium) {
+        setState('consortium');
+        return;
+      }
       setState('notfound');
     })();
     return () => { cancelled = true; };
   }, [token, role]);
+
+  // 컨소시엄 포털 뷰
+  if (state === 'consortium') {
+    return <ConsortiumRolePortalPage roleType={role} />;
+  }
 
   // 프로젝트 레벨 뷰 — SharePortalShell 없이 직접 렌더
   if (state === 'project' && projectCtx) {
