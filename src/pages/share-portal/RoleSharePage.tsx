@@ -21,6 +21,7 @@ import SurveyResponseItem from './items/SurveyResponseItem';
 import SurveyResultsViewItem from './items/SurveyResultsViewItem';
 import ReportViewItem from './items/ReportViewItem';
 import ClubDashboardItem from './items/ClubDashboardItem';
+import ShareBoardItem from './items/ShareBoardItem';
 import FileUploadItem from './items/FileUploadItem';
 import BeneficiarySchoolGate from './BeneficiarySchoolGate';
 import {
@@ -341,6 +342,8 @@ export default function RoleSharePage({ role }: Props) {
           ) : (
             restItems.map(renderItem)
           )}
+          {/* 박경수님 2026-06-08 — 공통 게시판 (모든 역할 페이지 하단 고정) */}
+          <ShareBoardItem programId={ctx.program.id} role={role} />
         </div>
       )}
     </SharePortalShell>

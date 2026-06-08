@@ -33,6 +33,8 @@ export const SHARE_ITEM_LABEL: Record<ShareItem, string> = {
   file_upload: '파일 제출',
   approval: '동의·확인',
   tax_invoice: '세금계산서 요청',
+  // 박경수님 2026-06-08 — 공통 게시판
+  board: '공통 게시판',
 };
 
 // 박경수님 2026-06-02 — 4역할 추가. 기존 3종은 호환 fallback (UI 에서는 숨길 수 있음).

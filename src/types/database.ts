@@ -473,7 +473,9 @@ export type ShareItem =
   // 박경수님 2026-06-02 CLUB-10 — 동아리 전체 진행률 대시보드 (지원기관·수혜기관)
   | 'club_dashboard'
   // 박경수님 2026-06-02 MERGE-2 — 레거시 포털 기능 흡수
-  | 'file_download' | 'file_upload' | 'approval' | 'tax_invoice';
+  | 'file_download' | 'file_upload' | 'approval' | 'tax_invoice'
+  // 박경수님 2026-06-08 — 공통 게시판 (역할 무관 프로그램 단위 단일 게시판)
+  | 'board';
 
 // 박경수님 2026-06-02 STEP-SURVEY-MULTI-TARGET — 설문 정의 + 동적 문항 + 4역할 대상
 export type SurveyFormKind = 'pre-demand' | 'mid' | 'satisfaction' | 'custom';
