@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import SharePortalShell from './SharePortalShell';
 import BasicInfoItem from './items/BasicInfoItem';
 import CurriculumItem from './items/CurriculumItem';
@@ -65,24 +65,27 @@ function RoleAccordionCard({
   token,
   open,
   onToggle,
+  hideToggle = false,
 }: {
   role: Props['role'];
   program: ProjectShareContext['programs'][number];
   token: string;
   open: boolean;
   onToggle: () => void;
+  hideToggle?: boolean;
 }) {
   const tabs = ROLE_TABS[role];
   const [activeTab, setActiveTab] = useState(tabs[0].key);
   const statusTone = PROGRAM_STATUS_TONE[program.status ?? ''] ?? 'bg-slate-100 text-slate-500';
 
+  const HeaderTag = hideToggle ? 'div' : 'button';
+
   return (
     <div id={`prog-${program.id}`} className={`rounded-2xl border bg-white shadow-sm overflow-hidden transition-colors ${open ? 'border-violet-300 ring-1 ring-violet-200' : 'border-violet-100'}`}>
       {/* 헤더 */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-4 text-left hover:bg-violet-50/40 transition-colors"
+      <HeaderTag
+        {...(hideToggle ? {} : { type: 'button' as const, onClick: onToggle })}
+        className={`w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-4 text-left ${hideToggle ? '' : 'hover:bg-violet-50/40 cursor-pointer'} transition-colors`}
       >
         <div className="min-w-0 flex-1 flex items-center gap-3">
           {program.type && (
@@ -105,11 +108,11 @@ function RoleAccordionCard({
               {program.status}
             </span>
           )}
-          {open
+          {!hideToggle && (open
             ? <ChevronUp size={15} className="text-violet-500" />
-            : <ChevronDown size={15} className="text-slate-400" />}
+            : <ChevronDown size={15} className="text-slate-400" />)}
         </div>
-      </button>
+      </HeaderTag>
 
       {/* 탭 바 + 콘텐츠 */}
       {open && (
@@ -168,20 +171,9 @@ function ProjectShareView({
     return [...ctx.programs].sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''));
   }, [ctx.programs]);
 
-  // 진행 중 프로그램을 기본 펼침, 없으면 첫 번째
-  const initialOpen = useMemo(() => {
-    const running = programs.find((p) => p.status === '진행');
-    return running?.id ?? programs[0]?.id ?? null;
-  }, [programs]);
-  const [openId, setOpenId] = useState<string | null>(initialOpen);
-
-  function jumpTo(id: string) {
-    setOpenId(id);
-    // 카드로 부드럽게 스크롤
-    requestAnimationFrame(() => {
-      document.getElementById(`prog-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }
+  // 박경수님 2026-06-08 #3 — 기본 진입은 '제일 먼저 진행되는(가장 이른)' 프로그램
+  const [selectedId, setSelectedId] = useState<string | null>(programs[0]?.id ?? null);
+  const selected = programs.find((p) => p.id === selectedId) ?? programs[0] ?? null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-violet-50/50 to-slate-50/60 flex flex-col items-center px-4 py-8 sm:py-10 gap-5">
@@ -203,47 +195,41 @@ function ProjectShareView({
         </div>
       </div>
 
-      {/* 프로그램 흐름도 (가로 스크롤) */}
-      {programs.length > 0 && (
+      {/* 프로그램 스텝퍼 (화면 폭에 맞춤 — 가로 스크롤 없음) */}
+      {programs.length > 1 && (
         <div className="w-full max-w-2xl">
-          <p className="text-[11px] font-bold text-slate-500 mb-2 px-1">프로그램 흐름</p>
-          <div className="flex items-stretch gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+          <div className="flex w-full rounded-xl border border-violet-100 bg-white overflow-hidden shadow-sm">
             {programs.map((p, i) => {
-              const tone = PROGRAM_STATUS_TONE[p.status ?? ''] ?? 'bg-slate-100 text-slate-500';
-              const active = openId === p.id;
+              const active = selected?.id === p.id;
+              const dot = p.status === '진행' ? 'bg-violet-500'
+                : p.status === '완료' ? 'bg-emerald-500'
+                : p.status === '취소' ? 'bg-rose-400' : 'bg-slate-300';
               return (
-                <div key={p.id} className="flex items-center gap-2 shrink-0">
-                  <button type="button" onClick={() => jumpTo(p.id)}
-                    className={`w-40 text-left rounded-xl border p-3 transition-all ${
-                      active ? 'border-violet-400 bg-white ring-1 ring-violet-200 shadow-sm' : 'border-slate-200 bg-white/70 hover:border-violet-200'
-                    }`}>
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <span className="text-[9px] font-bold text-slate-400">STEP {i + 1}</span>
-                      {p.status && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${tone}`}>{p.status}</span>}
-                    </div>
-                    <p className="text-xs font-bold text-[#1E1B4B] line-clamp-2 leading-tight">{p.name}</p>
-                    {p.start_date && <p className="text-[9px] text-slate-400 mt-1">{p.start_date}</p>}
-                  </button>
-                  {i < programs.length - 1 && <ChevronRight size={14} className="text-slate-300 shrink-0" aria-hidden="true" />}
-                </div>
+                <button key={p.id} type="button" onClick={() => setSelectedId(p.id)}
+                  className={`flex-1 min-w-0 px-1.5 py-2.5 flex flex-col items-center gap-1 border-l first:border-l-0 border-slate-100 transition-colors ${
+                    active ? 'bg-violet-600 text-white' : 'text-slate-500 hover:bg-violet-50'
+                  }`}>
+                  <span className="text-[10px] font-black">{i + 1}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-white' : dot}`} aria-hidden="true" />
+                  <span className={`text-[9px] font-bold leading-none ${active ? 'text-violet-100' : 'text-slate-400'}`}>
+                    {p.status ?? ''}
+                  </span>
+                </button>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* 프로그램 카드 목록 */}
-      <div className="w-full max-w-2xl space-y-3">
-        {programs.length === 0 ? (
+      {/* 선택된 프로그램 1개만 표시 */}
+      <div className="w-full max-w-2xl">
+        {!selected ? (
           <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center">
             <p className="text-sm text-slate-400">등록된 프로그램이 없어요.</p>
           </div>
         ) : (
-          programs.map((p) => (
-            <RoleAccordionCard key={p.id} role={role} program={p} token={token}
-              open={openId === p.id}
-              onToggle={() => setOpenId((cur) => (cur === p.id ? null : p.id))} />
-          ))
+          <RoleAccordionCard key={selected.id} role={role} program={selected} token={token}
+            open hideToggle onToggle={() => undefined} />
         )}
       </div>
     </div>
