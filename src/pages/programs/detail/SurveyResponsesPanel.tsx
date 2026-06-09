@@ -43,6 +43,56 @@ function fmtDate(iso: string): string {
   return `${d.getFullYear()}-${m}-${day} ${hh}:${mm}`;
 }
 
+// 내용으로 답변 종류 추론 (구버전 응답 복구용)
+function isClubJson(t: string | null): boolean {
+  if (!t) return false;
+  try { const o = JSON.parse(t); return !!o && typeof o === 'object' && ('clubName' in o || 'clubId' in o); }
+  catch { return false; }
+}
+function isScheduleJson(t: string | null): boolean {
+  if (!t) return false;
+  try {
+    const o = JSON.parse(t);
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return false;
+    return Object.values(o).some((v) => Array.isArray(v));
+  } catch { return false; }
+}
+function matchesCheckbox(t: string | null, opts: string[] | undefined): boolean {
+  if (!t || !opts || opts.length === 0) return false;
+  const parts = t.split(',').map((s) => s.trim()).filter(Boolean);
+  return parts.length > 0 && parts.every((p) => opts.includes(p));
+}
+
+// 박경수님 2026-06-08 — answers 를 문항에 정렬 (question_key 우선, 없으면 내용 추론)
+function alignAnswers(
+  questions: SurveyFormQuestion[],
+  list: ResponseRow[],
+): (ResponseRow | undefined)[] {
+  if (list.some((r) => r.question_key)) {
+    return questions.map((q) => list.find((r) => r.question_key === q.id));
+  }
+  // 구버전: 내용으로 추론
+  const remaining = [...list];
+  const take = (pred: (r: ResponseRow) => boolean): ResponseRow | undefined => {
+    const idx = remaining.findIndex(pred);
+    return idx === -1 ? undefined : remaining.splice(idx, 1)[0];
+  };
+  const result: (ResponseRow | undefined)[] = questions.map(() => undefined);
+  // 1차: 구조가 뚜렷한 문항부터 매칭
+  questions.forEach((q, i) => {
+    if (q.type === 'club-autofill') result[i] = take((r) => isClubJson(r.answer_text));
+    else if (q.type === 'date-schedule') result[i] = take((r) => isScheduleJson(r.answer_text));
+    else if (q.type === 'checkbox') result[i] = take((r) => matchesCheckbox(r.answer_text, q.options));
+  });
+  // 2차: 나머지 문항을 남은 답변으로 순서대로 채움
+  questions.forEach((q, i) => {
+    if (result[i] === undefined && (q.type === 'text' || q.type === 'textarea' || q.type === 'number' || q.type === 'date' || q.type === 'select')) {
+      result[i] = remaining.shift();
+    }
+  });
+  return result;
+}
+
 // 박경수님 2026-06-08 — 동아리(club-autofill)·월별일정(date-schedule) 답변을 읽기 좋게 포맷
 const HOPE_LABELS = ['희망1', '희망2', '희망3'];
 function formatAnswerText(type: string, text: string | null): string {
@@ -102,7 +152,8 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
   const questions = useMemo(() => form.questions ?? [], [form]);
 
   // 응답자 단위 그룹핑 — 같은 token+같은 created_at 분 단위 묶음 = 한 응답 세트
-  // 박경수님 2026-06-08 — answers 를 question_key 로 문항 순서에 정확히 정렬 (어긋남 방지)
+  // 박경수님 2026-06-08 — answers 를 문항 순서에 정렬:
+  //   ① question_key 있으면 키로 매핑 ② 없으면(구버전) 내용으로 문항 추론 복구
   const responseSets = useMemo(() => {
     const map = new Map<string, ResponseRow[]>();
     rows.forEach((r) => {
@@ -111,20 +162,13 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
       list.push(r);
       map.set(key, list);
     });
-    return Array.from(map.entries()).map(([key, list]) => {
-      const hasKeys = list.some((r) => r.question_key);
-      // question_key 가 있으면 문항 순서대로 정렬, 없으면(구버전) 원래 순서 유지
-      const answers: (ResponseRow | undefined)[] = hasKeys
-        ? questions.map((q) => list.find((r) => r.question_key === q.id))
-        : list;
-      return {
-        key,
-        token: list[0].respondent_token ?? 'anon',
-        role: list[0].respondent_role ?? '미지정',
-        created_at: list[0].created_at,
-        answers,
-      };
-    });
+    return Array.from(map.entries()).map(([key, list]) => ({
+      key,
+      token: list[0].respondent_token ?? 'anon',
+      role: list[0].respondent_role ?? '미지정',
+      created_at: list[0].created_at,
+      answers: alignAnswers(questions, list),
+    }));
   }, [rows, questions]);
 
   function handleCsvDownload() {
