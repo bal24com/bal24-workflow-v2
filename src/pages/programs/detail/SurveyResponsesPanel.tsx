@@ -205,7 +205,7 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
               <Loader2 size={20} className="animate-spin text-violet-400" aria-hidden="true" />
             </div>
           ) : activeTab === 'mentor' ? (
-            <SurveyMentorMatchPanel questions={questions} responseSets={responseSets} />
+            <SurveyMentorMatchPanel programId={form.program_id} questions={questions} responseSets={responseSets} />
           ) : responseSets.length === 0 ? (
             <p className="text-sm text-slate-400 italic text-center py-10">
               아직 응답이 없어요. 외부 토큰 페이지에서 응답이 들어오면 여기에 나타나요.
