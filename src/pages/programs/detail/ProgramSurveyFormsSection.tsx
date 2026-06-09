@@ -12,6 +12,7 @@ import {
 } from '../../../types/database';
 import SurveyFormCreateModal from './SurveyFormCreateModal';
 import SurveyResponsesPanel from './SurveyResponsesPanel';
+import SurveySatisfactionTrend from './SurveySatisfactionTrend';
 
 interface Props {
   programId: string;
@@ -109,6 +110,9 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
   }
 
   return (
+    <div className="space-y-3">
+    {/* 박경수님 2026-06-08 #2 — 만족도 누적 추이 (만족도 설문 있을 때만 표시) */}
+    <SurveySatisfactionTrend programId={programId} />
     <section className="rounded-2xl border border-violet-100 bg-white p-3 space-y-3">
       <header className="flex items-center justify-between gap-2">
         <div className="min-w-0">
@@ -244,5 +248,6 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
         />
       )}
     </section>
+    </div>
   );
 }
