@@ -42,6 +42,34 @@ function fmtDate(iso: string): string {
   return `${d.getFullYear()}-${m}-${day} ${hh}:${mm}`;
 }
 
+// 박경수님 2026-06-08 — 동아리(club-autofill)·월별일정(date-schedule) 답변을 읽기 좋게 포맷
+const HOPE_LABELS = ['희망1', '희망2', '희망3'];
+function formatAnswerText(type: string, text: string | null): string {
+  if (!text) return '';
+  if (type === 'club-autofill') {
+    try {
+      const c = JSON.parse(text) as { clubName?: string; school?: string; teacher?: string; phone?: string };
+      const head = [c.clubName, c.school].filter(Boolean).join(' · ');
+      const sub = [c.teacher, c.phone].filter(Boolean).join(' ');
+      return sub ? `${head}${head ? ' · ' : ''}지도교사 ${sub}` : head || text;
+    } catch { return text; }
+  }
+  if (type === 'date-schedule') {
+    try {
+      const ds = JSON.parse(text) as Record<string, Array<{ date: string; time: string; duration: string }>>;
+      const lines = Object.entries(ds).map(([month, slots]) => {
+        const valid = (slots ?? []).filter((s) => s.date || s.time);
+        if (valid.length === 0) return null;
+        const parts = valid.map((s, i) =>
+          `${HOPE_LABELS[i] ?? `희망${i + 1}`} ${s.date || '-'}${s.time ? ` ${s.time}` : ''}${s.duration ? ` (${s.duration})` : ''}`);
+        return `${month}: ${parts.join(', ')}`;
+      }).filter(Boolean);
+      return lines.length > 0 ? lines.join('\n') : text;
+    } catch { return text; }
+  }
+  return text;
+}
+
 export default function SurveyResponsesPanel({ form, onClose }: Props) {
   const toast = useToast();
   const [rows, setRows] = useState<ResponseRow[]>([]);
@@ -95,9 +123,10 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
     const header = ['응답일시', '응답자 역할', ...questions.map((q) => q.label)];
     const rowsCsv = responseSets.map((set) => {
       const cols = [fmtDate(set.created_at), ROLE_LABEL[set.role] ?? set.role];
-      questions.forEach((_q, idx) => {
+      questions.forEach((q, idx) => {
         const a = set.answers[idx];
-        const v = a?.answer_text ?? (a?.answer_score != null ? String(a.answer_score) : '');
+        const v = formatAnswerText(q.type, a?.answer_text ?? null)
+          || (a?.answer_score != null ? String(a.answer_score) : '');
         cols.push(v);
       });
       return cols;
@@ -243,11 +272,12 @@ function ResponsesTable({ questions, responseSets }: { questions: SurveyFormQues
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
               {questions.map((q, idx) => {
                 const a = set.answers[idx];
-                const v = a?.answer_text ?? (a?.answer_score != null ? String(a.answer_score) : '');
+                const raw = a?.answer_text ?? (a?.answer_score != null ? String(a.answer_score) : '');
+                const v = formatAnswerText(q.type, a?.answer_text ?? null) || raw;
                 return (
                   <div key={q.id} className="flex gap-2">
                     <span className="text-slate-500 font-semibold shrink-0 w-32 truncate">{q.label}</span>
-                    <span className={`flex-1 min-w-0 break-words ${v ? 'text-slate-700' : 'text-slate-300 italic'}`}>
+                    <span className={`flex-1 min-w-0 break-words whitespace-pre-line ${v ? 'text-slate-700' : 'text-slate-300 italic'}`}>
                       {v || '미응답'}
                     </span>
                   </div>
