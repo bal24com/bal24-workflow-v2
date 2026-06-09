@@ -37,7 +37,7 @@ export default function ClubManageTab({ programId }: Props) {
   // 박경수님 2026-06-02 CLUB-7a — 차수 일정 펼친 동아리 id
   const [scheduleOpen, setScheduleOpen] = useState<string | null>(null);
   // 박경수님 2026-06-02 CLUB-8/9 — 리스트 / 카드 / 멘토별 보기 토글
-  const [view, setView] = useState<'list' | 'card' | 'mentor'>('list');
+  const [view, setView] = useState<'list' | 'card' | 'mentor'>('card');
   const [dispatchOpen, setDispatchOpen] = useState(false);
 
   const reload = useCallback(async () => {
