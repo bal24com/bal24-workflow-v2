@@ -48,6 +48,8 @@ export default function SurveyTab({ programId, canEdit }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [originalIds, setOriginalIds] = useState<Set<string>>(new Set());
+  // 박경수님 2026-06-08 — 만족도·보고 하위 탭
+  const [subTab, setSubTab] = useState<'survey' | 'satisfaction' | 'result'>('survey');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -169,8 +171,31 @@ export default function SurveyTab({ programId, canEdit }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 상단 2열 — 만족도 문항 + 설문 조사 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      {/* 제목 + 하위 탭 */}
+      <div className="space-y-2">
+        <h2 className="text-base font-bold text-[#1E1B4B]">만족도·보고</h2>
+        <div className="inline-flex bg-slate-100 rounded-lg p-0.5">
+          {([
+            { k: 'survey', l: '설문조사' },
+            { k: 'satisfaction', l: '만족도' },
+            { k: 'result', l: '결과' },
+          ] as const).map((t) => (
+            <button key={t.k} type="button" onClick={() => setSubTab(t.k)}
+              className={`px-4 h-8 rounded-md text-xs font-bold transition-colors ${
+                subTab === t.k ? 'bg-white shadow-sm text-violet-700' : 'text-slate-500 hover:text-slate-700'
+              }`}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 설문조사 탭 */}
+      {subTab === 'survey' && <ProgramSurveyFormsSection programId={programId} canEdit={canEdit} />}
+
+      {/* 만족도 탭 — 만족도 문항 + 외부 파일 분석 */}
+      {subTab === 'satisfaction' && (
+      <div className="flex flex-col gap-4">
       {/* 만족도 문항 */}
       <section className="rounded-2xl border border-violet-100 bg-white shadow-[0_4px_16px_rgba(124,58,237,0.06)] p-3">
         <header className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -345,16 +370,13 @@ export default function SurveyTab({ programId, canEdit }: Props) {
         )}
       </section>
 
-      {/* 설문 조사 — 2열 그리드 우측 */}
-      <ProgramSurveyFormsSection programId={programId} canEdit={canEdit} />
-      </div>{/* end 2열 grid */}
-
-      {/* STEP-CURRICULUM-ATTEND-SURVEY-FULL — 외부 만족도 파일 업로드·분석 */}
-      {/* STEP-SURVEY-FIX — xlsx import 후 웹 폼 문항 목록 자동 재조회 */}
+      {/* 만족도 외부 파일 업로드·분석 */}
       <SurveyFileUploadSection programId={programId} onImportDone={() => void reload()} />
+      </div>
+      )}
 
-      {/* 하단 — 기존 외부 폼 발송·통계 */}
-      <SurveyResultTab programId={programId} />
+      {/* 결과 탭 — 외부 폼 발송·통계 + 만족도 응답 */}
+      {subTab === 'result' && <SurveyResultTab programId={programId} />}
     </div>
   );
 }
