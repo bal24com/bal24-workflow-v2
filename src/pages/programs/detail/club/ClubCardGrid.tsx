@@ -1,7 +1,7 @@
 // 박경수님 2026-06-02 CLUB-8 — 동아리 카드형 보기.
 // 학교별 그룹 헤더 + 동아리 카드 grid. 링크 복사·열기·삭제·일정 액션.
 
-import { Copy, Trash2, ExternalLink, School, CalendarDays, Users } from 'lucide-react';
+import { Copy, Trash2, ExternalLink, School, CalendarDays, Users, ClipboardCheck } from 'lucide-react';
 import type { ProgramClub } from '../../../../types/database';
 
 interface ClubWithActivity extends ProgramClub {
@@ -10,6 +10,8 @@ interface ClubWithActivity extends ProgramClub {
 
 interface Props {
   bySchool: Array<[string, ClubWithActivity[]]>;
+  /** 박경수님 2026-06-08 — 설문 응답한 동아리 id 집합 */
+  respondedClubIds?: Set<string>;
   onCopyLink: (club: ProgramClub) => void;
   onDelete: (club: ProgramClub) => void;
   onSchedule: (clubId: string) => void;
@@ -20,7 +22,7 @@ const TYPE_TONE: Record<string, string> = {
   융합: 'bg-cyan-100 text-cyan-700',
 };
 
-export default function ClubCardGrid({ bySchool, onCopyLink, onDelete, onSchedule }: Props) {
+export default function ClubCardGrid({ bySchool, respondedClubIds, onCopyLink, onDelete, onSchedule }: Props) {
   return (
     <div className="space-y-4">
       {bySchool.map(([school, clubs]) => (
@@ -35,11 +37,18 @@ export default function ClubCardGrid({ bySchool, onCopyLink, onDelete, onSchedul
               <article key={c.id} className="rounded-2xl border border-violet-100 bg-white p-4 shadow-sm space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <h4 className="text-sm font-bold text-[#1E1B4B] min-w-0 truncate">{c.club_name}</h4>
-                  {c.club_type && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${TYPE_TONE[c.club_type] ?? 'bg-slate-100 text-slate-600'}`}>
-                      {c.club_type}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {respondedClubIds?.has(c.id) && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700" title="설문 응답 완료">
+                        <ClipboardCheck size={10} aria-hidden="true" /> 응답
+                      </span>
+                    )}
+                    {c.club_type && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${TYPE_TONE[c.club_type] ?? 'bg-slate-100 text-slate-600'}`}>
+                        {c.club_type}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="text-[11px] text-slate-500 space-y-0.5">
                   {c.teacher_name && <p>지도 {c.teacher_name}{c.teacher_phone ? ` · ${c.teacher_phone}` : ''}</p>}

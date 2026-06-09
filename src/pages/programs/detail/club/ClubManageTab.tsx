@@ -39,6 +39,8 @@ export default function ClubManageTab({ programId }: Props) {
   // 박경수님 2026-06-02 CLUB-8/9 — 리스트 / 카드 / 멘토별 보기 토글
   const [view, setView] = useState<'list' | 'card' | 'mentor'>('card');
   const [dispatchOpen, setDispatchOpen] = useState(false);
+  // 박경수님 2026-06-08 — 설문 응답한 동아리 id 집합 (동아리 카드 연동)
+  const [respondedClubIds, setRespondedClubIds] = useState<Set<string>>(new Set());
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -75,6 +77,24 @@ export default function ClubManageTab({ programId }: Props) {
       }
     }
     setClubs(list.map((c) => ({ ...c, activity_count: counts.get(c.id) ?? 0 })));
+
+    // 박경수님 2026-06-08 — 설문 응답에서 동아리(clubId) 추출 → 응답완료 표시
+    const sRes = await supabase
+      .from('survey_responses')
+      .select('answer_text')
+      .eq('program_id', programId);
+    if (!sRes.error) {
+      const ids = new Set<string>();
+      (sRes.data ?? []).forEach((r) => {
+        const t = (r as { answer_text: string | null }).answer_text;
+        if (!t || !t.includes('clubId')) return;
+        try {
+          const o = JSON.parse(t) as { clubId?: string };
+          if (o?.clubId) ids.add(o.clubId);
+        } catch { /* JSON 아님 무시 */ }
+      });
+      setRespondedClubIds(ids);
+    }
     setLoading(false);
   }, [programId, toast]);
 
@@ -158,6 +178,7 @@ export default function ClubManageTab({ programId }: Props) {
       ) : view === 'card' ? (
         <ClubCardGrid
           bySchool={bySchool}
+          respondedClubIds={respondedClubIds}
           onCopyLink={(c) => void copyClubLink(c)}
           onDelete={(c) => void handleDelete(c)}
           onSchedule={(id) => { setView('list'); setScheduleOpen(id); }}
