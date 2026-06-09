@@ -8,6 +8,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import {
   SURVEY_FORM_KIND_LABEL,
   type ProgramSurveyForm,
+  type SurveyFormKind,
 } from '../../../types/database';
 import SurveyFormCreateModal from './SurveyFormCreateModal';
 import SurveyResponsesPanel from './SurveyResponsesPanel';
@@ -33,6 +34,8 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
   const [editing, setEditing] = useState<ProgramSurveyForm | null>(null);
   // 박경수님 2026-06-02 STEP-SURVEY-RESULTS-A — 응답 상세 패널 대상
   const [responsesTarget, setResponsesTarget] = useState<ProgramSurveyForm | null>(null);
+  // 박경수님 2026-06-08 #1 — 설문 종류별 하위 탭 필터
+  const [kindFilter, setKindFilter] = useState<'all' | SurveyFormKind>('all');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -123,6 +126,31 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
         )}
       </header>
 
+      {/* 박경수님 2026-06-08 #1 — 종류별 하위 탭 (설문 2개 이상일 때만) */}
+      {!loading && forms.length > 1 && (() => {
+        const presentKinds = Array.from(new Set(forms.map((f) => f.kind)));
+        if (presentKinds.length < 2) return null;
+        const tabs: Array<{ key: 'all' | SurveyFormKind; label: string }> = [
+          { key: 'all', label: `전체 ${forms.length}` },
+          ...presentKinds.map((k) => ({
+            key: k,
+            label: `${SURVEY_FORM_KIND_LABEL[k] ?? k} ${forms.filter((f) => f.kind === k).length}`,
+          })),
+        ];
+        return (
+          <div className="flex gap-1 flex-wrap">
+            {tabs.map((t) => (
+              <button key={t.key} type="button" onClick={() => setKindFilter(t.key)}
+                className={`px-2.5 h-7 rounded-full text-[11px] font-bold transition-colors ${
+                  kindFilter === t.key ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-violet-50'
+                }`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+
       {loading ? (
         <div className="flex justify-center py-5">
           <Loader2 size={16} className="animate-spin text-violet-400" aria-hidden="true" />
@@ -133,7 +161,7 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
         </p>
       ) : (
         <ul className="space-y-2">
-          {forms.map((f) => {
+          {forms.filter((f) => kindFilter === 'all' || f.kind === kindFilter).map((f) => {
             const count = responseCounts.get(f.id) ?? 0;
             return (
               <li key={f.id}
