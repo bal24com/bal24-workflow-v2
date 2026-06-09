@@ -12,6 +12,8 @@ interface Props {
   bySchool: Array<[string, ClubWithActivity[]]>;
   /** 박경수님 2026-06-08 — 설문 응답한 동아리 id 집합 */
   respondedClubIds?: Set<string>;
+  /** 박경수님 2026-06-08 — 동아리별 희망일정 요약 */
+  clubScheduleMap?: Map<string, string>;
   onCopyLink: (club: ProgramClub) => void;
   onDelete: (club: ProgramClub) => void;
   onSchedule: (clubId: string) => void;
@@ -22,7 +24,7 @@ const TYPE_TONE: Record<string, string> = {
   융합: 'bg-cyan-100 text-cyan-700',
 };
 
-export default function ClubCardGrid({ bySchool, respondedClubIds, onCopyLink, onDelete, onSchedule }: Props) {
+export default function ClubCardGrid({ bySchool, respondedClubIds, clubScheduleMap, onCopyLink, onDelete, onSchedule }: Props) {
   return (
     <div className="space-y-4">
       {bySchool.map(([school, clubs]) => (
@@ -61,6 +63,12 @@ export default function ClubCardGrid({ bySchool, respondedClubIds, onCopyLink, o
                 </div>
                 {c.operating_method && (
                   <p className="text-[11px] text-slate-400 line-clamp-2">{c.operating_method}</p>
+                )}
+                {/* 박경수님 2026-06-08 — 설문 희망일정 요약 */}
+                {clubScheduleMap?.get(c.id) && (
+                  <p className="text-[10px] text-emerald-700 bg-emerald-50 rounded-md px-2 py-1 line-clamp-2">
+                    📅 희망 {clubScheduleMap.get(c.id)}
+                  </p>
                 )}
                 <div className="flex items-center gap-1 pt-1.5 border-t border-slate-100">
                   <button type="button" onClick={() => onSchedule(c.id)}

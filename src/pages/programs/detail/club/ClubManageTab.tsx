@@ -39,8 +39,9 @@ export default function ClubManageTab({ programId }: Props) {
   // 박경수님 2026-06-02 CLUB-8/9 — 리스트 / 카드 / 멘토별 보기 토글
   const [view, setView] = useState<'list' | 'card' | 'mentor'>('card');
   const [dispatchOpen, setDispatchOpen] = useState(false);
-  // 박경수님 2026-06-08 — 설문 응답한 동아리 id 집합 (동아리 카드 연동)
+  // 박경수님 2026-06-08 — 설문 응답한 동아리 id 집합 + 희망일정 요약 (동아리 카드 연동)
   const [respondedClubIds, setRespondedClubIds] = useState<Set<string>>(new Set());
+  const [clubScheduleMap, setClubScheduleMap] = useState<Map<string, string>>(new Map());
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -78,22 +79,49 @@ export default function ClubManageTab({ programId }: Props) {
     }
     setClubs(list.map((c) => ({ ...c, activity_count: counts.get(c.id) ?? 0 })));
 
-    // 박경수님 2026-06-08 — 설문 응답에서 동아리(clubId) 추출 → 응답완료 표시
+    // 박경수님 2026-06-08 — 설문 응답을 응답자(팀) 단위로 묶어 동아리별 응답완료·희망일정 추출
     const sRes = await supabase
       .from('survey_responses')
-      .select('answer_text')
+      .select('answer_text, respondent_token, created_at')
       .eq('program_id', programId);
     if (!sRes.error) {
+      // 응답자 세트 그룹핑 (token + 분 단위)
+      const sets = new Map<string, string[]>();
+      (sRes.data ?? []).forEach((row) => {
+        const r = row as { answer_text: string | null; respondent_token: string | null; created_at: string | null };
+        const k = `${r.respondent_token ?? 'anon'}_${(r.created_at ?? '').slice(0, 16)}`;
+        const arr = sets.get(k) ?? [];
+        if (r.answer_text) arr.push(r.answer_text);
+        sets.set(k, arr);
+      });
       const ids = new Set<string>();
-      (sRes.data ?? []).forEach((r) => {
-        const t = (r as { answer_text: string | null }).answer_text;
-        if (!t || !t.includes('clubId')) return;
-        try {
-          const o = JSON.parse(t) as { clubId?: string };
-          if (o?.clubId) ids.add(o.clubId);
-        } catch { /* JSON 아님 무시 */ }
+      const schedMap = new Map<string, string>();
+      sets.forEach((texts) => {
+        let clubId: string | undefined;
+        let schedule: string | undefined;
+        texts.forEach((t) => {
+          if (t.includes('clubId')) {
+            try { const o = JSON.parse(t) as { clubId?: string }; if (o?.clubId) clubId = o.clubId; } catch { /* skip */ }
+          } else {
+            try {
+              const o = JSON.parse(t) as Record<string, Array<{ date: string; time: string; duration: string }>>;
+              if (o && typeof o === 'object' && Object.values(o).some((v) => Array.isArray(v))) {
+                const lines = Object.entries(o).map(([m, slots]) => {
+                  const valid = (slots ?? []).filter((s) => s.date);
+                  return valid.length ? `${m} ${valid.map((s) => s.date).join('·')}` : null;
+                }).filter(Boolean);
+                if (lines.length) schedule = lines.join(' / ');
+              }
+            } catch { /* skip */ }
+          }
+        });
+        if (clubId) {
+          ids.add(clubId);
+          if (schedule) schedMap.set(clubId, schedule);
+        }
       });
       setRespondedClubIds(ids);
+      setClubScheduleMap(schedMap);
     }
     setLoading(false);
   }, [programId, toast]);
@@ -179,6 +207,7 @@ export default function ClubManageTab({ programId }: Props) {
         <ClubCardGrid
           bySchool={bySchool}
           respondedClubIds={respondedClubIds}
+          clubScheduleMap={clubScheduleMap}
           onCopyLink={(c) => void copyClubLink(c)}
           onDelete={(c) => void handleDelete(c)}
           onSchedule={(id) => { setView('list'); setScheduleOpen(id); }}

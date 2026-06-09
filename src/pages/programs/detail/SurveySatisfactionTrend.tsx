@@ -80,40 +80,61 @@ export default function SurveySatisfactionTrend({ programId }: Props) {
   }
   if (rows.length === 0) return null; // 만족도 설문 없으면 숨김
 
+  // 박경수님 2026-06-08 B — 회차별 평균 점수 꺾은선(라인) 차트
+  const W = 520, H = 140, padL = 28, padR = 12, padT = 12, padB = 26;
   const maxAvg = Math.max(...rows.map((r) => r.avg ?? 0), 5);
+  const n = rows.length;
+  const xAt = (i: number) => padL + (n <= 1 ? (W - padL - padR) / 2 : (i * (W - padL - padR)) / (n - 1));
+  const yAt = (v: number) => padT + (H - padT - padB) * (1 - v / maxAvg);
+  const pts = rows.map((r, i) => ({ x: xAt(i), y: r.avg != null ? yAt(r.avg) : null, r, i }));
+  const linePts = pts.filter((p) => p.y != null) as Array<{ x: number; y: number; r: TrendRow; i: number }>;
+  const path = linePts.map((p, k) => `${k === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
 
   return (
-    <section className="rounded-2xl border border-violet-100 bg-white p-3 space-y-3">
+    <section className="rounded-2xl border border-violet-100 bg-white p-3 space-y-2">
       <h3 className="text-sm font-bold text-[#1E1B4B] inline-flex items-center gap-1.5">
         <TrendingUp size={14} className="text-violet-600" aria-hidden="true" />
         만족도 누적 추이 ({rows.length}회차)
       </h3>
-      <ul className="space-y-2">
-        {rows.map((r, i) => {
-          const pct = r.avg != null ? Math.min(100, (r.avg / maxAvg) * 100) : 0;
-          return (
-            <li key={r.form.id} className="space-y-1">
-              <div className="flex items-center justify-between gap-2 text-[11px]">
-                <span className="font-semibold text-[#1E1B4B] truncate">
-                  <span className="text-slate-400 mr-1">{i + 1}회</span>
-                  {r.form.title}
-                  <span className="ml-1 text-slate-400">· {SURVEY_FORM_KIND_LABEL[r.form.kind] ?? r.form.kind} · {fmtDate(r.form.created_at)}</span>
-                </span>
-                <span className="shrink-0 text-slate-500">
-                  응답 <strong className="text-violet-700">{r.respondents}</strong>건
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-violet-400 to-violet-600 rounded-full" style={{ width: `${pct}%` }} aria-hidden="true" />
-                </div>
-                <span className="shrink-0 w-16 text-right text-xs font-bold text-violet-700 tabular-nums">
-                  {r.avg != null ? `${r.avg.toFixed(2)}점` : '—'}
-                </span>
-              </div>
-            </li>
-          );
-        })}
+
+      <div className="overflow-x-auto">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[420px]" role="img" aria-label="만족도 회차별 평균 추이">
+          {/* 가로 눈금 (0·중간·max) */}
+          {[0, maxAvg / 2, maxAvg].map((g) => (
+            <g key={g}>
+              <line x1={padL} y1={yAt(g)} x2={W - padR} y2={yAt(g)} stroke="#eef2f7" strokeWidth={1} />
+              <text x={padL - 5} y={yAt(g) + 3} textAnchor="end" fontSize={8} fill="#94a3b8">{g.toFixed(0)}</text>
+            </g>
+          ))}
+          {/* 라인 */}
+          {linePts.length > 1 && <path d={path} fill="none" stroke="#7C3AED" strokeWidth={2} />}
+          {/* 점 + 값 + x라벨 */}
+          {pts.map((p) => (
+            <g key={p.r.form.id}>
+              {p.y != null && <circle cx={p.x} cy={p.y} r={3.5} fill="#7C3AED" />}
+              {p.y != null && p.r.avg != null && (
+                <text x={p.x} y={p.y - 7} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#6d28d9">{p.r.avg.toFixed(1)}</text>
+              )}
+              <text x={p.x} y={H - 14} textAnchor="middle" fontSize={8} fill="#475569">{p.i + 1}회</text>
+              <text x={p.x} y={H - 4} textAnchor="middle" fontSize={7} fill="#94a3b8">{fmtDate(p.r.form.created_at)}</text>
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      {/* 회차 목록 (제목·응답수) */}
+      <ul className="space-y-1">
+        {rows.map((r, i) => (
+          <li key={r.form.id} className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="truncate text-slate-600">
+              <span className="text-slate-400 mr-1">{i + 1}회</span>{r.form.title}
+              <span className="ml-1 text-slate-400">· {SURVEY_FORM_KIND_LABEL[r.form.kind] ?? r.form.kind}</span>
+            </span>
+            <span className="shrink-0 text-slate-500">
+              {r.avg != null ? <strong className="text-violet-700">{r.avg.toFixed(2)}점</strong> : '—'} · 응답 {r.respondents}건
+            </span>
+          </li>
+        ))}
       </ul>
       <p className="text-[10px] text-slate-400">숫자 문항 응답의 평균이에요. 평점 문항은 설문 만들 때 '숫자' 타입으로 넣어 주세요.</p>
     </section>
