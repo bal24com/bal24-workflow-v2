@@ -129,9 +129,36 @@ export default function SurveyMentorMatchPanel({ programId, questions, responseS
       return;
     }
 
+    // 3) 박경수님 2026-06-08 A — 확정 날짜가 있으면 멘토링 차수(program_club_sessions) 자동 생성
+    if (clubId && confirmedDate) {
+      const dateMatch = confirmedDate.match(/\d{4}-\d{2}-\d{2}/);
+      const timeMatch = confirmedDate.match(/\d{1,2}:\d{2}/);
+      const { data: existing } = await supabase
+        .from('program_club_sessions').select('session_no').eq('club_id', clubId);
+      const nextNo = ((existing ?? []) as Array<{ session_no: number }>)
+        .reduce((m, s) => Math.max(m, s.session_no), 0) + 1;
+      const { error: sessErr } = await supabase.from('program_club_sessions').insert({
+        club_id: clubId,
+        session_no: nextNo,
+        session_label: `${nextNo}차 멘토링`,
+        confirmed_date: dateMatch?.[0] ?? null,
+        confirmed_time: timeMatch?.[0] ?? null,
+        status: 'confirmed',
+        mentor_names: [{ name: mentor, source: opt.sourceType === 'staff_pool' ? 'pool' : 'profile', id: opt.id }],
+      });
+      if (sessErr) {
+        console.error('[SurveyMentorMatchPanel] 차수 자동생성 실패:', sessErr.message);
+        toast.error('멘토·강사 등록은 됐지만 차수 자동생성에 실패했어요.');
+      }
+    }
+
     setSavingKey(null);
     setSavedKeys((prev) => new Set(prev).add(set.key));
-    toast.success(`${mentor} 멘토를 배정하고 강사진에 등록했어요.`);
+    toast.success(
+      confirmedDate
+        ? `${mentor} 멘토 배정 + 강사진 등록 + ${confirmedDate.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? ''} 차수 생성 완료`
+        : `${mentor} 멘토를 배정하고 강사진에 등록했어요.`,
+    );
   }
 
   return (
