@@ -58,18 +58,25 @@ export default function ProgramSurveyFormsSection({ programId, canEdit }: Props)
     const list = (fRes.data ?? []) as ProgramSurveyForm[];
     setForms(list);
 
-    // 응답 개수 별도 fetch (form_id 컬럼 사용)
+    // 박경수님 2026-06-08 — 응답 '건수'를 문항 행이 아니라 응답자(팀) 단위로 집계
+    //   (행 수 = 응답자수 × 문항수 라 혼동 → respondent_token+제출시각 분 단위로 distinct)
     if (list.length > 0) {
       const rRes = await supabase
         .from('survey_responses')
-        .select('form_id')
+        .select('form_id, respondent_token, created_at')
         .in('form_id', list.map((f) => f.id));
       if (!rRes.error) {
-        const map = new Map<string, number>();
+        const sets = new Map<string, Set<string>>();
         (rRes.data ?? []).forEach((row) => {
-          const fid = (row as { form_id: string | null }).form_id;
-          if (fid) map.set(fid, (map.get(fid) ?? 0) + 1);
+          const r = row as { form_id: string | null; respondent_token: string | null; created_at: string | null };
+          if (!r.form_id) return;
+          const key = `${r.respondent_token ?? 'anon'}_${(r.created_at ?? '').slice(0, 16)}`;
+          const s = sets.get(r.form_id) ?? new Set<string>();
+          s.add(key);
+          sets.set(r.form_id, s);
         });
+        const map = new Map<string, number>();
+        sets.forEach((s, fid) => map.set(fid, s.size));
         setResponseCounts(map);
       }
     } else {
