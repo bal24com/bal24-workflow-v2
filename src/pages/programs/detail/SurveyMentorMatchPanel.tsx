@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { UserCog, Save, Loader2, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useToast } from '../../../contexts/ToastContext';
+import { useCurriculumStaff } from './useCurriculumStaff';
 import type { SurveyFormQuestion } from '../../../types/database';
 
 interface ResponseSet {
@@ -46,6 +47,8 @@ function formatScheduleSummary(ds: DateScheduleAnswer): string {
 
 export default function SurveyMentorMatchPanel({ questions, responseSets }: Props) {
   const toast = useToast();
+  // 커리큘럼과 동일한 인력 목록 (전문가 풀 + 내부직원)
+  const { staffOptions } = useCurriculumStaff();
   // 각 응답 세트의 멘토 배정값
   const [mentorMap, setMentorMap] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -145,17 +148,22 @@ export default function SurveyMentorMatchPanel({ questions, responseSets }: Prop
               </div>
             )}
 
-            {/* 멘토 배정 인풋 */}
+            {/* 멘토 배정 — 인력 명단에서 선택 (커리큘럼과 동일 목록) */}
             <div className="flex gap-1.5">
               <div className="relative flex-1">
-                <UserCog size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                <input
-                  type="text"
+                <UserCog size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" aria-hidden="true" />
+                <select
                   value={mentorMap[set.key] ?? ''}
                   onChange={(e) => setMentorMap((prev) => ({ ...prev, [set.key]: e.target.value }))}
-                  placeholder="멘토 이름 입력"
-                  className="w-full h-9 pl-7 pr-3 rounded-lg border border-slate-200 text-xs outline-none focus:border-violet-400"
-                />
+                  className="w-full h-9 pl-7 pr-3 rounded-lg border border-slate-200 bg-white text-xs outline-none focus:border-violet-400"
+                >
+                  <option value="">멘토 선택</option>
+                  {staffOptions.map((s) => (
+                    <option key={`${s.sourceType}_${s.id}`} value={s.name}>
+                      {s.name}{s.organization ? ` (${s.organization})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               <button
                 type="button"
