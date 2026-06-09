@@ -137,6 +137,7 @@ function SurveyFormResponder({ form, programId, role, respondentToken, alreadySu
       program_id: programId,
       form_id: form.id,
       question_id: null,
+      question_key: q.id,
       respondent_token: respondentToken,
       respondent_role: role,
       answer_score: q.type === 'number' ? Number(answers[q.id] ?? 0) || null : null,

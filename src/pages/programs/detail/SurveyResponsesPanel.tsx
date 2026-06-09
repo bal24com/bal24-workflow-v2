@@ -19,6 +19,7 @@ interface ResponseRow {
   respondent_token: string | null;
   respondent_role: string | null;
   question_id: string | null;
+  question_key: string | null;
   answer_text: string | null;
   answer_score: number | null;
   created_at: string;
@@ -81,7 +82,7 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
     setLoading(true);
     const { data, error } = await supabase
       .from('survey_responses')
-      .select('id, respondent_token, respondent_role, question_id, answer_text, answer_score, created_at, phase')
+      .select('id, respondent_token, respondent_role, question_id, question_key, answer_text, answer_score, created_at, phase')
       .eq('form_id', form.id)
       .order('created_at', { ascending: false });
     if (error) {
@@ -97,7 +98,11 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
 
   useEffect(() => { void reload(); }, [reload]);
 
+  // 문항 인덱스 매핑 — survey_responses 는 question_id 가 null 일 수 있어서 form.questions 순서 기준
+  const questions = useMemo(() => form.questions ?? [], [form]);
+
   // 응답자 단위 그룹핑 — 같은 token+같은 created_at 분 단위 묶음 = 한 응답 세트
+  // 박경수님 2026-06-08 — answers 를 question_key 로 문항 순서에 정확히 정렬 (어긋남 방지)
   const responseSets = useMemo(() => {
     const map = new Map<string, ResponseRow[]>();
     rows.forEach((r) => {
@@ -106,17 +111,21 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
       list.push(r);
       map.set(key, list);
     });
-    return Array.from(map.entries()).map(([key, list]) => ({
-      key,
-      token: list[0].respondent_token ?? 'anon',
-      role: list[0].respondent_role ?? '미지정',
-      created_at: list[0].created_at,
-      answers: list,
-    }));
-  }, [rows]);
-
-  // 문항 인덱스 매핑 — survey_responses 는 question_id 가 null 일 수 있어서 form.questions 순서 기준
-  const questions = useMemo(() => form.questions ?? [], [form]);
+    return Array.from(map.entries()).map(([key, list]) => {
+      const hasKeys = list.some((r) => r.question_key);
+      // question_key 가 있으면 문항 순서대로 정렬, 없으면(구버전) 원래 순서 유지
+      const answers: (ResponseRow | undefined)[] = hasKeys
+        ? questions.map((q) => list.find((r) => r.question_key === q.id))
+        : list;
+      return {
+        key,
+        token: list[0].respondent_token ?? 'anon',
+        role: list[0].respondent_role ?? '미지정',
+        created_at: list[0].created_at,
+        answers,
+      };
+    });
+  }, [rows, questions]);
 
   function handleCsvDownload() {
     if (responseSets.length === 0) { toast.error('내보낼 응답이 없어요.'); return; }
@@ -213,7 +222,7 @@ export default function SurveyResponsesPanel({ form, onClose }: Props) {
   );
 }
 
-interface ResponseSet { key: string; token: string; role: string; created_at: string; answers: ResponseRow[] }
+interface ResponseSet { key: string; token: string; role: string; created_at: string; answers: (ResponseRow | undefined)[] }
 
 function SummaryRow({ questions, responseSets }: { questions: SurveyFormQuestion[]; responseSets: ResponseSet[] }) {
   // select / checkbox 문항만 집계

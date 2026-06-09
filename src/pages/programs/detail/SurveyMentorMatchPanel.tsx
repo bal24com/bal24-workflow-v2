@@ -13,7 +13,7 @@ interface ResponseSet {
   token: string;
   role: string;
   created_at: string;
-  answers: { question_id: string | null; answer_text: string | null; answer_score: number | null }[];
+  answers: ({ question_id: string | null; answer_text: string | null; answer_score: number | null } | undefined)[];
 }
 
 interface Props {
